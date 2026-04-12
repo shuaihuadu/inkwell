@@ -1,0 +1,29 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+*.DotSettings.user
+
+## IDE
+.idea/
+*.swp
+*~
+
+## Build
+publish/
+artifacts/
+
+## Secrets
+appsettings.*.json
+!appsettings.json
+secrets.json
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Checkpoints
+chk-*/

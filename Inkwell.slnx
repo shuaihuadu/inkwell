@@ -1,0 +1,9 @@
+﻿<Solution>
+    <Folder Name="/src/core/">
+        <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
+        <Project Path="src/core/Inkwell.Workflows/Inkwell.Workflows.csproj" />
+    </Folder>
+    <Folder Name="/src/app/">
+        <Project Path="src/app/console/Inkwell.ConsoleApp/Inkwell.ConsoleApp.csproj" />
+    </Folder>
+</Solution>

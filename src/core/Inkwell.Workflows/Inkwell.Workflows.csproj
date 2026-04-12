@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.Workflows</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Agents.AI" />
+        <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+        <PackageReference Include="Microsoft.Extensions.AI" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Core\Inkwell.Core.csproj" />
+    </ItemGroup>
+
+</Project>
