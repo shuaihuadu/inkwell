@@ -14,12 +14,17 @@
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+        <PackageReference Include="YamlDotNet" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\core\Inkwell.Agents\Inkwell.Agents.csproj" />
         <ProjectReference Include="..\..\..\core\Inkwell.Workflows\Inkwell.Workflows.csproj" />
         <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.InMemory\Inkwell.Persistence.InMemory.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="Agents\*.yaml" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>

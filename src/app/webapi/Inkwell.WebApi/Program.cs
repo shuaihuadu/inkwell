@@ -2,7 +2,10 @@
 using Inkwell.Agents;
 using Inkwell.Persistence.InMemory;
 using Inkwell.Workflows;
+using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.AI;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -33,8 +36,17 @@ public static class Program
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
 
+        // 加载声明式 Agent（YAML 定义）
+        IChatClient defaultClient = builder.Services
+            .Where(d => d.ServiceType == typeof(IChatClient) && !d.IsKeyedService && d.ImplementationInstance is IChatClient)
+            .Select(d => (IChatClient)d.ImplementationInstance!)
+            .FirstOrDefault()!;
+
+        string agentsDir = Path.Combine(builder.Environment.ContentRootPath, "Agents");
+        DeclarativeAgentLoader.LoadFromDirectory(agentRegistry, defaultClient, agentsDir);
+
         // 注册所有 Workflow
-        builder.Services.AddInkwellWorkflows();
+        WorkflowRegistry workflowRegistry = builder.Services.AddInkwellWorkflows();
 
         // 配置 OpenTelemetry
         builder.Services.AddOpenTelemetry()
@@ -69,6 +81,29 @@ public static class Program
         foreach (AgentRegistration registration in agentRegistry.GetAll())
         {
             app.MapAGUI(registration.AguiRoute, registration.Agent);
+        }
+
+        // ========== 将 Workflow 包装为 Agent 并映射 AG-UI 端点 ==========
+        foreach (WorkflowRegistration workflowReg in workflowRegistry.GetAll())
+        {
+            // 仅对支持对话交互的 Workflow 暴露 AG-UI 端点
+            string agentId = $"workflow-{workflowReg.Id}";
+
+            // Workflow.AsAIAgent() 将 Workflow 转换为可对话的 Agent
+            AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name);
+
+            string aguiRoute = $"/api/agui/{agentId}";
+            app.MapAGUI(aguiRoute, workflowAgent);
+
+            // 同时注册到 AgentRegistry 以便前端发现
+            agentRegistry.Register(new AgentRegistration
+            {
+                Id = agentId,
+                Name = $"[Workflow] {workflowReg.Name}",
+                Description = workflowReg.Description,
+                Agent = workflowAgent,
+                AguiRoute = aguiRoute
+            });
         }
 
         app.Run();
