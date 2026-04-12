@@ -8,7 +8,7 @@ public sealed class Article
     /// <summary>
     /// 获取或设置文章唯一标识
     /// </summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Id { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置文章主题

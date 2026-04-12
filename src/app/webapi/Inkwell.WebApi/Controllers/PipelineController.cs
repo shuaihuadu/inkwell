@@ -3,7 +3,6 @@ using Inkwell;
 using Inkwell.Workflows;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.AI;
 
 namespace Inkwell.WebApi.Controllers;
 
@@ -13,8 +12,9 @@ namespace Inkwell.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public sealed class PipelineController(
-    IChatClient chatClient,
-    IPipelineRunPersistenceProvider runProvider) : ControllerBase
+    WorkflowRegistry workflowRegistry,
+    IPipelineRunPersistenceProvider runProvider,
+    ILogger<PipelineController> logger) : ControllerBase
 {
     /// <summary>
     /// 获取最近的运行记录
@@ -49,13 +49,20 @@ public sealed class PipelineController(
     /// 启动内容生产流水线（SSE 流式返回事件，支持 Checkpoint）
     /// </summary>
     /// <param name="request">运行请求</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>SSE 事件流</returns>
     [HttpPost("run")]
     [Produces("text/event-stream")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task RunAsync([FromBody] PipelineRunRequest request)
+    public async Task RunAsync([FromBody] PipelineRunRequest request, CancellationToken cancellationToken)
     {
-        Workflow workflow = ContentPipelineBuilder.Build(chatClient, maxRevisions: request.MaxRevisions);
+        // [H2 修复] 从 WorkflowRegistry 获取，不再每次重建
+        WorkflowRegistration? registration = workflowRegistry.GetById("content-pipeline");
+        if (registration is null)
+        {
+            this.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return;
+        }
 
         // 创建运行记录
         PipelineRunRecord runRecord = new()
@@ -65,81 +72,127 @@ public sealed class PipelineController(
             Status = "Running",
             StartedAt = DateTimeOffset.UtcNow
         };
-        await runProvider.AddAsync(runRecord);
+        await runProvider.AddAsync(runRecord, cancellationToken);
+
+        logger.LogInformation("[Pipeline] 启动流水线 RunId={RunId}, Topic={Topic}", runRecord.Id, request.Topic);
 
         // 设置 SSE 响应头
         this.Response.ContentType = "text/event-stream";
         this.Response.Headers.CacheControl = "no-cache";
         this.Response.Headers.Connection = "keep-alive";
 
-        StreamWriter writer = new(this.Response.Body);
+        // [C3 修复] 使用 using 确保 StreamWriter 被释放
+        await using StreamWriter writer = new(this.Response.Body, leaveOpen: true);
 
-        // 使用 CheckpointManager 支持检查点（需求 3.9）
-        CheckpointManager checkpointManager = CheckpointManager.Default;
-
-        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
-            workflow, request.Topic, checkpointManager);
-
-        await foreach (WorkflowEvent evt in run.WatchStreamAsync())
+        try
         {
-            string eventData = evt switch
-            {
-                WorkflowOutputEvent output => JsonSerializer.Serialize(new
-                {
-                    type = "output",
-                    runId = runRecord.Id,
-                    data = output.Data?.ToString(),
-                    executorId = output.ExecutorId,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                }),
-                ExecutorCompletedEvent completed => JsonSerializer.Serialize(new
-                {
-                    type = "executor_complete",
-                    runId = runRecord.Id,
-                    executorId = completed.ExecutorId,
-                    data = completed.Data?.ToString(),
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                }),
-                SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
-                {
-                    type = "checkpoint",
-                    runId = runRecord.Id,
-                    hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                }),
-                RequestInfoEvent requestInfo => JsonSerializer.Serialize(new
-                {
-                    type = "human_review_request",
-                    runId = runRecord.Id,
-                    requestId = requestInfo.Request.RequestId,
-                    data = requestInfo.Request.Data?.ToString(),
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                }),
-                _ => string.Empty
-            };
+            CheckpointManager checkpointManager = CheckpointManager.Default;
 
-            if (!string.IsNullOrEmpty(eventData))
+            // [H3 修复] 传入 CancellationToken
+            await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
+                registration.Workflow, request.Topic, checkpointManager);
+
+            await foreach (WorkflowEvent evt in run.WatchStreamAsync().WithCancellation(cancellationToken))
             {
-                await writer.WriteLineAsync($"data: {eventData}");
+                string eventData = evt switch
+                {
+                    WorkflowOutputEvent output => JsonSerializer.Serialize(new
+                    {
+                        type = "output",
+                        runId = runRecord.Id,
+                        data = output.Data?.ToString(),
+                        executorId = output.ExecutorId,
+                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    }),
+                    ExecutorCompletedEvent completed => JsonSerializer.Serialize(new
+                    {
+                        type = "executor_complete",
+                        runId = runRecord.Id,
+                        executorId = completed.ExecutorId,
+                        data = completed.Data?.ToString(),
+                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    }),
+                    SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
+                    {
+                        type = "checkpoint",
+                        runId = runRecord.Id,
+                        hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null,
+                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    }),
+                    RequestInfoEvent requestInfo => JsonSerializer.Serialize(new
+                    {
+                        type = "human_review_request",
+                        runId = runRecord.Id,
+                        requestId = requestInfo.Request.RequestId,
+                        data = requestInfo.Request.Data?.ToString(),
+                        timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    }),
+                    _ => string.Empty
+                };
+
+                if (!string.IsNullOrEmpty(eventData))
+                {
+                    await writer.WriteLineAsync($"data: {eventData}");
+                    await writer.WriteLineAsync();
+                    await writer.FlushAsync();
+                }
+            }
+
+            // 更新运行记录状态
+            runRecord.Status = "Completed";
+            runRecord.CompletedAt = DateTimeOffset.UtcNow;
+            await runProvider.UpdateAsync(runRecord, cancellationToken);
+
+            logger.LogInformation("[Pipeline] 流水线完成 RunId={RunId}", runRecord.Id);
+
+            await writer.WriteLineAsync($"data: {{\"type\":\"done\",\"runId\":\"{runRecord.Id}\"}}");
+            await writer.WriteLineAsync();
+            await writer.FlushAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // [C4 修复] 客户端断开连接
+            runRecord.Status = "Cancelled";
+            runRecord.CompletedAt = DateTimeOffset.UtcNow;
+            await runProvider.UpdateAsync(runRecord);
+
+            logger.LogWarning("[Pipeline] 流水线被取消 RunId={RunId}", runRecord.Id);
+        }
+        catch (Exception ex)
+        {
+            // [C4 修复] Workflow 执行异常
+            runRecord.Status = "Failed";
+            runRecord.CompletedAt = DateTimeOffset.UtcNow;
+            await runProvider.UpdateAsync(runRecord);
+
+            logger.LogError(ex, "[Pipeline] 流水线执行失败 RunId={RunId}", runRecord.Id);
+
+            try
+            {
+                await writer.WriteLineAsync($"data: {{\"type\":\"error\",\"runId\":\"{runRecord.Id}\",\"message\":\"{ex.Message.Replace("\"", "\\\"").Replace("\n", " ")}\"}}");
                 await writer.WriteLineAsync();
                 await writer.FlushAsync();
             }
+            catch
+            {
+                // 客户端已断开，忽略写入错误
+            }
         }
-
-        // 更新运行记录状态
-        runRecord.Status = "Completed";
-        runRecord.CompletedAt = DateTimeOffset.UtcNow;
-        await runProvider.UpdateAsync(runRecord);
-
-        await writer.WriteLineAsync($"data: {{\"type\":\"done\",\"runId\":\"{runRecord.Id}\"}}");
-        await writer.WriteLineAsync();
-        await writer.FlushAsync();
     }
 }
 
 /// <summary>
 /// 流水线运行请求
 /// </summary>
-/// <param name="Topic">文章主题</param>
-/// <param name="MaxRevisions">最大修订次数</param>
-public sealed record PipelineRunRequest(string Topic, int MaxRevisions = 3);
+public sealed class PipelineRunRequest
+{
+    /// <summary>
+    /// 获取或设置文章主题
+    /// </summary>
+    public string Topic { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置最大修订次数
+    /// </summary>
+    public int MaxRevisions { get; set; } = 3;
+}

@@ -115,6 +115,11 @@ internal sealed class TopicDiscussionManager(AIAgent[] agents) : GroupChatManage
         IReadOnlyList<ChatMessage> history,
         CancellationToken cancellationToken = default)
     {
+        if (this._agents.Length == 0)
+        {
+            throw new InvalidOperationException("TopicDiscussionManager requires at least one agent.");
+        }
+
         // 按轮次循环分配：Market → Editor → SEO → Market → ...
         int agentIndex = this.IterationCount % this._agents.Length;
         return new ValueTask<AIAgent>(this._agents[agentIndex]);

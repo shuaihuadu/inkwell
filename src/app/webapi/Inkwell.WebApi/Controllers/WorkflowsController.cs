@@ -10,7 +10,9 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public sealed class WorkflowsController(WorkflowRegistry workflowRegistry) : ControllerBase
+public sealed class WorkflowsController(
+    WorkflowRegistry workflowRegistry,
+    ILogger<WorkflowsController> logger) : ControllerBase
 {
     /// <summary>
     /// 获取所有 Workflow 列表
@@ -88,12 +90,13 @@ public sealed class WorkflowsController(WorkflowRegistry workflowRegistry) : Con
     /// </summary>
     /// <param name="id">Workflow ID</param>
     /// <param name="request">运行请求</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>SSE 事件流</returns>
     [HttpPost("{id}/run")]
     [Produces("text/event-stream")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task RunWorkflowAsync(string id, [FromBody] WorkflowRunRequest request)
+    public async Task RunWorkflowAsync(string id, [FromBody] WorkflowRunRequest request, CancellationToken cancellationToken)
     {
         WorkflowRegistration? registration = workflowRegistry.GetById(id);
 
@@ -103,57 +106,85 @@ public sealed class WorkflowsController(WorkflowRegistry workflowRegistry) : Con
             return;
         }
 
+        logger.LogInformation("[Workflow] 启动 Workflow Id={WorkflowId}, Input={Input}", id, request.Input[..Math.Min(request.Input.Length, 100)]);
+
         // 设置 SSE 响应头
         this.Response.ContentType = "text/event-stream";
         this.Response.Headers.CacheControl = "no-cache";
         this.Response.Headers.Connection = "keep-alive";
 
-        StreamWriter writer = new(this.Response.Body);
+        // [C3 修复] using 确保 StreamWriter 释放
+        await using StreamWriter writer = new(this.Response.Body, leaveOpen: true);
 
-        // 使用 CheckpointManager（需求 3.9）
-        CheckpointManager checkpointManager = CheckpointManager.Default;
-
-        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
-            registration.Workflow, request.Input, checkpointManager);
-
-        await foreach (WorkflowEvent evt in run.WatchStreamAsync())
+        try
         {
-            string eventData = evt switch
-            {
-                WorkflowOutputEvent output => JsonSerializer.Serialize(new
-                {
-                    type = "output",
-                    workflowId = id,
-                    data = output.Data?.ToString(),
-                    executorId = output.ExecutorId
-                }),
-                ExecutorCompletedEvent completed => JsonSerializer.Serialize(new
-                {
-                    type = "executor_complete",
-                    workflowId = id,
-                    executorId = completed.ExecutorId,
-                    data = completed.Data?.ToString()
-                }),
-                SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
-                {
-                    type = "checkpoint",
-                    workflowId = id,
-                    hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null
-                }),
-                _ => string.Empty
-            };
+            CheckpointManager checkpointManager = CheckpointManager.Default;
 
-            if (!string.IsNullOrEmpty(eventData))
+            await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
+                registration.Workflow, request.Input, checkpointManager);
+
+            // [H3 修复] 传入 CancellationToken
+            await foreach (WorkflowEvent evt in run.WatchStreamAsync().WithCancellation(cancellationToken))
             {
-                await writer.WriteLineAsync($"data: {eventData}");
+                string eventData = evt switch
+                {
+                    WorkflowOutputEvent output => JsonSerializer.Serialize(new
+                    {
+                        type = "output",
+                        workflowId = id,
+                        data = output.Data?.ToString(),
+                        executorId = output.ExecutorId
+                    }),
+                    ExecutorCompletedEvent completed => JsonSerializer.Serialize(new
+                    {
+                        type = "executor_complete",
+                        workflowId = id,
+                        executorId = completed.ExecutorId,
+                        data = completed.Data?.ToString()
+                    }),
+                    SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
+                    {
+                        type = "checkpoint",
+                        workflowId = id,
+                        hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null
+                    }),
+                    _ => string.Empty
+                };
+
+                if (!string.IsNullOrEmpty(eventData))
+                {
+                    await writer.WriteLineAsync($"data: {eventData}");
+                    await writer.WriteLineAsync();
+                    await writer.FlushAsync();
+                }
+            }
+
+            logger.LogInformation("[Workflow] 完成 Id={WorkflowId}", id);
+
+            await writer.WriteLineAsync($"data: {{\"type\":\"done\",\"workflowId\":\"{id}\"}}");
+            await writer.WriteLineAsync();
+            await writer.FlushAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("[Workflow] 被取消 Id={WorkflowId}", id);
+        }
+        catch (Exception ex)
+        {
+            // [C4 修复] 异常处理 + 错误事件推送
+            logger.LogError(ex, "[Workflow] 执行失败 Id={WorkflowId}", id);
+
+            try
+            {
+                await writer.WriteLineAsync($"data: {{\"type\":\"error\",\"workflowId\":\"{id}\",\"message\":\"{ex.Message.Replace("\"", "\\\"").Replace("\n", " ")}\"}}");
                 await writer.WriteLineAsync();
                 await writer.FlushAsync();
             }
+            catch
+            {
+                // 客户端已断开
+            }
         }
-
-        await writer.WriteLineAsync($"data: {{\"type\":\"done\",\"workflowId\":\"{id}\"}}");
-        await writer.WriteLineAsync();
-        await writer.FlushAsync();
     }
 }
 

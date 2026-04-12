@@ -1,6 +1,7 @@
 using Inkwell.Agents;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -18,11 +19,13 @@ public static class DeclarativeAgentLoader
     /// <param name="registry">Agent 注册表</param>
     /// <param name="chatClient">LLM 客户端</param>
     /// <param name="agentsDirectory">YAML 文件目录路径</param>
+    /// <param name="logger">日志记录器</param>
     /// <returns>加载的 Agent 数量</returns>
-    public static int LoadFromDirectory(AgentRegistry registry, IChatClient chatClient, string agentsDirectory)
+    public static int LoadFromDirectory(AgentRegistry registry, IChatClient chatClient, string agentsDirectory, ILogger? logger = null)
     {
         if (!Directory.Exists(agentsDirectory))
         {
+            logger?.LogWarning("[DeclarativeAgent] Directory not found: {Directory}", agentsDirectory);
             return 0;
         }
 
@@ -33,28 +36,38 @@ public static class DeclarativeAgentLoader
         int count = 0;
         foreach (string filePath in Directory.EnumerateFiles(agentsDirectory, "*.yaml"))
         {
-            string yaml = File.ReadAllText(filePath);
-            AgentDefinition definition = deserializer.Deserialize<AgentDefinition>(yaml);
-
-            if (string.IsNullOrWhiteSpace(definition.Name) || string.IsNullOrWhiteSpace(definition.Instructions))
+            try
             {
-                continue;
+                string yaml = File.ReadAllText(filePath);
+                AgentDefinition? definition = deserializer.Deserialize<AgentDefinition>(yaml);
+
+                // [C5 修复] null check
+                if (definition is null || string.IsNullOrWhiteSpace(definition.Name) || string.IsNullOrWhiteSpace(definition.Instructions))
+                {
+                    logger?.LogWarning("[DeclarativeAgent] Skipped invalid YAML: {File}", Path.GetFileName(filePath));
+                    continue;
+                }
+
+                AIAgent agent = chatClient.AsAIAgent(
+                    name: definition.Name,
+                    instructions: definition.Instructions);
+
+                registry.Register(new AgentRegistration
+                {
+                    Id = definition.Name,
+                    Name = definition.Description ?? definition.Name,
+                    Description = $"[声明式] {definition.Description ?? definition.Name}",
+                    Agent = agent,
+                    AguiRoute = $"/api/agui/{definition.Name}"
+                });
+
+                logger?.LogInformation("[DeclarativeAgent] Registered: {AgentId}", definition.Name);
+                count++;
             }
-
-            AIAgent agent = chatClient.AsAIAgent(
-                name: definition.Name,
-                instructions: definition.Instructions);
-
-            registry.Register(new AgentRegistration
+            catch (Exception ex)
             {
-                Id = definition.Name,
-                Name = definition.Description ?? definition.Name,
-                Description = $"[声明式] {definition.Description ?? definition.Name}",
-                Agent = agent,
-                AguiRoute = $"/api/agui/{definition.Name}"
-            });
-
-            count++;
+                logger?.LogError(ex, "[DeclarativeAgent] Failed to load: {File}", Path.GetFileName(filePath));
+            }
         }
 
         return count;

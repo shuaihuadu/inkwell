@@ -12,16 +12,17 @@ namespace Inkwell.Agents;
 public static class InkwellAgents
 {
     /// <summary>
-    /// 对话历史保留消息数（ChatReducer 每次保留多少条消息）
+    /// 默认对话历史保留消息数
     /// </summary>
-    private const int ChatHistoryRetainCount = 20;
+    private const int DefaultChatHistoryRetainCount = 20;
 
     /// <summary>
-    /// 创建内容写手 Agent（带搜索工具、ChatReducer、护栏中间件）
+    /// 创建内容写手 Agent（带搜索工具、ChatReducer、护栏 + 审计中间件）
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
+    /// <param name="chatHistoryRetainCount">对话历史保留数量，默认 20</param>
     /// <returns>Agent 注册信息</returns>
-    public static AgentRegistration CreateWriter(IChatClient chatClient)
+    public static AgentRegistration CreateWriter(IChatClient chatClient, int chatHistoryRetainCount = DefaultChatHistoryRetainCount)
     {
         AIAgent baseAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
@@ -43,16 +44,16 @@ public static class InkwellAgents
                     AIFunctionFactory.Create(SensitiveWordSkill.Scan)
                 ]
             },
-            // 长对话自动裁剪：保留最近 N 条消息
+            // [M3 修复] 对话历史保留数从参数读取
 #pragma warning disable MEAI001 // MessageCountingChatReducer is experimental
             ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
             {
-                ChatReducer = new MessageCountingChatReducer(ChatHistoryRetainCount)
+                ChatReducer = new MessageCountingChatReducer(chatHistoryRetainCount)
             })
 #pragma warning restore MEAI001
         });
 
-        // 应用中间件管线：内容安全护栏
+        // [M4 修复] 应用中间件管线：护栏 + 函数调用审计
         AIAgent agent = baseAgent
             .AsBuilder()
             .Use(ContentGuardrailMiddleware.InvokeAsync, null)

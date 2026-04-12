@@ -33,7 +33,7 @@ public sealed class DashboardController(
             agentCount = agentRegistry.Count,
             workflowCount = workflowRegistry.Count,
             totalRuns = runs.Count,
-            publishedArticles = articles.Count(a => a.Status == "Published"),
+            publishedArticles = articles.Count(a => a.Status == nameof(ArticleStatus.Published)),
             totalArticles = articles.Count,
             completedRuns = runs.Count(r => r.Status == "Completed"),
             approvalRate = runs.Count > 0

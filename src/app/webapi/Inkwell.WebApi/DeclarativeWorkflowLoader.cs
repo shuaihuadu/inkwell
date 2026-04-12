@@ -2,6 +2,7 @@ using Inkwell.Workflows;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -19,11 +20,13 @@ public static class DeclarativeWorkflowLoader
     /// <param name="registry">Workflow 注册表</param>
     /// <param name="chatClient">LLM 客户端</param>
     /// <param name="workflowsDirectory">YAML 文件目录路径</param>
+    /// <param name="logger">日志记录器</param>
     /// <returns>加载的 Workflow 数量</returns>
-    public static int LoadFromDirectory(WorkflowRegistry registry, IChatClient chatClient, string workflowsDirectory)
+    public static int LoadFromDirectory(WorkflowRegistry registry, IChatClient chatClient, string workflowsDirectory, ILogger? logger = null)
     {
         if (!Directory.Exists(workflowsDirectory))
         {
+            logger?.LogWarning("[DeclarativeWorkflow] Directory not found: {Directory}", workflowsDirectory);
             return 0;
         }
 
@@ -34,30 +37,41 @@ public static class DeclarativeWorkflowLoader
         int count = 0;
         foreach (string filePath in Directory.EnumerateFiles(workflowsDirectory, "*.yaml"))
         {
-            string yaml = File.ReadAllText(filePath);
-            WorkflowDefinition definition = deserializer.Deserialize<WorkflowDefinition>(yaml);
-
-            if (string.IsNullOrWhiteSpace(definition.Name) || definition.Executors.Count == 0)
+            try
             {
-                continue;
+                string yaml = File.ReadAllText(filePath);
+                WorkflowDefinition? definition = deserializer.Deserialize<WorkflowDefinition>(yaml);
+
+                // [C5 修复] null check
+                if (definition is null || string.IsNullOrWhiteSpace(definition.Name) || definition.Executors.Count == 0)
+                {
+                    logger?.LogWarning("[DeclarativeWorkflow] Skipped invalid YAML: {File}", Path.GetFileName(filePath));
+                    continue;
+                }
+
+                Workflow? workflow = BuildWorkflowFromDefinition(definition, chatClient);
+                if (workflow is null)
+                {
+                    logger?.LogWarning("[DeclarativeWorkflow] Failed to build workflow: {Name}", definition.Name);
+                    continue;
+                }
+
+                string workflowId = $"declarative-{definition.Name.ToLowerInvariant()}";
+                registry.Register(new WorkflowRegistration
+                {
+                    Id = workflowId,
+                    Name = $"[声明式] {definition.Name}",
+                    Description = definition.Description ?? definition.Name,
+                    Workflow = workflow
+                });
+
+                logger?.LogInformation("[DeclarativeWorkflow] Registered: {WorkflowId}", workflowId);
+                count++;
             }
-
-            Workflow? workflow = BuildWorkflowFromDefinition(definition, chatClient);
-            if (workflow is null)
+            catch (Exception ex)
             {
-                continue;
+                logger?.LogError(ex, "[DeclarativeWorkflow] Failed to load: {File}", Path.GetFileName(filePath));
             }
-
-            string workflowId = $"declarative-{definition.Name.ToLowerInvariant()}";
-            registry.Register(new WorkflowRegistration
-            {
-                Id = workflowId,
-                Name = $"[声明式] {definition.Name}",
-                Description = definition.Description ?? definition.Name,
-                Workflow = workflow
-            });
-
-            count++;
         }
 
         return count;

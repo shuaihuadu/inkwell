@@ -33,17 +33,34 @@ public static class Program
             .UseInMemoryDatabase()
             .UseAzureOpenAI(builder.Configuration);
 
+        // [C1 修复] 从 Keyed DI 中安全获取 Primary IChatClient
+        IChatClient? primaryClient = null;
+        foreach (ServiceDescriptor descriptor in builder.Services)
+        {
+            if (descriptor.ServiceType == typeof(IChatClient)
+                && descriptor.IsKeyedService
+                && descriptor.ServiceKey is string key
+                && key == ModelServiceKeys.Primary
+                && descriptor.KeyedImplementationInstance is IChatClient client)
+            {
+                primaryClient = client;
+                break;
+            }
+        }
+
+        if (primaryClient is null)
+        {
+            throw new InvalidOperationException("Primary IChatClient not registered. Ensure UseAzureOpenAI() is called before this point.");
+        }
+
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
 
-        // 加载声明式 Agent（YAML 定义）
-        IChatClient defaultClient = builder.Services
-            .Where(d => d.ServiceType == typeof(IChatClient) && !d.IsKeyedService && d.ImplementationInstance is IChatClient)
-            .Select(d => (IChatClient)d.ImplementationInstance!)
-            .FirstOrDefault()!;
-
+        // 加载声明式 Agent（YAML 定义）[M8 修复: 增加日志]
+        ILogger<AgentRegistry> agentLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger<AgentRegistry>();
         string agentsDir = Path.Combine(builder.Environment.ContentRootPath, "Agents");
-        DeclarativeAgentLoader.LoadFromDirectory(agentRegistry, defaultClient, agentsDir);
+        int loadedAgents = DeclarativeAgentLoader.LoadFromDirectory(agentRegistry, primaryClient, agentsDir, agentLogger);
+        agentLogger.LogInformation("Loaded {Count} declarative agents from {Directory}", loadedAgents, agentsDir);
 
         // 注册 CMS MCP 工具服务
         builder.Services.AddSingleton<CmsMcpTools>();
@@ -56,7 +73,8 @@ public static class Program
 
         // 加载声明式 Workflow（YAML 定义）
         string workflowsDir = Path.Combine(builder.Environment.ContentRootPath, "Workflows");
-        DeclarativeWorkflowLoader.LoadFromDirectory(workflowRegistry, defaultClient, workflowsDir);
+        int loadedWorkflows = DeclarativeWorkflowLoader.LoadFromDirectory(workflowRegistry, primaryClient, workflowsDir, agentLogger);
+        agentLogger.LogInformation("Loaded {Count} declarative workflows from {Directory}", loadedWorkflows, workflowsDir);
 
         // 配置 OpenTelemetry
         builder.Services.AddOpenTelemetry()
@@ -71,12 +89,15 @@ public static class Program
                     .AddOtlpExporter();
             });
 
-        // 配置 CORS
+        // [H7 修复] CORS origin 从配置读取
+        string[] corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+            ?? ["http://localhost:5188", "http://localhost:3000"];
+
         builder.Services.AddCors(options =>
         {
             options.AddDefaultPolicy(policy =>
             {
-                policy.WithOrigins("http://localhost:5188", "http://localhost:3000")
+                policy.WithOrigins(corsOrigins)
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             });
@@ -84,12 +105,15 @@ public static class Program
 
         WebApplication app = builder.Build();
 
-        app.UseCors();
+        // [L1 修复] 全局异常处理
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/error");
+        }
 
-        // 认证/授权中间件（Auth.Enabled=false 时不会拦截请求）
+        app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
-
         app.MapControllers();
 
         // ========== 为每个 Agent 映射 AG-UI 端点 ==========
@@ -101,16 +125,12 @@ public static class Program
         // ========== 将 Workflow 包装为 Agent 并映射 AG-UI 端点 ==========
         foreach (WorkflowRegistration workflowReg in workflowRegistry.GetAll())
         {
-            // 仅对支持对话交互的 Workflow 暴露 AG-UI 端点
             string agentId = $"workflow-{workflowReg.Id}";
-
-            // Workflow.AsAIAgent() 将 Workflow 转换为可对话的 Agent
             AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name);
 
             string aguiRoute = $"/api/agui/{agentId}";
             app.MapAGUI(aguiRoute, workflowAgent);
 
-            // 同时注册到 AgentRegistry 以便前端发现
             agentRegistry.Register(new AgentRegistration
             {
                 Id = agentId,
