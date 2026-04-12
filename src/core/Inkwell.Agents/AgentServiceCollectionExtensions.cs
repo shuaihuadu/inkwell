@@ -81,6 +81,9 @@ public static class AgentServiceCollectionExtensions
 
         services.AddSingleton(registry);
 
+        // 注册会话持久化服务
+        services.AddSingleton<ISessionPersistenceService, InMemorySessionPersistenceService>();
+
         return registry;
     }
 

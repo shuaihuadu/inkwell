@@ -1,3 +1,4 @@
+using Inkwell.Agents.Middleware;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -10,20 +11,44 @@ namespace Inkwell.Agents;
 public static class InkwellAgents
 {
     /// <summary>
-    /// 创建内容写手 Agent（带搜索工具）
+    /// 对话历史保留消息数（ChatReducer 每次保留多少条消息）
+    /// </summary>
+    private const int ChatHistoryRetainCount = 20;
+
+    /// <summary>
+    /// 创建内容写手 Agent（带搜索工具、ChatReducer、护栏中间件）
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
     /// <returns>Agent 注册信息</returns>
     public static AgentRegistration CreateWriter(IChatClient chatClient)
     {
-        AIAgent agent = chatClient.AsAIAgent(
-            instructions: """
-                你是一名专业内容写手。你擅长撰写引人入胜、结构清晰的文章。
-                你的文章信息丰富、对目标受众有吸引力。注重清晰度、叙事性和可操作的见解。
-                你可以使用搜索工具获取最新资讯来丰富文章内容。
-                请用中文回复。
-                """,
-            tools: [AIFunctionFactory.Create(InkwellTools.SearchLatestNews)]);
+        AIAgent baseAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = "Writer",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    你是一名专业内容写手。你擅长撰写引人入胜、结构清晰的文章。
+                    你的文章信息丰富、对目标受众有吸引力。注重清晰度、叙事性和可操作的见解。
+                    你可以使用搜索工具获取最新资讯来丰富文章内容。
+                    请用中文回复。
+                    """,
+                Tools = [AIFunctionFactory.Create(InkwellTools.SearchLatestNews)]
+            },
+            // 长对话自动裁剪：保留最近 N 条消息
+#pragma warning disable MEAI001 // MessageCountingChatReducer is experimental
+            ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
+            {
+                ChatReducer = new MessageCountingChatReducer(ChatHistoryRetainCount)
+            })
+#pragma warning restore MEAI001
+        });
+
+        // 应用中间件管线：内容安全护栏
+        AIAgent agent = baseAgent
+            .AsBuilder()
+            .Use(ContentGuardrailMiddleware.InvokeAsync, null)
+            .Build();
 
         return new AgentRegistration
         {
@@ -36,17 +61,23 @@ public static class InkwellAgents
     }
 
     /// <summary>
-    /// 创建内容审核 Agent
+    /// 创建内容审核 Agent（带护栏中间件）
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
     /// <returns>Agent 注册信息</returns>
     public static AgentRegistration CreateCritic(IChatClient chatClient)
     {
-        AIAgent agent = chatClient.AsAIAgent(
+        AIAgent baseAgent = chatClient.AsAIAgent(
+            name: "Critic",
             instructions: """
                 你是一名严格的内容编辑。从质量、准确性、吸引力和完整性四个维度审核文章。
                 提供建设性的反馈，指出问题并给出改进建议。请用中文回复。
                 """);
+
+        AIAgent agent = baseAgent
+            .AsBuilder()
+            .Use(ContentGuardrailMiddleware.InvokeAsync, null)
+            .Build();
 
         return new AgentRegistration
         {
