@@ -1,10 +1,10 @@
-﻿using Azure.AI.OpenAI;
-using Azure.Identity;
-using Inkwell;
+﻿using Inkwell;
 using Inkwell.Agents;
 using Inkwell.Persistence.InMemory;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.AI;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace Inkwell.WebApi;
 
@@ -13,6 +13,11 @@ namespace Inkwell.WebApi;
 /// </summary>
 public static class Program
 {
+    /// <summary>
+    /// OpenTelemetry 服务名称
+    /// </summary>
+    private const string ServiceName = "Inkwell.WebApi";
+
     public static void Main(string[] args)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -20,20 +25,26 @@ public static class Program
         // 注册 Controller
         builder.Services.AddControllers();
 
-        // 注册 Inkwell 核心服务 + 持久化
-        builder.Services.AddInkwellCore().UseInMemoryDatabase();
+        // 注册 Inkwell 核心服务 + 持久化 + Azure OpenAI 多模型
+        builder.Services.AddInkwellCore()
+            .UseInMemoryDatabase()
+            .UseAzureOpenAI(builder.Configuration);
 
-        // 创建 LLM 客户端
-        string endpoint = builder.Configuration["AZURE_OPENAI_ENDPOINT"]
-            ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT is not configured.");
-        string deploymentName = builder.Configuration["AZURE_OPENAI_DEPLOYMENT_NAME"] ?? "gpt-4o-mini";
+        // 注册所有 Agent（使用 Keyed IChatClient）
+        AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
 
-        IChatClient chatClient = new AzureOpenAIClient(new Uri(endpoint), new AzureCliCredential())
-            .GetChatClient(deploymentName)
-            .AsIChatClient();
-
-        // 注册所有 Agent
-        AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(chatClient);
+        // 配置 OpenTelemetry
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService(ServiceName))
+            .WithTracing(tracing =>
+            {
+                tracing
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddSource("Microsoft.Agents.AI.Workflows*")
+                    .AddSource(ServiceName)
+                    .AddOtlpExporter();
+            });
 
         // 配置 CORS
         builder.Services.AddCors(options =>
