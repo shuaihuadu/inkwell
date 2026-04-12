@@ -10,7 +10,7 @@
 前端代码位于：src\app\webapp\src
 相关的参考资料如下：
 Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
-智能体对话界面：https://ant-design-x.antgroup.com/index-cn
+智能体对话界面：https://ant-design-x.antgroup.com/components/introduce-cn
 
 在为本仓库贡献代码时，请遵循以下指南：
 
