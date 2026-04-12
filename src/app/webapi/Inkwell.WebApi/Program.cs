@@ -45,8 +45,15 @@ public static class Program
         string agentsDir = Path.Combine(builder.Environment.ContentRootPath, "Agents");
         DeclarativeAgentLoader.LoadFromDirectory(agentRegistry, defaultClient, agentsDir);
 
+        // 注册 CMS MCP 工具服务
+        builder.Services.AddSingleton<CmsMcpTools>();
+
         // 注册所有 Workflow
         WorkflowRegistry workflowRegistry = builder.Services.AddInkwellWorkflows();
+
+        // 加载声明式 Workflow（YAML 定义）
+        string workflowsDir = Path.Combine(builder.Environment.ContentRootPath, "Workflows");
+        DeclarativeWorkflowLoader.LoadFromDirectory(workflowRegistry, defaultClient, workflowsDir);
 
         // 配置 OpenTelemetry
         builder.Services.AddOpenTelemetry()

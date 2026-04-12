@@ -25,6 +25,7 @@
 
     <ItemGroup>
         <Content Include="Agents\*.yaml" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="Workflows\*.yaml" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>
