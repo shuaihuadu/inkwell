@@ -166,7 +166,7 @@ export default function KnowledgePage() {
         columns={columns}
         rowKey="id"
         pagination={false}
-        locale={{ emptyText: "知识库为空，点击"上传文档"添加内容" }}
+        locale={{ emptyText: "知识库为空，点击「上传文档」添加内容" }}
       />
 
       {/* 上传弹窗 */}

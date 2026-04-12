@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Typography, Button, Space, Flex, Select } from "antd";
 import { ClearOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Bubble, Sender } from "@ant-design/x";
+import { XMarkdown } from "@ant-design/x-markdown";
 import { useAGUIAgent } from "../../hooks/use-agui-agent";
 import type { ChatMessage } from "../../hooks/use-agui-agent";
 import { API_BASE } from "../../services/api";
@@ -20,6 +21,7 @@ function toBubbleItems(messages: ChatMessage[]) {
     role: msg.role as string,
     content: msg.content || (msg.status === "streaming" ? "思考中..." : ""),
     loading: msg.status === "streaming",
+    streaming: msg.status === "streaming",
   }));
 }
 
@@ -116,12 +118,20 @@ export default function PipelineRunPage() {
             roles={{
               user: {
                 placement: "end",
-                avatar: { icon: roles.user.avatar, style: { background: "#1677ff" } },
+                avatar: {
+                  icon: roles.user.avatar,
+                  style: { background: "#1677ff" },
+                },
               },
               assistant: {
                 placement: "start",
-                avatar: { icon: roles.assistant.avatar, style: { background: "#52c41a" } },
-                typing: { step: 2, interval: 30 },
+                avatar: {
+                  icon: roles.assistant.avatar,
+                  style: { background: "#52c41a" },
+                },
+                contentRender: (content: string) => (
+                  <XMarkdown content={typeof content === "string" ? content : ""} />
+                ),
               },
             }}
           />

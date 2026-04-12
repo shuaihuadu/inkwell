@@ -16,7 +16,7 @@ import {
   PlayCircleOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import ReactMarkdown from "react-markdown";
+import { XMarkdown } from "@ant-design/x-markdown";
 import { API_BASE } from "../../services/api";
 
 interface WorkflowInfo {
@@ -195,18 +195,11 @@ export default function WorkflowPage() {
         {topoLoading ? (
           <Spin />
         ) : (
-          <pre
-            style={{
-              background: "#f5f5f5",
-              padding: 16,
-              borderRadius: 8,
-              overflow: "auto",
-              maxHeight: 500,
-              fontSize: 13,
-            }}
-          >
-            {topoData?.topology ?? "无拓扑数据"}
-          </pre>
+          <div style={{ maxHeight: 500, overflow: "auto" }}>
+            <XMarkdown
+              content={`\`\`\`mermaid\n${topoData?.topology ?? "graph LR\n  empty[无拓扑数据]"}\n\`\`\``}
+            />
+          </div>
         )}
       </Modal>
 
@@ -282,7 +275,7 @@ export default function WorkflowPage() {
               {evt.executorId && <Tag color="purple">{evt.executorId}</Tag>}
               {evt.data && (
                 <div style={{ marginTop: 4 }}>
-                  <ReactMarkdown>{evt.data}</ReactMarkdown>
+                  <XMarkdown content={evt.data} />
                 </div>
               )}
               {evt.message && (
