@@ -107,6 +107,9 @@ public static class AgentServiceCollectionExtensions
         // 注册会话持久化服务
         services.AddSingleton<ISessionPersistenceService, InMemorySessionPersistenceService>();
 
+        // 注册工具循环检查点服务（需求 2.16）
+        services.AddSingleton<ToolLoopCheckpointService>();
+
         return registry;
     }
 

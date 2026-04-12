@@ -40,6 +40,7 @@
         <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
         <!-- A2A -->
         <PackageVersion Include="A2A" Version="0.3.4-preview" />
+        <PackageVersion Include="A2A.AspNetCore" Version="0.3.4-preview" />
         <!-- Azure Functions -->
         <PackageVersion Include="Microsoft.Agents.AI.Hosting.AzureFunctions" Version="1.1.0-preview.260410.1" />
         <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.50.0" />

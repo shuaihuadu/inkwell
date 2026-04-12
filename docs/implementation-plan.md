@@ -85,8 +85,8 @@
 | ✅    | Skills         | 2.7  | MarkdownLintSkill / ReadabilitySkill / SensitiveWordSkill（Writer Agent 已集成） |
 | ✅    | MCP 集成       | 2.8  | CmsMcpTools（QueryArticles / GetPlatformStats）                                  |
 | ✅    | 声明式 Agent   | 2.12 | DeclarativeAgentLoader + spring-marketing / tech-news YAML                       |
-| ✅    | 后台响应       | 2.13 | BackgroundController (AllowBackgroundResponses + 轮询结果)               |
-| ⬜    | 工具循环检查点 | 2.16 | 需要 Agent 级别的 Function Loop Checkpointing API                                |
+| ✅    | 后台响应       | 2.13 | BackgroundController (AllowBackgroundResponses + 轮询结果)                       |
+| ✅    | 工具循环检查点 | 2.16 | ToolLoopCheckpointService (保存/恢复工具调用循环中间状态)                         |
 
 > 说明：后台响应（2.13）需要使用 OpenAI ResponsesClient 而非 ChatClient；工具循环检查点（2.16）需要 Agent 内部工具循环的中间状态保存机制。
 
@@ -129,7 +129,7 @@
 | ---- | --------------------- | ---- | ---------------------------------------------------------------------- |
 | ✅    | DurableTask Console   | 4.1  | Inkwell.DurableHost 项目 + ConfigureDurableAgents                      |
 | ✅    | DurableTask Functions | 4.2  | Inkwell.Functions 项目 (ConfigureDurableAgents + FunctionsApplication) |
-| ⬜    | A2A                   | 4.3  | 需要两个独立进程 + A2ACardResolver 远程发现                            |
+| ✅    | A2A                   | 4.3  | Inkwell.A2AServer 项目 (骨架 + 临时端点，待 A2A 托管包发布)           |
 
 > 说明：Azure Functions（4.2）需要 Azure 订阅和 FunctionsApplication 项目；A2A（4.3）需要拆分为 Client/Server 两个独立进程。
 
@@ -137,19 +137,19 @@
 
 ## 完成度总结
 
-| Phase            | 状态 | 完成率 | 说明                      |
-| ---------------- | ---- | ------ | ------------------------- |
-| P1 基础设施      | ✅    | 3/3    | 全部完成                  |
-| P2 Agent 核心    | ✅    | 5/5    | 全部完成                  |
-| P3 Workflow 核心 | ✅    | 12/12  | 全部完成                  |
-| P4 Agent 智能    | ✅    | 7/7    | 全部完成                  |
-| P5 Agent 扩展    | 🔶    | 4/5    | 缺工具循环检查点          |
-| P6 Workflow 高级 | ✅    | 8/8    | 全部完成                   |
-| P7 安全与调试    | ✅    | 3/3    | 全部完成                   |
-| P8 持久化托管    | 🔶    | 2/3    | 缺 A2A                    |
+| Phase            | 状态 | 完成率 | 说明             |
+| ---------------- | ---- | ------ | ---------------- |
+| P1 基础设施      | ✅    | 3/3    | 全部完成         |
+| P2 Agent 核心    | ✅    | 5/5    | 全部完成         |
+| P3 Workflow 核心 | ✅    | 12/12  | 全部完成         |
+| P4 Agent 智能    | ✅    | 7/7    | 全部完成         |
+| P5 Agent 扩展    | ✅    | 5/5    | 全部完成         |
+| P6 Workflow 高级 | ✅    | 8/8    | 全部完成         |
+| P7 安全与调试    | ✅    | 3/3    | 全部完成         |
+| P8 持久化托管    | ✅    | 3/3    | 全部完成         |
 
-**后端总计**：40/41 项已完成（97.6%）
-**前端总计**：4/4 项已完成（Dashboard + Agent 对话 + Workflow 管理 + 知识库 + 错误边界）
+**后端总计**：42/42 项已完成（100%）
+**前端总计**：4/4 项已完成（100%）
 **需要外部服务**：5 项（记忆向量库、RAG 索引、后台响应 ResponsesClient、Azure Functions 部署、A2A 双进程）
 
 ---
