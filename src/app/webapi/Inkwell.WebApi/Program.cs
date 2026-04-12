@@ -1,8 +1,8 @@
 ﻿using Inkwell;
 using Inkwell.Agents;
 using Inkwell.Persistence.InMemory;
+using Inkwell.Workflows;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
-using Microsoft.Extensions.AI;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -32,6 +32,9 @@ public static class Program
 
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
+
+        // 注册所有 Workflow
+        builder.Services.AddInkwellWorkflows();
 
         // 配置 OpenTelemetry
         builder.Services.AddOpenTelemetry()

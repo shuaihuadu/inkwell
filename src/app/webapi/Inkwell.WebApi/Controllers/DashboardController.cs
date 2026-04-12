@@ -1,5 +1,6 @@
 ﻿using Inkwell;
 using Inkwell.Agents;
+using Inkwell.Workflows;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Controllers;
@@ -11,6 +12,7 @@ namespace Inkwell.WebApi.Controllers;
 [Route("api/[controller]")]
 public sealed class DashboardController(
     AgentRegistry agentRegistry,
+    WorkflowRegistry workflowRegistry,
     IArticlePersistenceProvider articleProvider,
     IPipelineRunPersistenceProvider runProvider) : ControllerBase
 {
@@ -29,7 +31,7 @@ public sealed class DashboardController(
         return this.Ok(new
         {
             agentCount = agentRegistry.Count,
-            workflowCount = 1,
+            workflowCount = workflowRegistry.Count,
             totalRuns = runs.Count,
             publishedArticles = articles.Count(a => a.Status == "Published"),
             totalArticles = articles.Count,
