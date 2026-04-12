@@ -19,8 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
-        <ProjectReference Include="..\..\..\core\Inkwell.Agents\Inkwell.Agents.csproj" />
+        <ProjectReference Include="..\..\..\core\Inkwell.Core\Inkwell.Core.csproj" />
     </ItemGroup>
 
 </Project>

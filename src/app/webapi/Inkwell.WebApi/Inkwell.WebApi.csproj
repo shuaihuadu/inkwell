@@ -19,8 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\core\Inkwell.Agents\Inkwell.Agents.csproj" />
-        <ProjectReference Include="..\..\..\core\Inkwell.Workflows\Inkwell.Workflows.csproj" />
+        <ProjectReference Include="..\..\..\core\Inkwell.Core\Inkwell.Core.csproj" />
         <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.InMemory\Inkwell.Persistence.InMemory.csproj" />
     </ItemGroup>
 
