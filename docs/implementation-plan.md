@@ -68,7 +68,7 @@
 | ---- | -------------- | ---- | -------------------------------------------------------------------------------- |
 | ✅    | 记忆           | 2.5  | AgentMemoryService (ChatHistoryMemoryProvider + InMemoryVectorStore)             |
 | ✅    | RAG            | 2.6  | KnowledgeBaseService (TextSearchProvider + 关键词检索) + KnowledgeController API |
-| ⬜    | 图像/多模态    | 2.9  | image-analyst 实际处理图片输入（DataContent）                                    |
+| ✅    | 图像/多模态    | 2.9  | AgentsController POST image-analyst/analyze (DataContent multimodal)             |
 | ✅    | 中间件         | 2.10 | ContentGuardrailMiddleware + FunctionCallAuditMiddleware                         |
 | ✅    | 对话压缩       | 2.11 | Writer Agent 配置 MessageCountingChatReducer(20)                                 |
 | ✅    | 对话持久化     | 2.15 | ISessionPersistenceService + InMemory 实现                                       |
@@ -113,11 +113,11 @@
 
 > 生产就绪。
 
-| 状态 | 任务     | 需求 | 内容                                                         |
-| ---- | -------- | ---- | ------------------------------------------------------------ |
-| ✅    | JWT 授权 | 1.7  | AuthOptions + TokenService + AuthController + Authorize 策略 |
-| ⬜    | DevUI    | 5.5  | Prompt 查看 / Token 统计 / 日志                              |
-| ⬜    | 前端打磨 | —    | 错误处理 / Loading / 数据完善                                |
+| 状态 | 任务     | 需求 | 内容                                                            |
+| ---- | -------- | ---- | --------------------------------------------------------------- |
+| ✅    | JWT 授权 | 1.7  | AuthOptions + TokenService + AuthController + Authorize 策略    |
+| ✅    | DevUI    | 5.5  | DevController (diagnostics / agent-debug / workflow-topologies) |
+| ⬜    | 前端打磨 | —    | 错误处理 / Loading / 数据完善                                   |
 
 ---
 
@@ -125,11 +125,11 @@
 
 > DurableTask + A2A。
 
-| 状态 | 任务                  | 需求 | 内容                                              |
-| ---- | --------------------- | ---- | ------------------------------------------------- |
-| ✅    | DurableTask Console   | 4.1  | Inkwell.DurableHost 项目 + ConfigureDurableAgents |
-| ⬜    | DurableTask Functions | 4.2  | Azure Functions 项目（需要 Azure 订阅部署）       |
-| ⬜    | A2A                   | 4.3  | 需要两个独立进程 + A2ACardResolver 远程发现       |
+| 状态 | 任务                  | 需求 | 内容                                                                   |
+| ---- | --------------------- | ---- | ---------------------------------------------------------------------- |
+| ✅    | DurableTask Console   | 4.1  | Inkwell.DurableHost 项目 + ConfigureDurableAgents                      |
+| ✅    | DurableTask Functions | 4.2  | Inkwell.Functions 项目 (ConfigureDurableAgents + FunctionsApplication) |
+| ⬜    | A2A                   | 4.3  | 需要两个独立进程 + A2ACardResolver 远程发现                            |
 
 > 说明：Azure Functions（4.2）需要 Azure 订阅和 FunctionsApplication 项目；A2A（4.3）需要拆分为 Client/Server 两个独立进程。
 
@@ -142,13 +142,13 @@
 | P1 基础设施      | ✅    | 3/3    | 全部完成                   |
 | P2 Agent 核心    | 🔶    | 4/5    | 前端 Agent 对话页未实现    |
 | P3 Workflow 核心 | 🔶    | 11/12  | 前端 Workflow 管理页未实现 |
-| P4 Agent 智能    | 🔶    | 5/7    | 缺图像处理/前端知识库      |
+| P4 Agent 智能    | 🔶    | 6/7    | 缺前端知识库               |
 | P5 Agent 扩展    | 🔶    | 3/5    | 缺后台响应/工具循环检查点  |
 | P6 Workflow 高级 | ✅    | 8/8    | 全部完成                   |
-| P7 安全与调试    | 🔶    | 1/3    | 缺 DevUI/前端打磨          |
-| P8 持久化托管    | 🔶    | 1/3    | 缺 Azure Functions/A2A     |
+| P7 安全与调试    | 🔶    | 2/3    | 缺前端打磨                 |
+| P8 持久化托管    | 🔶    | 2/3    | 缺 A2A                     |
 
-**后端总计**：36/40 项已完成ﾈ90%）
+**后端总计**：39/40 项已完成ﾈ97.5%）
 **前端总计**：0/4 项已完成（脚手架已有，页面功能未实现）
 **需要外部服务**：5 项（记忆向量库、RAG 索引、后台响应 ResponsesClient、Azure Functions 部署、A2A 双进程）
 
