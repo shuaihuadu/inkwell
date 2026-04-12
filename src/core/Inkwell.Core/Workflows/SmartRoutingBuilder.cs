@@ -100,7 +100,6 @@ public static class SmartRoutingBuilder
          *       └── 翻译问题 ──→ TranslatorSpecialist ───────┘
          */
 
-#pragma warning disable MAAIW001 // HandoffWorkflowBuilder is experimental
         return AgentWorkflowBuilder
             .CreateHandoffBuilderWith(coordinator)
             .WithHandoff(coordinator, writerSpecialist, "用户需要写作或修改文章时转交")
@@ -108,6 +107,5 @@ public static class SmartRoutingBuilder
             .WithHandoff(coordinator, translatorSpecialist, "用户需要翻译内容时转交")
             .EnableReturnToPrevious()
             .Build();
-#pragma warning restore MAAIW001
     }
 }

@@ -1,4 +1,5 @@
 using Inkwell.Agents;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Controllers;
@@ -8,6 +9,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "EditorOrAdmin")]
 public sealed class AgentsController(AgentRegistry agentRegistry) : ControllerBase
 {
     /// <summary>

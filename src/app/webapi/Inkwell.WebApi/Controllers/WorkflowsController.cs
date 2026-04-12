@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Inkwell.Workflows;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Controllers;
@@ -10,6 +11,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "EditorOrAdmin")]
 public sealed class WorkflowsController(
     WorkflowRegistry workflowRegistry,
     ILogger<WorkflowsController> logger) : ControllerBase

@@ -9,6 +9,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "EditorOrAdmin")]
 public sealed class ReviewsController(
     IReviewPersistenceProvider reviewProvider,
     IArticlePersistenceProvider articleProvider) : ControllerBase
@@ -43,6 +44,12 @@ public sealed class ReviewsController(
         if (article is null)
         {
             return this.NotFound();
+        }
+
+        // [M2 修复] 幂等性检查：已审核的文章不允许重复操作
+        if (article.Status == nameof(ArticleStatus.Published) || article.Status == nameof(ArticleStatus.Approved))
+        {
+            return this.Conflict(new { message = "Article has already been approved or published." });
         }
 
         ReviewRecord review = new()

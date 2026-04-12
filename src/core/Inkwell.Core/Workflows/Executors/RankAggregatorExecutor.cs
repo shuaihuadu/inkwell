@@ -6,9 +6,10 @@ namespace Inkwell.Workflows.Executors;
 /// <summary>
 /// 评估结果聚合排序 Executor
 /// 收集所有文章评分，按综合得分降序排列输出报告
+/// Fan-In Barrier 可能逐一传入每篇文章的结果，需要收集齐后再输出
 /// </summary>
 [SendsMessage(typeof(BatchEvaluationReport))]
-internal sealed class RankAggregatorExecutor() : Executor<ArticleScore>("RankAggregator")
+internal sealed class RankAggregatorExecutor(int expectedCount = 3) : Executor<ArticleScore>("RankAggregator")
 {
     private readonly List<ArticleScore> _scores = [];
 
@@ -17,7 +18,12 @@ internal sealed class RankAggregatorExecutor() : Executor<ArticleScore>("RankAgg
     {
         this._scores.Add(message);
 
-        // Fan-In Barrier 保证所有评分完成才进入此 Executor
+        // [M7 修复] 仅在收齐所有评分后才输出
+        if (this._scores.Count < expectedCount)
+        {
+            return;
+        }
+
         List<ArticleScore> ranked = [.. this._scores.OrderByDescending(s => s.TotalScore)];
 
         BatchEvaluationReport report = new()

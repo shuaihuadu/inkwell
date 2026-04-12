@@ -4,5 +4,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <!-- 抑制 MAF 实验性 API 警告 -->
+        <NoWarn>$(NoWarn);MEAI001;MAAIW001</NoWarn>
     </PropertyGroup>
 </Project>

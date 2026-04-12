@@ -4,7 +4,7 @@ namespace Inkwell;
 
 /// <summary>
 /// 基于内存的发布/订阅提供程序
-/// 使用 ConcurrentDictionary + 委托列表实现，适用于单进程开发调试场景
+/// 使用 ConcurrentDictionary + 锁保护的委托列表实现，适用于单进程开发调试场景
 /// </summary>
 /// <typeparam name="T">消息类型</typeparam>
 public sealed class InMemoryPubSubProvider<T> : IPubSubProvider<T> where T : class
@@ -15,28 +15,30 @@ public sealed class InMemoryPubSubProvider<T> : IPubSubProvider<T> where T : cla
     /// <inheritdoc />
     public async Task PublishAsync(T message, string channel, CancellationToken cancellationToken = default)
     {
-        if (this._subscriptions.TryGetValue(channel, out List<Func<T, CancellationToken, Task>>? handlers))
+        if (!this._subscriptions.TryGetValue(channel, out List<Func<T, CancellationToken, Task>>? handlers))
         {
-            List<Func<T, CancellationToken, Task>> snapshot;
-            lock (this._lock)
-            {
-                snapshot = [.. handlers];
-            }
+            return;
+        }
 
-            foreach (Func<T, CancellationToken, Task> handler in snapshot)
-            {
-                await handler(message, cancellationToken).ConfigureAwait(false);
-            }
+        // [H4 修复] 在同一把锁内获取快照，避免 TryGetValue 和 snapshot 之间的竞态
+        Func<T, CancellationToken, Task>[] snapshot;
+        lock (this._lock)
+        {
+            snapshot = [.. handlers];
+        }
+
+        foreach (Func<T, CancellationToken, Task> handler in snapshot)
+        {
+            await handler(message, cancellationToken).ConfigureAwait(false);
         }
     }
 
     /// <inheritdoc />
     public Task<IAsyncDisposable> SubscribeAsync(string channel, Func<T, CancellationToken, Task> handler, CancellationToken cancellationToken = default)
     {
-        List<Func<T, CancellationToken, Task>> handlers = this._subscriptions.GetOrAdd(channel, _ => []);
-
         lock (this._lock)
         {
+            List<Func<T, CancellationToken, Task>> handlers = this._subscriptions.GetOrAdd(channel, _ => []);
             handlers.Add(handler);
         }
 

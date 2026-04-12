@@ -45,12 +45,10 @@ public static class InkwellAgents
                 ]
             },
             // [M3 修复] 对话历史保留数从参数读取
-#pragma warning disable MEAI001 // MessageCountingChatReducer is experimental
             ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
             {
                 ChatReducer = new MessageCountingChatReducer(chatHistoryRetainCount)
             })
-#pragma warning restore MEAI001
         });
 
         // [M4 修复] 应用中间件管线：护栏 + 函数调用审计

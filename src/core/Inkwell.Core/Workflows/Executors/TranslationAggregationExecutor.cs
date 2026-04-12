@@ -6,9 +6,10 @@ namespace Inkwell.Workflows.Executors;
 /// <summary>
 /// 翻译聚合 Executor
 /// 将多个语言的翻译结果汇总为 MultiLanguageResult
+/// Fan-In Barrier 可能逐一传入每种语言的结果，需要收集齐后再输出
 /// </summary>
 [SendsMessage(typeof(MultiLanguageResult))]
-internal sealed class TranslationAggregationExecutor() : Executor<TranslationResult>("TranslationAggregation")
+internal sealed class TranslationAggregationExecutor(int expectedCount = 3) : Executor<TranslationResult>("TranslationAggregation")
 {
     private readonly List<TranslationResult> _results = [];
     private string _original = string.Empty;
@@ -26,8 +27,12 @@ internal sealed class TranslationAggregationExecutor() : Executor<TranslationRes
     {
         this._results.Add(message);
 
-        // Fan-In Barrier 保证所有翻译完成才进入此 Executor
-        // 聚合后输出最终结果
+        // [M6 修复] 仅在收齐所有翻译结果后才输出
+        if (this._results.Count < expectedCount)
+        {
+            return;
+        }
+
         MultiLanguageResult result = new()
         {
             Original = this._original,
@@ -35,8 +40,6 @@ internal sealed class TranslationAggregationExecutor() : Executor<TranslationRes
         };
 
         await context.SendMessageAsync(result, cancellationToken: cancellationToken);
-
-        // 输出到 Workflow
         await context.YieldOutputAsync(result, cancellationToken: cancellationToken);
     }
 }
