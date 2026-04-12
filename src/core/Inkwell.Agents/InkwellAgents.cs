@@ -1,4 +1,5 @@
 using Inkwell.Agents.Middleware;
+using Inkwell.Agents.Skills;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -31,9 +32,16 @@ public static class InkwellAgents
                     你是一名专业内容写手。你擅长撰写引人入胜、结构清晰的文章。
                     你的文章信息丰富、对目标受众有吸引力。注重清晰度、叙事性和可操作的见解。
                     你可以使用搜索工具获取最新资讯来丰富文章内容。
+                    你也可以使用 Markdown 校验、可读性分析、敏感词扫描等技能来检查和改进文章。
                     请用中文回复。
                     """,
-                Tools = [AIFunctionFactory.Create(InkwellTools.SearchLatestNews)]
+                Tools =
+                [
+                    AIFunctionFactory.Create(InkwellTools.SearchLatestNews),
+                    AIFunctionFactory.Create(MarkdownLintSkill.Lint),
+                    AIFunctionFactory.Create(ReadabilitySkill.Analyze),
+                    AIFunctionFactory.Create(SensitiveWordSkill.Scan)
+                ]
             },
             // 长对话自动裁剪：保留最近 N 条消息
 #pragma warning disable MEAI001 // MessageCountingChatReducer is experimental

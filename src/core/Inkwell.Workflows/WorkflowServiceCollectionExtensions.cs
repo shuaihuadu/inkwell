@@ -69,6 +69,24 @@ public static class WorkflowServiceCollectionExtensions
             Workflow = SmartRoutingBuilder.Build(primaryChatClient, secondaryChatClient)
         });
 
+        // 6. 批量内容评估（MapReduce）
+        registry.Register(new WorkflowRegistration
+        {
+            Id = "batch-evaluation",
+            Name = "批量内容评估",
+            Description = "对 N 篇文章并行多维度评分，汇总排序（MapReduce 动态 Fan-Out）",
+            Workflow = BatchEvaluationBuilder.Build(secondaryChatClient)
+        });
+
+        // 7. 内容生产 + 翻译一体化（SubWorkflow）
+        registry.Register(new WorkflowRegistration
+        {
+            Id = "content-with-translation",
+            Name = "内容 + 翻译一体化",
+            Description = "写作完成后自动触发翻译子工作流（SubWorkflow / BindAsExecutor）",
+            Workflow = ContentWithTranslationBuilder.Build(primaryChatClient, secondaryChatClient)
+        });
+
         services.AddSingleton(registry);
 
         return registry;
