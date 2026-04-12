@@ -46,6 +46,7 @@ public static class WriterCriticLoopBuilder
 
         LoopWriterExecutor writer = new(writerAgent);
         CriticExecutor critic = new(criticAgent, maxRevisions);
+        LoopCompletionExecutor completion = new();
 
         // ========== 构建 Workflow ==========
 
@@ -62,7 +63,7 @@ public static class WriterCriticLoopBuilder
          *        │
          *        │ 通过
          *        ▼
-         *   [输出: Article]
+         *    Completion → [输出: Article]
          */
 
         return new WorkflowBuilder(writer)
@@ -70,9 +71,9 @@ public static class WriterCriticLoopBuilder
             .WithDescription("Writer-Critic iterative loop until approval or max revisions")
             .AddEdge(writer, critic)
             .AddSwitch(critic, sw => sw
-                .AddCase<Article>(a => a?.Status == ArticleStatus.Approved, null!)
+                .AddCase<Article>(a => a?.Status == ArticleStatus.Approved, completion)
                 .WithDefault(writer))
-            .WithOutputFrom(critic)
+            .WithOutputFrom(completion)
             .WithOpenTelemetry()
             .Build();
     }
@@ -142,5 +143,17 @@ internal sealed class LoopWriterExecutor(AIAgent agent) : Executor<TopicAnalysis
             scopeName: StateScopes.ArticleScope, cancellationToken);
 
         await context.SendMessageAsync(article, cancellationToken: cancellationToken);
+    }
+}
+
+/// <summary>
+/// 循环完成 Executor：接收审核通过的文章并输出
+/// </summary>
+internal sealed class LoopCompletionExecutor() : Executor<Article>("LoopCompletion")
+{
+    /// <inheritdoc />
+    public override async ValueTask HandleAsync(Article message, IWorkflowContext context, CancellationToken cancellationToken = default)
+    {
+        await context.YieldOutputAsync(message, cancellationToken: cancellationToken);
     }
 }

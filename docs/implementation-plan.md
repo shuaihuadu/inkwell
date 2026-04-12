@@ -117,7 +117,7 @@
 | ---- | -------- | ---- | --------------------------------------------------------------- |
 | ✅    | JWT 授权 | 1.7  | AuthOptions + TokenService + AuthController + Authorize 策略    |
 | ✅    | DevUI    | 5.5  | DevController (diagnostics / agent-debug / workflow-topologies) |
-| ✅    | 前端打磨 | —    | ErrorBoundary + API_BASE 抽取 + Dashboard Table/Tag 升级            |
+| ✅    | 前端打磨 | —    | ErrorBoundary + API_BASE 抽取 + Dashboard Table/Tag 升级        |
 
 ---
 

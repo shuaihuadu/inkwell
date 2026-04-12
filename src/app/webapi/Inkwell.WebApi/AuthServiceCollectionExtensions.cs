@@ -28,9 +28,29 @@ public static class AuthServiceCollectionExtensions
         // 注册 Token 生成服务
         services.AddSingleton<TokenService>();
 
+        // 始终注册授权策略（Controller 上有 [Authorize] 属性需要策略存在）
+        services.AddAuthorization(options =>
+        {
+            if (authOptions.Enabled)
+            {
+                // 生产模式：要求角色
+                options.AddPolicy("AdminOnly", policy => policy.RequireRole(InkwellRoles.Admin));
+                options.AddPolicy("EditorOrAdmin", policy =>
+                    policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Editor));
+                options.AddPolicy("ReviewerOrAdmin", policy =>
+                    policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Reviewer));
+            }
+            else
+            {
+                // 开发模式：所有策略允许匿名访问
+                options.AddPolicy("AdminOnly", policy => policy.RequireAssertion(_ => true));
+                options.AddPolicy("EditorOrAdmin", policy => policy.RequireAssertion(_ => true));
+                options.AddPolicy("ReviewerOrAdmin", policy => policy.RequireAssertion(_ => true));
+            }
+        });
+
         if (!authOptions.Enabled)
         {
-            // 认证未启用时，仍注册 Authentication 但不强制要求
             return services;
         }
 
@@ -49,20 +69,6 @@ public static class AuthServiceCollectionExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.SecretKey))
                 };
             });
-
-        services.AddAuthorization(options =>
-        {
-            // admin：全部权限
-            options.AddPolicy("AdminOnly", policy => policy.RequireRole(InkwellRoles.Admin));
-
-            // editor：Agent 对话、Workflow 触发、文章管理
-            options.AddPolicy("EditorOrAdmin", policy =>
-                policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Editor));
-
-            // reviewer：人工审核
-            options.AddPolicy("ReviewerOrAdmin", policy =>
-                policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Reviewer));
-        });
 
         return services;
     }
