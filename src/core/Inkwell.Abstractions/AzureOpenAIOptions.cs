@@ -1,7 +1,7 @@
 namespace Inkwell;
 
 /// <summary>
-/// Azure OpenAI 连接配置选项
+/// Azure OpenAI 总配置选项
 /// </summary>
 public sealed class AzureOpenAIOptions
 {
@@ -10,6 +10,27 @@ public sealed class AzureOpenAIOptions
     /// </summary>
     public const string SectionName = "AzureOpenAI";
 
+    /// <summary>
+    /// 获取或设置主模型配置（写作、审核等高质量任务）
+    /// </summary>
+    public AzureOpenAIModelOptions Primary { get; set; } = new() { DeploymentName = "gpt-4o" };
+
+    /// <summary>
+    /// 获取或设置辅助模型配置（分析、翻译等经济任务）
+    /// </summary>
+    public AzureOpenAIModelOptions Secondary { get; set; } = new() { DeploymentName = "gpt-4o-mini" };
+
+    /// <summary>
+    /// 获取或设置嵌入模型配置（记忆和 RAG 场景）
+    /// </summary>
+    public AzureOpenAIModelOptions Embedding { get; set; } = new() { DeploymentName = "text-embedding-3-small" };
+}
+
+/// <summary>
+/// 单个 Azure OpenAI 模型的连接配置
+/// </summary>
+public sealed class AzureOpenAIModelOptions
+{
     /// <summary>
     /// 获取或设置 Azure OpenAI 服务端点
     /// </summary>
@@ -21,17 +42,7 @@ public sealed class AzureOpenAIOptions
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置主模型部署名称（用于写作、审核等高质量任务）
+    /// 获取或设置模型部署名称
     /// </summary>
-    public string PrimaryDeploymentName { get; set; } = "gpt-4o";
-
-    /// <summary>
-    /// 获取或设置辅助模型部署名称（用于分析、翻译等经济任务）
-    /// </summary>
-    public string SecondaryDeploymentName { get; set; } = "gpt-4o-mini";
-
-    /// <summary>
-    /// 获取或设置嵌入模型部署名称（用于记忆和 RAG 场景）
-    /// </summary>
-    public string EmbeddingDeploymentName { get; set; } = "text-embedding-3-small";
+    public string DeploymentName { get; set; } = string.Empty;
 }

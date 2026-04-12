@@ -14,6 +14,7 @@ public static class AzureOpenAIServiceCollectionExtensions
 {
     /// <summary>
     /// 注册 Azure OpenAI 多模型服务（Primary / Secondary / Embedding）
+    /// 每个模型可独立配置 Endpoint、ApiKey、DeploymentName
     /// </summary>
     /// <param name="coreBuilder">Inkwell 核心构建器</param>
     /// <param name="configuration">应用配置</param>
@@ -24,53 +25,70 @@ public static class AzureOpenAIServiceCollectionExtensions
         AzureOpenAIOptions options = new();
         section.Bind(options);
 
-        // 验证必填配置
-        if (string.IsNullOrWhiteSpace(options.Endpoint))
+        // 验证 Primary 必填
+        if (string.IsNullOrWhiteSpace(options.Primary.Endpoint))
         {
-            throw new InvalidOperationException($"Configuration '{AzureOpenAIOptions.SectionName}:Endpoint' is required.");
+            throw new InvalidOperationException($"Configuration '{AzureOpenAIOptions.SectionName}:Primary:Endpoint' is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.PrimaryDeploymentName))
+        if (string.IsNullOrWhiteSpace(options.Primary.DeploymentName))
         {
-            throw new InvalidOperationException($"Configuration '{AzureOpenAIOptions.SectionName}:PrimaryDeploymentName' is required.");
+            throw new InvalidOperationException($"Configuration '{AzureOpenAIOptions.SectionName}:Primary:DeploymentName' is required.");
         }
 
         // 注册配置对象
         coreBuilder.Services.Configure<AzureOpenAIOptions>(section);
 
-        // 创建 OpenAI 客户端（ApiKey 为空时回退到 AzureCliCredential）
-        AzureOpenAIClient azureClient = CreateAzureOpenAIClient(options);
-
-        // 创建 Primary IChatClient（写作、审核等高质量任务）
-        IChatClient primaryChatClient = azureClient
-            .GetChatClient(options.PrimaryDeploymentName)
-            .AsIChatClient();
-
-        // 创建 Secondary IChatClient（分析、翻译等经济任务）
-        IChatClient secondaryChatClient = azureClient
-            .GetChatClient(options.SecondaryDeploymentName)
-            .AsIChatClient();
-
-        // 注册到 DI
+        // 创建 Primary IChatClient
+        IChatClient primaryChatClient = CreateChatClient(options.Primary);
         coreBuilder.Services.AddKeyedSingleton<IChatClient>(ModelServiceKeys.Primary, primaryChatClient);
-        coreBuilder.Services.AddKeyedSingleton<IChatClient>(ModelServiceKeys.Secondary, secondaryChatClient);
         coreBuilder.Services.AddSingleton(primaryChatClient);
+
+        // 创建 Secondary IChatClient（未配置时回退到 Primary）
+        AzureOpenAIModelOptions secondaryConfig = FallbackTo(options.Secondary, options.Primary);
+        IChatClient secondaryChatClient = CreateChatClient(secondaryConfig);
+        coreBuilder.Services.AddKeyedSingleton<IChatClient>(ModelServiceKeys.Secondary, secondaryChatClient);
 
         return coreBuilder;
     }
 
     /// <summary>
-    /// 创建 Azure OpenAI 客户端
+    /// 根据模型配置创建 IChatClient
     /// </summary>
-    private static AzureOpenAIClient CreateAzureOpenAIClient(AzureOpenAIOptions options)
+    private static IChatClient CreateChatClient(AzureOpenAIModelOptions modelOptions)
     {
-        Uri endpoint = new(options.Endpoint);
+        AzureOpenAIClient azureClient = CreateAzureOpenAIClient(modelOptions);
 
-        if (!string.IsNullOrWhiteSpace(options.ApiKey))
+        return azureClient
+            .GetChatClient(modelOptions.DeploymentName)
+            .AsIChatClient();
+    }
+
+    /// <summary>
+    /// 创建 Azure OpenAI 客户端（ApiKey 为空时回退到 AzureCliCredential）
+    /// </summary>
+    private static AzureOpenAIClient CreateAzureOpenAIClient(AzureOpenAIModelOptions modelOptions)
+    {
+        Uri endpoint = new(modelOptions.Endpoint);
+
+        if (!string.IsNullOrWhiteSpace(modelOptions.ApiKey))
         {
-            return new AzureOpenAIClient(endpoint, new AzureKeyCredential(options.ApiKey));
+            return new AzureOpenAIClient(endpoint, new AzureKeyCredential(modelOptions.ApiKey));
         }
 
         return new AzureOpenAIClient(endpoint, new AzureCliCredential());
+    }
+
+    /// <summary>
+    /// 若目标配置的 Endpoint 或 DeploymentName 为空，则继承 fallback 的值
+    /// </summary>
+    private static AzureOpenAIModelOptions FallbackTo(AzureOpenAIModelOptions target, AzureOpenAIModelOptions fallback)
+    {
+        return new AzureOpenAIModelOptions
+        {
+            Endpoint = string.IsNullOrWhiteSpace(target.Endpoint) ? fallback.Endpoint : target.Endpoint,
+            ApiKey = string.IsNullOrWhiteSpace(target.ApiKey) ? fallback.ApiKey : target.ApiKey,
+            DeploymentName = string.IsNullOrWhiteSpace(target.DeploymentName) ? fallback.DeploymentName : target.DeploymentName
+        };
     }
 }
