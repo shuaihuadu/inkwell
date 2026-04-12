@@ -2,214 +2,304 @@
 
 ## 项目定位
 
-Inkwell 是一个 AI 驱动的内容生产平台，通过 Microsoft Agent Framework（MAF）编排多个 AI Agent 和人工环节，实现从选题到发布的端到端自动化。项目的双重目标：
+Inkwell 是一个 AI 驱动的内容生产与智能体管理平台，基于 Microsoft Agent Framework（MAF）构建。项目的目标是：
 
-1. **业务目标**：构建可用的内容生产流水线
-2. **技术目标**：通过真实场景完整覆盖 MAF 的核心能力
-
----
-
-## Phase 1：核心流水线（已完成）
-
-### 需求 1.1：选题分析
-
-**用户故事**：作为内容运营人员，我希望输入一个主题后，系统能自动从市场趋势和竞品内容两个维度进行分析，为后续写作提供方向。
-
-**验收标准**：
-- 输入：主题字符串（如 "The Future of AI in Healthcare"）
-- 两个分析维度并行执行，互不阻塞
-- 两个分析都完成后，合并为一份统一的分析报告
-- 分析报告存入共享状态，供后续环节引用
-- 输出阶段性结果通知（选题分析完成）
-
-**MAF 能力**：Fan-Out / Fan-In Barrier、SharedState、YieldOutputAsync
-
-### 需求 1.2：内容创作
-
-**用户故事**：作为内容运营人员，我希望系统基于选题分析报告自动撰写文章，并经过 AI 审核，不通过则自动修改，直到通过或达到最大修订次数。
-
-**验收标准**：
-- Writer Agent 基于分析报告撰写 300-500 字的文章
-- Critic Agent 审核文章，给出通过/退回决策和反馈
-- 退回时 Writer 读取审核反馈，在原稿基础上修改
-- 最多修订 3 次（可配置），超过后强制通过
-- 修订次数通过 Executor 内部状态跟踪
-
-**MAF 能力**：Writer-Critic Loop、AddSwitch 条件路由、SharedState
-
-### 需求 1.3：人工审核
-
-**用户故事**：作为终审编辑，我希望在 AI 审核通过后能看到完整文章，决定是否批准发布。退回则触发重写。
-
-**验收标准**：
-- Workflow 暂停，展示文章标题、版本号、内容
-- 编辑输入 y 批准 / n 退回
-- 批准：输出最终文章
-- 退回：触发 Writer 重写循环
-
-**MAF 能力**：Human-in-the-Loop（RequestPort）、ReviewGateExecutor
+1. **覆盖 MAF 全部应用场景**：AIAgent、Workflow、GroupChat、Handoff、HITL、可观测性、声明式等
+2. **端到端可运行**：从 AI Agent 对话到 Workflow 编排到文章发布，形成完整闭环
+3. **生产级架构**：可插拔持久化、队列、文件存储，集成 Aspire 可观测性
 
 ---
 
-## Phase 2：高级模式（计划中）
+## 一、基础设施
 
-### 需求 2.1：多语言翻译
+### 1.1 LLM 配置
 
-**用户故事**：作为国际内容运营人员，我希望一篇文章能同时翻译成多种语言（中文、日文、法文等），翻译结果汇总后统一发布。
+**需求**：通过 `appsettings.json` 配置 Azure OpenAI 的连接信息，支持 user-secrets 覆盖。
 
-**验收标准**：
-- 文章发布后，Fan-Out 到多个翻译 Agent
-- 每个翻译 Agent 独立工作，互不影响
-- 所有翻译完成后 Fan-In 汇总
-- 翻译结果与原文一起存入共享状态
+**配置格式**：
 
-**MAF 能力**：Fan-Out / Fan-In（第二层并行）、Agent 绑定
-
-### 需求 2.2：SEO 优化
-
-**用户故事**：作为 SEO 专员，我希望系统能自动分析文章的关键词密度、标题评分等 SEO 指标，并给出优化建议。
-
-**验收标准**：
-- 通过函数工具调用 SEO 分析逻辑
-- 分析结果反馈给 Writer Agent 进行优化
-- SEO 评分达标后进入下一环节
-
-**MAF 能力**：Function Tool
-
-### 需求 2.3：条件发布路由
-
-**用户故事**：作为发布管理员，我希望根据内容类型和目标渠道，自动路由到不同的发布流程（博客、社交媒体、邮件通讯等）。
+```json
+{
+  "AzureOpenAI": {
+    "Endpoint": "https://xxx.openai.azure.com/",
+    "ApiKey": "",
+    "DeploymentName": "gpt-4o-mini"
+  }
+}
+```
 
 **验收标准**：
-- 根据文章元数据（类型、标签、长度）条件路由
-- 不同发布渠道有不同的格式化需求
-- 多渠道可并行发布
+- `Endpoint` 和 `DeploymentName` 必填，缺失时启动报错
+- `ApiKey` 为空时自动回退到 `AzureCliCredential`（开发环境）；有值时使用 `AzureKeyCredential`
+- 通过 DI 注册为 `IChatClient` 单例
+- 所有 Agent 和 Workflow 共享同一个 `IChatClient`
 
-**MAF 能力**：AddSwitch、AddEdge\<T\> 条件路由
+### 1.2 持久化
 
-### 需求 2.4：Checkpoint 恢复
+**需求**：通过 Fluent API 或配置文件切换持久化后端。
 
-**用户故事**：作为运维人员，我希望长时间运行的流水线在中断后能从断点恢复，不用从头开始。
+```csharp
+builder.Services.AddInkwellCore()
+    .UseInMemoryDatabase()       // 开发
+    .UseSqlServer(connectionString)  // 生产
+```
+
+**覆盖的实体**：文章（ArticleRecord）、运行记录（PipelineRunRecord）、分析报告（AnalysisRecord）、审核记录（ReviewRecord）
+
+### 1.3 队列
+
+**需求**：FIFO 队列 + 发布/订阅，支持 InMemory 和 Redis。
+
+```csharp
+builder.Services.AddInkwellCore()
+    .UseInMemoryQueue()          // 开发
+    .UseRedisQueue(redisConn)    // 生产
+```
+
+### 1.4 文件存储
+
+**需求**：本地文件系统存储（默认），后续可扩展 Azure Blob Storage。
+
+```csharp
+builder.Services.AddInkwellCore()
+    .UseLocalFileStorage("storage")
+```
+
+### 1.5 可观测性（Aspire 集成）
+
+**需求**：集成 .NET Aspire，提供 OpenTelemetry Trace/Metrics/Logs 的统一管理。
 
 **验收标准**：
-- 每个 SuperStep 完成后生成 Checkpoint
-- 进程重启后从最近的 Checkpoint 恢复
-- 共享状态在恢复后保持一致
+- WebApi 项目集成 Aspire ServiceDefaults
+- Workflow 执行通过 `WithOpenTelemetry` 注入 Trace
+- 每个 Agent 的调用、Executor 的执行、SuperStep 的推进都有对应的 Span
+- Aspire Dashboard（`http://localhost:18888`）可查看完整调用链
+- 支持 `EnableSensitiveData` 配置（开发环境开启，生产环境关闭）
 
-**MAF 能力**：CheckpointManager、ResumeStreamingAsync
+**MAF 能力**：`WithOpenTelemetry`、`WorkflowTelemetryOptions`
 
 ---
 
-## Phase 3：可观测与可视化（计划中）
+## 二、AIAgent
 
-### 需求 3.1：执行追踪
+### 2.1 预定义 Agent
 
-**用户故事**：作为开发者，我希望能看到流水线每个环节的执行耗时和 Token 消耗，快速定位性能瓶颈。
+**需求**：系统内置多个专业 Agent，每个 Agent 独立可用，也可作为 Workflow 节点。
 
-**验收标准**：
-- 每个 Executor 的执行时间可在 Application Insights / Aspire Dashboard 中查看
-- 完整的分布式 Trace 链路
-- 支持 `EnableSensitiveData` 查看消息内容
-
-**MAF 能力**：WithOpenTelemetry、ActivitySource
-
-### 需求 3.2：Workflow 可视化
-
-**用户故事**：作为技术负责人，我希望能导出流水线的结构图，用于文档和团队沟通。
+| Agent ID | 名称 | 职责 | AG-UI 路由 |
+| --- | --- | --- | --- |
+| `writer` | 内容写手 | 撰写高质量文章 | `/api/agui/writer` |
+| `critic` | 内容审核 | 审核文章质量，给出改进建议 | `/api/agui/critic` |
+| `market-analyst` | 市场分析 | 分析市场趋势和目标受众 | `/api/agui/market-analyst` |
+| `seo-optimizer` | SEO 优化 | 分析和优化搜索引擎排名 | `/api/agui/seo-optimizer` |
+| `translator-english` | 英文翻译 | 翻译为英文 | `/api/agui/translator-english` |
+| `translator-japanese` | 日文翻译 | 翻译为日文 | `/api/agui/translator-japanese` |
 
 **验收标准**：
-- 导出 Mermaid 格式（嵌入 README）
-- 导出 DOT 格式（生成 SVG/PNG）
+- 每个 Agent 通过 AG-UI 协议（SSE）独立对外暴露
+- 前端可选择 Agent 进行对话
+- Agent 注册表（`AgentRegistry`）提供元数据查询 API
+- 每个 Agent 的 Instructions 使用中文
 
-**MAF 能力**：ToMermaidString、ToDotString
+### 2.2 Agent 注册与管理
+
+**需求**：`AgentRegistry` 作为 Agent 的集中管理入口。
+
+**API**：
+- `GET /api/agents` — 获取所有 Agent 列表
+- `GET /api/agents/{id}` — 获取 Agent 详情
 
 ---
 
-## Phase 4：声明式与服务化（计划中）
+## 三、Workflow
 
-### 需求 4.1：YAML 模板
+### 3.1 内容生产流水线（串行 + 并行 + HITL）
 
-**用户故事**：作为非技术用户，我希望通过 YAML 文件定义简化版的内容流水线，不需要写 C# 代码。
+**需求**：完整的内容生产流水线，组合多种 Workflow 编排模式。
+
+**拓扑**：
+
+```
+输入(主题) → InputDispatch
+              ├── Fan-Out → MarketAnalysis ──┐
+              └── Fan-Out → CompetitorAnalysis──┤ Fan-In Barrier
+                                                ▼
+                                     AnalysisAggregation
+                                                │
+                                     ┌── Writer ◀──┐
+                                     │      │      │ Critic 退回
+                                     │      ▼      │
+                                     │   Critic ───┘
+                                     │      │ 通过
+                                     │      ▼
+                                     │  RequestPort(人工审核) ⏸
+                                     │      │
+                                     │      ▼
+                                     │  ReviewGate → [发布] / [退回 → Writer]
+```
+
+**MAF 能力覆盖**：
+- `AddFanOutEdge` / `AddFanInBarrierEdge`（并行）
+- `AddEdge`（串行）
+- `AddSwitch`（条件路由）
+- `RequestPort`（Human-in-the-Loop）
+- `SharedState`（共享状态）
+- `YieldOutputAsync`（多阶段输出）
+
+### 3.2 多语言翻译流水线（纯并行）
+
+**需求**：一篇文章同时翻译为多种语言。
+
+**拓扑**：
+
+```
+输入(文章) → Fan-Out → TranslatorEN ──┐
+                     → TranslatorJA ──┤ Fan-In Barrier
+                     → TranslatorFR ──┘
+                            ▼
+                     TranslationAggregator → [输出: 多语言版本]
+```
+
+**MAF 能力**：Fan-Out / Fan-In、Agent 绑定（`BindAsExecutor`）
+
+### 3.3 选题讨论会（GroupChat）
+
+**需求**：多个角色 Agent 围绕选题轮流发言讨论，由 Manager 控制发言顺序和终止条件。
+
+**参与者**：
+- 市场分析师：从市场角度评估选题
+- 内容编辑：从内容质量角度评估
+- SEO 专家：从搜索优化角度评估
+- 主持人（Manager）：控制讨论节奏，判断是否达成共识
 
 **验收标准**：
-- 提供简化版 YAML 模板（顺序写作流程）
-- 通过 `DeclarativeWorkflowBuilder.Build` 加载运行
-- 运行结果与代码版本一致
+- 使用 `AgentWorkflowBuilder.CreateGroupChatBuilderWith` 构建
+- `GroupChatManager` 实现自定义的发言选择逻辑
+- 最大讨论轮次可配置（默认 10 轮）
+- 讨论结果作为选题的最终决策输出
 
-**MAF 能力**：DeclarativeWorkflowBuilder、Power Fx 表达式
+**MAF 能力**：`GroupChatWorkflowBuilder`、`GroupChatManager`、`SelectNextAgentAsync`
 
-### 需求 4.2：Code Eject
+### 3.4 客服场景（Handoff）
 
-**用户故事**：作为开发者，我希望将 YAML 模板转换为 C# 代码，方便进一步自定义。
+**需求**：用户提问后根据问题类型自动切换到对应专业 Agent，处理完后可返回主 Agent。
 
-**验收标准**：
-- 从 YAML 生成等价的 C# 代码
-- 生成的代码可编译运行
-
-**MAF 能力**：DeclarativeWorkflowBuilder.Eject
-
-### 需求 4.3：Workflow as Agent API
-
-**用户故事**：作为系统集成者，我希望整个流水线封装为一个 Agent，通过 API 接口调用。
+**角色**：
+- 协调者 Agent：初始接待，判断问题类型
+- 内容写作 Agent：处理写作相关问题
+- SEO Agent：处理 SEO 相关问题
+- 翻译 Agent：处理翻译相关问题
 
 **验收标准**：
-- 通过 `workflow.AsAIAgent()` 封装
-- 外部调用者看到的是标准 Agent 接口
-- 支持流式输出
+- 使用 `AgentWorkflowBuilder.CreateHandoffBuilderWith` 构建
+- `WithHandoff(from, to, reason)` 定义切换关系
+- `EnableReturnToPrevious()` 允许返回上一个 Agent
+- 切换过程对用户透明
 
-**MAF 能力**：AsAIAgent、WorkflowHostAgent
+**MAF 能力**：`HandoffWorkflowBuilder`（`[Experimental]`）
+
+### 3.5 Workflow 可视化
+
+**需求**：所有 Workflow 支持导出拓扑图。
+
+**验收标准**：
+- `ToMermaidString()` 导出 Mermaid 格式
+- `ToDotString()` 导出 Graphviz DOT 格式
+- 前端页面展示 Workflow 拓扑（使用 React Flow 或 Mermaid 渲染）
+
+**MAF 能力**：`Visualization`
 
 ---
 
-## Phase 5：生产级（计划中）
+## 四、前端
 
-### 需求 5.1：选题讨论会
+### 4.1 Dashboard
 
-**用户故事**：作为内容团队负责人，我希望多个角色 Agent（市场、编辑、SEO）能轮流发言讨论选题，最终达成共识。
+**需求**：系统总览页。
 
-**验收标准**：
-- 3-5 个 Agent 参与讨论
-- GroupChatManager 控制发言顺序
-- 讨论达到共识或最大轮次后结束
+**展示内容**：
+- Agent 数量
+- Workflow 数量
+- 流水线运行次数 / 完成次数
+- 文章总数 / 已发布数
+- 审核通过率
+- 最近运行记录列表
 
-**MAF 能力**：GroupChatWorkflowBuilder、RoundRobinGroupChatManager
+### 4.2 Agent 对话
 
-### 需求 5.2：子流程复用
+**需求**：选择任意 Agent 进行对话。
 
-**用户故事**：作为架构师，我希望"内容创作"模块能作为独立子流程，嵌入到不同的主流程中复用。
+**UI 组件**：
+- Ant Design X `Bubble` 组件渲染对话
+- Ant Design X `Sender` 组件输入
+- Agent 选择器（下拉框）
+- 新对话按钮
 
-**验收标准**：
-- "创作子流程"（Writer-Critic Loop）封装为独立 Workflow
-- 通过 `SubworkflowBinding` 嵌入主流程
-- 子流程的共享状态与主流程隔离
+**对接方式**：通过 AG-UI 协议（SSE）对接后端 Agent
 
-**MAF 能力**：SubworkflowBinding、BindAsExecutor
+### 4.3 Workflow 管理
 
-### 需求 5.3：分布式执行
+**需求**：展示系统中的 Workflow 列表，可触发运行。
 
-**用户故事**：作为运维人员，我希望流水线在生产环境下通过 Azure Functions 持久化运行，服务重启后自动恢复。
-
-**验收标准**：
-- 通过 DurableTask 模式执行
-- Agent 作为 Durable Entity 持久化
-- Azure Functions 托管
-
-**MAF 能力**：DurableTask、Azure Functions Hosting
+**功能**：
+- Workflow 列表（名称、描述、节点数、状态）
+- 运行 Workflow（输入参数 → SSE 实时事件流）
+- 人工审核界面（HITL 场景）
+- Workflow 拓扑图展示
 
 ---
 
-## 非功能性需求
+## 五、API 总览
+
+### REST API
+
+| Controller | Method | Route | 说明 |
+| --- | --- | --- | --- |
+| Health | GET | `/api/health` | 健康检查 |
+| Dashboard | GET | `/api/dashboard/stats` | Dashboard 统计 |
+| Agents | GET | `/api/agents` | Agent 列表 |
+| Agents | GET | `/api/agents/{id}` | Agent 详情 |
+| Articles | GET | `/api/articles` | 文章列表 |
+| Articles | GET | `/api/articles/{id}` | 文章详情 |
+| Articles | GET | `/api/articles/status/{status}` | 按状态查询 |
+| Pipeline | GET | `/api/pipeline/runs` | 运行记录列表 |
+| Pipeline | GET | `/api/pipeline/runs/{id}` | 运行记录详情 |
+| Pipeline | POST | `/api/pipeline/run` | 启动流水线（SSE） |
+| Reviews | GET | `/api/reviews/{articleId}` | 审核记录 |
+| Analyses | GET | `/api/analyses/{pipelineRunId}` | 分析报告 |
+
+### AG-UI 端点
+
+通过 `MapAGUI` 自动注册，每个 Agent 一个端点：
+
+```
+POST /api/agui/{agent-id}
+```
+
+---
+
+## 六、非功能性需求
 
 ### 安全
-- 所有密钥通过 user-secrets 或环境变量管理，不硬编码
+- 所有密钥通过 user-secrets 或环境变量管理
+- `ApiKey` 支持配置文件，不硬编码
 - `EnableSensitiveData` 仅在开发环境启用
+- 文件存储防路径遍历攻击
 
-### 代码质量
-- 所有公共类和方法有 XML 文档注释
-- 遵循 .editorconfig 规范
-- file-scoped namespace
+### 代码规范
+- 文件作用域命名空间
+- 主构造函数（Primary Constructor）
+- `this.` 前缀，显式类型（不用 `var`）
+- XML 文档注释（中文 summary，英文异常消息）
+- 提示词使用中文
+- 一个类一个文件
 
-### 可维护性
-- 每个 Executor 职责单一
-- 共享状态通过 `StateScopes` 常量管理
-- Workflow 拓扑通过注释清晰记录
+### 前端规范
+- kebab-case 文件命名
+- TypeScript strict mode
+- Ant Design 6 + Ant Design X
+
+### 可观测性
+- 集成 Aspire ServiceDefaults
+- OpenTelemetry Trace 覆盖 Agent 调用和 Workflow 执行
+- Aspire Dashboard 开发环境默认启用
