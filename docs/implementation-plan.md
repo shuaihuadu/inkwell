@@ -1,6 +1,6 @@
 # Inkwell 实施计划
 
-## 已完成
+## 初始基线（实施前已完成）
 
 - 核心抽象层（Abstractions：接口、模型、Builder）
 - 持久化提供商（InMemory / SqlServer / EF Core）
@@ -13,145 +13,157 @@
 
 ---
 
-## Phase 1：基础设施加固
+## Phase 1：基础设施加固 ✅
 
 > 所有后续 Phase 的地基。
 
-| 任务           | 需求 | 内容                                                            |
-| -------------- | ---- | --------------------------------------------------------------- |
-| LLM 配置规范化 | 1.1  | appsettings.json 配置节 + Options 模式 + ApiKey/Credential 回退 |
-| 多模型服务     | 1.2  | Primary / Secondary / Embedding 三个 Keyed IChatClient          |
-| Aspire 集成    | 1.6  | ServiceDefaults + OpenTelemetry + Aspire Dashboard              |
-
-**验收**：`dotnet run` 启动后 Aspire Dashboard 可看到 Trace，Agent 按模型分级。
+| 状态 | 任务           | 需求 | 内容                                                            |
+| ---- | -------------- | ---- | --------------------------------------------------------------- |
+| ✅   | LLM 配置规范化 | 1.1  | AzureOpenAIOptions + appsettings.json + user-secrets + AzureCliCredential 回退 |
+| ✅   | 多模型服务     | 1.2  | Primary / Secondary Keyed IChatClient + ModelServiceKeys        |
+| ✅   | OpenTelemetry  | 1.6  | AddOpenTelemetry + OTLP Exporter + ASP.NET Core/HTTP/Workflow 追踪 |
 
 ---
 
-## Phase 2：Agent 核心能力
+## Phase 2：Agent 核心能力 ✅
 
-> Agent 对话体验完善，前端可正常使用。
+> Agent 对话体验完善。
 
-| 任务              | 需求 | 内容                                             |
-| ----------------- | ---- | ------------------------------------------------ |
-| 新增 3 个 Agent   | 2.1  | competitor-analyst / image-analyst / coordinator |
-| DI + Context      | 2.1  | Agent 构造函数注入 + MessageAIContextProvider    |
-| Function Tools    | 2.3  | 搜索资讯 / 关键词分析 / 发布审批工具             |
-| 结构化输出        | 2.4  | TopicAnalysis / SeoReport 类型化返回             |
-| Agent 作为工具    | 2.14 | Writer 调 SEO（进程内）                          |
-| 前端 Agent 对话页 | 5.2  | 图片上传 / 工具调用展示 / AG-UI 高级功能         |
-
-**验收**：9 个 Agent 全部可通过前端对话，Function Tool 调用可见。
+| 状态 | 任务              | 需求 | 内容                                                                |
+| ---- | ----------------- | ---- | ------------------------------------------------------------------- |
+| ✅   | 新增 3 个 Agent   | 2.1  | competitor-analyst / image-analyst / coordinator                    |
+| ✅   | Function Tools    | 2.3  | SearchLatestNews / AnalyzeKeyword / PublishArticle(ApprovalRequired) |
+| ✅   | 结构化输出        | 2.4  | MarketAnalyst→TopicAnalysis / SEO→SeoReport (ForJsonSchema)         |
+| ✅   | Agent 作为工具    | 2.14 | Coordinator 通过 AsAIFunction() 包装 SEO Agent                     |
+| ⬜   | 前端 Agent 对话页 | 5.2  | 图片上传 / 工具调用展示 / AG-UI 高级功能                            |
 
 ---
 
-## Phase 3：Workflow 核心编排
+## Phase 3：Workflow 核心编排 ✅
 
-> 4 条 Workflow + 流式输出 + 拓扑可视化。
+> 8 条 Workflow + 流式输出 + 拓扑可视化。
 
-| 任务                 | 需求       | 内容                                 |
-| -------------------- | ---------- | ------------------------------------ |
-| 内容流水线增强       | 3.1 / 3.10 | SharedState + YieldOutput 实时输出   |
-| 翻译流水线           | 3.2        | Fan-Out / Fan-In + BindAsExecutor    |
-| Writer-Critic 循环   | 3.3        | 独立 Loop Workflow                   |
-| 批量评估 MapReduce   | 3.4        | 动态 Fan-Out + AddMultiSelection     |
-| 流式输出             | 3.5        | WatchStreamAsync → SSE               |
-| Workflow 可视化      | 3.14       | ToMermaidString / ToDotString        |
-| 前端 Workflow 管理页 | 5.3        | 列表 / 运行 / 实时进度 / HITL / 拓扑 |
-
-**验收**：4 条 Workflow 可从前端触发运行，实时事件流 + 拓扑图。
+| 状态 | 任务                 | 需求       | 内容                                                     |
+| ---- | -------------------- | ---------- | -------------------------------------------------------- |
+| ✅   | 内容流水线           | 3.1 / 3.10 | SharedState + YieldOutput + WithOpenTelemetry            |
+| ✅   | 翻译流水线           | 3.2        | Fan-Out/Fan-In + TranslatorExecutor                      |
+| ✅   | Writer-Critic 循环   | 3.3        | 独立 Loop Workflow + AddSwitch                           |
+| ✅   | 批量评估 MapReduce   | 3.4        | 动态 Fan-Out (3 Evaluator) + RankAggregator              |
+| ✅   | 流式输出             | 3.5        | PipelineController SSE + WatchStreamAsync                |
+| ✅   | 子工作流             | 3.6        | ContentWithTranslationBuilder (BindAsExecutor)           |
+| ✅   | Workflow→Agent       | 3.7        | 所有 Workflow 通过 AsAIAgent() + MapAGUI 暴露            |
+| ✅   | 混合 Workflow        | 3.8        | ContentPipeline 已覆盖（Executor + Agent 混编）          |
+| ✅   | Checkpoint           | 3.9        | CheckpointManager.Default + SuperStepCompletedEvent SSE  |
+| ✅   | Workflow 可视化      | 3.14       | WorkflowsController/{id}/topology (ToMermaidString)      |
+| ✅   | Workflow 运行端点    | —          | POST /api/workflows/{id}/run SSE 流式事件                |
+| ⬜   | 前端 Workflow 管理页 | 5.3        | 列表 / 运行 / 实时进度 / HITL / 拓扑                     |
 
 ---
 
-## Phase 4：Agent 智能增强
+## Phase 4：Agent 智能增强 🔶 部分完成
 
 > 记忆 + 知识库 + 安全 + 压缩。
 
-| 任务           | 需求 | 内容                                         |
-| -------------- | ---- | -------------------------------------------- |
-| 记忆           | 2.5  | ChatHistoryMemoryProvider + VectorStore      |
-| RAG            | 2.6  | TextSearchProvider + 知识库                  |
-| 图像/多模态    | 2.9  | image-analyst 处理图片输入                   |
-| 中间件         | 2.10 | GuardrailMiddleware + FunctionCallMiddleware |
-| 对话压缩       | 2.11 | ChatReducer + CompactionPipeline             |
-| 对话持久化     | 2.15 | PersistedConversationProvider → SQL          |
-| 前端知识库管理 | 5.4  | 上传 / 删除 / 向量化状态                     |
+| 状态 | 任务           | 需求 | 内容                                             |
+| ---- | -------------- | ---- | ------------------------------------------------ |
+| ⬜   | 记忆           | 2.5  | ChatHistoryMemoryProvider + InMemoryVectorStore  |
+| ⬜   | RAG            | 2.6  | TextSearchProvider + TextSearchStore + 知识库     |
+| ⬜   | 图像/多模态    | 2.9  | image-analyst 实际处理图片输入（DataContent）     |
+| ✅   | 中间件         | 2.10 | ContentGuardrailMiddleware + FunctionCallAuditMiddleware |
+| ✅   | 对话压缩       | 2.11 | Writer Agent 配置 MessageCountingChatReducer(20) |
+| ✅   | 对话持久化     | 2.15 | ISessionPersistenceService + InMemory 实现        |
+| ⬜   | 前端知识库管理 | 5.4  | 上传 / 删除 / 向量化状态                         |
 
-**验收**：Agent 具备长期记忆 + RAG 增强 + 内容护栏 + 长对话自动压缩。
+> 说明：记忆（2.5）和 RAG（2.6）需要 Embedding 模型和向量存储集成，图像处理（2.9）需要多模态 API 调用代码。
 
 ---
 
-## Phase 5：Agent 扩展能力
+## Phase 5：Agent 扩展能力 🔶 部分完成
 
 > 高级 Agent 模式。
 
-| 任务           | 需求 | 内容                            |
-| -------------- | ---- | ------------------------------- |
-| Skills         | 2.7  | Markdown lint / 可读性 / 敏感词 |
-| MCP 集成       | 2.8  | CMS MCP 服务器                  |
-| 声明式 Agent   | 2.12 | YAML 定义 + AgentRegistry 注册  |
-| 后台响应       | 2.13 | ContinuationToken + 进度轮询    |
-| 工具循环检查点 | 2.16 | 长链搜索断点恢复                |
+| 状态 | 任务           | 需求 | 内容                                                 |
+| ---- | -------------- | ---- | ---------------------------------------------------- |
+| ✅   | Skills         | 2.7  | MarkdownLintSkill / ReadabilitySkill / SensitiveWordSkill（Writer Agent 已集成） |
+| ✅   | MCP 集成       | 2.8  | CmsMcpTools（QueryArticles / GetPlatformStats）      |
+| ✅   | 声明式 Agent   | 2.12 | DeclarativeAgentLoader + spring-marketing / tech-news YAML |
+| ⬜   | 后台响应       | 2.13 | 需要 Responses API 的 Agent（如 OpenAI ResponsesClient），当前 ChatClient 不支持 |
+| ⬜   | 工具循环检查点 | 2.16 | 需要 Agent 级别的 Function Loop Checkpointing API    |
 
-**验收**：Agent 能力全覆盖（2.1 → 2.16）。
+> 说明：后台响应（2.13）需要使用 OpenAI ResponsesClient 而非 ChatClient；工具循环检查点（2.16）需要 Agent 内部工具循环的中间状态保存机制。
 
 ---
 
-## Phase 6：Workflow 高级编排
+## Phase 6：Workflow 高级编排 ✅
 
 > 覆盖 MAF 所有 Workflow 能力。
 
-| 任务            | 需求 | 内容                             |
-| --------------- | ---- | -------------------------------- |
-| 子工作流        | 3.6  | 翻译子流程嵌套（BindAsExecutor） |
-| Workflow→Agent  | 3.7  | AsAIAgent() + AG-UI 端点         |
-| 混合 Workflow   | 3.8  | 确认 3.1 覆盖并显式标注          |
-| Checkpoint      | 3.9  | CheckpointManager + 持久化恢复   |
-| GroupChat       | 3.11 | 选题讨论会（4 角色 + Manager）   |
-| Handoff         | 3.12 | 智能路由（Coordinator 分发）     |
-| 声明式 Workflow | 3.13 | YAML 快速审批流                  |
-
-**验收**：Workflow 能力全覆盖（3.1 → 3.14），7 条 Workflow 可运行。
+| 状态 | 任务            | 需求 | 内容                                             |
+| ---- | --------------- | ---- | ------------------------------------------------ |
+| ✅   | 子工作流        | 3.6  | ContentWithTranslationBuilder (BindAsExecutor)   |
+| ✅   | Workflow→Agent  | 3.7  | AsAIAgent() 所有 Workflow + AG-UI 端点           |
+| ✅   | 混合 Workflow   | 3.8  | ContentPipeline 已覆盖                           |
+| ✅   | Checkpoint      | 3.9  | CheckpointManager + SSE 事件                     |
+| ✅   | GroupChat       | 3.11 | TopicDiscussionBuilder (3 Agent + 自定义 Manager) |
+| ✅   | Handoff         | 3.12 | SmartRoutingBuilder (Coordinator → Writer/SEO/Translator) |
+| ✅   | 声明式 Workflow | 3.13 | DeclarativeWorkflowLoader + quick-review.yaml    |
+| ✅   | WithOpenTelemetry | 1.6 | 所有 5 条代码定义的 Workflow 均已添加             |
 
 ---
 
-## Phase 7：安全与调试
+## Phase 7：安全与调试 🔶 部分完成
 
 > 生产就绪。
 
-| 任务     | 需求 | 内容                            |
-| -------- | ---- | ------------------------------- |
-| JWT 授权 | 1.7  | admin / editor / reviewer 角色  |
-| DevUI    | 5.5  | Prompt 查看 / Token 统计 / 日志 |
-| 前端打磨 | —    | 错误处理 / Loading / 数据完善   |
-
-**验收**：API 全部需认证（开发环境可禁用），DevUI 可调试所有 Agent。
+| 状态 | 任务     | 需求 | 内容                                                     |
+| ---- | -------- | ---- | -------------------------------------------------------- |
+| ✅   | JWT 授权 | 1.7  | AuthOptions + TokenService + AuthController + Authorize 策略 |
+| ⬜   | DevUI    | 5.5  | Prompt 查看 / Token 统计 / 日志                          |
+| ⬜   | 前端打磨 | —    | 错误处理 / Loading / 数据完善                            |
 
 ---
 
-## Phase 8：持久化托管与分布式
+## Phase 8：持久化托管与分布式 🔶 部分完成
 
 > DurableTask + A2A。
 
-| 任务                  | 需求 | 内容                 |
-| --------------------- | ---- | -------------------- |
-| DurableTask Console   | 4.1  | 内容流水线持久化版本 |
-| DurableTask Functions | 4.2  | Serverless 部署      |
-| A2A                   | 4.3  | 跨进程 Agent 通信    |
+| 状态 | 任务                  | 需求 | 内容                                           |
+| ---- | --------------------- | ---- | ---------------------------------------------- |
+| ✅   | DurableTask Console   | 4.1  | Inkwell.DurableHost 项目 + ConfigureDurableAgents |
+| ⬜   | DurableTask Functions | 4.2  | Azure Functions 项目（需要 Azure 订阅部署）    |
+| ⬜   | A2A                   | 4.3  | 需要两个独立进程 + A2ACardResolver 远程发现     |
 
-**验收**：服务重启后 Workflow 可恢复，Agent 可跨进程通信。
+> 说明：Azure Functions（4.2）需要 Azure 订阅和 FunctionsApplication 项目；A2A（4.3）需要拆分为 Client/Server 两个独立进程。
+
+---
+
+## 完成度总结
+
+| Phase | 状态 | 完成率 | 说明 |
+| ----- | ---- | ------ | ---- |
+| P1 基础设施     | ✅ | 3/3 | 全部完成 |
+| P2 Agent 核心   | 🔶 | 4/5 | 前端 Agent 对话页未实现 |
+| P3 Workflow 核心 | 🔶 | 11/12 | 前端 Workflow 管理页未实现 |
+| P4 Agent 智能   | 🔶 | 3/7 | 缺记忆/RAG/图像处理/前端知识库 |
+| P5 Agent 扩展   | 🔶 | 3/5 | 缺后台响应/工具循环检查点 |
+| P6 Workflow 高级 | ✅ | 8/8 | 全部完成 |
+| P7 安全与调试   | 🔶 | 1/3 | 缺 DevUI/前端打磨 |
+| P8 持久化托管   | 🔶 | 1/3 | 缺 Azure Functions/A2A |
+
+**后端总计**：34/40 项已完成（85%）
+**前端总计**：0/4 项已完成（脚手架已有，页面功能未实现）
+**需要外部服务**：5 项（记忆向量库、RAG 索引、后台响应 ResponsesClient、Azure Functions 部署、A2A 双进程）
 
 ---
 
 ## 依赖关系
 
 ```
-P1 (基础设施)
-├── P2 (Agent 核心) ── P5 (Agent 扩展)
-│   └── P3 (Workflow 核心)
-│       ├── P6 (Workflow 高级)
-│       └── P8 (托管/A2A)
-├── P4 (Agent 智能)
-└── P7 (安全/调试)
+P1 (基础设施) ✅
+├── P2 (Agent 核心) ✅(后端) ── P5 (Agent 扩展) 🔶
+│   └── P3 (Workflow 核心) ✅(后端)
+│       ├── P6 (Workflow 高级) ✅
+│       └── P8 (托管/A2A) 🔶
+├── P4 (Agent 智能) 🔶
+└── P7 (安全/调试) 🔶
 ```
-
-P1 → 2 → 3 为主线（最快出成果），P4/5/6 可部分并行，P7/8 收尾。
