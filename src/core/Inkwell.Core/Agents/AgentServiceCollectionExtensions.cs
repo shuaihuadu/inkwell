@@ -66,8 +66,26 @@ public static class AgentServiceCollectionExtensions
     {
         AgentRegistry registry = new();
 
-        // Primary 模型 Agent
-        registry.Register(InkwellAgents.CreateWriter(primaryChatClient));
+        // 查找已注册的知识库服务（用于 Writer RAG）
+        KnowledgeBaseService? knowledgeBase = null;
+        foreach (ServiceDescriptor descriptor in services)
+        {
+            if (descriptor.ServiceType == typeof(KnowledgeBaseService)
+                && descriptor.ImplementationInstance is KnowledgeBaseService kb)
+            {
+                knowledgeBase = kb;
+                break;
+            }
+        }
+
+        // Primary 模型 Agent（Writer 集成 RAG）
+        List<Microsoft.Agents.AI.AIContextProvider> writerContextProviders = [];
+        if (knowledgeBase is not null)
+        {
+            writerContextProviders.Add(knowledgeBase.CreateSearchProvider());
+        }
+
+        registry.Register(InkwellAgents.CreateWriter(primaryChatClient, contextProviders: writerContextProviders));
         registry.Register(InkwellAgents.CreateCritic(primaryChatClient));
         registry.Register(InkwellAgents.CreateImageAnalyst(primaryChatClient));
 

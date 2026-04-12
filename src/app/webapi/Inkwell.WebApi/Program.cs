@@ -56,6 +56,24 @@ public static class Program
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
 
+        // 注册知识库服务 + 初始化示例文档
+        KnowledgeBaseService knowledgeBase = new();
+        knowledgeBase.AddDocument("Inkwell 品牌风格指南", """
+            Inkwell 是一个 AI 驱动的内容生产平台。
+            品牌调性：专业、创新、高效。
+            文章风格：结构清晰、数据驱动、面向行动。
+            目标读者：内容创作者、营销人员、企业编辑。
+            """);
+        knowledgeBase.AddDocument("SEO 最佳实践 2026", """
+            1. 标题控制在 60 字符以内，包含主关键词
+            2. 元描述 150-160 字符，包含行动号召
+            3. 正文前 100 字出现核心关键词
+            4. 使用 H2/H3 结构化内容
+            5. 图片包含 ALT 文本
+            6. 内链和外链平衡
+            """);
+        builder.Services.AddSingleton(knowledgeBase);
+
         // 加载声明式 Agent（YAML 定义）[M8 修复: 增加日志]
         ILogger<AgentRegistry> agentLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger<AgentRegistry>();
         string agentsDir = Path.Combine(builder.Environment.ContentRootPath, "Agents");

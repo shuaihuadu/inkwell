@@ -21,9 +21,15 @@ public static class InkwellAgents
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
     /// <param name="chatHistoryRetainCount">对话历史保留数量，默认 20</param>
+    /// <param name="contextProviders">额外的 AI 上下文提供程序（如 RAG TextSearchProvider）</param>
     /// <returns>Agent 注册信息</returns>
-    public static AgentRegistration CreateWriter(IChatClient chatClient, int chatHistoryRetainCount = DefaultChatHistoryRetainCount)
+    public static AgentRegistration CreateWriter(
+        IChatClient chatClient,
+        int chatHistoryRetainCount = DefaultChatHistoryRetainCount,
+        IEnumerable<AIContextProvider>? contextProviders = null)
     {
+        List<AIContextProvider> providers = contextProviders is not null ? [.. contextProviders] : [];
+
         AIAgent baseAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
             Name = "Writer",
@@ -34,6 +40,7 @@ public static class InkwellAgents
                     你的文章信息丰富、对目标受众有吸引力。注重清晰度、叙事性和可操作的见解。
                     你可以使用搜索工具获取最新资讯来丰富文章内容。
                     你也可以使用 Markdown 校验、可读性分析、敏感词扫描等技能来检查和改进文章。
+                    系统会自动从知识库中检索与你写作主题相关的参考资料，请善加利用。
                     请用中文回复。
                     """,
                 Tools =
@@ -44,14 +51,16 @@ public static class InkwellAgents
                     AIFunctionFactory.Create(SensitiveWordSkill.Scan)
                 ]
             },
-            // [M3 修复] 对话历史保留数从参数读取
+            // 对话历史保留数从参数读取
             ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
             {
                 ChatReducer = new MessageCountingChatReducer(chatHistoryRetainCount)
-            })
+            }),
+            // RAG 知识检索（如果配置了 TextSearchProvider）
+            AIContextProviders = providers.Count > 0 ? providers : null
         });
 
-        // [M4 修复] 应用中间件管线：护栏 + 函数调用审计
+        // 应用中间件管线：护栏
         AIAgent agent = baseAgent
             .AsBuilder()
             .Use(ContentGuardrailMiddleware.InvokeAsync, null)
