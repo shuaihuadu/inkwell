@@ -1,3 +1,4 @@
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,12 +24,13 @@ public static class WorkflowServiceCollectionExtensions
         WorkflowRegistry registry = new();
 
         // 1. 内容生产流水线（串行 + 并行 + HITL）
+        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient);
         registry.Register(new WorkflowRegistration
         {
             Id = "content-pipeline",
             Name = "内容生产流水线",
-            Description = "完整的内容生产流水线：选题分析(Fan-Out) → 写作(Writer-Critic Loop) → 人工审核(HITL)",
-            Workflow = ContentPipelineBuilder.Build(primaryChatClient)
+            Description = "选题分析(Fan-Out) → 写作(Writer-Critic Loop) → 人工审核(HITL)",
+            Workflow = contentPipeline
         });
 
         // 2. 多语言翻译流水线（Fan-Out / Fan-In）
@@ -47,6 +49,24 @@ public static class WorkflowServiceCollectionExtensions
             Name = "Writer-Critic 循环",
             Description = "写作-审核迭代循环，直到审核通过或达到最大修订次数",
             Workflow = WriterCriticLoopBuilder.Build(primaryChatClient)
+        });
+
+        // 4. 选题讨论会（GroupChat）
+        registry.Register(new WorkflowRegistration
+        {
+            Id = "topic-discussion",
+            Name = "选题讨论会",
+            Description = "市场分析师 + 内容编辑 + SEO 专家围绕选题轮流讨论（GroupChat）",
+            Workflow = TopicDiscussionBuilder.Build(secondaryChatClient)
+        });
+
+        // 5. 智能路由（Handoff）
+        registry.Register(new WorkflowRegistration
+        {
+            Id = "smart-routing",
+            Name = "智能路由",
+            Description = "Coordinator 根据问题类型自动切换到写作/SEO/翻译专家（Handoff）",
+            Workflow = SmartRoutingBuilder.Build(primaryChatClient, secondaryChatClient)
         });
 
         services.AddSingleton(registry);
