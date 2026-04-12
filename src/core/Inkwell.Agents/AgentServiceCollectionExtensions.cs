@@ -74,10 +74,15 @@ public static class AgentServiceCollectionExtensions
         // Secondary 模型 Agent
         registry.Register(InkwellAgents.CreateMarketAnalyst(secondaryChatClient));
         registry.Register(InkwellAgents.CreateCompetitorAnalyst(secondaryChatClient));
-        registry.Register(InkwellAgents.CreateSeoOptimizer(secondaryChatClient));
+
+        AgentRegistration seoRegistration = InkwellAgents.CreateSeoOptimizer(secondaryChatClient);
+        registry.Register(seoRegistration);
+
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "English"));
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "Japanese"));
-        registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient));
+
+        // Coordinator 将 SEO Agent 作为函数工具（Agent-as-Tool，需求 2.14）
+        registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient, seoRegistration.Agent));
 
         services.AddSingleton(registry);
 

@@ -138,6 +138,7 @@ public static class ContentPipelineBuilder
             .AddEdge(reviewPort, reviewGate)
             .AddEdge<TopicAnalysis>(reviewGate, writer, condition: null)
             .WithOutputFrom(analysisAggregation, reviewGate)
+            .WithOpenTelemetry()
             .Build();
     }
 }

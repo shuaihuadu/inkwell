@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Inkwell.Workflows;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.AspNetCore.Mvc;
@@ -81,4 +82,88 @@ public sealed class WorkflowsController(WorkflowRegistry workflowRegistry) : Con
             topology = mermaid
         });
     }
+
+    /// <summary>
+    /// 运行指定 Workflow（SSE 流式事件，支持 Checkpoint）
+    /// </summary>
+    /// <param name="id">Workflow ID</param>
+    /// <param name="request">运行请求</param>
+    /// <returns>SSE 事件流</returns>
+    [HttpPost("{id}/run")]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task RunWorkflowAsync(string id, [FromBody] WorkflowRunRequest request)
+    {
+        WorkflowRegistration? registration = workflowRegistry.GetById(id);
+
+        if (registration is null)
+        {
+            this.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        // 设置 SSE 响应头
+        this.Response.ContentType = "text/event-stream";
+        this.Response.Headers.CacheControl = "no-cache";
+        this.Response.Headers.Connection = "keep-alive";
+
+        StreamWriter writer = new(this.Response.Body);
+
+        // 使用 CheckpointManager（需求 3.9）
+        CheckpointManager checkpointManager = CheckpointManager.Default;
+
+        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
+            registration.Workflow, request.Input, checkpointManager);
+
+        await foreach (WorkflowEvent evt in run.WatchStreamAsync())
+        {
+            string eventData = evt switch
+            {
+                WorkflowOutputEvent output => JsonSerializer.Serialize(new
+                {
+                    type = "output",
+                    workflowId = id,
+                    data = output.Data?.ToString(),
+                    executorId = output.ExecutorId
+                }),
+                ExecutorCompletedEvent completed => JsonSerializer.Serialize(new
+                {
+                    type = "executor_complete",
+                    workflowId = id,
+                    executorId = completed.ExecutorId,
+                    data = completed.Data?.ToString()
+                }),
+                SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
+                {
+                    type = "checkpoint",
+                    workflowId = id,
+                    hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null
+                }),
+                _ => string.Empty
+            };
+
+            if (!string.IsNullOrEmpty(eventData))
+            {
+                await writer.WriteLineAsync($"data: {eventData}");
+                await writer.WriteLineAsync();
+                await writer.FlushAsync();
+            }
+        }
+
+        await writer.WriteLineAsync($"data: {{\"type\":\"done\",\"workflowId\":\"{id}\"}}");
+        await writer.WriteLineAsync();
+        await writer.FlushAsync();
+    }
+}
+
+/// <summary>
+/// Workflow 运行请求
+/// </summary>
+public sealed class WorkflowRunRequest
+{
+    /// <summary>
+    /// 获取或设置输入内容
+    /// </summary>
+    public string Input { get; set; } = string.Empty;
 }

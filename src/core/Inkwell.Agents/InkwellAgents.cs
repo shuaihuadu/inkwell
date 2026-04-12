@@ -212,12 +212,24 @@ public static class InkwellAgents
     }
 
     /// <summary>
-    /// 创建智能调度 Agent（Coordinator，带发布审批工具）
+    /// 创建智能调度 Agent（Coordinator，带发布审批工具 + SEO Agent 作为函数工具）
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
+    /// <param name="seoAgent">SEO Agent 实例，包装为函数工具供 Coordinator 调用</param>
     /// <returns>Agent 注册信息</returns>
-    public static AgentRegistration CreateCoordinator(IChatClient chatClient)
+    public static AgentRegistration CreateCoordinator(IChatClient chatClient, AIAgent? seoAgent = null)
     {
+        List<AITool> tools =
+        [
+            new ApprovalRequiredAIFunction(AIFunctionFactory.Create(InkwellTools.PublishArticle))
+        ];
+
+        // Agent-as-Tool (2.14)：将 SEO Agent 包装为函数工具
+        if (seoAgent is not null)
+        {
+            tools.Add(seoAgent.AsAIFunction());
+        }
+
         AIAgent agent = chatClient.AsAIAgent(
             instructions: """
                 你是 Inkwell 内容平台的智能助手。你的职责是：
@@ -227,14 +239,14 @@ public static class InkwellAgents
                    - 审核文章 → 建议使用「内容审核」Agent
                    - 分析市场/选题 → 建议使用「市场分析」Agent
                    - 分析竞品 → 建议使用「竞品分析」Agent
-                   - SEO 优化 → 建议使用「SEO 优化」Agent
+                   - SEO 优化 → 可直接使用内置的 SEO 分析工具
                    - 翻译内容 → 建议使用对应语言的翻译 Agent
                    - 分析图片 → 建议使用「图片分析」Agent
                 3. 回答关于平台功能的一般性问题
                 4. 在用户确认后，可以调用发布工具发布文章
                 请用中文回复。保持友好专业的对话风格。
                 """,
-            tools: [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(InkwellTools.PublishArticle))]);
+            tools: tools);
 
         return new AgentRegistration
         {

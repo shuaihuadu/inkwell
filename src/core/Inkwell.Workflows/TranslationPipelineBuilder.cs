@@ -69,7 +69,8 @@ public static class TranslationPipelineBuilder
             .WithDescription("Multi-language translation pipeline using Fan-Out/Fan-In pattern")
             .AddFanOutEdge(dispatch, translatorBindings)
             .AddFanInBarrierEdge(translatorBindings, aggregation)
-            .WithOutputFrom(aggregation);
+            .WithOutputFrom(aggregation)
+            .WithOpenTelemetry();
 
         return builder.Build();
     }

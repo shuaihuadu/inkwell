@@ -73,6 +73,7 @@ public static class BatchEvaluationBuilder
             .AddFanOutEdge(dispatch, evaluatorBindings)
             .AddFanInBarrierEdge(evaluatorBindings, aggregator)
             .WithOutputFrom(aggregator)
+            .WithOpenTelemetry()
             .Build();
     }
 }

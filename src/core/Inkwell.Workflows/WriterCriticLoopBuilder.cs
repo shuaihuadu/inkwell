@@ -73,6 +73,7 @@ public static class WriterCriticLoopBuilder
                 .AddCase<Article>(a => a?.Status == ArticleStatus.Approved, null!)
                 .WithDefault(writer))
             .WithOutputFrom(critic)
+            .WithOpenTelemetry()
             .Build();
     }
 }

@@ -59,6 +59,7 @@ public static class ContentWithTranslationBuilder
             .WithDescription("Content creation + automatic multi-language translation via SubWorkflow (BindAsExecutor)")
             .AddEdge(writer, translationExecutor)
             .WithOutputFrom(translationExecutor)
+            .WithOpenTelemetry()
             .Build();
     }
 }

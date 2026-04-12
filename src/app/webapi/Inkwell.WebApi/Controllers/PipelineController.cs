@@ -1,6 +1,4 @@
 ﻿using System.Text.Json;
-using Azure.AI.OpenAI;
-using Azure.Identity;
 using Inkwell;
 using Inkwell.Workflows;
 using Microsoft.Agents.AI.Workflows;
@@ -15,7 +13,7 @@ namespace Inkwell.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public sealed class PipelineController(
-    IConfiguration configuration,
+    IChatClient chatClient,
     IPipelineRunPersistenceProvider runProvider) : ControllerBase
 {
     /// <summary>
@@ -48,7 +46,7 @@ public sealed class PipelineController(
     }
 
     /// <summary>
-    /// 启动内容生产流水线（SSE 流式返回事件）
+    /// 启动内容生产流水线（SSE 流式返回事件，支持 Checkpoint）
     /// </summary>
     /// <param name="request">运行请求</param>
     /// <returns>SSE 事件流</returns>
@@ -57,14 +55,6 @@ public sealed class PipelineController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task RunAsync([FromBody] PipelineRunRequest request)
     {
-        string endpoint = configuration["AZURE_OPENAI_ENDPOINT"]
-            ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT is not configured.");
-        string deploymentName = configuration["AZURE_OPENAI_DEPLOYMENT_NAME"] ?? "gpt-4o-mini";
-
-        IChatClient chatClient = new AzureOpenAIClient(new Uri(endpoint), new AzureCliCredential())
-            .GetChatClient(deploymentName)
-            .AsIChatClient();
-
         Workflow workflow = ContentPipelineBuilder.Build(chatClient, maxRevisions: request.MaxRevisions);
 
         // 创建运行记录
@@ -84,7 +74,11 @@ public sealed class PipelineController(
 
         StreamWriter writer = new(this.Response.Body);
 
-        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, request.Topic);
+        // 使用 CheckpointManager 支持检查点（需求 3.9）
+        CheckpointManager checkpointManager = CheckpointManager.Default;
+
+        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
+            workflow, request.Topic, checkpointManager);
 
         await foreach (WorkflowEvent evt in run.WatchStreamAsync())
         {
@@ -104,6 +98,13 @@ public sealed class PipelineController(
                     runId = runRecord.Id,
                     executorId = completed.ExecutorId,
                     data = completed.Data?.ToString(),
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                }),
+                SuperStepCompletedEvent superStep => JsonSerializer.Serialize(new
+                {
+                    type = "checkpoint",
+                    runId = runRecord.Id,
+                    hasCheckpoint = superStep.CompletionInfo?.Checkpoint is not null,
                     timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
                 }),
                 RequestInfoEvent requestInfo => JsonSerializer.Serialize(new
