@@ -69,12 +69,15 @@ public static class AgentServiceCollectionExtensions
         // Primary 模型 Agent
         registry.Register(InkwellAgents.CreateWriter(primaryChatClient));
         registry.Register(InkwellAgents.CreateCritic(primaryChatClient));
+        registry.Register(InkwellAgents.CreateImageAnalyst(primaryChatClient));
 
         // Secondary 模型 Agent
         registry.Register(InkwellAgents.CreateMarketAnalyst(secondaryChatClient));
+        registry.Register(InkwellAgents.CreateCompetitorAnalyst(secondaryChatClient));
         registry.Register(InkwellAgents.CreateSeoOptimizer(secondaryChatClient));
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "English"));
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "Japanese"));
+        registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient));
 
         services.AddSingleton(registry);
 
