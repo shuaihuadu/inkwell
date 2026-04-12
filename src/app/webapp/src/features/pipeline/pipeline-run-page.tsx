@@ -4,8 +4,7 @@ import { ClearOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Bubble, Sender } from "@ant-design/x";
 import { useAGUIAgent } from "../../hooks/use-agui-agent";
 import type { ChatMessage } from "../../hooks/use-agui-agent";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../services/api";
 
 interface AgentInfo {
   id: string;

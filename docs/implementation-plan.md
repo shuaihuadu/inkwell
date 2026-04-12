@@ -35,7 +35,7 @@
 | ✅    | Function Tools    | 2.3  | SearchLatestNews / AnalyzeKeyword / PublishArticle(ApprovalRequired) |
 | ✅    | 结构化输出        | 2.4  | MarketAnalyst→TopicAnalysis / SEO→SeoReport (ForJsonSchema)          |
 | ✅    | Agent 作为工具    | 2.14 | Coordinator 通过 AsAIFunction() 包装 SEO Agent                       |
-| ✅    | 前端 Agent 对话页 | 5.2  | Agent 选择器 + Bubble/Sender AG-UI SSE 对话 + 新对话             |
+| ✅    | 前端 Agent 对话页 | 5.2  | Agent 选择器 + Bubble/Sender AG-UI SSE 对话 + 新对话                 |
 
 ---
 
@@ -56,7 +56,7 @@
 | ✅    | Checkpoint           | 3.9        | CheckpointManager.Default + SuperStepCompletedEvent SSE |
 | ✅    | Workflow 可视化      | 3.14       | WorkflowsController/{id}/topology (ToMermaidString)     |
 | ✅    | Workflow 运行端点    | —          | POST /api/workflows/{id}/run SSE 流式事件               |
-| ✅    | 前端 Workflow 管理页 | 5.3  | 列表 / Mermaid 拓扑 / SSE 实时运行 / 事件流展示                    |
+| ✅    | 前端 Workflow 管理页 | 5.3        | 列表 / Mermaid 拓扑 / SSE 实时运行 / 事件流展示         |
 
 ---
 
@@ -72,7 +72,7 @@
 | ✅    | 中间件         | 2.10 | ContentGuardrailMiddleware + FunctionCallAuditMiddleware                         |
 | ✅    | 对话压缩       | 2.11 | Writer Agent 配置 MessageCountingChatReducer(20)                                 |
 | ✅    | 对话持久化     | 2.15 | ISessionPersistenceService + InMemory 实现                                       |
-| ✅    | 前端知识库管理 | 5.4  | 上传文档 / 列表 / 删除 / 字数统计                            |
+| ✅    | 前端知识库管理 | 5.4  | 上传文档 / 列表 / 删除 / 字数统计                                                |
 
 ---
 
@@ -85,7 +85,7 @@
 | ✅    | Skills         | 2.7  | MarkdownLintSkill / ReadabilitySkill / SensitiveWordSkill（Writer Agent 已集成） |
 | ✅    | MCP 集成       | 2.8  | CmsMcpTools（QueryArticles / GetPlatformStats）                                  |
 | ✅    | 声明式 Agent   | 2.12 | DeclarativeAgentLoader + spring-marketing / tech-news YAML                       |
-| ⬜    | 后台响应       | 2.13 | 需要 Responses API 的 Agent（如 OpenAI ResponsesClient），当前 ChatClient 不支持 |
+| ✅    | 后台响应       | 2.13 | BackgroundController (AllowBackgroundResponses + 轮询结果)               |
 | ⬜    | 工具循环检查点 | 2.16 | 需要 Agent 级别的 Function Loop Checkpointing API                                |
 
 > 说明：后台响应（2.13）需要使用 OpenAI ResponsesClient 而非 ChatClient；工具循环检查点（2.16）需要 Agent 内部工具循环的中间状态保存机制。
@@ -137,19 +137,19 @@
 
 ## 完成度总结
 
-| Phase            | 状态 | 完成率 | 说明                       |
-| ---------------- | ---- | ------ | -------------------------- |
-| P1 基础设施      | ✅    | 3/3    | 全部完成                   |
-| P2 Agent 核心    | ✅    | 5/5    | 全部完成                   |
-| P3 Workflow 核心 | ✅    | 12/12  | 全部完成                   |
-| P4 Agent 智能    | ✅    | 7/7    | 全部完成                   |
-| P5 Agent 扩展    | 🔶    | 3/5    | 缺后台响应/工具循环检查点  |
+| Phase            | 状态 | 完成率 | 说明                      |
+| ---------------- | ---- | ------ | ------------------------- |
+| P1 基础设施      | ✅    | 3/3    | 全部完成                  |
+| P2 Agent 核心    | ✅    | 5/5    | 全部完成                  |
+| P3 Workflow 核心 | ✅    | 12/12  | 全部完成                  |
+| P4 Agent 智能    | ✅    | 7/7    | 全部完成                  |
+| P5 Agent 扩展    | 🔶    | 4/5    | 缺工具循环检查点          |
 | P6 Workflow 高级 | ✅    | 8/8    | 全部完成                   |
-| P7 安全与调试    | 🔶    | 2/3    | 缺前端打磨                 |
-| P8 持久化托管    | 🔶    | 2/3    | 缺 A2A                     |
+| P7 安全与调试    | ✅    | 3/3    | 全部完成                   |
+| P8 持久化托管    | 🔶    | 2/3    | 缺 A2A                    |
 
-**后端总计**：39/40 项已完成（97.5%）
-**前端总计**：3/3 项已完成（Agent 对话 / Workflow 管理 / 知识库）
+**后端总计**：40/41 项已完成（97.6%）
+**前端总计**：4/4 项已完成（Dashboard + Agent 对话 + Workflow 管理 + 知识库 + 错误边界）
 **需要外部服务**：5 项（记忆向量库、RAG 索引、后台响应 ResponsesClient、Azure Functions 部署、A2A 双进程）
 
 ---

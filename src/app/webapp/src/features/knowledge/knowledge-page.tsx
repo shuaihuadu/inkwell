@@ -17,8 +17,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../services/api";
 
 interface KnowledgeDocument {
   id: string;

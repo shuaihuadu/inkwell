@@ -17,8 +17,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../services/api";
 
 interface WorkflowInfo {
   id: string;
@@ -94,7 +93,7 @@ export default function WorkflowPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ input: runInput }),
-        }
+        },
       );
 
       const reader = res.body?.getReader();
@@ -257,28 +256,30 @@ export default function WorkflowPage() {
           {runEvents.map((evt, i) => (
             <div
               key={i}
-              style={{ marginBottom: 8, borderBottom: "1px solid #f0f0f0", paddingBottom: 8 }}
+              style={{
+                marginBottom: 8,
+                borderBottom: "1px solid #f0f0f0",
+                paddingBottom: 8,
+              }}
             >
               <Tag
                 color={
                   evt.type === "output"
                     ? "green"
                     : evt.type === "executor_complete"
-                    ? "blue"
-                    : evt.type === "checkpoint"
-                    ? "orange"
-                    : evt.type === "error"
-                    ? "red"
-                    : evt.type === "done"
-                    ? "cyan"
-                    : "default"
+                      ? "blue"
+                      : evt.type === "checkpoint"
+                        ? "orange"
+                        : evt.type === "error"
+                          ? "red"
+                          : evt.type === "done"
+                            ? "cyan"
+                            : "default"
                 }
               >
                 {evt.type}
               </Tag>
-              {evt.executorId && (
-                <Tag color="purple">{evt.executorId}</Tag>
-              )}
+              {evt.executorId && <Tag color="purple">{evt.executorId}</Tag>}
               {evt.data && (
                 <div style={{ marginTop: 4 }}>
                   <ReactMarkdown>{evt.data}</ReactMarkdown>

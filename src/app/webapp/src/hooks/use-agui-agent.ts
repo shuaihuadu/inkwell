@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { RunAgentInput, AGUIMessage } from "../services/agui-types";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../services/api";
 
 export interface ChatMessage {
   id: string;

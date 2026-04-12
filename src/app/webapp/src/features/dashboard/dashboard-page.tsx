@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Col, Row, Statistic, Typography, Empty, Spin, Table } from "antd";
+import { Card, Col, Row, Statistic, Typography, Empty, Spin, Table, Tag } from "antd";
 import {
   FileTextOutlined,
   ThunderboltOutlined,
@@ -7,8 +7,7 @@ import {
   RobotOutlined,
   ApartmentOutlined,
 } from "@ant-design/icons";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../../services/api";
 
 interface DashboardStats {
   agentCount: number;
@@ -141,26 +140,51 @@ export default function DashboardPage() {
         {runs.length === 0 ? (
           <Empty description="暂无运行记录" />
         ) : (
-          <table style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: 8 }}>主题</th>
-                <th style={{ textAlign: "left", padding: 8 }}>状态</th>
-                <th style={{ textAlign: "left", padding: 8 }}>开始时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.id}>
-                  <td style={{ padding: 8 }}>{run.topic}</td>
-                  <td style={{ padding: 8 }}>{run.status}</td>
-                  <td style={{ padding: 8 }}>
-                    {new Date(run.startedAt).toLocaleString("zh-CN")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table
+            dataSource={runs}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            columns={[
+              {
+                title: "主题",
+                dataIndex: "topic",
+                key: "topic",
+                render: (text: string) => <strong>{text}</strong>,
+              },
+              {
+                title: "状态",
+                dataIndex: "status",
+                key: "status",
+                width: 120,
+                render: (status: string) => (
+                  <Tag
+                    color={
+                      status === "Completed"
+                        ? "green"
+                        : status === "Running"
+                        ? "blue"
+                        : status === "Failed"
+                        ? "red"
+                        : status === "Cancelled"
+                        ? "orange"
+                        : "default"
+                    }
+                  >
+                    {status}
+                  </Tag>
+                ),
+              },
+              {
+                title: "开始时间",
+                dataIndex: "startedAt",
+                key: "startedAt",
+                width: 180,
+                render: (date: string) =>
+                  new Date(date).toLocaleString("zh-CN"),
+              },
+            ]}
+          />
         )}
       </Card>
     </div>
