@@ -40,6 +40,12 @@
         <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
         <!-- A2A -->
         <PackageVersion Include="A2A" Version="0.3.4-preview" />
+        <!-- Azure Functions -->
+        <PackageVersion Include="Microsoft.Agents.AI.Hosting.AzureFunctions" Version="1.1.0-preview.260410.1" />
+        <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.50.0" />
+        <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.DurableTask" Version="1.12.1" />
+        <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.0.0" />
+        <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.4" />
         <!-- OpenTelemetry -->
         <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
         <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />

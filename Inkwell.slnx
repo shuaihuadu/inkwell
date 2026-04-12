@@ -12,5 +12,6 @@
     <Folder Name="/src/app/">
         <Project Path="src/app/webapi/Inkwell.WebApi/Inkwell.WebApi.csproj" />
         <Project Path="src/app/durable-host/Inkwell.DurableHost/Inkwell.DurableHost.csproj" />
+        <Project Path="src/app/functions/Inkwell.Functions/Inkwell.Functions.csproj" />
     </Folder>
 </Solution>

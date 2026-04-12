@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Inkwell.Functions</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Azure.AI.OpenAI" />
+        <PackageReference Include="Azure.Identity" />
+        <PackageReference Include="Microsoft.Agents.AI" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.AzureFunctions" />
+        <PackageReference Include="Microsoft.Azure.Functions.Worker" />
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" />
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" />
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="host.json" CopyToOutputDirectory="PreserveNewest" />
+        <None Update="local.settings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    </ItemGroup>
+
+</Project>
