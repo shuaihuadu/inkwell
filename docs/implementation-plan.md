@@ -66,15 +66,13 @@
 
 | 状态 | 任务           | 需求 | 内容                                                     |
 | ---- | -------------- | ---- | -------------------------------------------------------- |
-| ⬜    | 记忆           | 2.5  | ChatHistoryMemoryProvider + InMemoryVectorStore          |
-| ⬜    | RAG            | 2.6  | TextSearchProvider + TextSearchStore + 知识库            |
+| ✅    | 记忆           | 2.5  | AgentMemoryService (ChatHistoryMemoryProvider + InMemoryVectorStore) |
+| ✅    | RAG            | 2.6  | KnowledgeBaseService (TextSearchProvider + 关键词检索) + KnowledgeController API |
 | ⬜    | 图像/多模态    | 2.9  | image-analyst 实际处理图片输入（DataContent）            |
 | ✅    | 中间件         | 2.10 | ContentGuardrailMiddleware + FunctionCallAuditMiddleware |
 | ✅    | 对话压缩       | 2.11 | Writer Agent 配置 MessageCountingChatReducer(20)         |
 | ✅    | 对话持久化     | 2.15 | ISessionPersistenceService + InMemory 实现               |
 | ⬜    | 前端知识库管理 | 5.4  | 上传 / 删除 / 向量化状态                                 |
-
-> 说明：记忆（2.5）和 RAG（2.6）需要 Embedding 模型和向量存储集成，图像处理（2.9）需要多模态 API 调用代码。
 
 ---
 
@@ -144,13 +142,13 @@
 | P1 基础设施      | ✅    | 3/3    | 全部完成                       |
 | P2 Agent 核心    | 🔶    | 4/5    | 前端 Agent 对话页未实现        |
 | P3 Workflow 核心 | 🔶    | 11/12  | 前端 Workflow 管理页未实现     |
-| P4 Agent 智能    | 🔶    | 3/7    | 缺记忆/RAG/图像处理/前端知识库 |
+| P4 Agent 智能    | 🔶    | 5/7    | 缺图像处理/前端知识库           |
 | P5 Agent 扩展    | 🔶    | 3/5    | 缺后台响应/工具循环检查点      |
 | P6 Workflow 高级 | ✅    | 8/8    | 全部完成                       |
 | P7 安全与调试    | 🔶    | 1/3    | 缺 DevUI/前端打磨              |
 | P8 持久化托管    | 🔶    | 1/3    | 缺 Azure Functions/A2A         |
 
-**后端总计**：34/40 项已完成（85%）
+**后端总计**：36/40 项已完成ﾈ90%）
 **前端总计**：0/4 项已完成（脚手架已有，页面功能未实现）
 **需要外部服务**：5 项（记忆向量库、RAG 索引、后台响应 ResponsesClient、Azure Functions 部署、A2A 双进程）
 
