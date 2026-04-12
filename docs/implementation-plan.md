@@ -60,7 +60,7 @@
 
 ---
 
-## Phase 4：Agent 智能增强 🔶 部分完成
+## Phase 4：Agent 智能增强 ✅
 
 > 记忆 + 知识库 + 安全 + 压缩。
 
@@ -76,7 +76,7 @@
 
 ---
 
-## Phase 5：Agent 扩展能力 🔶 部分完成
+## Phase 5：Agent 扩展能力 ✅
 
 > 高级 Agent 模式。
 
@@ -109,7 +109,7 @@
 
 ---
 
-## Phase 7：安全与调试 🔶 部分完成
+## Phase 7：安全与调试 ✅
 
 > 生产就绪。
 
@@ -117,11 +117,11 @@
 | ---- | -------- | ---- | --------------------------------------------------------------- |
 | ✅    | JWT 授权 | 1.7  | AuthOptions + TokenService + AuthController + Authorize 策略    |
 | ✅    | DevUI    | 5.5  | DevController (diagnostics / agent-debug / workflow-topologies) |
-| ⬜    | 前端打磨 | —    | 错误处理 / Loading / 数据完善                                   |
+| ✅    | 前端打磨 | —    | ErrorBoundary + API_BASE 抽取 + Dashboard Table/Tag 升级            |
 
 ---
 
-## Phase 8：持久化托管与分布式 🔶 部分完成
+## Phase 8：持久化托管与分布式 ✅
 
 > DurableTask + A2A。
 
@@ -158,10 +158,10 @@
 
 ```
 P1 (基础设施) ✅
-├── P2 (Agent 核心) ✅(后端) ── P5 (Agent 扩展) 🔶
-│   └── P3 (Workflow 核心) ✅(后端)
+├── P2 (Agent 核心) ✅ ── P5 (Agent 扩展) ✅
+│   └── P3 (Workflow 核心) ✅
 │       ├── P6 (Workflow 高级) ✅
-│       └── P8 (托管/A2A) 🔶
-├── P4 (Agent 智能) 🔶
-└── P7 (安全/调试) 🔶
+│       └── P8 (托管/A2A) ✅
+├── P4 (Agent 智能) ✅
+└── P7 (安全/调试) ✅
 ```
