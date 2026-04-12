@@ -1,5 +1,10 @@
 import { Layout, Menu, Typography } from "antd";
-import { DashboardOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import {
+  DashboardOutlined,
+  MessageOutlined,
+  ApartmentOutlined,
+  BookOutlined,
+} from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 
 const { Header, Sider, Content } = Layout;
@@ -11,9 +16,19 @@ const menuItems = [
     label: "Dashboard",
   },
   {
-    key: "/pipeline/run",
-    icon: <ThunderboltOutlined />,
-    label: "运行流水线",
+    key: "/chat",
+    icon: <MessageOutlined />,
+    label: "Agent 对话",
+  },
+  {
+    key: "/workflows",
+    icon: <ApartmentOutlined />,
+    label: "Workflow 管理",
+  },
+  {
+    key: "/knowledge",
+    icon: <BookOutlined />,
+    label: "知识库",
   },
 ];
 
