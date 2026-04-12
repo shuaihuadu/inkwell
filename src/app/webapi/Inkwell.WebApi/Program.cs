@@ -48,6 +48,9 @@ public static class Program
         // 注册 CMS MCP 工具服务
         builder.Services.AddSingleton<CmsMcpTools>();
 
+        // 注册认证与授权服务
+        builder.Services.AddInkwellAuth(builder.Configuration);
+
         // 注册所有 Workflow
         WorkflowRegistry workflowRegistry = builder.Services.AddInkwellWorkflows();
 
@@ -82,6 +85,11 @@ public static class Program
         WebApplication app = builder.Build();
 
         app.UseCors();
+
+        // 认证/授权中间件（Auth.Enabled=false 时不会拦截请求）
+        app.UseAuthentication();
+        app.UseAuthorization();
+
         app.MapControllers();
 
         // ========== 为每个 Agent 映射 AG-UI 端点 ==========
