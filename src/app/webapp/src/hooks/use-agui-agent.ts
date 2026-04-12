@@ -25,7 +25,7 @@ export interface UseAGUIAgentReturn {
  * 自定义 Hook：对接后端 AG-UI 端点
  * 通过 SSE 流式接收 Agent 响应
  */
-export function useAGUIAgent(): UseAGUIAgentReturn {
+export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAgentReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -71,7 +71,7 @@ export function useAGUIAgent(): UseAGUIAgentReturn {
       try {
         abortRef.current = new AbortController();
 
-        const response = await fetch(`${API_BASE}/api/agui`, {
+        const response = await fetch(`${API_BASE}${aguiRoute}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),

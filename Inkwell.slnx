@@ -1,6 +1,7 @@
 ﻿<Solution>
     <Folder Name="/src/core/">
         <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
+        <Project Path="src/core/Inkwell.Agents/Inkwell.Agents.csproj" />
         <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
         <Project Path="src/core/Inkwell.Workflows/Inkwell.Workflows.csproj" />
     </Folder>

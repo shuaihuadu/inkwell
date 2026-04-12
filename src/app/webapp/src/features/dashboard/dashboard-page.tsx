@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
-import { Card, Col, Row, Statistic, Typography, Empty, Spin } from "antd";
+import { Card, Col, Row, Statistic, Typography, Empty, Spin, Table } from "antd";
 import {
   FileTextOutlined,
   ThunderboltOutlined,
   CheckCircleOutlined,
+  RobotOutlined,
+  ApartmentOutlined,
 } from "@ant-design/icons";
 
 const API_BASE = "http://localhost:5000";
 
 interface DashboardStats {
+  agentCount: number;
+  workflowCount: number;
   totalRuns: number;
   publishedArticles: number;
+  totalArticles: number;
   completedRuns: number;
   approvalRate: number;
 }
@@ -59,13 +64,56 @@ export default function DashboardPage() {
   return (
     <div>
       <Typography.Title level={3}>Dashboard</Typography.Title>
+
+      {/* 第一行：Agent / Workflow / 运行次数 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Agent 数量"
+              value={stats?.agentCount ?? 0}
+              prefix={<RobotOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Workflow 数量"
+              value={stats?.workflowCount ?? 0}
+              prefix={<ApartmentOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="流水线运行"
+              value={stats?.totalRuns ?? 0}
+              prefix={<ThunderboltOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="审核通过率"
+              value={stats?.approvalRate ?? 0}
+              suffix="%"
+              prefix={<CheckCircleOutlined />}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 第二行：文章统计 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={8}>
           <Card>
             <Statistic
-              title="流水线运行次数"
-              value={stats?.totalRuns ?? 0}
-              prefix={<ThunderboltOutlined />}
+              title="文章总数"
+              value={stats?.totalArticles ?? 0}
+              prefix={<FileTextOutlined />}
             />
           </Card>
         </Col>
@@ -74,6 +122,7 @@ export default function DashboardPage() {
             <Statistic
               title="已发布文章"
               value={stats?.publishedArticles ?? 0}
+              valueStyle={{ color: "#3f8600" }}
               prefix={<FileTextOutlined />}
             />
           </Card>
@@ -81,9 +130,8 @@ export default function DashboardPage() {
         <Col span={8}>
           <Card>
             <Statistic
-              title="审核通过率"
-              value={stats?.approvalRate ?? 0}
-              suffix="%"
+              title="已完成运行"
+              value={stats?.completedRuns ?? 0}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
