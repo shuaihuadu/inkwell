@@ -120,22 +120,20 @@ InputDispatch ─── Fan-Out ──▶ MarketAnalysis ──┐
 Inkwell/
 ├── src/
 │   ├── core/
-│   │   ├── Inkwell.Core/              # 业务模型（Article, TopicAnalysis, ReviewDecision）
-│   │   └── Inkwell.Workflows/         # Workflow 定义和 Executor
-│   │       ├── Executors/
-│   │       │   ├── InputDispatchExecutor.cs
-│   │       │   ├── MarketAnalysisExecutor.cs
-│   │       │   ├── CompetitorAnalysisExecutor.cs
-│   │       │   ├── AnalysisAggregationExecutor.cs
-│   │       │   ├── WriterExecutor.cs
-│   │       │   ├── CriticExecutor.cs
-│   │       │   └── ReviewGateExecutor.cs
-│   │       └── ContentPipelineBuilder.cs
+│   │   ├── Inkwell.Abstractions/       # 接口 + 模型
+│   │   ├── Inkwell.Core/              # 默认实现（InMemory 队列、本地文件存储）
+│   │   ├── Inkwell.Workflows/         # MAF Workflow 定义和 Executor
+│   │   └── providers/                  # 可插拔提供程序
+│   │       ├── Inkwell.Persistence.EntityFrameworkCore/
+│   │       ├── Inkwell.Persistence.InMemory/
+│   │       ├── Inkwell.Persistence.SqlServer/
+│   │       └── Inkwell.Queue.Redis/
 │   └── app/
-│       └── console/
-│           └── Inkwell.ConsoleApp/     # 控制台入口
+│       ├── webapi/Inkwell.WebApi/      # ASP.NET Core Web API
+│       └── webapp/                     # React 前端
 ├── docs/
-│   └── requirements.md                # 需求文档
+│   ├── architecture.md                 # 架构设计文档
+│   └── requirements.md                 # 需求文档
 ├── Inkwell.slnx
 ├── Directory.Build.props
 ├── Directory.Packages.props

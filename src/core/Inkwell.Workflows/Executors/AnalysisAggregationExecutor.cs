@@ -1,4 +1,4 @@
-﻿using Inkwell.Core;
+﻿using Inkwell;
 using Microsoft.Agents.AI.Workflows;
 
 namespace Inkwell.Workflows.Executors;

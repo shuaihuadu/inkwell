@@ -1,4 +1,4 @@
-﻿using Inkwell.Core;
+﻿using Inkwell;
 using Inkwell.Workflows.Executors;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
@@ -28,8 +28,8 @@ public static class ContentPipelineBuilder
             ChatOptions = new()
             {
                 Instructions = """
-                    You are a market research analyst. Analyze market trends, target audience,
-                    and content opportunities for the given topic. Respond in JSON format:
+                    你是一名市场研究分析师。请分析给定主题的市场趋势、目标受众和内容机会。
+                    请以 JSON 格式回复：
                     {"topic": "...", "market_trends": "...", "target_audience": "...", "content_angles": "..."}
                     """,
                 ResponseFormat = ChatResponseFormat.ForJsonSchema<TopicAnalysis>()
@@ -42,8 +42,8 @@ public static class ContentPipelineBuilder
             ChatOptions = new()
             {
                 Instructions = """
-                    You are a competitive content analyst. Analyze existing content in the market
-                    and suggest unique content angles for differentiation. Respond in JSON format:
+                    你是一名竞品内容分析师。请分析市场上已有的同类内容，并提出差异化的内容角度建议。
+                    请以 JSON 格式回复：
                     {"topic": "...", "market_trends": "...", "target_audience": "...", "content_angles": "..."}
                     """,
                 ResponseFormat = ChatResponseFormat.ForJsonSchema<TopicAnalysis>()
@@ -56,9 +56,9 @@ public static class ContentPipelineBuilder
             ChatOptions = new()
             {
                 Instructions = """
-                    You are a professional content writer. Write engaging, well-structured articles
-                    that are informative and appealing to the target audience. Focus on clarity,
-                    compelling storytelling, and actionable insights.
+                    你是一名专业内容写作者。请撰写引人入胜、结构清晰的文章，
+                    内容要信息丰富且对目标受众有吸引力。注重清晰度、
+                    叙事性和可操作的见解。
                     """
             }
         });
@@ -69,9 +69,9 @@ public static class ContentPipelineBuilder
             ChatOptions = new()
             {
                 Instructions = """
-                    You are a strict content editor. Review articles for quality, accuracy,
-                    engagement, and completeness. Provide constructive feedback. Respond in JSON:
-                    {"approved": true/false, "feedback": "detailed feedback", "score": 1-10}
+                    你是一名严格的内容编辑。请从质量、准确性、吸引力和完整性四个维度审核文章。
+                    提供建设性的反馈。请以 JSON 格式回复：
+                    {"approved": true/false, "feedback": "详细反馈", "score": 1-10}
                     """,
                 ResponseFormat = ChatResponseFormat.ForJsonSchema<ReviewDecision>()
             }

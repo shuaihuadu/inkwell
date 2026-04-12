@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Inkwell.Core;
+using Inkwell;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -16,7 +16,7 @@ internal sealed class MarketAnalysisExecutor(AIAgent agent) : Executor<string, T
     public override async ValueTask<TopicAnalysis> HandleAsync(string topic, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         AgentResponse response = await agent.RunAsync(
-            $"Analyze market trends and target audience for the topic: {topic}",
+            $"请分析以下主题的市场趋势和目标受众：{topic}",
             cancellationToken: cancellationToken);
 
         TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(response.Text)

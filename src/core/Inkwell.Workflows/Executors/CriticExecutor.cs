@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Inkwell.Core;
+using Inkwell;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -18,25 +18,25 @@ internal sealed class CriticExecutor(AIAgent agent, int maxRevisions = 3) : Exec
     public override async ValueTask HandleAsync(Article article, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         string prompt = $$"""
-            Review the following article and provide your decision.
+            请审核以下文章并给出你的决定。
 
-            Title: {{article.Title}}
-            Content:
+            标题：{{article.Title}}
+            内容：
             {{article.Content}}
 
-            Revision: {{article.Revision}} of {{maxRevisions}}
+            当前版本：第 {{article.Revision}} 稿（最多 {{maxRevisions}} 稿）
 
-            Evaluate on: clarity, engagement, accuracy, and completeness.
-            If revision is at max ({{maxRevisions}}), be more lenient.
+            请从清晰度、吸引力、准确性和完整性四个维度评估。
+            如果已达到最大修订次数（{{maxRevisions}}），请适当放宽标准。
 
-            Respond in JSON format:
-            {"approved": true/false, "feedback": "your detailed feedback", "score": 1-10}
+            请以 JSON 格式回复：
+            {"approved": true/false, "feedback": "你的详细反馈", "score": 1-10}
             """;
 
         AgentResponse response = await agent.RunAsync(prompt, cancellationToken: cancellationToken);
 
         ReviewDecision decision = JsonSerializer.Deserialize<ReviewDecision>(response.Text)
-            ?? new ReviewDecision { Approved = true, Feedback = "Looks good.", Score = 7 };
+            ?? new ReviewDecision { Approved = true, Feedback = "整体质量较好。", Score = 7 };
 
         // 如果达到最大修订次数，强制通过
         if (article.Revision >= maxRevisions && !decision.Approved)

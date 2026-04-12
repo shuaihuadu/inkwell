@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Inkwell.Core;
+using Inkwell;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -32,34 +32,34 @@ internal sealed class WriterExecutor(AIAgent agent) : Executor<TopicAnalysis>("W
                 scopeName: StateScopes.ArticleScope, cancellationToken);
 
             prompt = $"""
-                Please revise the following article based on the feedback.
+                请根据审核反馈修改以下文章。
 
-                Original article:
+                原文：
                 {existingArticle.Content}
 
-                Feedback:
-                {review?.Feedback ?? "Please improve the quality."}
+                审核反馈：
+                {review?.Feedback ?? "请提升文章质量。"}
 
-                Topic analysis for reference:
-                Market trends: {message.MarketTrends}
-                Target audience: {message.TargetAudience}
-                Content angles: {message.ContentAngles}
+                选题分析参考：
+                市场趋势：{message.MarketTrends}
+                目标受众：{message.TargetAudience}
+                内容角度：{message.ContentAngles}
 
-                Please write an improved version. Respond with the full revised article only.
+                请写出改进版本，只返回文章内容。
                 """;
         }
         else
         {
             // 初稿：基于分析报告撰写
             prompt = $"""
-                Write a high-quality article about: {message.Topic}
+                请撰写一篇关于以下主题的高质量文章：{message.Topic}
 
-                Use the following analysis to guide your writing:
-                Market trends: {message.MarketTrends}
-                Target audience: {message.TargetAudience}
-                Content angles: {message.ContentAngles}
+                请参考以下分析来指导写作：
+                市场趋势：{message.MarketTrends}
+                目标受众：{message.TargetAudience}
+                内容角度：{message.ContentAngles}
 
-                Write a compelling article of 300-500 words. Respond with the article only.
+                请撰写 300-500 字的文章，只返回文章内容。
                 """;
         }
 

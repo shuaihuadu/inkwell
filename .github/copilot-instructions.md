@@ -24,6 +24,7 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 ## C# 代码规范
 
 以下是适用于所有代码的一些通用规范：
+
 - 所有 C# 文件使用 文件作用域命名空间（file-scoped namespaces）
 - 将警告视为错误处理
 - 遵循 .editorconfig 中的约定，创建文件的编码和行尾符都要按照 .editorconfig 中的设置
@@ -49,7 +50,7 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 - 对于实现了System.IDisposable，合理使用 using 关键字
 - 合理使用 nullable 类型
 - 合理使用 async 操作和 ConfigureAwait(false)
-- 合理使用 ```/// <inheritdoc />``` 继承注释
+- 合理使用 `/// <inheritdoc />` 继承注释
 - 避免使用 emoji 表情，无论是在日志还是注释中
 - 在功能稳定的前提下，尽量保证较好的性能
 - 在 C# 中始终使用主构造函数（Primary Constructor）
@@ -69,6 +70,7 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 - 代码和注释符合社区和统一的标准规范
 
 ## 单元测试规范
+
 - 使用 MS Tests 写出完整的单元测试
 - 为每个测试添加 Arrange、Act 和 Assert 注释
 - 确保所有未被继承的私有类都声明为 sealed
@@ -79,11 +81,14 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 
 ## 注意事项
 
+如果需要你编写的提示词、Skills，请使用中文
+
 ### 跨平台开发
 
 本项目在开发过程中有跨平台的开发需求，目标就是保证不同IDE和不同平台开发的一致性，有以下IDE和平台：
+
 1. Windows + Visual Studio + Docker Desktop
 2. VSCode SSH 到 Linux Ubuntu 24.04 + Docker
 3. Mac OS + VSCode + Mac Docker Desktop
 4. Windows + VSCode + Docker Desktop
-在完成任务和修改代码的时候，需要保证在团队协作过程中各个平台和IDE均不受环境的影响，每个用户都不受影响，按照业界标准和最佳实践来修改和优化配置。
+   在完成任务和修改代码的时候，需要保证在团队协作过程中各个平台和IDE均不受环境的影响，每个用户都不受影响，按照业界标准和最佳实践来修改和优化配置。

@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Inkwell.Core;
+using Inkwell;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -16,7 +16,7 @@ internal sealed class CompetitorAnalysisExecutor(AIAgent agent) : Executor<strin
     public override async ValueTask<TopicAnalysis> HandleAsync(string topic, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         AgentResponse response = await agent.RunAsync(
-            $"Analyze competitor content and suggest unique angles for the topic: {topic}",
+            $"请分析以下主题的竞品内容，并提出差异化的内容角度建议：{topic}",
             cancellationToken: cancellationToken);
 
         TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(response.Text)

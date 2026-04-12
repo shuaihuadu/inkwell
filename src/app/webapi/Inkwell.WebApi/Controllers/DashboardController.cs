@@ -1,0 +1,37 @@
+﻿using Inkwell;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Inkwell.WebApi.Controllers;
+
+/// <summary>
+/// Dashboard 统计控制器
+/// </summary>
+[ApiController]
+[Route("api/[controller]")]
+public sealed class DashboardController(
+    IArticlePersistenceProvider articleProvider,
+    IPipelineRunPersistenceProvider runProvider) : ControllerBase
+{
+    /// <summary>
+    /// 获取 Dashboard 统计数据
+    /// </summary>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>统计数据</returns>
+    [HttpGet("stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ArticleRecord> articles = await articleProvider.GetAllAsync(cancellationToken);
+        IReadOnlyList<PipelineRunRecord> runs = await runProvider.GetAllAsync(cancellationToken);
+
+        return this.Ok(new
+        {
+            totalRuns = runs.Count,
+            publishedArticles = articles.Count(a => a.Status == "Published"),
+            completedRuns = runs.Count(r => r.Status == "Completed"),
+            approvalRate = runs.Count > 0
+                ? Math.Round(runs.Count(r => r.Status == "Completed") * 100.0 / runs.Count)
+                : 0
+        });
+    }
+}
