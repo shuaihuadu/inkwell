@@ -285,8 +285,12 @@ public static class InkwellAgents
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
     /// <param name="seoAgent">SEO Agent 实例，包装为函数工具供 Coordinator 调用</param>
+    /// <param name="contextProviders">额外的 AI 上下文提供程序（如长期记忆）</param>
     /// <returns>Agent 注册信息</returns>
-    public static AgentRegistration CreateCoordinator(IChatClient chatClient, AIAgent? seoAgent = null)
+    public static AgentRegistration CreateCoordinator(
+        IChatClient chatClient,
+        AIAgent? seoAgent = null,
+        IEnumerable<AIContextProvider>? contextProviders = null)
     {
         List<AITool> tools =
         [
@@ -321,7 +325,8 @@ public static class InkwellAgents
                     """,
                 Tools = tools
             },
-            ChatHistoryProvider = CreatePipelineChatHistoryProvider(chatClient)
+            ChatHistoryProvider = CreatePipelineChatHistoryProvider(chatClient),
+            AIContextProviders = contextProviders?.ToList() is { Count: > 0 } list ? list : null
         });
 
         return new AgentRegistration

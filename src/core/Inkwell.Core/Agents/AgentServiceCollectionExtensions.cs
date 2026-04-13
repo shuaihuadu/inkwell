@@ -78,11 +78,28 @@ public static class AgentServiceCollectionExtensions
             }
         }
 
-        // Primary 模型 Agent（Writer 集成 RAG）
+        // 查找已注册的记忆服务（用于 Writer / Coordinator 长期记忆）
+        AgentMemoryService? memoryService = null;
+        foreach (ServiceDescriptor descriptor in services)
+        {
+            if (descriptor.ServiceType == typeof(AgentMemoryService)
+                && descriptor.ImplementationInstance is AgentMemoryService ms)
+            {
+                memoryService = ms;
+                break;
+            }
+        }
+
+        // Primary 模型 Agent（Writer 集成 RAG + 长期记忆）
         List<Microsoft.Agents.AI.AIContextProvider> writerContextProviders = [];
         if (knowledgeBase is not null)
         {
             writerContextProviders.Add(knowledgeBase.CreateSearchProvider());
+        }
+
+        if (memoryService is not null)
+        {
+            writerContextProviders.Add(memoryService.CreateMemoryProvider("writer"));
         }
 
         registry.Register(InkwellAgents.CreateWriter(primaryChatClient, contextProviders: writerContextProviders));
@@ -99,8 +116,14 @@ public static class AgentServiceCollectionExtensions
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "English"));
         registry.Register(InkwellAgents.CreateTranslator(secondaryChatClient, "Japanese"));
 
-        // Coordinator 将 SEO Agent 作为函数工具（Agent-as-Tool，需求 2.14）
-        registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient, seoRegistration.Agent));
+        // Coordinator 将 SEO Agent 作为函数工具（Agent-as-Tool）+ 长期记忆
+        List<Microsoft.Agents.AI.AIContextProvider> coordinatorContextProviders = [];
+        if (memoryService is not null)
+        {
+            coordinatorContextProviders.Add(memoryService.CreateMemoryProvider("coordinator"));
+        }
+
+        registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient, seoRegistration.Agent, coordinatorContextProviders));
 
         services.AddSingleton(registry);
 

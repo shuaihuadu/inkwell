@@ -1,11 +1,14 @@
 import {
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   MessageOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Popconfirm, Space, Spin, Typography } from "antd";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { SessionInfo } from "../hooks/use-session-list";
+import { API_BASE } from "../services/api";
 
 interface SessionSidebarProps {
   sessions: SessionInfo[];
@@ -26,6 +29,15 @@ export default function SessionSidebar({
 }: SessionSidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [searchText, setSearchText] = useState("");
+
+  const filteredSessions = useMemo(() => {
+    if (!searchText.trim()) return sessions;
+    return sessions.filter(
+      (s) =>
+        s.title?.toLowerCase().includes(searchText.toLowerCase()) ?? false,
+    );
+  }, [sessions, searchText]);
 
   const startEdit = (session: SessionInfo) => {
     setEditingId(session.id);
@@ -62,7 +74,18 @@ export default function SessionSidebar({
         <Typography.Text strong>历史会话</Typography.Text>
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
+      <div style={{ padding: "8px 12px" }}>
+        <Input
+          placeholder="搜索会话..."
+          prefix={<SearchOutlined style={{ color: "#bbb" }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+        />
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "0 0 8px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 24 }}>
             <Spin size="small" />
@@ -74,8 +97,15 @@ export default function SessionSidebar({
           >
             暂无历史会话
           </Typography.Text>
+        ) : filteredSessions.length === 0 ? (
+          <Typography.Text
+            type="secondary"
+            style={{ display: "block", textAlign: "center", padding: 24 }}
+          >
+            无匹配会话
+          </Typography.Text>
         ) : (
-          sessions.map((session) => (
+          filteredSessions.map((session) => (
             <div
               key={session.id}
               onClick={() => onSelect(session.id)}
@@ -136,6 +166,18 @@ export default function SessionSidebar({
                         size="small"
                         icon={<EditOutlined />}
                         onClick={() => startEdit(session)}
+                        style={{ padding: "0 4px" }}
+                      />
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<DownloadOutlined />}
+                        onClick={() => {
+                          window.open(
+                            `${API_BASE}/api/sessions/${session.id}/export`,
+                            "_blank",
+                          );
+                        }}
                         style={{ padding: "0 4px" }}
                       />
                       <Popconfirm

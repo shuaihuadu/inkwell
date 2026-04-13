@@ -33,8 +33,7 @@ public static class Program
         builder.Services.AddInkwellCore()
             .UseInMemoryDatabase()
             .UseAzureOpenAI(builder.Configuration)
-            .UseAzureOpenAIEmbedding(builder.Configuration)
-            .UseInMemoryVectorStore();
+            .UseAzureOpenAIEmbedding(builder.Configuration);
 
         // [C1 修复] 从 Keyed DI 中安全获取 Primary IChatClient
         IChatClient? primaryClient = null;
@@ -56,11 +55,16 @@ public static class Program
             throw new InvalidOperationException("Primary IChatClient not registered. Ensure UseAzureOpenAI() is called before this point.");
         }
 
+        // 注册 Agent 记忆服务（在 AddInkwellAgents 之前，以便 Agent 挂载长期记忆）
+        // 使用 DI 注册的 VectorStore 实例（此时 IEmbeddingGenerator 会在运行时延迟解析）
+        Microsoft.Extensions.VectorData.VectorStore vectorStore =
+            new Microsoft.SemanticKernel.Connectors.InMemory.InMemoryVectorStore();
+        builder.Services.AddSingleton(vectorStore);
+        AgentMemoryService agentMemory = new(vectorStore);
+        builder.Services.AddSingleton(agentMemory);
+
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
-
-        // 注册 Agent 记忆服务（依赖 VectorStore）
-        builder.Services.AddSingleton<AgentMemoryService>();
 
         // 注册知识库服务 + 初始化示例文档
         KnowledgeBaseService knowledgeBase = new();
