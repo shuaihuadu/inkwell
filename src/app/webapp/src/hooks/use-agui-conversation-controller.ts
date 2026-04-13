@@ -6,21 +6,27 @@ export interface UseAguiConversationControllerReturn {
   inputValue: string;
   loading: boolean;
   messages: ReturnType<typeof useAGUIAgent>["messages"];
+  threadId: string;
   setInputValue: (value: string) => void;
   submit: () => Promise<void>;
   clear: () => void;
   changeRoute: (route: string) => void;
+  switchSession: (sessionId: string) => Promise<void>;
 }
 
-/**
- * 统一 AGUI 会话控制：路由切换、输入发送、会话清空
- */
 export function useAguiConversationController(
   initialRoute: string,
 ): UseAguiConversationControllerReturn {
   const [route, setRoute] = useState(initialRoute);
   const [inputValue, setInputValue] = useState("");
-  const { messages, loading, sendMessage, reset } = useAGUIAgent(route);
+  const {
+    messages,
+    loading,
+    threadId,
+    sendMessage,
+    reset,
+    loadMessages,
+  } = useAGUIAgent(route);
 
   const clear = useCallback(() => {
     reset();
@@ -38,22 +44,29 @@ export function useAguiConversationController(
 
   const submit = useCallback(async () => {
     const normalized = inputValue.trim();
-    if (!normalized) {
-      return;
-    }
-
+    if (!normalized) return;
     await sendMessage(normalized);
     setInputValue("");
   }, [inputValue, sendMessage]);
+
+  const switchSession = useCallback(
+    async (sessionId: string) => {
+      setInputValue("");
+      await loadMessages(sessionId);
+    },
+    [loadMessages],
+  );
 
   return {
     route,
     inputValue,
     loading,
     messages,
+    threadId,
     setInputValue,
     submit,
     clear,
     changeRoute,
+    switchSession,
   };
 }

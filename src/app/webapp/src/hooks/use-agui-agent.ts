@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RunAgentInput, AGUIMessage } from "../services/agui-types";
+import type { RunAgentInput } from "../services/agui-types";
 import { API_BASE } from "../services/api";
 
 export interface ChatMessage {
@@ -10,102 +10,23 @@ export interface ChatMessage {
 }
 
 export interface UseAGUIAgentReturn {
-  /** 消息列表 */
   messages: ChatMessage[];
-  /** 是否正在运行 */
   loading: boolean;
-  /** 发送消息 */
-  sendMessage: (content: string) => Promise<void>;
-  /** 重置对话 */
-  reset: () => void;
-}
-
-/** localStorage key 前缀 */
-const STORAGE_PREFIX = "inkwell-chat-";
-
-/** 从 localStorage 恢复会话 */
-function loadSession(route: string): {
-  messages: ChatMessage[];
   threadId: string;
-} {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${route}`);
-    if (raw) {
-      const data = JSON.parse(raw);
-      // 只恢复已完成的消息，丢弃流式中断的
-      const messages: ChatMessage[] = (data.messages ?? []).filter(
-        (m: ChatMessage) => m.status === "done",
-      );
-      return { messages, threadId: data.threadId ?? crypto.randomUUID() };
-    }
-  } catch {
-    // 解析失败则忽略
-  }
-  return { messages: [], threadId: crypto.randomUUID() };
+  sendMessage: (content: string) => Promise<void>;
+  reset: () => void;
+  setThreadId: (id: string) => void;
+  loadMessages: (sessionId: string) => Promise<void>;
 }
 
-/** 保存会话到 localStorage */
-function saveSession(
-  route: string,
-  messages: ChatMessage[],
-  threadId: string,
-) {
-  try {
-    const doneMessages = messages.filter((m) => m.status === "done");
-    localStorage.setItem(
-      `${STORAGE_PREFIX}${route}`,
-      JSON.stringify({ messages: doneMessages, threadId }),
-    );
-  } catch {
-    // 存储满或无权限则忽略
-  }
-}
-
-/** 清除会话 */
-function clearSession(route: string) {
-  try {
-    localStorage.removeItem(`${STORAGE_PREFIX}${route}`);
-  } catch {
-    // 忽略
-  }
-}
-
-/**
- * 自定义 Hook：对接后端 AG-UI 端点
- * 通过 SSE 流式接收 Agent 响应，支持 localStorage 持久化
- */
 export function useAGUIAgent(
   aguiRoute: string = "/api/agui/writer",
 ): UseAGUIAgentReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    return loadSession(aguiRoute).messages;
-  });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const threadIdRef = useRef<string>(loadSession(aguiRoute).threadId);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  const routeRef = useRef(aguiRoute);
-
-  // 路由切换时重新加载对应会话
-  useEffect(() => {
-    if (routeRef.current !== aguiRoute) {
-      routeRef.current = aguiRoute;
-      const session = loadSession(aguiRoute);
-      setMessages(session.messages);
-      threadIdRef.current = session.threadId;
-    }
-  }, [aguiRoute]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  // 消息变化时自动保存（仅保存已完成的消息）
-  useEffect(() => {
-    if (messages.length > 0) {
-      saveSession(routeRef.current, messages, threadIdRef.current);
-    }
-  }, [messages]);
+  const threadIdRef = useRef<string>(crypto.randomUUID());
+  const [threadId, setThreadIdState] = useState(threadIdRef.current);
 
   useEffect(() => {
     return () => {
@@ -113,17 +34,42 @@ export function useAGUIAgent(
     };
   }, []);
 
+  const setThreadId = useCallback((id: string) => {
+    threadIdRef.current = id;
+    setThreadIdState(id);
+  }, []);
+
+  const loadMessages = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`);
+      if (!res.ok) return;
+      const data: Array<{
+        id: string;
+        role: string;
+        content: string;
+        status: string;
+      }> = await res.json();
+      const loaded: ChatMessage[] = data.map((m) => ({
+        id: m.id,
+        role: m.role as ChatMessage["role"],
+        content: m.content,
+        status: (m.status || "done") as ChatMessage["status"],
+      }));
+      setMessages(loaded);
+      threadIdRef.current = sessionId;
+      setThreadIdState(sessionId);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const sendMessage = useCallback(
     async (content: string) => {
       const normalized = content.trim();
-      if (!normalized) {
-        return;
-      }
+      if (!normalized) return;
 
-      // 启动新请求前中止旧请求，避免并发串流污染当前消息
       abortRef.current?.abort();
 
-      // 添加用户消息
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "user",
@@ -131,7 +77,6 @@ export function useAGUIAgent(
         status: "done",
       };
 
-      // 创建助手消息占位
       const assistantMsgId = crypto.randomUUID();
       const assistantMsg: ChatMessage = {
         id: assistantMsgId,
@@ -143,18 +88,10 @@ export function useAGUIAgent(
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setLoading(true);
 
-      // 准备 AG-UI 请求
-      const allMessages: AGUIMessage[] = [
-        ...messagesRef.current
-          .filter((m) => m.status === "done")
-          .map((m) => ({ id: m.id, role: m.role, content: m.content })),
-        { id: userMsg.id, role: "user", content: normalized },
-      ];
-
       const input: RunAgentInput = {
         threadId: threadIdRef.current,
         runId: crypto.randomUUID(),
-        messages: allMessages,
+        messages: [{ id: userMsg.id, role: "user", content: normalized }],
       };
 
       try {
@@ -193,26 +130,17 @@ export function useAGUIAgent(
                 const event = JSON.parse(data);
 
                 switch (event.type) {
-                  case "RUN_STARTED":
-                    // 静默处理，不显示系统消息
-                    break;
-
-                  case "TEXT_MESSAGE_START":
-                    // 可选：标记新消息开始
-                    break;
-
                   case "TEXT_MESSAGE_CONTENT":
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === assistantMsgId
-                          ? { ...m, content: m.content + (event.delta ?? "") }
+                          ? {
+                              ...m,
+                              content: m.content + (event.delta ?? ""),
+                            }
                           : m,
                       ),
                     );
-                    break;
-
-                  case "TEXT_MESSAGE_END":
-                    // 文本消息结束（RUN_FINISHED 之前可能有多段）
                     break;
 
                   case "TOOL_CALL_START":
@@ -220,9 +148,9 @@ export function useAGUIAgent(
                       ...prev,
                       {
                         id: `tool-${event.toolCallId ?? crypto.randomUUID()}`,
-                        role: "system",
-                        content: `🔧 调用工具: ${event.toolCallName ?? "unknown"}`,
-                        status: "done",
+                        role: "system" as const,
+                        content: `调用工具: ${event.toolCallName ?? "unknown"}`,
+                        status: "done" as const,
                       },
                     ]);
                     break;
@@ -232,21 +160,19 @@ export function useAGUIAgent(
                       ...prev,
                       {
                         id: `tool-result-${event.toolCallId ?? crypto.randomUUID()}`,
-                        role: "system",
-                        content: `✅ 工具返回结果`,
-                        status: "done",
+                        role: "system" as const,
+                        content: "工具返回结果",
+                        status: "done" as const,
                       },
                     ]);
-                    break;
-
-                  case "STATE_SNAPSHOT":
-                    // 静默处理，不显示系统消息
                     break;
 
                   case "RUN_FINISHED":
                     setMessages((prev) =>
                       prev.map((m) =>
-                        m.id === assistantMsgId ? { ...m, status: "done" } : m,
+                        m.id === assistantMsgId
+                          ? { ...m, status: "done" as const }
+                          : m,
                       ),
                     );
                     break;
@@ -257,8 +183,8 @@ export function useAGUIAgent(
                         m.id === assistantMsgId
                           ? {
                               ...m,
-                              content: event.message ?? "发生错误",
-                              status: "error",
+                              content: event.message ?? "Error occurred",
+                              status: "error" as const,
                             }
                           : m,
                       ),
@@ -266,21 +192,19 @@ export function useAGUIAgent(
                     break;
 
                   default:
-                    // 其他未知事件类型静默忽略
                     break;
                 }
               } catch {
-                // 忽略不可解析的行
+                // skip
               }
             }
           }
         }
 
-        // 确保最终状态
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId && m.status === "streaming"
-              ? { ...m, status: "done" }
+              ? { ...m, status: "done" as const }
               : m,
           ),
         );
@@ -291,8 +215,8 @@ export function useAGUIAgent(
               m.id === assistantMsgId
                 ? {
                     ...m,
-                    content: `请求失败: ${(error as Error).message}`,
-                    status: "error",
+                    content: `Request failed: ${(error as Error).message}`,
+                    status: "error" as const,
                   }
                 : m,
             ),
@@ -310,8 +234,18 @@ export function useAGUIAgent(
     abortRef.current?.abort();
     setMessages([]);
     setLoading(false);
-    threadIdRef.current = crypto.randomUUID();
+    const newId = crypto.randomUUID();
+    threadIdRef.current = newId;
+    setThreadIdState(newId);
   }, []);
 
-  return { messages, loading, sendMessage, reset };
+  return {
+    messages,
+    loading,
+    threadId,
+    sendMessage,
+    reset,
+    setThreadId,
+    loadMessages,
+  };
 }
