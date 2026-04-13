@@ -21,7 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\core\Inkwell.Core\Inkwell.Core.csproj" />
     <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.InMemory\Inkwell.Persistence.InMemory.csproj" />
-    <ProjectReference Include="..\..\servicedefaults\Inkwell.ServiceDefaults\Inkwell.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\aspire\Inkwell.ServiceDefaults\Inkwell.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
