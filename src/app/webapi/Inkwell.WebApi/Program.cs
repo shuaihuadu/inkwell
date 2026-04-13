@@ -29,10 +29,12 @@ public static class Program
         // 注册 Controller
         builder.Services.AddControllers();
 
-        // 注册 Inkwell 核心服务 + 持久化 + Azure OpenAI 多模型
+        // 注册 Inkwell 核心服务 + 持久化 + Azure OpenAI 多模型 + Embedding + 向量存储
         builder.Services.AddInkwellCore()
             .UseInMemoryDatabase()
-            .UseAzureOpenAI(builder.Configuration);
+            .UseAzureOpenAI(builder.Configuration)
+            .UseAzureOpenAIEmbedding(builder.Configuration)
+            .UseInMemoryVectorStore();
 
         // [C1 修复] 从 Keyed DI 中安全获取 Primary IChatClient
         IChatClient? primaryClient = null;
@@ -56,6 +58,9 @@ public static class Program
 
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
+
+        // 注册 Agent 记忆服务（依赖 VectorStore）
+        builder.Services.AddSingleton<AgentMemoryService>();
 
         // 注册知识库服务 + 初始化示例文档
         KnowledgeBaseService knowledgeBase = new();

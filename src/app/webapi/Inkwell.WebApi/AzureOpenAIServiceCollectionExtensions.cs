@@ -91,4 +91,36 @@ public static class AzureOpenAIServiceCollectionExtensions
             DeploymentName = string.IsNullOrWhiteSpace(target.DeploymentName) ? fallback.DeploymentName : target.DeploymentName
         };
     }
+
+    /// <summary>
+    /// 注册 Azure OpenAI Embedding 生成器
+    /// Embedding 配置回退到 Primary 的 Endpoint/ApiKey
+    /// </summary>
+    /// <param name="coreBuilder">Inkwell 核心构建器</param>
+    /// <param name="configuration">应用配置</param>
+    /// <returns>Inkwell 核心构建器</returns>
+    public static InkwellCoreBuilder UseAzureOpenAIEmbedding(this InkwellCoreBuilder coreBuilder, IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection(AzureOpenAIOptions.SectionName);
+        AzureOpenAIOptions options = new();
+        section.Bind(options);
+
+        AzureOpenAIModelOptions embeddingConfig = FallbackTo(options.Embedding, options.Primary);
+
+        if (string.IsNullOrWhiteSpace(embeddingConfig.Endpoint) ||
+            string.IsNullOrWhiteSpace(embeddingConfig.DeploymentName))
+        {
+            return coreBuilder;
+        }
+
+        coreBuilder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
+        {
+            AzureOpenAIClient client = CreateAzureOpenAIClient(embeddingConfig);
+            return client
+                .GetEmbeddingClient(embeddingConfig.DeploymentName)
+                .AsIEmbeddingGenerator();
+        });
+
+        return coreBuilder;
+    }
 }
