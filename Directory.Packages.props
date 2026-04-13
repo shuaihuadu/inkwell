@@ -54,5 +54,9 @@
         <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
         <!-- Vector Store -->
         <PackageVersion Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.67.0-preview" />
+        <!-- Aspire -->
+        <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.2.2" />
+        <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.4.0" />
+        <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
     </ItemGroup>
 </Project>

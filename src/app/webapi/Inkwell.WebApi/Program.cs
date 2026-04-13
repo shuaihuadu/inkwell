@@ -7,8 +7,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 namespace Inkwell.WebApi;
 
@@ -17,11 +15,6 @@ namespace Inkwell.WebApi;
 /// </summary>
 public static class Program
 {
-    /// <summary>
-    /// OpenTelemetry 服务名称
-    /// </summary>
-    private const string ServiceName = "Inkwell.WebApi";
-
     public static void Main(string[] args)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -107,18 +100,8 @@ public static class Program
         // 注册 AG-UI 服务（JSON 序列化配置）
         builder.Services.AddAGUI();
 
-        // 配置 OpenTelemetry
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService(ServiceName))
-            .WithTracing(tracing =>
-            {
-                tracing
-                    .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddSource("Microsoft.Agents.AI.Workflows*")
-                    .AddSource(ServiceName)
-                    .AddOtlpExporter();
-            });
+        // 添加 Aspire 服务默认配置（OpenTelemetry、健康检查、服务发现、弹性 HTTP）
+        builder.AddServiceDefaults();
 
         // [H7 修复] CORS origin 从配置读取
         string[] corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
@@ -146,6 +129,7 @@ public static class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+        app.MapDefaultEndpoints();
 
         // ========== 为每个 Agent 映射 AG-UI 端点（带会话持久化）==========
         ISessionPersistenceProvider sessionProvider = app.Services.GetRequiredService<ISessionPersistenceProvider>();
