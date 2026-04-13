@@ -5,7 +5,6 @@ import AguiChatPanel from "./agui-chat-panel";
 import AguiChatToolbar from "./agui-chat-toolbar";
 
 interface AguiConversationShellProps {
-  title: string;
   leftExtra?: ReactNode;
   rightExtra?: ReactNode;
   onClear?: () => void;
@@ -29,7 +28,6 @@ interface AguiConversationShellProps {
 }
 
 export default function AguiConversationShell({
-  title,
   leftExtra,
   rightExtra,
   onClear,
@@ -52,10 +50,18 @@ export default function AguiConversationShell({
   messageContainerStyle,
 }: AguiConversationShellProps) {
   return (
-    <Flex vertical gap={12} style={{ height: "100%", ...shellStyle }}>
-      <div style={toolbarWrapperStyle}>
+    <Flex vertical gap={0} style={{ height: "100%", ...shellStyle }}>
+      <div
+        style={{
+          padding: "0 16px",
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          borderBottom: "1px solid #f0f0f0",
+          ...toolbarWrapperStyle,
+        }}
+      >
         <AguiChatToolbar
-          title={title}
           leftExtra={leftExtra}
           rightExtra={rightExtra}
           onClear={onClear}

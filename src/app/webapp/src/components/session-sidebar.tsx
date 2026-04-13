@@ -2,7 +2,6 @@ import {
   DeleteOutlined,
   EditOutlined,
   MessageOutlined,
-  PlusOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Popconfirm, Space, Spin, Typography } from "antd";
 import { useState } from "react";
@@ -13,7 +12,6 @@ interface SessionSidebarProps {
   loading: boolean;
   activeSessionId: string | null;
   onSelect: (sessionId: string) => void;
-  onNewSession: () => void;
   onDelete: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => void;
 }
@@ -23,7 +21,6 @@ export default function SessionSidebar({
   loading,
   activeSessionId,
   onSelect,
-  onNewSession,
   onDelete,
   onRename,
 }: SessionSidebarProps) {
@@ -55,22 +52,14 @@ export default function SessionSidebar({
     >
       <div
         style={{
-          padding: "12px 16px",
+          padding: "0 16px",
+          height: 56,
           borderBottom: "1px solid #f0f0f0",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
         }}
       >
         <Typography.Text strong>历史会话</Typography.Text>
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={onNewSession}
-        >
-          新对话
-        </Button>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Flex, Select } from "antd";
+import { Flex, Select, Space, Typography } from "antd";
 import AguiConversationShell from "../../components/agui-conversation-shell";
 import SessionSidebar from "../../components/session-sidebar";
 import { pipelineConversationPreset } from "../../components/agui-conversation-presets";
@@ -107,23 +107,24 @@ export default function PipelineRunPage() {
         loading={sessionsLoading}
         activeSessionId={activeSessionId}
         onSelect={(id) => void handleSelectSession(id)}
-        onNewSession={handleNewSession}
         onDelete={(id) => void handleDeleteSession(id)}
         onRename={renameSession}
       />
 
-      <Flex vertical style={{ flex: 1, height: "100%" }} gap={16}>
+      <Flex vertical style={{ flex: 1, height: "100%" }} gap={0}>
         <AguiConversationShell
-          title={pipelineConversationPreset.title}
           leftExtra={
-            <Select
-              value={selectedRoute}
-              onChange={changeRoute}
-              style={{ width: 200 }}
-              options={agentOptions}
-              placeholder="选择 Agent"
-              loading={agentsLoading}
-            />
+            <Space>
+              <Typography.Text strong>选择 Agent</Typography.Text>
+              <Select
+                value={selectedRoute}
+                onChange={changeRoute}
+                style={{ width: 200 }}
+                options={agentOptions}
+                placeholder="选择 Agent"
+                loading={agentsLoading}
+              />
+            </Space>
           }
           onClear={handleNewSession}
           clearDisabled={loading}

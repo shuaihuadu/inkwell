@@ -9,7 +9,7 @@ export interface AguiConversationPreset {
 
 export const pipelineConversationPreset: AguiConversationPreset = {
   title: "对话",
-  clearText: "新对话",
+  clearText: "新会话",
   placeholder: "输入文章主题开始创作...",
   emptyText: "输入文章主题开始创作，例如：AI 在医疗健康领域的未来",
   streamingText: "思考中...",
@@ -18,7 +18,7 @@ export const pipelineConversationPreset: AguiConversationPreset = {
 
 export const workflowRunConversationPreset: AguiConversationPreset = {
   title: "AGUI 会话",
-  clearText: "清空",
+  clearText: "新会话",
   placeholder: "输入内容，使用 AGUI 执行当前 Workflow...",
   emptyText: "输入内容后通过 AGUI 运行 Workflow",
   streamingText: "执行中...",

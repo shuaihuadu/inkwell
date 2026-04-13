@@ -53,7 +53,6 @@ export default function WorkflowRunModal({
       width={700}
     >
       <AguiConversationShell
-        title={workflowRunConversationPreset.title}
         leftExtra={
           <Space>
             <Select

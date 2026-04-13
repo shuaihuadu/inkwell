@@ -121,7 +121,7 @@ export default function DashboardPage() {
             <Statistic
               title="已发布文章"
               value={stats?.publishedArticles ?? 0}
-              valueStyle={{ color: "#3f8600" }}
+              styles={{ content: { color: "#3f8600" } }}
               prefix={<FileTextOutlined />}
             />
           </Card>

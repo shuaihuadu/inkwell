@@ -1,9 +1,8 @@
-import { ClearOutlined } from "@ant-design/icons";
-import { Button, Flex, Space, Typography } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import { Button, Flex, Space } from "antd";
 import type { ReactNode } from "react";
 
 interface AguiChatToolbarProps {
-  title: string;
   leftExtra?: ReactNode;
   rightExtra?: ReactNode;
   onClear?: () => void;
@@ -13,28 +12,22 @@ interface AguiChatToolbarProps {
 }
 
 export default function AguiChatToolbar({
-  title,
   leftExtra,
   rightExtra,
   onClear,
   clearDisabled = false,
-  clearText = "新对话",
+  clearText = "新会话",
   showClear = true,
 }: AguiChatToolbarProps) {
   return (
-    <Flex justify="space-between" align="center">
-      <Space>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {leftExtra}
-      </Space>
+    <Flex justify="space-between" align="center" style={{ width: "100%" }}>
+      <Space>{leftExtra}</Space>
 
       <Space>
         {rightExtra}
         {showClear && (
           <Button
-            icon={<ClearOutlined />}
+            icon={<PlusOutlined />}
             onClick={onClear}
             disabled={clearDisabled}
           >

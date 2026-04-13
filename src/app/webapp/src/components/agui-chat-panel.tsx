@@ -101,14 +101,23 @@ export default function AguiChatPanel({
   };
 
   return (
-    <Flex vertical gap={12} style={{ height: "100%", ...containerStyle }}>
+    <Flex
+      vertical
+      gap={12}
+      style={{
+        height: "100%",
+        padding: "12px 0 16px",
+        marginLeft: "20px",
+        ...containerStyle,
+      }}
+    >
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         style={{
           flex: 1,
           overflow: "auto",
-          padding: "0 8px",
+          padding: "0 16px",
           minHeight: 0,
           ...messageContainerStyle,
         }}
