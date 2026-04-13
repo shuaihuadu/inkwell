@@ -1,6 +1,7 @@
 using Inkwell.Agents.Middleware;
 using Inkwell.Agents.Skills;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Compaction;
 using Microsoft.Extensions.AI;
 
 namespace Inkwell.Agents;
@@ -28,6 +29,34 @@ public static class InkwellAgents
             ChatReducer = new MessageCountingChatReducer(retainCount)
         });
     }
+
+    /// <summary>
+    /// 创建对话型 Agent 使用的 Pipeline 裁剪 ChatHistoryProvider
+    /// 策略：工具结果压缩 -> 摘要 -> 截断
+    /// </summary>
+    /// <param name="chatClient">LLM 客户端（用于摘要生成）</param>
+    /// <param name="maxTokenCount">摘要触发的 token 上限</param>
+    /// <param name="truncationTokenCount">截断兜底的 token 上限</param>
+    /// <returns>InMemoryChatHistoryProvider 实例</returns>
+#pragma warning disable MAAI001 // CompactionStrategy is experimental
+    private static InMemoryChatHistoryProvider CreatePipelineChatHistoryProvider(
+        IChatClient chatClient,
+        int maxTokenCount = 6000,
+        int truncationTokenCount = 12000)
+    {
+        CompactionStrategy pipeline = new PipelineCompactionStrategy([
+            new ToolResultCompactionStrategy(CompactionTriggers.HasToolCalls()),
+            new SummarizationCompactionStrategy(chatClient, CompactionTriggers.TokensExceed(maxTokenCount)),
+            new TruncationCompactionStrategy(CompactionTriggers.TokensExceed(truncationTokenCount))
+        ]);
+
+        return new InMemoryChatHistoryProvider(new()
+        {
+            ChatReducer = pipeline.AsChatReducer(),
+            ReducerTriggerEvent = InMemoryChatHistoryProviderOptions.ChatReducerTriggerEvent.BeforeMessagesRetrieval
+        });
+    }
+#pragma warning restore MAAI001
 
     /// <summary>
     /// 创建内容写手 Agent（带搜索工具、ChatReducer、护栏 + 审计中间件）
@@ -64,8 +93,8 @@ public static class InkwellAgents
                     AIFunctionFactory.Create(SensitiveWordSkill.Scan)
                 ]
             },
-            // 对话历史保留数从参数读取
-            ChatHistoryProvider = CreateDefaultChatHistoryProvider(chatHistoryRetainCount),
+            // 对话历史使用 Pipeline 裁剪（工具结果压缩 -> 摘要 -> 截断）
+            ChatHistoryProvider = CreatePipelineChatHistoryProvider(chatClient),
             // RAG 知识检索（如果配置了 TextSearchProvider）
             AIContextProviders = providers.Count > 0 ? providers : null
         });
@@ -292,7 +321,7 @@ public static class InkwellAgents
                     """,
                 Tools = tools
             },
-            ChatHistoryProvider = CreateDefaultChatHistoryProvider(20)
+            ChatHistoryProvider = CreatePipelineChatHistoryProvider(chatClient)
         });
 
         return new AgentRegistration
