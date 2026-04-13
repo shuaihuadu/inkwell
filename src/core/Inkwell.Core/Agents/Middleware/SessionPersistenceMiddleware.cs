@@ -85,11 +85,81 @@ public static class SessionPersistenceMiddleware
         AgentSession session,
         string agentId,
         string threadId,
+        IEnumerable<ChatMessage> inputMessages,
         ISessionPersistenceProvider sessionProvider,
         CancellationToken cancellationToken)
     {
+        // 1) 序列化并保存 session state
         JsonElement state = await innerAgent.SerializeSessionAsync(session).ConfigureAwait(false);
         await sessionProvider.SaveSessionAsync(threadId, agentId, state, cancellationToken).ConfigureAwait(false);
+
+        // 2) 保存用户输入消息到 ChatMessageRecord
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        List<ChatMessageRecord> newMessages = [];
+        string? firstUserMessage = null;
+
+        foreach (ChatMessage msg in inputMessages)
+        {
+            string content = msg.Text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                continue;
+            }
+
+            newMessages.Add(new ChatMessageRecord(
+                Guid.NewGuid().ToString("N"),
+                msg.Role.Value,
+                content,
+                "done",
+                now));
+
+            if (msg.Role == ChatRole.User && firstUserMessage is null)
+            {
+                firstUserMessage = content;
+            }
+        }
+
+        // 3) 从 session 的 ChatHistoryProvider 中提取最新的 assistant 回复
+        if (session.TryGetInMemoryChatHistory(out List<ChatMessage>? history) && history.Count > 0)
+        {
+            // 取最后一条 assistant 消息
+            for (int i = history.Count - 1; i >= 0; i--)
+            {
+                if (history[i].Role == ChatRole.Assistant)
+                {
+                    string assistantContent = history[i].Text ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(assistantContent))
+                    {
+                        newMessages.Add(new ChatMessageRecord(
+                            Guid.NewGuid().ToString("N"),
+                            "assistant",
+                            assistantContent,
+                            "done",
+                            now.AddMilliseconds(1)));
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        if (newMessages.Count > 0)
+        {
+            await sessionProvider.SaveMessagesAsync(threadId, newMessages, cancellationToken).ConfigureAwait(false);
+        }
+
+        // 4) 首次对话时自动生成标题
+        if (firstUserMessage is not null)
+        {
+            SessionInfo? info = await sessionProvider.GetSessionInfoAsync(threadId, cancellationToken).ConfigureAwait(false);
+            if (info is not null && string.IsNullOrWhiteSpace(info.Title))
+            {
+                string title = firstUserMessage.Length > 50
+                    ? firstUserMessage[..50] + "..."
+                    : firstUserMessage;
+                await sessionProvider.UpdateSessionTitleAsync(threadId, title, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>
@@ -107,7 +177,7 @@ public static class SessionPersistenceMiddleware
 
             if (threadId is not null)
             {
-                await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, sessionProvider, cancellationToken).ConfigureAwait(false);
+                await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, cancellationToken).ConfigureAwait(false);
             }
 
             return response;
@@ -147,7 +217,7 @@ public static class SessionPersistenceMiddleware
 
         if (threadId is not null)
         {
-            await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, sessionProvider, cancellationToken).ConfigureAwait(false);
+            await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, cancellationToken).ConfigureAwait(false);
         }
     }
 }
