@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import {
   Typography,
   Card,
-  List,
+  Row,
+  Col,
   Button,
   Tag,
   Space,
@@ -75,11 +76,9 @@ export default function WorkflowPage() {
         <ApartmentOutlined /> Workflow 管理
       </Typography.Title>
 
-      <List
-        grid={{ gutter: 16, column: 2 }}
-        dataSource={workflows}
-        renderItem={(item) => (
-          <List.Item>
+      <Row gutter={[16, 16]}>
+        {workflows.map((item) => (
+          <Col key={item.id} xs={24} sm={12}>
             <Card
               title={item.name}
               extra={
@@ -112,9 +111,9 @@ export default function WorkflowPage() {
                 {item.id}
               </Tag>
             </Card>
-          </List.Item>
-        )}
-      />
+          </Col>
+        ))}
+      </Row>
 
       <WorkflowTopologyModal
         visible={topoVisible}

@@ -20,21 +20,91 @@ export interface UseAGUIAgentReturn {
   reset: () => void;
 }
 
+/** localStorage key 前缀 */
+const STORAGE_PREFIX = "inkwell-chat-";
+
+/** 从 localStorage 恢复会话 */
+function loadSession(route: string): {
+  messages: ChatMessage[];
+  threadId: string;
+} {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${route}`);
+    if (raw) {
+      const data = JSON.parse(raw);
+      // 只恢复已完成的消息，丢弃流式中断的
+      const messages: ChatMessage[] = (data.messages ?? []).filter(
+        (m: ChatMessage) => m.status === "done",
+      );
+      return { messages, threadId: data.threadId ?? crypto.randomUUID() };
+    }
+  } catch {
+    // 解析失败则忽略
+  }
+  return { messages: [], threadId: crypto.randomUUID() };
+}
+
+/** 保存会话到 localStorage */
+function saveSession(
+  route: string,
+  messages: ChatMessage[],
+  threadId: string,
+) {
+  try {
+    const doneMessages = messages.filter((m) => m.status === "done");
+    localStorage.setItem(
+      `${STORAGE_PREFIX}${route}`,
+      JSON.stringify({ messages: doneMessages, threadId }),
+    );
+  } catch {
+    // 存储满或无权限则忽略
+  }
+}
+
+/** 清除会话 */
+function clearSession(route: string) {
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${route}`);
+  } catch {
+    // 忽略
+  }
+}
+
 /**
  * 自定义 Hook：对接后端 AG-UI 端点
- * 通过 SSE 流式接收 Agent 响应
+ * 通过 SSE 流式接收 Agent 响应，支持 localStorage 持久化
  */
 export function useAGUIAgent(
   aguiRoute: string = "/api/agui/writer",
 ): UseAGUIAgentReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    return loadSession(aguiRoute).messages;
+  });
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const threadIdRef = useRef<string>(crypto.randomUUID());
+  const threadIdRef = useRef<string>(loadSession(aguiRoute).threadId);
   const messagesRef = useRef<ChatMessage[]>([]);
+  const routeRef = useRef(aguiRoute);
+
+  // 路由切换时重新加载对应会话
+  useEffect(() => {
+    if (routeRef.current !== aguiRoute) {
+      routeRef.current = aguiRoute;
+      const session = loadSession(aguiRoute);
+      setMessages(session.messages);
+      threadIdRef.current = session.threadId;
+    }
+  }, [aguiRoute]);
 
   useEffect(() => {
     messagesRef.current = messages;
+  }, [messages]);
+
+  // 消息变化时自动保存（仅保存已完成的消息）
+  useEffect(() => {
+    if (messages.length > 0) {
+      saveSession(routeRef.current, messages, threadIdRef.current);
+    }
   }, [messages]);
 
   useEffect(() => {
