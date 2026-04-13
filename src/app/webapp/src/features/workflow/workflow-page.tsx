@@ -17,6 +17,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import { XMarkdown } from "@ant-design/x-markdown";
+import MermaidDiagram from "../../components/mermaid-diagram";
 import { API_BASE } from "../../services/api";
 
 interface WorkflowInfo {
@@ -195,11 +196,7 @@ export default function WorkflowPage() {
         {topoLoading ? (
           <Spin />
         ) : (
-          <div style={{ maxHeight: 500, overflow: "auto" }}>
-            <XMarkdown
-              content={`\`\`\`mermaid\n${topoData?.topology ?? "graph LR\n  empty[无拓扑数据]"}\n\`\`\``}
-            />
-          </div>
+          <MermaidDiagram chart={topoData?.topology ?? "graph LR\n  empty[\"\u65E0\u62D3\u6251\u6570\u636E\"]"} />
         )}
       </Modal>
 

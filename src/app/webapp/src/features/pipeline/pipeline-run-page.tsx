@@ -14,6 +14,11 @@ interface AgentInfo {
   aguiRoute: string;
 }
 
+/** Markdown 渲染组件 */
+function MarkdownContent({ text }: { text: string }) {
+  return <XMarkdown content={text} />;
+}
+
 /** 将 ChatMessage 转为 Bubble.List 的 items 格式 */
 function toBubbleItems(messages: ChatMessage[]) {
   return messages.map((msg) => ({
@@ -22,6 +27,12 @@ function toBubbleItems(messages: ChatMessage[]) {
     content: msg.content || (msg.status === "streaming" ? "思考中..." : ""),
     loading: msg.status === "streaming",
     streaming: msg.status === "streaming",
+    // assistant 消息使用 Markdown 渲染
+    ...(msg.role === "assistant"
+      ? {
+          contentRender: () => <MarkdownContent text={msg.content} />,
+        }
+      : {}),
   }));
 }
 
@@ -129,9 +140,6 @@ export default function PipelineRunPage() {
                   icon: roles.assistant.avatar,
                   style: { background: "#52c41a" },
                 },
-                contentRender: (content: string) => (
-                  <XMarkdown content={typeof content === "string" ? content : ""} />
-                ),
               },
             }}
           />
