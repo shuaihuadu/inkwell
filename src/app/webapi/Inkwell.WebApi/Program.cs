@@ -1,5 +1,6 @@
 ﻿using Inkwell;
 using Inkwell.Agents;
+using Inkwell.Agents.Middleware;
 using Inkwell.Persistence.InMemory;
 using Inkwell.Workflows;
 using Microsoft.Agents.AI;
@@ -94,6 +95,9 @@ public static class Program
         int loadedWorkflows = DeclarativeWorkflowLoader.LoadFromDirectory(workflowRegistry, primaryClient, workflowsDir, agentLogger);
         agentLogger.LogInformation("Loaded {Count} declarative workflows from {Directory}", loadedWorkflows, workflowsDir);
 
+        // 注册 AG-UI 服务（JSON 序列化配置）
+        builder.Services.AddAGUI();
+
         // 配置 OpenTelemetry
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(ServiceName))
@@ -134,20 +138,24 @@ public static class Program
         app.UseAuthorization();
         app.MapControllers();
 
-        // ========== 为每个 Agent 映射 AG-UI 端点 ==========
+        // ========== 为每个 Agent 映射 AG-UI 端点（带会话持久化）==========
+        ISessionPersistenceProvider sessionProvider = app.Services.GetRequiredService<ISessionPersistenceProvider>();
+
         foreach (AgentRegistration registration in agentRegistry.GetAll())
         {
-            app.MapAGUI(registration.AguiRoute, registration.Agent);
+            AIAgent wrappedAgent = registration.Agent.WithSessionPersistence(registration.Id, sessionProvider);
+            app.MapAGUI(registration.AguiRoute, wrappedAgent);
         }
 
-        // ========== 将 Workflow 包装为 Agent 并映射 AG-UI 端点 ==========
+        // ========== 将 Workflow 包装为 Agent 并映射 AG-UI 端点（带会话持久化）==========
         foreach (WorkflowRegistration workflowReg in workflowRegistry.GetAll())
         {
             string agentId = $"workflow-{workflowReg.Id}";
             AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name, includeWorkflowOutputsInResponse: true);
 
             string aguiRoute = $"/api/agui/{agentId}";
-            app.MapAGUI(aguiRoute, workflowAgent);
+            AIAgent wrappedWorkflowAgent = workflowAgent.WithSessionPersistence(agentId, sessionProvider);
+            app.MapAGUI(aguiRoute, wrappedWorkflowAgent);
 
             agentRegistry.Register(new AgentRegistration
             {
