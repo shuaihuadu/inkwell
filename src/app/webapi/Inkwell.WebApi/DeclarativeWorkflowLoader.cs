@@ -175,7 +175,17 @@ internal sealed class DeclarativeExecutor : Executor<string>
             _ => $"你是一名 {typeName} 处理器。处理上游传入的内容并输出结果。"
         };
 
-        this._agent = chatClient.AsAIAgent(instructions: instructions + " 请用中文回复。");
+        this._agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            ChatOptions = new Microsoft.Extensions.AI.ChatOptions
+            {
+                Instructions = instructions + " 请用中文回复。"
+            },
+            ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
+            {
+                ChatReducer = new MessageCountingChatReducer(10)
+            })
+        });
     }
 
     /// <inheritdoc />

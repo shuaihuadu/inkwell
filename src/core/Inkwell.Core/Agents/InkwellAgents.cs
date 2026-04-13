@@ -17,6 +17,19 @@ public static class InkwellAgents
     private const int DefaultChatHistoryRetainCount = 20;
 
     /// <summary>
+    /// 创建默认的 ChatHistoryProvider
+    /// </summary>
+    /// <param name="retainCount">保留消息条数</param>
+    /// <returns>InMemoryChatHistoryProvider 实例</returns>
+    private static InMemoryChatHistoryProvider CreateDefaultChatHistoryProvider(int retainCount = DefaultChatHistoryRetainCount)
+    {
+        return new InMemoryChatHistoryProvider(new()
+        {
+            ChatReducer = new MessageCountingChatReducer(retainCount)
+        });
+    }
+
+    /// <summary>
     /// 创建内容写手 Agent（带搜索工具、ChatReducer、护栏 + 审计中间件）
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
@@ -52,10 +65,7 @@ public static class InkwellAgents
                 ]
             },
             // 对话历史保留数从参数读取
-            ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
-            {
-                ChatReducer = new MessageCountingChatReducer(chatHistoryRetainCount)
-            }),
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(chatHistoryRetainCount),
             // RAG 知识检索（如果配置了 TextSearchProvider）
             AIContextProviders = providers.Count > 0 ? providers : null
         });
@@ -83,12 +93,18 @@ public static class InkwellAgents
     /// <returns>Agent 注册信息</returns>
     public static AgentRegistration CreateCritic(IChatClient chatClient)
     {
-        AIAgent baseAgent = chatClient.AsAIAgent(
-            name: "Critic",
-            instructions: """
-                你是一名严格的内容编辑。从质量、准确性、吸引力和完整性四个维度审核文章。
-                提供建设性的反馈，指出问题并给出改进建议。请用中文回复。
-                """);
+        AIAgent baseAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = "Critic",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    你是一名严格的内容编辑。从质量、准确性、吸引力和完整性四个维度审核文章。
+                    提供建设性的反馈，指出问题并给出改进建议。请用中文回复。
+                    """
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(10)
+        });
 
         AIAgent agent = baseAgent
             .AsBuilder()
@@ -122,7 +138,8 @@ public static class InkwellAgents
                     当用户要求结构化分析时，请按照指定的 JSON 格式返回结果。
                     """,
                 ResponseFormat = ChatResponseFormat.ForJsonSchema<TopicAnalysis>()
-            }
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(10)
         });
 
         return new AgentRegistration
@@ -142,13 +159,20 @@ public static class InkwellAgents
     /// <returns>Agent 注册信息</returns>
     public static AgentRegistration CreateCompetitorAnalyst(IChatClient chatClient)
     {
-        AIAgent agent = chatClient.AsAIAgent(
-            instructions: """
-                你是一名竞品分析专家。研究和分析竞争对手的内容策略、发布频率、话题选择和受众互动。
-                识别竞品的优势和劣势，找出差异化机会。提供可操作的竞争策略建议。
-                请用中文回复。
-                """,
-            tools: [AIFunctionFactory.Create(InkwellTools.SearchLatestNews)]);
+        AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = "CompetitorAnalyst",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    你是一名竞品分析专家。研究和分析竞争对手的内容策略、发布频率、话题选择和受众互动。
+                    识别竞品的优势和劣势，找出差异化机会。提供可操作的竞争策略建议。
+                    请用中文回复。
+                    """,
+                Tools = [AIFunctionFactory.Create(InkwellTools.SearchLatestNews)]
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(10)
+        });
 
         return new AgentRegistration
         {
@@ -179,7 +203,8 @@ public static class InkwellAgents
                     """,
                 ResponseFormat = ChatResponseFormat.ForJsonSchema<SeoReport>(),
                 Tools = [AIFunctionFactory.Create(InkwellTools.AnalyzeKeyword)]
-            }
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(10)
         });
 
         return new AgentRegistration
@@ -199,15 +224,22 @@ public static class InkwellAgents
     /// <returns>Agent 注册信息</returns>
     public static AgentRegistration CreateImageAnalyst(IChatClient chatClient)
     {
-        AIAgent agent = chatClient.AsAIAgent(
-            instructions: """
-                你是一名图片内容分析专家。你可以分析用户上传的图片，生成以下内容：
-                1. 图片描述：准确描述图片的内容、构图和氛围
-                2. ALT 标签：为网页无障碍访问生成简洁的 ALT 文本
-                3. 配图说明：为文章配图撰写合适的说明文字
-                4. 标签建议：为图片推荐分类标签
-                请用中文回复。
-                """);
+        AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = "ImageAnalyst",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    你是一名图片内容分析专家。你可以分析用户上传的图片，生成以下内容：
+                    1. 图片描述：准确描述图片的内容、构图和氛围
+                    2. ALT 标签：为网页无障碍访问生成简洁的 ALT 文本
+                    3. 配图说明：为文章配图撰写合适的说明文字
+                    4. 标签建议：为图片推荐分类标签
+                    请用中文回复。
+                    """
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(6)
+        });
 
         return new AgentRegistration
         {
@@ -238,23 +270,30 @@ public static class InkwellAgents
             tools.Add(seoAgent.AsAIFunction());
         }
 
-        AIAgent agent = chatClient.AsAIAgent(
-            instructions: """
-                你是 Inkwell 内容平台的智能助手。你的职责是：
-                1. 接待用户，理解用户的需求
-                2. 根据需求类型引导用户使用合适的功能：
-                   - 写文章 → 建议使用「内容写手」Agent
-                   - 审核文章 → 建议使用「内容审核」Agent
-                   - 分析市场/选题 → 建议使用「市场分析」Agent
-                   - 分析竞品 → 建议使用「竞品分析」Agent
-                   - SEO 优化 → 可直接使用内置的 SEO 分析工具
-                   - 翻译内容 → 建议使用对应语言的翻译 Agent
-                   - 分析图片 → 建议使用「图片分析」Agent
-                3. 回答关于平台功能的一般性问题
-                4. 在用户确认后，可以调用发布工具发布文章
-                请用中文回复。保持友好专业的对话风格。
-                """,
-            tools: tools);
+        AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = "Coordinator",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    你是 Inkwell 内容平台的智能助手。你的职责是：
+                    1. 接待用户，理解用户的需求
+                    2. 根据需求类型引导用户使用合适的功能：
+                       - 写文章 → 建议使用「内容写手」Agent
+                       - 审核文章 → 建议使用「内容审核」Agent
+                       - 分析市场/选题 → 建议使用「市场分析」Agent
+                       - 分析竞品 → 建议使用「竞品分析」Agent
+                       - SEO 优化 → 可直接使用内置的 SEO 分析工具
+                       - 翻译内容 → 建议使用对应语言的翻译 Agent
+                       - 分析图片 → 建议使用「图片分析」Agent
+                    3. 回答关于平台功能的一般性问题
+                    4. 在用户确认后，可以调用发布工具发布文章
+                    请用中文回复。保持友好专业的对话风格。
+                    """,
+                Tools = tools
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(20)
+        });
 
         return new AgentRegistration
         {
@@ -276,11 +315,18 @@ public static class InkwellAgents
     {
         string agentId = $"translator-{targetLanguage.ToLowerInvariant()}";
 
-        AIAgent agent = chatClient.AsAIAgent(
-            instructions: $"""
-                你是一名专业翻译。将用户提供的内容准确翻译成{targetLanguage}。
-                保持原文的语气、风格和格式。确保翻译自然流畅，符合目标语言的表达习惯。
-                """);
+        AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+        {
+            Name = $"Translator-{targetLanguage}",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = $"""
+                    你是一名专业翻译。将用户提供的内容准确翻译成{targetLanguage}。
+                    保持原文的语气、风格和格式。确保翻译自然流畅，符合目标语言的表达习惯。
+                    """
+            },
+            ChatHistoryProvider = CreateDefaultChatHistoryProvider(6)
+        });
 
         return new AgentRegistration
         {

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
+using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
+
 namespace Inkwell.WebApi;
 
 /// <summary>
@@ -48,9 +50,15 @@ public static class DeclarativeAgentLoader
                     continue;
                 }
 
-                AIAgent agent = chatClient.AsAIAgent(
-                    name: definition.Name,
-                    instructions: definition.Instructions);
+                AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+                {
+                    Name = definition.Name,
+                    ChatOptions = new ChatOptions { Instructions = definition.Instructions },
+                    ChatHistoryProvider = new InMemoryChatHistoryProvider(new()
+                    {
+                        ChatReducer = new MessageCountingChatReducer(10)
+                    })
+                });
 
                 registry.Register(new AgentRegistration
                 {
