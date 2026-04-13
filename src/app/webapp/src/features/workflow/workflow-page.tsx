@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Typography,
   Card,
   List,
   Button,
-  Modal,
-  Input,
   Tag,
   Space,
   Spin,
@@ -16,9 +14,11 @@ import {
   PlayCircleOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import { XMarkdown } from "@ant-design/x-markdown";
-import MermaidDiagram from "../../components/mermaid-diagram";
-import { API_BASE } from "../../services/api";
+import WorkflowTopologyModal from "../../components/workflow-topology-modal";
+import WorkflowRunModal from "../../components/workflow-run-modal";
+import { useAguiConversationController } from "../../hooks/use-agui-conversation-controller";
+import { useApiList } from "../../hooks/use-api-list";
+import { useWorkflowTopology } from "../../hooks/use-workflow-topology";
 
 interface WorkflowInfo {
   id: string;
@@ -26,109 +26,43 @@ interface WorkflowInfo {
   description: string;
 }
 
-interface TopologyData {
-  id: string;
-  name: string;
-  format: string;
-  topology: string;
-}
-
-interface SSEEvent {
-  type: string;
-  workflowId?: string;
-  executorId?: string;
-  data?: string;
-  message?: string;
-  hasCheckpoint?: boolean;
-}
-
 export default function WorkflowPage() {
-  const [workflows, setWorkflows] = useState<WorkflowInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items: workflows, loading } = useApiList<WorkflowInfo>({
+    endpoint: "/api/workflows",
+    onError: () => {
+      message.error("加载 Workflow 列表失败");
+    },
+  });
 
-  // 拓扑图弹窗
-  const [topoVisible, setTopoVisible] = useState(false);
-  const [topoData, setTopoData] = useState<TopologyData | null>(null);
-  const [topoLoading, setTopoLoading] = useState(false);
+  const {
+    visible: topoVisible,
+    loading: topoLoading,
+    data: topoData,
+    openTopology,
+    closeTopology,
+  } = useWorkflowTopology(() => {
+    message.error("加载拓扑图失败");
+  });
 
   // 运行弹窗
   const [runVisible, setRunVisible] = useState(false);
   const [runWorkflow, setRunWorkflow] = useState<WorkflowInfo | null>(null);
-  const [runInput, setRunInput] = useState("");
-  const [runEvents, setRunEvents] = useState<SSEEvent[]>([]);
-  const [running, setRunning] = useState(false);
+  const runConversation = useAguiConversationController("/api/agui/writer");
 
-  useEffect(() => {
-    fetch(`${API_BASE}/api/workflows`)
-      .then((res) => res.json())
-      .then((data: WorkflowInfo[]) => setWorkflows(data))
-      .catch(() => message.error("加载 Workflow 列表失败"))
-      .finally(() => setLoading(false));
-  }, []);
+  const workflowRouteOptions = useMemo(
+    () =>
+      workflows.map((workflow) => ({
+        value: `/api/agui/workflow-${workflow.id}`,
+        label: workflow.name,
+        workflow,
+      })),
+    [workflows],
+  );
 
-  const showTopology = async (id: string) => {
-    setTopoLoading(true);
-    setTopoVisible(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/workflows/${id}/topology`);
-      if (res.ok) {
-        setTopoData(await res.json());
-      }
-    } catch {
-      message.error("加载拓扑图失败");
-    } finally {
-      setTopoLoading(false);
-    }
-  };
-
-  const startRun = async () => {
-    if (!runWorkflow || !runInput.trim()) return;
-
-    setRunning(true);
-    setRunEvents([]);
-
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/workflows/${runWorkflow.id}/run`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: runInput }),
-        },
-      );
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6).trim();
-            if (!data) continue;
-
-            try {
-              const event: SSEEvent = JSON.parse(data);
-              setRunEvents((prev) => [...prev, event]);
-            } catch {
-              // 忽略
-            }
-          }
-        }
-      }
-    } catch (err) {
-      message.error(`运行失败: ${(err as Error).message}`);
-    } finally {
-      setRunning(false);
-    }
+  const openRunModal = (workflow: WorkflowInfo) => {
+    setRunWorkflow(workflow);
+    runConversation.changeRoute(`/api/agui/workflow-${workflow.id}`);
+    setRunVisible(true);
   };
 
   if (loading) {
@@ -153,7 +87,9 @@ export default function WorkflowPage() {
                   <Button
                     size="small"
                     icon={<EyeOutlined />}
-                    onClick={() => showTopology(item.id)}
+                    onClick={() => {
+                      void openTopology(item.id);
+                    }}
                   >
                     拓扑
                   </Button>
@@ -161,12 +97,7 @@ export default function WorkflowPage() {
                     size="small"
                     type="primary"
                     icon={<PlayCircleOutlined />}
-                    onClick={() => {
-                      setRunWorkflow(item);
-                      setRunInput("");
-                      setRunEvents([]);
-                      setRunVisible(true);
-                    }}
+                    onClick={() => openRunModal(item)}
                   >
                     运行
                   </Button>
@@ -185,103 +116,26 @@ export default function WorkflowPage() {
         )}
       />
 
-      {/* 拓扑图弹窗 */}
-      <Modal
-        title={`拓扑图 — ${topoData?.name ?? ""}`}
-        open={topoVisible}
-        onCancel={() => setTopoVisible(false)}
-        footer={null}
-        width={700}
-      >
-        {topoLoading ? (
-          <Spin />
-        ) : (
-          <MermaidDiagram chart={topoData?.topology ?? "graph LR\n  empty[\"\u65E0\u62D3\u6251\u6570\u636E\"]"} />
-        )}
-      </Modal>
+      <WorkflowTopologyModal
+        visible={topoVisible}
+        loading={topoLoading}
+        data={topoData}
+        onClose={closeTopology}
+      />
 
-      {/* 运行弹窗 */}
-      <Modal
-        title={`运行 — ${runWorkflow?.name ?? ""}`}
-        open={runVisible}
-        onCancel={() => {
-          setRunVisible(false);
-          setRunning(false);
+      <WorkflowRunModal
+        visible={runVisible}
+        title={runWorkflow?.name ?? ""}
+        options={workflowRouteOptions}
+        conversation={runConversation}
+        onRouteChange={(route) => {
+          const selected = workflowRouteOptions.find(
+            (o) => o.value === route,
+          )?.workflow;
+          setRunWorkflow(selected ?? null);
         }}
-        footer={null}
-        width={700}
-      >
-        <Space.Compact style={{ width: "100%", marginBottom: 16 }}>
-          <Input
-            placeholder="输入内容（如文章主题）"
-            value={runInput}
-            onChange={(e) => setRunInput(e.target.value)}
-            onPressEnter={startRun}
-            disabled={running}
-          />
-          <Button
-            type="primary"
-            onClick={startRun}
-            loading={running}
-            disabled={!runInput.trim()}
-          >
-            {running ? "运行中..." : "开始"}
-          </Button>
-        </Space.Compact>
-
-        <div
-          style={{
-            maxHeight: 400,
-            overflow: "auto",
-            background: "#fafafa",
-            padding: 12,
-            borderRadius: 8,
-          }}
-        >
-          {runEvents.length === 0 && !running && (
-            <Typography.Text type="secondary">
-              输入内容后点击"开始"运行 Workflow
-            </Typography.Text>
-          )}
-          {runEvents.map((evt, i) => (
-            <div
-              key={i}
-              style={{
-                marginBottom: 8,
-                borderBottom: "1px solid #f0f0f0",
-                paddingBottom: 8,
-              }}
-            >
-              <Tag
-                color={
-                  evt.type === "output"
-                    ? "green"
-                    : evt.type === "executor_complete"
-                      ? "blue"
-                      : evt.type === "checkpoint"
-                        ? "orange"
-                        : evt.type === "error"
-                          ? "red"
-                          : evt.type === "done"
-                            ? "cyan"
-                            : "default"
-                }
-              >
-                {evt.type}
-              </Tag>
-              {evt.executorId && <Tag color="purple">{evt.executorId}</Tag>}
-              {evt.data && (
-                <div style={{ marginTop: 4 }}>
-                  <XMarkdown content={evt.data} />
-                </div>
-              )}
-              {evt.message && (
-                <Typography.Text type="danger">{evt.message}</Typography.Text>
-              )}
-            </div>
-          ))}
-        </div>
-      </Modal>
+        onClose={() => setRunVisible(false)}
+      />
     </div>
   );
 }

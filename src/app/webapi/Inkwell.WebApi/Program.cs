@@ -144,7 +144,7 @@ public static class Program
         foreach (WorkflowRegistration workflowReg in workflowRegistry.GetAll())
         {
             string agentId = $"workflow-{workflowReg.Id}";
-            AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name);
+            AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name, includeWorkflowOutputsInResponse: true);
 
             string aguiRoute = $"/api/agui/{agentId}";
             app.MapAGUI(aguiRoute, workflowAgent);

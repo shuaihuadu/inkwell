@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunAgentInput, AGUIMessage } from "../services/agui-types";
 import { API_BASE } from "../services/api";
 
@@ -15,7 +15,7 @@ export interface UseAGUIAgentReturn {
   /** 是否正在运行 */
   loading: boolean;
   /** 发送消息 */
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string) => Promise<void>;
   /** 重置对话 */
   reset: () => void;
 }
@@ -24,37 +24,41 @@ export interface UseAGUIAgentReturn {
  * 自定义 Hook：对接后端 AG-UI 端点
  * 通过 SSE 流式接收 Agent 响应
  */
-export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAgentReturn {
+export function useAGUIAgent(
+  aguiRoute: string = "/api/agui/writer",
+): UseAGUIAgentReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const threadIdRef = useRef<string>(crypto.randomUUID());
+  const messagesRef = useRef<ChatMessage[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const sendMessage = useCallback(
     async (content: string) => {
+      const normalized = content.trim();
+      if (!normalized) {
+        return;
+      }
+
+      // 启动新请求前中止旧请求，避免并发串流污染当前消息
+      abortRef.current?.abort();
+
       // 添加用户消息
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        content,
+        content: normalized,
         status: "done",
-      };
-
-      setMessages((prev) => [...prev, userMsg]);
-      setLoading(true);
-
-      // 准备 AG-UI 请求
-      const allMessages: AGUIMessage[] = [
-        ...messages
-          .filter((m) => m.status === "done")
-          .map((m) => ({ id: m.id, role: m.role, content: m.content })),
-        { id: userMsg.id, role: "user", content },
-      ];
-
-      const input: RunAgentInput = {
-        threadId: threadIdRef.current,
-        runId: crypto.randomUUID(),
-        messages: allMessages,
       };
 
       // 创建助手消息占位
@@ -65,7 +69,23 @@ export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAge
         content: "",
         status: "streaming",
       };
-      setMessages((prev) => [...prev, assistantMsg]);
+
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setLoading(true);
+
+      // 准备 AG-UI 请求
+      const allMessages: AGUIMessage[] = [
+        ...messagesRef.current
+          .filter((m) => m.status === "done")
+          .map((m) => ({ id: m.id, role: m.role, content: m.content })),
+        { id: userMsg.id, role: "user", content: normalized },
+      ];
+
+      const input: RunAgentInput = {
+        threadId: threadIdRef.current,
+        runId: crypto.randomUUID(),
+        messages: allMessages,
+      };
 
       try {
         abortRef.current = new AbortController();
@@ -102,32 +122,82 @@ export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAge
               try {
                 const event = JSON.parse(data);
 
-                if (event.type === "TEXT_MESSAGE_CONTENT") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId
-                        ? { ...m, content: m.content + (event.delta ?? "") }
-                        : m
-                    )
-                  );
-                } else if (event.type === "RUN_FINISHED") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId ? { ...m, status: "done" } : m
-                    )
-                  );
-                } else if (event.type === "RUN_ERROR") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId
-                        ? {
-                            ...m,
-                            content: event.message ?? "发生错误",
-                            status: "error",
-                          }
-                        : m
-                    )
-                  );
+                switch (event.type) {
+                  case "RUN_STARTED":
+                    // 静默处理，不显示系统消息
+                    break;
+
+                  case "TEXT_MESSAGE_START":
+                    // 可选：标记新消息开始
+                    break;
+
+                  case "TEXT_MESSAGE_CONTENT":
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMsgId
+                          ? { ...m, content: m.content + (event.delta ?? "") }
+                          : m,
+                      ),
+                    );
+                    break;
+
+                  case "TEXT_MESSAGE_END":
+                    // 文本消息结束（RUN_FINISHED 之前可能有多段）
+                    break;
+
+                  case "TOOL_CALL_START":
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `tool-${event.toolCallId ?? crypto.randomUUID()}`,
+                        role: "system",
+                        content: `🔧 调用工具: ${event.toolCallName ?? "unknown"}`,
+                        status: "done",
+                      },
+                    ]);
+                    break;
+
+                  case "TOOL_CALL_RESULT":
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `tool-result-${event.toolCallId ?? crypto.randomUUID()}`,
+                        role: "system",
+                        content: `✅ 工具返回结果`,
+                        status: "done",
+                      },
+                    ]);
+                    break;
+
+                  case "STATE_SNAPSHOT":
+                    // 静默处理，不显示系统消息
+                    break;
+
+                  case "RUN_FINISHED":
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMsgId ? { ...m, status: "done" } : m,
+                      ),
+                    );
+                    break;
+
+                  case "RUN_ERROR":
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantMsgId
+                          ? {
+                              ...m,
+                              content: event.message ?? "发生错误",
+                              status: "error",
+                            }
+                          : m,
+                      ),
+                    );
+                    break;
+
+                  default:
+                    // 其他未知事件类型静默忽略
+                    break;
                 }
               } catch {
                 // 忽略不可解析的行
@@ -141,8 +211,8 @@ export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAge
           prev.map((m) =>
             m.id === assistantMsgId && m.status === "streaming"
               ? { ...m, status: "done" }
-              : m
-          )
+              : m,
+          ),
         );
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
@@ -154,8 +224,8 @@ export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAge
                     content: `请求失败: ${(error as Error).message}`,
                     status: "error",
                   }
-                : m
-            )
+                : m,
+            ),
           );
         }
       } finally {
@@ -163,7 +233,7 @@ export function useAGUIAgent(aguiRoute: string = "/api/agui/writer"): UseAGUIAge
         abortRef.current = null;
       }
     },
-    [messages]
+    [aguiRoute],
   );
 
   const reset = useCallback(() => {

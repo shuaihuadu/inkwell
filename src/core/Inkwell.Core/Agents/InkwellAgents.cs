@@ -60,10 +60,10 @@ public static class InkwellAgents
             AIContextProviders = providers.Count > 0 ? providers : null
         });
 
-        // 应用中间件管线：护栏
+        // 应用中间件管线：护栏（同时提供非流式和流式实现）
         AIAgent agent = baseAgent
             .AsBuilder()
-            .Use(ContentGuardrailMiddleware.InvokeAsync, null)
+            .Use(ContentGuardrailMiddleware.InvokeAsync, ContentGuardrailMiddleware.InvokeStreamingAsync)
             .Build();
 
         return new AgentRegistration
@@ -92,7 +92,7 @@ public static class InkwellAgents
 
         AIAgent agent = baseAgent
             .AsBuilder()
-            .Use(ContentGuardrailMiddleware.InvokeAsync, null)
+            .Use(ContentGuardrailMiddleware.InvokeAsync, ContentGuardrailMiddleware.InvokeStreamingAsync)
             .Build();
 
         return new AgentRegistration

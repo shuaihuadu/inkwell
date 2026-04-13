@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
-import { Typography, Button, Space, Flex, Select } from "antd";
-import { ClearOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
-import { Bubble, Sender } from "@ant-design/x";
-import { XMarkdown } from "@ant-design/x-markdown";
-import { useAGUIAgent } from "../../hooks/use-agui-agent";
-import type { ChatMessage } from "../../hooks/use-agui-agent";
-import { API_BASE } from "../../services/api";
+import { useEffect, useMemo } from "react";
+import { Flex, Select } from "antd";
+import AguiConversationShell from "../../components/agui-conversation-shell";
+import { pipelineConversationPreset } from "../../components/agui-conversation-presets";
+import { useAguiConversationController } from "../../hooks/use-agui-conversation-controller";
+import { useApiList } from "../../hooks/use-api-list";
 
 interface AgentInfo {
   id: string;
@@ -14,145 +12,71 @@ interface AgentInfo {
   aguiRoute: string;
 }
 
-/** Markdown 渲染组件 */
-function MarkdownContent({ text }: { text: string }) {
-  return <XMarkdown content={text} />;
-}
-
-/** 将 ChatMessage 转为 Bubble.List 的 items 格式 */
-function toBubbleItems(messages: ChatMessage[]) {
-  return messages.map((msg) => ({
-    key: msg.id,
-    role: msg.role as string,
-    content: msg.content || (msg.status === "streaming" ? "思考中..." : ""),
-    loading: msg.status === "streaming",
-    streaming: msg.status === "streaming",
-    // assistant 消息使用 Markdown 渲染
-    ...(msg.role === "assistant"
-      ? {
-          contentRender: () => <MarkdownContent text={msg.content} />,
-        }
-      : {}),
-  }));
-}
-
-/** 角色配置 */
-const roles: Record<string, { name: string; avatar: React.ReactNode }> = {
-  user: {
-    name: "用户",
-    avatar: <UserOutlined />,
-  },
-  assistant: {
-    name: "Inkwell",
-    avatar: <RobotOutlined />,
-  },
-};
-
 export default function PipelineRunPage() {
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState("/api/agui/writer");
-  const { messages, loading, sendMessage, reset } = useAGUIAgent(selectedRoute);
-  const [inputValue, setInputValue] = useState("");
+  const { items: agents, loading: agentsLoading } = useApiList<AgentInfo>({
+    endpoint: "/api/agents",
+  });
+  const {
+    route,
+    inputValue,
+    loading,
+    messages,
+    setInputValue,
+    submit,
+    clear,
+    changeRoute,
+  } = useAguiConversationController("/api/agui/writer");
 
-  // 加载 Agent 列表
+  const agentOptions = useMemo(
+    () =>
+      agents.map((agent) => ({
+        value: agent.aguiRoute,
+        label: agent.name,
+      })),
+    [agents],
+  );
+
+  const selectedRoute = useMemo(() => {
+    if (agentOptions.some((option) => option.value === route)) {
+      return route;
+    }
+
+    return agentOptions[0]?.value ?? route;
+  }, [agentOptions, route]);
+
   useEffect(() => {
-    fetch(`${API_BASE}/api/agents`)
-      .then((res) => res.json())
-      .then((data: AgentInfo[]) => {
-        setAgents(data);
-        if (data.length > 0) {
-          setSelectedRoute(data[0].aguiRoute);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleSend = (value: string) => {
-    if (!value.trim()) return;
-    sendMessage(value.trim());
-    setInputValue("");
-  };
-
-  const handleAgentChange = (route: string) => {
-    setSelectedRoute(route);
-    reset();
-  };
+    if (selectedRoute !== route) {
+      changeRoute(selectedRoute);
+    }
+  }, [changeRoute, route, selectedRoute]);
 
   return (
     <Flex vertical style={{ height: "100%" }} gap={16}>
-      {/* 标题栏 + Agent 选择 */}
-      <Flex justify="space-between" align="center">
-        <Space>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            对话
-          </Typography.Title>
+      <AguiConversationShell
+        title={pipelineConversationPreset.title}
+        leftExtra={
           <Select
             value={selectedRoute}
-            onChange={handleAgentChange}
+            onChange={changeRoute}
             style={{ width: 200 }}
-            options={agents.map((a) => ({
-              value: a.aguiRoute,
-              label: a.name,
-            }))}
+            options={agentOptions}
             placeholder="选择 Agent"
+            loading={agentsLoading}
           />
-        </Space>
-        <Button icon={<ClearOutlined />} onClick={reset} disabled={loading}>
-          新对话
-        </Button>
-      </Flex>
-
-      {/* 对话区域 */}
-      <div
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "0 8px",
-          minHeight: 0,
-        }}
-      >
-        {messages.length === 0 ? (
-          <Flex
-            vertical
-            align="center"
-            justify="center"
-            style={{ height: "100%", opacity: 0.5 }}
-          >
-            <RobotOutlined style={{ fontSize: 48, marginBottom: 16 }} />
-            <Typography.Text type="secondary">
-              输入文章主题开始创作，例如：AI 在医疗健康领域的未来
-            </Typography.Text>
-          </Flex>
-        ) : (
-          <Bubble.List
-            items={toBubbleItems(messages)}
-            roles={{
-              user: {
-                placement: "end",
-                avatar: {
-                  icon: roles.user.avatar,
-                  style: { background: "#1677ff" },
-                },
-              },
-              assistant: {
-                placement: "start",
-                avatar: {
-                  icon: roles.assistant.avatar,
-                  style: { background: "#52c41a" },
-                },
-              },
-            }}
-          />
-        )}
-      </div>
-
-      {/* 输入区域 */}
-      <Sender
-        value={inputValue}
-        onChange={setInputValue}
-        onSubmit={handleSend}
+        }
+        onClear={clear}
+        clearDisabled={loading}
+        clearText={pipelineConversationPreset.clearText}
+        messages={messages}
         loading={loading}
-        placeholder="输入文章主题开始创作..."
+        inputValue={inputValue}
+        onInputChange={setInputValue}
+        onSubmit={submit}
+        placeholder={pipelineConversationPreset.placeholder}
+        emptyText={pipelineConversationPreset.emptyText}
+        streamingText={pipelineConversationPreset.streamingText}
+        statusText={pipelineConversationPreset.getStatusText(loading)}
+        shellStyle={{ flex: 1, minHeight: 0 }}
       />
     </Flex>
   );

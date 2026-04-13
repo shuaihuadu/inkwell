@@ -68,10 +68,7 @@ export default function MermaidDiagram({ chart }: MermaidDiagramProps) {
   return (
     <div>
       {loading && <Spin size="small" />}
-      <div
-        ref={containerRef}
-        style={{ overflow: "auto", maxHeight: 500 }}
-      />
+      <div ref={containerRef} style={{ overflow: "auto", maxHeight: 500 }} />
     </div>
   );
 }

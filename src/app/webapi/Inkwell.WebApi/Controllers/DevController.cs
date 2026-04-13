@@ -3,6 +3,7 @@ using Inkwell.Workflows;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.AI;
 
 namespace Inkwell.WebApi.Controllers;
 
@@ -16,6 +17,7 @@ namespace Inkwell.WebApi.Controllers;
 public sealed class DevController(
     AgentRegistry agentRegistry,
     WorkflowRegistry workflowRegistry,
+    IChatClient chatClient,
     IConfiguration configuration,
     IWebHostEnvironment environment) : ControllerBase
 {
@@ -142,5 +144,96 @@ public sealed class DevController(
                 mermaid
             };
         }));
+    }
+
+    /// <summary>
+    /// 诊断：直接测试 IChatClient 流式输出，隔离 Agent Framework 层
+    /// </summary>
+    /// <param name="prompt">测试提示词</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>SSE 流，每个 chunk 一个事件，含序号和内容长度</returns>
+    [HttpGet("stream-test")]
+    [AllowAnonymous]
+    public async Task StreamTest([FromQuery] string prompt = "用中文写一篇关于AI的短文，200字左右", CancellationToken cancellationToken = default)
+    {
+        this.Response.ContentType = "text/event-stream";
+        this.Response.Headers.CacheControl = "no-cache";
+        this.Response.Headers.Connection = "keep-alive";
+
+        await using StreamWriter writer = new(this.Response.Body, leaveOpen: true);
+
+        List<ChatMessage> messages =
+        [
+            new(ChatRole.User, prompt)
+        ];
+
+        int chunkIndex = 0;
+        int totalChars = 0;
+
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync(messages, cancellationToken: cancellationToken))
+        {
+            string text = update.Text ?? "";
+            totalChars += text.Length;
+            chunkIndex++;
+
+            await writer.WriteLineAsync($"data: [chunk {chunkIndex}] len={text.Length} total={totalChars} text=\"{text.Replace("\"", "\\\"").Replace("\n", "\\n")}\"");
+            await writer.WriteLineAsync();
+            await writer.FlushAsync();
+        }
+
+        await writer.WriteLineAsync($"data: [done] totalChunks={chunkIndex} totalChars={totalChars}");
+        await writer.WriteLineAsync();
+        await writer.FlushAsync();
+    }
+
+    /// <summary>
+    /// 诊断：测试 Agent RunStreamingAsync 输出，验证 Agent Framework 是否缓冲
+    /// </summary>
+    /// <param name="agentId">Agent ID</param>
+    /// <param name="prompt">测试提示词</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>SSE 流，每个 AgentResponseUpdate 一个事件</returns>
+    [HttpGet("agent-stream-test/{agentId}")]
+    [AllowAnonymous]
+    public async Task AgentStreamTest(string agentId, [FromQuery] string prompt = "hello", CancellationToken cancellationToken = default)
+    {
+        this.Response.ContentType = "text/event-stream";
+        this.Response.Headers.CacheControl = "no-cache";
+        this.Response.Headers.Connection = "keep-alive";
+
+        await using StreamWriter writer = new(this.Response.Body, leaveOpen: true);
+
+        AgentRegistration? registration = agentRegistry.GetById(agentId);
+        if (registration is null)
+        {
+            await writer.WriteLineAsync($"data: [error] agent '{agentId}' not found");
+            await writer.WriteLineAsync();
+            await writer.FlushAsync();
+            return;
+        }
+
+        List<ChatMessage> messages = [new(ChatRole.User, prompt)];
+
+        int updateIndex = 0;
+        await foreach (Microsoft.Agents.AI.AgentResponseUpdate update in registration.Agent.RunStreamingAsync(messages, cancellationToken: cancellationToken))
+        {
+            updateIndex++;
+            string textContent = "";
+            foreach (AIContent content in update.Contents)
+            {
+                if (content is TextContent tc)
+                {
+                    textContent += tc.Text;
+                }
+            }
+
+            await writer.WriteLineAsync($"data: [update {updateIndex}] contentCount={update.Contents.Count} textLen={textContent.Length} text=\"{textContent.Replace("\"", "\\\"").Replace("\n", "\\n")[..Math.Min(textContent.Length, 100)]}\"");
+            await writer.WriteLineAsync();
+            await writer.FlushAsync();
+        }
+
+        await writer.WriteLineAsync($"data: [done] totalUpdates={updateIndex}");
+        await writer.WriteLineAsync();
+        await writer.FlushAsync();
     }
 }
