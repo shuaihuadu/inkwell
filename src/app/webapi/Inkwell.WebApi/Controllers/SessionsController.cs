@@ -18,12 +18,14 @@ public sealed class SessionsController(
     /// 获取指定 Agent 的会话列表
     /// </summary>
     /// <param name="agentId">Agent ID（可选，不传则返回所有）</param>
+    /// <param name="search">按标题模糊搜索（可选）</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>会话信息列表</returns>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListSessionsAsync(
         [FromQuery] string? agentId,
+        [FromQuery] string? search,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(agentId))
@@ -34,6 +36,15 @@ public sealed class SessionsController(
         IReadOnlyList<SessionInfo> sessions = await sessionProvider
             .ListSessionInfosAsync(agentId, cancellationToken)
             .ConfigureAwait(false);
+
+        // 按标题模糊搜索
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            sessions = sessions
+                .Where(s => s.Title is not null && s.Title.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList()
+                .AsReadOnly();
+        }
 
         return this.Ok(sessions);
     }
@@ -190,6 +201,64 @@ public sealed class SessionsController(
         logger.LogInformation("[Sessions] Deleted session {SessionId}", threadId);
 
         return this.NoContent();
+    }
+
+    /// <summary>
+    /// 导出会话为 Markdown
+    /// </summary>
+    /// <param name="threadId">会话 ID</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>Markdown 文件</returns>
+    [HttpGet("{threadId}/export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportSessionAsync(
+        string threadId,
+        CancellationToken cancellationToken)
+    {
+        SessionInfo? info = await sessionProvider
+            .GetSessionInfoAsync(threadId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (info is null)
+        {
+            return this.NotFound();
+        }
+
+        IReadOnlyList<ChatMessageRecord> messages = await sessionProvider
+            .GetMessagesAsync(threadId, cancellationToken)
+            .ConfigureAwait(false);
+
+        System.Text.StringBuilder sb = new();
+        sb.AppendLine($"# {info.Title ?? "Untitled"}");
+        sb.AppendLine();
+        sb.AppendLine($"> Agent: {info.AgentId} | Messages: {info.MessageCount} | Created: {info.CreatedAt:yyyy-MM-dd HH:mm}");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+
+        foreach (ChatMessageRecord msg in messages)
+        {
+            string roleLabel = msg.Role switch
+            {
+                "user" => "**User**",
+                "assistant" => "**Assistant**",
+                "system" => "**System**",
+                _ => $"**{msg.Role}**"
+            };
+
+            sb.AppendLine($"{roleLabel} ({msg.CreatedAt:HH:mm:ss})");
+            sb.AppendLine();
+            sb.AppendLine(msg.Content);
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
+
+        string fileName = $"{info.Title ?? "session"}-{threadId[..8]}.md";
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+
+        return this.File(bytes, "text/markdown", fileName);
     }
 }
 
