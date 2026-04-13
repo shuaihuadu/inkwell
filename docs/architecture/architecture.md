@@ -51,8 +51,14 @@ Inkwell/
 │   │       └── Inkwell.Queue.Redis/               # Redis Queue + PubSub
 │   │
 │   └── app/                                     # 应用层
-│       ├── webapi/Inkwell.WebApi/              # ASP.NET Core Web API
-│       │   └── Controllers/                       # Controller + Action
+│       ├── aspire/                              # .NET Aspire 编排
+│       │   ├── Inkwell.AppHost/                   # AppHost 项目
+│       │   └── Inkwell.ServiceDefaults/           # 服务默认配置
+│       ├── services/                            # 宿主服务
+│       │   ├── Inkwell.WebApi/                    # ASP.NET Core Web API
+│       │   ├── Inkwell.DurableHost/               # DurableTask Console 托管
+│       │   ├── Inkwell.Functions/                 # Azure Functions
+│       │   └── Inkwell.A2AServer/                 # A2A 服务器
 │       └── webapp/                              # React 前端
 │           └── src/
 │               ├── features/pipeline/             # 流水线运行页

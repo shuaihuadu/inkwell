@@ -1,27 +1,30 @@
 ﻿<Solution>
-    <Folder Name="/src/core/">
-        <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
-        <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
-    </Folder>
-    <Folder Name="/src/core/providers/">
-        <Project Path="src/core/providers/Inkwell.Persistence.EntityFrameworkCore/Inkwell.Persistence.EntityFrameworkCore.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.InMemory/Inkwell.Persistence.InMemory.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.SqlServer/Inkwell.Persistence.SqlServer.csproj" />
-        <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
-    </Folder>
-    <Folder Name="/docs/" />
-    <Folder Name="/docs/architecture/" />
-    <Folder Name="/docs/design/" />
-    <Folder Name="/docs/plan/" />
-    <Folder Name="/scripts/" />
-    <Folder Name="/src/" />
-    <Folder Name="/src/app/">
-        <Project Path="src/app/a2a-server/Inkwell.A2AServer/Inkwell.A2AServer.csproj" />
-        <Project Path="src/app/apphost/Inkwell.AppHost/Inkwell.AppHost.csproj" />
-        <Project Path="src/app/aspire/Inkwell.ServiceDefaults/Inkwell.ServiceDefaults.csproj" />
-        <Project Path="src/app/durable-host/Inkwell.DurableHost/Inkwell.DurableHost.csproj" />
-        <Project Path="src/app/functions/Inkwell.Functions/Inkwell.Functions.csproj" />
-        <Project Path="src/app/webapi/Inkwell.WebApi/Inkwell.WebApi.csproj" />
-    </Folder>
-    <Folder Name="/tests/" />
+  <Folder Name="/src/app/aspire/" />
+  <Folder Name="/src/core/">
+    <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
+    <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/core/providers/">
+    <Project Path="src/core/providers/Inkwell.Persistence.EntityFrameworkCore/Inkwell.Persistence.EntityFrameworkCore.csproj" />
+    <Project Path="src/core/providers/Inkwell.Persistence.InMemory/Inkwell.Persistence.InMemory.csproj" />
+    <Project Path="src/core/providers/Inkwell.Persistence.SqlServer/Inkwell.Persistence.SqlServer.csproj" />
+    <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
+  </Folder>
+  <Folder Name="/docs/" />
+  <Folder Name="/docs/architecture/" />
+  <Folder Name="/docs/design/" />
+  <Folder Name="/docs/plan/" />
+  <Folder Name="/scripts/" />
+  <Folder Name="/src/" />
+  <Folder Name="/src/app/">
+    <Project Path="src/app/aspire/Inkwell.AppHost/Inkwell.AppHost.csproj" />
+    <Project Path="src/app/aspire/Inkwell.ServiceDefaults/Inkwell.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/app/services/">
+    <Project Path="src/app/services/Inkwell.WebApi/Inkwell.WebApi.csproj" />
+    <Project Path="src/app/services/Inkwell.DurableHost/Inkwell.DurableHost.csproj" />
+    <Project Path="src/app/services/Inkwell.Functions/Inkwell.Functions.csproj" />
+    <Project Path="src/app/services/Inkwell.A2AServer/Inkwell.A2AServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
 </Solution>

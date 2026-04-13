@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\webapi\Inkwell.WebApi\Inkwell.WebApi.csproj" />
+    <ProjectReference Include="..\..\services\Inkwell.WebApi\Inkwell.WebApi.csproj" />
   </ItemGroup>
 
   <Import Sdk="Aspire.AppHost.Sdk" Version="13.2.2" Project="Sdk.targets" />
