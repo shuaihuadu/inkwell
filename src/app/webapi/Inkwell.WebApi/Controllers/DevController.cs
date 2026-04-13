@@ -153,9 +153,14 @@ public sealed class DevController(
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>SSE 流，每个 chunk 一个事件，含序号和内容长度</returns>
     [HttpGet("stream-test")]
-    [AllowAnonymous]
     public async Task StreamTest([FromQuery] string prompt = "用中文写一篇关于AI的短文，200字左右", CancellationToken cancellationToken = default)
     {
+        if (!environment.IsDevelopment())
+        {
+            this.Response.StatusCode = 403;
+            return;
+        }
+
         this.Response.ContentType = "text/event-stream";
         this.Response.Headers.CacheControl = "no-cache";
         this.Response.Headers.Connection = "keep-alive";
@@ -194,9 +199,14 @@ public sealed class DevController(
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>SSE 流，每个 AgentResponseUpdate 一个事件</returns>
     [HttpGet("agent-stream-test/{agentId}")]
-    [AllowAnonymous]
     public async Task AgentStreamTest(string agentId, [FromQuery] string prompt = "hello", CancellationToken cancellationToken = default)
     {
+        if (!environment.IsDevelopment())
+        {
+            this.Response.StatusCode = 403;
+            return;
+        }
+
         this.Response.ContentType = "text/event-stream";
         this.Response.Headers.CacheControl = "no-cache";
         this.Response.Headers.Connection = "keep-alive";

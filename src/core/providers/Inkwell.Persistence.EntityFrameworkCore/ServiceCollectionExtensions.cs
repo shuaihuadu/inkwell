@@ -20,7 +20,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPipelineRunPersistenceProvider, EfCorePipelineRunPersistenceProvider>();
         services.AddScoped<IAnalysisPersistenceProvider, EfCoreAnalysisPersistenceProvider>();
         services.AddScoped<IReviewPersistenceProvider, EfCoreReviewPersistenceProvider>();
-        services.AddScoped<ISessionPersistenceProvider, EfCoreSessionPersistenceProvider>();
+
+        // SessionPersistenceProvider 注册为 Singleton（因为被 Singleton 中间件和服务引用）
+        // 内部每次操作通过 IServiceScopeFactory 创建 scope 来获取 DbContext
+        services.AddSingleton<ISessionPersistenceProvider>(sp =>
+        {
+            IServiceScopeFactory scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+            return new EfCoreScopedSessionPersistenceProvider(scopeFactory);
+        });
         return services;
     }
 }
