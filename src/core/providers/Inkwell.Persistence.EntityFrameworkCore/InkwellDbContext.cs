@@ -28,6 +28,16 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
     /// </summary>
     public DbSet<ReviewEntity> Reviews => this.Set<ReviewEntity>();
 
+    /// <summary>
+    /// 获取或设置聊天会话数据集
+    /// </summary>
+    public DbSet<ChatSessionEntity> ChatSessions => this.Set<ChatSessionEntity>();
+
+    /// <summary>
+    /// 获取或设置聊天消息数据集
+    /// </summary>
+    public DbSet<ChatMessageEntity> ChatMessages => this.Set<ChatMessageEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +63,18 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         modelBuilder.Entity<ReviewEntity>(entity =>
         {
             entity.HasIndex(e => e.ArticleId);
+        });
+
+        modelBuilder.Entity<ChatSessionEntity>(entity =>
+        {
+            entity.HasIndex(e => e.AgentId);
+            entity.HasIndex(e => e.UpdatedAt);
+        });
+
+        modelBuilder.Entity<ChatMessageEntity>(entity =>
+        {
+            entity.HasIndex(e => e.SessionId);
+            entity.HasIndex(e => e.CreatedAt);
         });
     }
 }

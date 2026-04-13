@@ -6,7 +6,7 @@ namespace Inkwell.Agents;
 /// 工具循环检查点服务（需求 2.16）
 /// 在 Agent 执行长链工具调用时，保存中间检查点，支持失败后恢复
 /// </summary>
-public sealed class ToolLoopCheckpointService(ISessionPersistenceService sessionService)
+public sealed class ToolLoopCheckpointService(ISessionPersistenceProvider sessionService)
 {
     /// <summary>
     /// 保存工具调用循环的检查点

@@ -14,7 +14,7 @@ namespace Inkwell.WebApi.Controllers;
 [Authorize(Policy = "EditorOrAdmin")]
 public sealed class BackgroundController(
     AgentRegistry agentRegistry,
-    ISessionPersistenceService sessionService,
+    ISessionPersistenceProvider sessionService,
     ILogger<BackgroundController> logger) : ControllerBase
 {
     /// <summary>

@@ -53,17 +53,17 @@ IEmbeddingGenerator<string, Embedding<float>> generator =
 
 所有连接器均实现 VectorStore 抽象，通过 NuGet 引用即可切换：
 
-| NuGet 包 | 向量后端 | 适用场景 |
-|----------|---------|---------|
-| Microsoft.SemanticKernel.Connectors.InMemory | 内存 | 开发/测试 |
-| Microsoft.SemanticKernel.Connectors.Qdrant | Qdrant | 自托管高性能 |
-| Microsoft.SemanticKernel.Connectors.AzureAISearch | Azure AI Search | Azure 云原生 |
-| Microsoft.SemanticKernel.Connectors.AzureCosmosDBNoSQL | Cosmos DB | 已有 Cosmos |
-| Microsoft.SemanticKernel.Connectors.Postgres | PostgreSQL pgvector | 已有 PG |
-| Microsoft.SemanticKernel.Connectors.Redis | Redis | 极低延迟 |
-| Microsoft.SemanticKernel.Connectors.Pinecone | Pinecone | 托管服务 |
-| Microsoft.SemanticKernel.Connectors.Weaviate | Weaviate | 开源引擎 |
-| Microsoft.SemanticKernel.Connectors.Sqlite | SQLite | 嵌入式/边缘 |
+| NuGet 包                                               | 向量后端            | 适用场景     |
+| ------------------------------------------------------ | ------------------- | ------------ |
+| Microsoft.SemanticKernel.Connectors.InMemory           | 内存                | 开发/测试    |
+| Microsoft.SemanticKernel.Connectors.Qdrant             | Qdrant              | 自托管高性能 |
+| Microsoft.SemanticKernel.Connectors.AzureAISearch      | Azure AI Search     | Azure 云原生 |
+| Microsoft.SemanticKernel.Connectors.AzureCosmosDBNoSQL | Cosmos DB           | 已有 Cosmos  |
+| Microsoft.SemanticKernel.Connectors.Postgres           | PostgreSQL pgvector | 已有 PG      |
+| Microsoft.SemanticKernel.Connectors.Redis              | Redis               | 极低延迟     |
+| Microsoft.SemanticKernel.Connectors.Pinecone           | Pinecone            | 托管服务     |
+| Microsoft.SemanticKernel.Connectors.Weaviate           | Weaviate            | 开源引擎     |
+| Microsoft.SemanticKernel.Connectors.Sqlite             | SQLite              | 嵌入式/边缘  |
 
 ---
 
@@ -173,13 +173,13 @@ InkwellCoreBuilder coreBuilder = builder.Services
 
 ### 5.1 为什么不自定义 IVectorProvider
 
-| 考虑因素 | 结论 |
-|---------|------|
-| 是否有现成抽象 | Microsoft.Extensions.VectorData.Abstractions 是官方统一标准 |
-| MAF 是否直接使用 | ChatHistoryMemoryProvider 构造函数接受 VectorStore 抽象类 |
-| 连接器生态 | SK Connectors 提供 10+ 实现，均遵循同一抽象 |
-| 自定义收益 | 仅增加一层无意义的转接，不提供额外价值 |
-| 维护成本 | 自定义接口需要跟踪上游抽象变化并适配 |
+| 考虑因素         | 结论                                                        |
+| ---------------- | ----------------------------------------------------------- |
+| 是否有现成抽象   | Microsoft.Extensions.VectorData.Abstractions 是官方统一标准 |
+| MAF 是否直接使用 | ChatHistoryMemoryProvider 构造函数接受 VectorStore 抽象类   |
+| 连接器生态       | SK Connectors 提供 10+ 实现，均遵循同一抽象                 |
+| 自定义收益       | 仅增加一层无意义的转接，不提供额外价值                      |
+| 维护成本         | 自定义接口需要跟踪上游抽象变化并适配                        |
 
 直接使用 VectorStore 抽象，通过 DI 注入切换实现即可。
 
@@ -198,15 +198,15 @@ IEmbeddingGenerator 和 VectorStore 分开注册：
 
 ## 6. 实施计划
 
-| 步骤 | 任务 | 涉及文件 |
-|------|------|---------|
-| 1 | AzureOpenAIOptions 新增 Embedding 配置段 | AzureOpenAIOptions.cs |
-| 2 | 实现 UseAzureOpenAIEmbedding 注册方法 | AzureOpenAIServiceCollectionExtensions.cs |
-| 3 | 实现 UseInMemoryVectorStore 注册方法 | VectorStoreServiceCollectionExtensions.cs |
-| 4 | Program.cs 接入 Embedding + VectorStore | Program.cs |
-| 5 | 创建 ChatHistoryMemoryProvider 并挂载到 Agent | InkwellAgents.cs |
-| 6 | 验证跨 session 语义检索 | 手动测试 |
-| 7 | 按需引入生产连接器（Qdrant / AzureAISearch） | 新增 NuGet 引用 + 注册方法 |
+| 步骤 | 任务                                          | 涉及文件                                  |
+| ---- | --------------------------------------------- | ----------------------------------------- |
+| 1    | AzureOpenAIOptions 新增 Embedding 配置段      | AzureOpenAIOptions.cs                     |
+| 2    | 实现 UseAzureOpenAIEmbedding 注册方法         | AzureOpenAIServiceCollectionExtensions.cs |
+| 3    | 实现 UseInMemoryVectorStore 注册方法          | VectorStoreServiceCollectionExtensions.cs |
+| 4    | Program.cs 接入 Embedding + VectorStore       | Program.cs                                |
+| 5    | 创建 ChatHistoryMemoryProvider 并挂载到 Agent | InkwellAgents.cs                          |
+| 6    | 验证跨 session 语义检索                       | 手动测试                                  |
+| 7    | 按需引入生产连接器（Qdrant / AzureAISearch）  | 新增 NuGet 引用 + 注册方法                |
 # Inkwell 向量存储设计方案
 
 ## 1. 架构概览
