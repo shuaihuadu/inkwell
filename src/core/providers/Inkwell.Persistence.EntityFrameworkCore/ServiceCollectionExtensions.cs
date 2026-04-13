@@ -1,4 +1,5 @@
 ﻿using Inkwell;
+using Inkwell.Agents;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inkwell.Persistence.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPipelineRunPersistenceProvider, EfCorePipelineRunPersistenceProvider>();
         services.AddScoped<IAnalysisPersistenceProvider, EfCoreAnalysisPersistenceProvider>();
         services.AddScoped<IReviewPersistenceProvider, EfCoreReviewPersistenceProvider>();
+        services.AddScoped<ISessionPersistenceProvider, EfCoreSessionPersistenceProvider>();
         return services;
     }
 }
