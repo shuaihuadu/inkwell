@@ -38,6 +38,16 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
     /// </summary>
     public DbSet<ChatMessageEntity> ChatMessages => this.Set<ChatMessageEntity>();
 
+    /// <summary>
+    /// 获取或设置知识库文档数据集
+    /// </summary>
+    public DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => this.Set<KnowledgeDocumentEntity>();
+
+    /// <summary>
+    /// 获取或设置知识库切片数据集
+    /// </summary>
+    public DbSet<KnowledgeChunkEntity> KnowledgeChunks => this.Set<KnowledgeChunkEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +85,17 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         {
             entity.HasIndex(e => e.SessionId);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        modelBuilder.Entity<KnowledgeDocumentEntity>(entity =>
+        {
+            entity.HasIndex(e => e.CreatedAt);
+        });
+
+        modelBuilder.Entity<KnowledgeChunkEntity>(entity =>
+        {
+            entity.HasIndex(e => e.DocumentId);
+            entity.HasIndex(e => e.ChunkIndex);
         });
     }
 }

@@ -48,8 +48,7 @@ public static class Program
             throw new InvalidOperationException("Primary IChatClient not registered. Ensure UseAzureOpenAI() is called before this point.");
         }
 
-        // 注册 Agent 记忆服务（在 AddInkwellAgents 之前，以便 Agent 挂载长期记忆）
-        // 使用 DI 注册的 VectorStore 实例（此时 IEmbeddingGenerator 会在运行时延迟解析）
+        // 注册向量存储和 Agent 记忆服务
         Microsoft.Extensions.VectorData.VectorStore vectorStore =
             new Microsoft.SemanticKernel.Connectors.InMemory.InMemoryVectorStore();
         builder.Services.AddSingleton(vectorStore);
@@ -59,8 +58,10 @@ public static class Program
         // 注册所有 Agent（使用 Keyed IChatClient）
         AgentRegistry agentRegistry = builder.Services.AddInkwellAgents(builder.Configuration);
 
-        // 注册知识库服务 + 初始化示例文档
-        KnowledgeBaseService knowledgeBase = new();
+        // 注册知识库服务（支持向量检索，如果 Embedding 配置可用）
+        // EmbeddingGenerator 在 UseAzureOpenAIEmbedding() 中注册为 deferred singleton
+        // 这里先用无向量模式创建，运行时会在首次 AddDocumentAsync 时检查
+        KnowledgeBaseService knowledgeBase = new(vectorStore, null!);
         knowledgeBase.AddDocument("Inkwell 品牌风格指南", """
             Inkwell 是一个 AI 驱动的内容生产平台。
             品牌调性：专业、创新、高效。
