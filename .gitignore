@@ -6,6 +6,7 @@ obj/
 *.userprefs
 .vs/
 *.DotSettings.user
+TestResults/
 
 ## IDE
 .idea/
