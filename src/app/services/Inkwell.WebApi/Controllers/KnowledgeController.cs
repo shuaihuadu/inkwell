@@ -12,6 +12,7 @@ namespace Inkwell.WebApi.Controllers;
 [Authorize(Policy = "EditorOrAdmin")]
 public sealed class KnowledgeController(
     KnowledgeBaseService knowledgeBase,
+    KnowledgePersistenceService persistence,
     ILogger<KnowledgeController> logger) : ControllerBase
 {
     /// <summary>
@@ -68,6 +69,11 @@ public sealed class KnowledgeController(
             sourceLink: request.SourceLink,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
+        // 持久化到 DB
+        await persistence.SaveDocumentAsync(
+            id, request.Title, request.Content, "txt", request.SourceLink,
+            knowledgeBase.GetChunks(id), cancellationToken).ConfigureAwait(false);
+
         logger.LogInformation("[Knowledge] Uploaded document {Id}: {Title}", id, request.Title);
 
         return this.Ok(new { id, message = "Document uploaded successfully.", title = request.Title });
@@ -116,6 +122,13 @@ public sealed class KnowledgeController(
             content,
             cancellationToken).ConfigureAwait(false);
 
+        // 持久化到 DB
+        string fileExt = Path.GetExtension(file.FileName).ToLowerInvariant();
+        string fileType = fileExt is ".md" or ".markdown" ? "md" : "txt";
+        await persistence.SaveDocumentAsync(
+            id, Path.GetFileNameWithoutExtension(file.FileName), content, fileType,
+            $"file://{file.FileName}", knowledgeBase.GetChunks(id), cancellationToken).ConfigureAwait(false);
+
         logger.LogInformation("[Knowledge] Uploaded file {Id}: {FileName} ({Size} bytes)",
             id, file.FileName, file.Length);
 
@@ -161,7 +174,7 @@ public sealed class KnowledgeController(
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult Delete(string id)
+    public async Task<IActionResult> DeleteAsync(string id, CancellationToken cancellationToken)
     {
         bool removed = knowledgeBase.RemoveDocument(id);
 
@@ -169,6 +182,9 @@ public sealed class KnowledgeController(
         {
             return this.NotFound();
         }
+
+        // 从 DB 删除
+        await persistence.DeleteDocumentAsync(id, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation("[Knowledge] Deleted document {Id}", id);
 

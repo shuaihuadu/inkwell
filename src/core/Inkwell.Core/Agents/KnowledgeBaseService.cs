@@ -82,7 +82,7 @@ public sealed class KnowledgeBaseService
     private readonly ConcurrentDictionary<string, KnowledgeDocument> _documents = new();
     private readonly ConcurrentDictionary<string, List<KnowledgeChunk>> _chunks = new();
     private readonly VectorStore? _vectorStore;
-    private readonly IEmbeddingGenerator<string, Embedding<float>>? _embeddingGenerator;
+    private IEmbeddingGenerator<string, Embedding<float>>? _embeddingGenerator;
 
     /// <summary>
     /// 默认切片大小（字符数）
@@ -110,13 +110,21 @@ public sealed class KnowledgeBaseService
     /// 初始化知识库服务（带向量存储，支持语义检索）
     /// </summary>
     /// <param name="vectorStore">向量存储实例</param>
-    /// <param name="embeddingGenerator">嵌入生成器</param>
+    /// <param name="embeddingGenerator">嵌入生成器（可为 null，运行时可通过 SetEmbeddingGenerator 注入）</param>
     public KnowledgeBaseService(
         VectorStore vectorStore,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
+        IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator = null)
     {
         this._vectorStore = vectorStore;
         this._embeddingGenerator = embeddingGenerator;
+    }
+
+    /// <summary>
+    /// 运行时注入 EmbeddingGenerator（用于 DI 延迟解析场景）
+    /// </summary>
+    public void SetEmbeddingGenerator(IEmbeddingGenerator<string, Embedding<float>> generator)
+    {
+        this._embeddingGenerator = generator;
     }
 
     /// <summary>

@@ -61,7 +61,7 @@ public static class Program
         // 注册知识库服务（支持向量检索，如果 Embedding 配置可用）
         // EmbeddingGenerator 在 UseAzureOpenAIEmbedding() 中注册为 deferred singleton
         // 这里先用无向量模式创建，运行时会在首次 AddDocumentAsync 时检查
-        KnowledgeBaseService knowledgeBase = new(vectorStore, null!);
+        KnowledgeBaseService knowledgeBase = new(vectorStore);
         knowledgeBase.AddDocument("Inkwell 品牌风格指南", """
             Inkwell 是一个 AI 驱动的内容生产平台。
             品牌调性：专业、创新、高效。
@@ -77,6 +77,10 @@ public static class Program
             6. 内链和外链平衡
             """);
         builder.Services.AddSingleton(knowledgeBase);
+
+        // 注册知识库持久化同步服务（启动时从 DB 加载，变更时写回 DB）
+        builder.Services.AddSingleton<KnowledgePersistenceService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<KnowledgePersistenceService>());
 
         // 加载声明式 Agent（YAML 定义）[M8 修复: 增加日志]
         ILogger<AgentRegistry> agentLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger<AgentRegistry>();
@@ -124,6 +128,14 @@ public static class Program
         });
 
         WebApplication app = builder.Build();
+
+        // 运行时注入 EmbeddingGenerator 到知识库（DI 已完全构建）
+        IEmbeddingGenerator<string, Embedding<float>>? embeddingGen =
+            app.Services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
+        if (embeddingGen is not null)
+        {
+            knowledgeBase.SetEmbeddingGenerator(embeddingGen);
+        }
 
         // [L1 修复] 全局异常处理
         if (!app.Environment.IsDevelopment())
