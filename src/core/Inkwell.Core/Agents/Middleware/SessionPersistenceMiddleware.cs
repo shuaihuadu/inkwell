@@ -17,17 +17,19 @@ public static class SessionPersistenceMiddleware
     /// <param name="agent">原始 Agent</param>
     /// <param name="agentId">Agent ID（用于持久化标识）</param>
     /// <param name="sessionProvider">会话持久化提供程序</param>
+    /// <param name="titleGenerator">用于生成会话标题的 LLM 客户端（可选，不传则截取首条消息前 50 字符）</param>
     /// <returns>包装后的 Agent</returns>
     public static AIAgent WithSessionPersistence(
         this AIAgent agent,
         string agentId,
-        ISessionPersistenceProvider sessionProvider)
+        ISessionPersistenceProvider sessionProvider,
+        IChatClient? titleGenerator = null)
     {
         return agent
             .AsBuilder()
             .Use(
-                CreateRunFunc(agentId, sessionProvider),
-                CreateRunStreamingFunc(agentId, sessionProvider))
+                CreateRunFunc(agentId, sessionProvider, titleGenerator),
+                CreateRunStreamingFunc(agentId, sessionProvider, titleGenerator))
             .Build();
     }
 
@@ -87,6 +89,7 @@ public static class SessionPersistenceMiddleware
         string threadId,
         IEnumerable<ChatMessage> inputMessages,
         ISessionPersistenceProvider sessionProvider,
+        IChatClient? titleGenerator,
         CancellationToken cancellationToken)
     {
         // 1) 序列化并保存 session state
@@ -154,19 +157,53 @@ public static class SessionPersistenceMiddleware
             SessionInfo? info = await sessionProvider.GetSessionInfoAsync(threadId, cancellationToken).ConfigureAwait(false);
             if (info is not null && string.IsNullOrWhiteSpace(info.Title))
             {
-                string title = firstUserMessage.Length > 50
-                    ? firstUserMessage[..50] + "..."
-                    : firstUserMessage;
+                string title = await GenerateTitleAsync(firstUserMessage, titleGenerator, cancellationToken).ConfigureAwait(false);
                 await sessionProvider.UpdateSessionTitleAsync(threadId, title, cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
     /// <summary>
+    /// 生成会话标题：优先使用 LLM 总结，回退到截取前 50 字符
+    /// </summary>
+    private static async Task<string> GenerateTitleAsync(
+        string firstUserMessage,
+        IChatClient? titleGenerator,
+        CancellationToken cancellationToken)
+    {
+        if (titleGenerator is not null)
+        {
+            try
+            {
+                ChatResponse response = await titleGenerator.GetResponseAsync(
+                    [
+                        new ChatMessage(ChatRole.System, "用不超过 15 个中文字为以下对话生成一个简短标题，只输出标题文字，不要加引号或标点。"),
+                        new ChatMessage(ChatRole.User, firstUserMessage)
+                    ],
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+
+                string? generated = response.Text?.Trim();
+                if (!string.IsNullOrWhiteSpace(generated) && generated.Length <= 50)
+                {
+                    return generated;
+                }
+            }
+            catch
+            {
+                // LLM 调用失败时回退到截取
+            }
+        }
+
+        return firstUserMessage.Length > 50
+            ? firstUserMessage[..50] + "..."
+            : firstUserMessage;
+    }
+
+    /// <summary>
     /// 创建非流式运行委托
     /// </summary>
     private static Func<IEnumerable<ChatMessage>, AgentSession?, AgentRunOptions?, AIAgent, CancellationToken, Task<AgentResponse>>
-        CreateRunFunc(string agentId, ISessionPersistenceProvider sessionProvider)
+        CreateRunFunc(string agentId, ISessionPersistenceProvider sessionProvider, IChatClient? titleGenerator)
     {
         return async (messages, session, options, innerAgent, cancellationToken) =>
         {
@@ -177,7 +214,7 @@ public static class SessionPersistenceMiddleware
 
             if (threadId is not null)
             {
-                await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, cancellationToken).ConfigureAwait(false);
+                await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, titleGenerator, cancellationToken).ConfigureAwait(false);
             }
 
             return response;
@@ -188,11 +225,11 @@ public static class SessionPersistenceMiddleware
     /// 创建流式运行委托
     /// </summary>
     private static Func<IEnumerable<ChatMessage>, AgentSession?, AgentRunOptions?, AIAgent, CancellationToken, IAsyncEnumerable<AgentResponseUpdate>>
-        CreateRunStreamingFunc(string agentId, ISessionPersistenceProvider sessionProvider)
+        CreateRunStreamingFunc(string agentId, ISessionPersistenceProvider sessionProvider, IChatClient? titleGenerator)
     {
         return (messages, session, options, innerAgent, cancellationToken) =>
         {
-            return RunStreamingWithPersistenceAsync(messages, options, innerAgent, agentId, sessionProvider, cancellationToken);
+            return RunStreamingWithPersistenceAsync(messages, options, innerAgent, agentId, sessionProvider, titleGenerator, cancellationToken);
         };
     }
 
@@ -205,6 +242,7 @@ public static class SessionPersistenceMiddleware
         AIAgent innerAgent,
         string agentId,
         ISessionPersistenceProvider sessionProvider,
+        IChatClient? titleGenerator,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         (AgentSession loadedSession, string? threadId) =
@@ -217,7 +255,7 @@ public static class SessionPersistenceMiddleware
 
         if (threadId is not null)
         {
-            await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, cancellationToken).ConfigureAwait(false);
+            await PersistSessionAsync(innerAgent, loadedSession, agentId, threadId, messages, sessionProvider, titleGenerator, cancellationToken).ConfigureAwait(false);
         }
     }
 }

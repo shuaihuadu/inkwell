@@ -103,6 +103,9 @@ public static class Program
         // 添加 Aspire 服务默认配置（OpenTelemetry、健康检查、服务发现、弹性 HTTP）
         builder.AddServiceDefaults();
 
+        // 注册过期会话清理后台服务
+        builder.Services.AddHostedService<SessionCleanupService>();
+
         // [H7 修复] CORS origin 从配置读取
         string[] corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
             ?? ["http://localhost:5188", "http://localhost:3000"];
@@ -133,10 +136,11 @@ public static class Program
 
         // ========== 为每个 Agent 映射 AG-UI 端点（带会话持久化）==========
         ISessionPersistenceProvider sessionProvider = app.Services.GetRequiredService<ISessionPersistenceProvider>();
+        IChatClient? titleClient = app.Services.GetService<IChatClient>();
 
         foreach (AgentRegistration registration in agentRegistry.GetAll())
         {
-            AIAgent wrappedAgent = registration.Agent.WithSessionPersistence(registration.Id, sessionProvider);
+            AIAgent wrappedAgent = registration.Agent.WithSessionPersistence(registration.Id, sessionProvider, titleClient);
             app.MapAGUI(registration.AguiRoute, wrappedAgent);
         }
 
@@ -147,7 +151,7 @@ public static class Program
             AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name, includeWorkflowOutputsInResponse: true);
 
             string aguiRoute = $"/api/agui/{agentId}";
-            AIAgent wrappedWorkflowAgent = workflowAgent.WithSessionPersistence(agentId, sessionProvider);
+            AIAgent wrappedWorkflowAgent = workflowAgent.WithSessionPersistence(agentId, sessionProvider, titleClient);
             app.MapAGUI(aguiRoute, wrappedWorkflowAgent);
 
             agentRegistry.Register(new AgentRegistration
