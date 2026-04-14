@@ -116,7 +116,9 @@ export default function KnowledgePage() {
 
       if (res.ok) {
         const data = await res.json();
-        message.success(`文件上传成功: ${data.fileName} (${data.chunkCount} 个切片)`);
+        message.success(
+          `文件上传成功: ${data.fileName} (${data.chunkCount} 个切片)`,
+        );
         setUploadVisible(false);
         await fetchDocuments();
       } else {
@@ -132,7 +134,9 @@ export default function KnowledgePage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/knowledge/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/knowledge/${id}`, {
+        method: "DELETE",
+      });
       if (res.ok) {
         message.success("文档已删除");
         await fetchDocuments();
@@ -172,7 +176,9 @@ export default function KnowledgePage() {
         <Space>
           <FileTextOutlined />
           <strong>{text}</strong>
-          <Tag color={record.fileType === "md" ? "green" : "default"}>{record.fileType}</Tag>
+          <Tag color={record.fileType === "md" ? "green" : "default"}>
+            {record.fileType}
+          </Tag>
         </Space>
       ),
     },
@@ -182,7 +188,9 @@ export default function KnowledgePage() {
       key: "contentLength",
       width: 100,
       render: (len: number) => (
-        <Tag color="blue">{len > 1000 ? `${(len / 1000).toFixed(1)}K` : `${len}`} 字符</Tag>
+        <Tag color="blue">
+          {len > 1000 ? `${(len / 1000).toFixed(1)}K` : `${len}`} 字符
+        </Tag>
       ),
     },
     {
@@ -212,7 +220,10 @@ export default function KnowledgePage() {
           >
             切片
           </Button>
-          <Popconfirm title="确定删除这个文档？" onConfirm={() => void handleDelete(record.id)}>
+          <Popconfirm
+            title="确定删除这个文档？"
+            onConfirm={() => void handleDelete(record.id)}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -226,11 +237,21 @@ export default function KnowledgePage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <Space
+        style={{
+          marginBottom: 16,
+          width: "100%",
+          justifyContent: "space-between",
+        }}
+      >
         <Typography.Title level={3} style={{ margin: 0 }}>
           <BookOutlined /> 知识库
         </Typography.Title>
-        <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadVisible(true)}>
+        <Button
+          type="primary"
+          icon={<UploadOutlined />}
+          onClick={() => setUploadVisible(true)}
+        >
           上传文档
         </Button>
       </Space>
@@ -268,7 +289,11 @@ export default function KnowledgePage() {
                     value={uploadContent}
                     onChange={(e) => setUploadContent(e.target.value)}
                   />
-                  <Button type="primary" onClick={() => void handleTextUpload()} loading={uploading}>
+                  <Button
+                    type="primary"
+                    onClick={() => void handleTextUpload()}
+                    loading={uploading}
+                  >
                     上传
                   </Button>
                 </Space>
@@ -281,13 +306,17 @@ export default function KnowledgePage() {
                 <Upload.Dragger
                   accept=".txt,.text,.md,.markdown"
                   showUploadList={false}
-                  customRequest={({ file }) => void handleFileUpload(file as UploadFile)}
+                  customRequest={({ file }) =>
+                    void handleFileUpload(file as UploadFile)
+                  }
                 >
                   <p className="ant-upload-drag-icon">
                     <InboxOutlined />
                   </p>
                   <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                  <p className="ant-upload-hint">支持 .txt / .md 文件，最大 5 MB</p>
+                  <p className="ant-upload-hint">
+                    支持 .txt / .md 文件，最大 5 MB
+                  </p>
                 </Upload.Dragger>
               ),
             },

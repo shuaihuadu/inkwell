@@ -1,4 +1,4 @@
-﻿<Solution>
+<Solution>
   <Folder Name="/src/app/aspire/" />
   <Folder Name="/src/core/">
     <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
@@ -21,10 +21,12 @@
     <Project Path="src/app/aspire/Inkwell.ServiceDefaults/Inkwell.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/app/services/">
-    <Project Path="src/app/services/Inkwell.WebApi/Inkwell.WebApi.csproj" />
+    <Project Path="src/app/services/Inkwell.A2AServer/Inkwell.A2AServer.csproj" />
     <Project Path="src/app/services/Inkwell.DurableHost/Inkwell.DurableHost.csproj" />
     <Project Path="src/app/services/Inkwell.Functions/Inkwell.Functions.csproj" />
-    <Project Path="src/app/services/Inkwell.A2AServer/Inkwell.A2AServer.csproj" />
+    <Project Path="src/app/services/Inkwell.WebApi/Inkwell.WebApi.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Inkwell.Tests/Inkwell.Tests.csproj" Id="b267df87-b91e-4008-8632-1777a4c04b85" />
+  </Folder>
 </Solution>
