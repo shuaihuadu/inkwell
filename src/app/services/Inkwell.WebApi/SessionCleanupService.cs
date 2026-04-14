@@ -2,8 +2,30 @@ using Inkwell.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Inkwell.WebApi;
+
+/// <summary>
+/// 会话清理配置选项
+/// </summary>
+public sealed class SessionCleanupOptions
+{
+    /// <summary>
+    /// 配置节名称
+    /// </summary>
+    public const string SectionName = "SessionCleanup";
+
+    /// <summary>
+    /// 获取或设置清理间隔（小时），默认 24
+    /// </summary>
+    public int IntervalHours { get; set; } = 24;
+
+    /// <summary>
+    /// 获取或设置会话保留天数，默认 30
+    /// </summary>
+    public int RetentionDays { get; set; } = 30;
+}
 
 /// <summary>
 /// 过期会话清理后台服务
@@ -11,30 +33,24 @@ namespace Inkwell.WebApi;
 /// </summary>
 public sealed class SessionCleanupService(
     IServiceScopeFactory scopeFactory,
+    IOptions<SessionCleanupOptions> options,
     ILogger<SessionCleanupService> logger) : BackgroundService
 {
-    /// <summary>
-    /// 清理间隔（默认每 24 小时执行一次）
-    /// </summary>
-    private static readonly TimeSpan s_interval = TimeSpan.FromHours(24);
-
-    /// <summary>
-    /// 会话保留天数（默认 30 天）
-    /// </summary>
-    private const int RetentionDays = 30;
-
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("[SessionCleanup] Started. Interval: {Interval}, Retention: {Days} days",
-            s_interval, RetentionDays);
+        SessionCleanupOptions config = options.Value;
+        TimeSpan interval = TimeSpan.FromHours(config.IntervalHours);
+
+        logger.LogInformation("[SessionCleanup] Started. Interval: {Interval}h, Retention: {Days} days",
+            config.IntervalHours, config.RetentionDays);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(s_interval, stoppingToken).ConfigureAwait(false);
-                await CleanupExpiredSessionsAsync(stoppingToken).ConfigureAwait(false);
+                await Task.Delay(interval, stoppingToken).ConfigureAwait(false);
+                await CleanupExpiredSessionsAsync(config.RetentionDays, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -47,14 +63,13 @@ public sealed class SessionCleanupService(
         }
     }
 
-    private async Task CleanupExpiredSessionsAsync(CancellationToken cancellationToken)
+    private async Task CleanupExpiredSessionsAsync(int retentionDays, CancellationToken cancellationToken)
     {
         using IServiceScope scope = scopeFactory.CreateScope();
         ISessionPersistenceProvider provider = scope.ServiceProvider.GetRequiredService<ISessionPersistenceProvider>();
 
-        // 获取所有 agents 的会话（通过 agentId 遍历已知 Agent）
         AgentRegistry registry = scope.ServiceProvider.GetRequiredService<AgentRegistry>();
-        DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-RetentionDays);
+        DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
         int deletedCount = 0;
 
         foreach (AgentRegistration agent in registry.GetAll())
@@ -75,7 +90,7 @@ public sealed class SessionCleanupService(
         if (deletedCount > 0)
         {
             logger.LogInformation("[SessionCleanup] Deleted {Count} expired sessions (older than {Days} days)",
-                deletedCount, RetentionDays);
+                deletedCount, retentionDays);
         }
     }
 }

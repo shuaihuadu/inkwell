@@ -104,6 +104,8 @@ public static class Program
         builder.AddServiceDefaults();
 
         // 注册过期会话清理后台服务
+        builder.Services.Configure<SessionCleanupOptions>(
+            builder.Configuration.GetSection(SessionCleanupOptions.SectionName));
         builder.Services.AddHostedService<SessionCleanupService>();
 
         // [H7 修复] CORS origin 从配置读取
