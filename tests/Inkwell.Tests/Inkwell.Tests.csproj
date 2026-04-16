@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\core\Inkwell.Core\Inkwell.Core.csproj" />
     <ProjectReference Include="..\..\src\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\core\providers\Inkwell.Persistence.EntityFrameworkCore\Inkwell.Persistence.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.Persistence.InMemory\Inkwell.Persistence.InMemory.csproj" />
   </ItemGroup>
 
 </Project>

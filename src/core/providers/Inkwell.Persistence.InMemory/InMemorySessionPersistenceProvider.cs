@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace Inkwell.Agents;
+namespace Inkwell.Persistence.InMemory;
 
 /// <summary>
 /// 内存会话持久化提供程序（开发用）

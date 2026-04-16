@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Inkwell.Agents;
+using Inkwell.Persistence.InMemory;
 
 namespace Inkwell.Tests.Agents;
 

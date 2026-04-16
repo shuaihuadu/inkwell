@@ -1,38 +1,6 @@
 using System.Text.Json;
 
-namespace Inkwell.Agents;
-
-/// <summary>
-/// 会话信息
-/// </summary>
-/// <param name="Id">会话 ID</param>
-/// <param name="AgentId">Agent ID</param>
-/// <param name="Title">会话标题</param>
-/// <param name="MessageCount">消息总数</param>
-/// <param name="CreatedAt">创建时间</param>
-/// <param name="UpdatedAt">更新时间</param>
-public sealed record SessionInfo(
-    string Id,
-    string AgentId,
-    string? Title,
-    int MessageCount,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
-
-/// <summary>
-/// 聊天消息记录
-/// </summary>
-/// <param name="Id">消息 ID</param>
-/// <param name="Role">角色（user / assistant / system）</param>
-/// <param name="Content">消息内容</param>
-/// <param name="Status">状态（done / error）</param>
-/// <param name="CreatedAt">创建时间</param>
-public sealed record ChatMessageRecord(
-    string Id,
-    string Role,
-    string Content,
-    string Status,
-    DateTimeOffset CreatedAt);
+namespace Inkwell;
 
 /// <summary>
 /// Agent 会话持久化提供程序

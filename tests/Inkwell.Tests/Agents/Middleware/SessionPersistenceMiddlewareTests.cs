@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Inkwell.Agents;
 using Inkwell.Agents.Middleware;
+using Inkwell.Persistence.InMemory;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
