@@ -1,4 +1,4 @@
-﻿using Inkwell;
+using Inkwell;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Inkwell.Persistence.EntityFrameworkCore;
@@ -15,17 +15,17 @@ public static class ServiceCollectionExtensions
     /// <returns>服务集合</returns>
     public static IServiceCollection AddInkwellEfCorePersistence(this IServiceCollection services)
     {
-        services.AddScoped<IArticlePersistenceProvider, EfCoreArticlePersistenceProvider>();
-        services.AddScoped<IPipelineRunPersistenceProvider, EfCorePipelineRunPersistenceProvider>();
-        services.AddScoped<IAnalysisPersistenceProvider, EfCoreAnalysisPersistenceProvider>();
-        services.AddScoped<IReviewPersistenceProvider, EfCoreReviewPersistenceProvider>();
+        services.AddScoped<IArticlePersistenceProvider, ArticlePersistenceProvider>();
+        services.AddScoped<IPipelineRunPersistenceProvider, PipelineRunPersistenceProvider>();
+        services.AddScoped<IAnalysisPersistenceProvider, AnalysisPersistenceProvider>();
+        services.AddScoped<IReviewPersistenceProvider, ReviewPersistenceProvider>();
 
         // SessionPersistenceProvider 注册为 Singleton（因为被 Singleton 中间件和服务引用）
         // 内部每次操作通过 IServiceScopeFactory 创建 scope 来获取 DbContext
         services.AddSingleton<ISessionPersistenceProvider>(sp =>
         {
             IServiceScopeFactory scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
-            return new EfCoreScopedSessionPersistenceProvider(scopeFactory);
+            return new ScopedSessionPersistenceProvider(scopeFactory);
         });
         return services;
     }

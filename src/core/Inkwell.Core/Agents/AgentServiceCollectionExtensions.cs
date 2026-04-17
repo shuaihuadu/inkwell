@@ -99,7 +99,14 @@ public static class AgentServiceCollectionExtensions
 
         if (memoryService is not null)
         {
-            writerContextProviders.Add(memoryService.CreateMemoryProvider("writer"));
+            try
+            {
+                writerContextProviders.Add(memoryService.CreateMemoryProvider("writer"));
+            }
+            catch (InvalidOperationException)
+            {
+                // Embedding Generator 未配置时跳过长期记忆（开发/Docker 环境）
+            }
         }
 
         registry.Register(InkwellAgents.CreateWriter(primaryChatClient, contextProviders: writerContextProviders));
@@ -120,7 +127,14 @@ public static class AgentServiceCollectionExtensions
         List<Microsoft.Agents.AI.AIContextProvider> coordinatorContextProviders = [];
         if (memoryService is not null)
         {
-            coordinatorContextProviders.Add(memoryService.CreateMemoryProvider("coordinator"));
+            try
+            {
+                coordinatorContextProviders.Add(memoryService.CreateMemoryProvider("coordinator"));
+            }
+            catch (InvalidOperationException)
+            {
+                // Embedding Generator 未配置时跳过长期记忆（开发/Docker 环境）
+            }
         }
 
         registry.Register(InkwellAgents.CreateCoordinator(secondaryChatClient, seoRegistration.Agent, coordinatorContextProviders));

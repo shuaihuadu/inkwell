@@ -1,5 +1,8 @@
 <Solution>
-  <Folder Name="/src/app/aspire/" />
+  <Folder Name="/src/app/aspire/">
+    <Project Path="src/app/aspire/Inkwell.AppHost/Inkwell.AppHost.csproj" />
+    <Project Path="src/app/aspire/Inkwell.ServiceDefaults/Inkwell.ServiceDefaults.csproj" />
+  </Folder>
   <Folder Name="/src/core/">
     <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
     <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
@@ -11,15 +14,21 @@
     <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
   </Folder>
   <Folder Name="/docs/" />
-  <Folder Name="/docs/architecture/" />
-  <Folder Name="/docs/design/" />
-  <Folder Name="/docs/plan/" />
+  <Folder Name="/docs/architecture/">
+    <File Path="docs/architecture/architecture.md" />
+  </Folder>
+  <Folder Name="/docs/design/">
+    <File Path="docs/design/chat-history-persistence.md" />
+    <File Path="docs/design/vector-store.md" />
+  </Folder>
+  <Folder Name="/docs/plan/">
+    <File Path="docs/plan/chat-persistence-sprint-plan.md" />
+    <File Path="docs/plan/implementation-plan.md" />
+    <File Path="docs/plan/requirements.md" />
+  </Folder>
   <Folder Name="/scripts/" />
   <Folder Name="/src/" />
-  <Folder Name="/src/app/">
-    <Project Path="src/app/aspire/Inkwell.AppHost/Inkwell.AppHost.csproj" />
-    <Project Path="src/app/aspire/Inkwell.ServiceDefaults/Inkwell.ServiceDefaults.csproj" />
-  </Folder>
+  <Folder Name="/src/app/" />
   <Folder Name="/src/app/services/">
     <Project Path="src/app/services/Inkwell.A2AServer/Inkwell.A2AServer.csproj" />
     <Project Path="src/app/services/Inkwell.DurableHost/Inkwell.DurableHost.csproj" />

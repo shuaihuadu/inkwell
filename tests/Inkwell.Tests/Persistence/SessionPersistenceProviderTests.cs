@@ -1,15 +1,14 @@
-using System.Text.Json;
 using Inkwell.Persistence.EntityFrameworkCore;
-using Inkwell.Persistence.EntityFrameworkCore.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Inkwell.Tests.Persistence;
 
 [TestClass]
-public sealed class EfCoreSessionPersistenceProviderTests
+public sealed class SessionPersistenceProviderTests
 {
     private InkwellDbContext _db = null!;
-    private EfCoreSessionPersistenceProvider _provider = null!;
+    private SessionPersistenceProvider _provider = null!;
 
     [TestInitialize]
     public void Setup()
@@ -19,7 +18,7 @@ public sealed class EfCoreSessionPersistenceProviderTests
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         _db = new InkwellDbContext(options);
-        _provider = new EfCoreSessionPersistenceProvider(_db);
+        _provider = new SessionPersistenceProvider(_db);
     }
 
     [TestCleanup]

@@ -2,7 +2,7 @@
 
 我们的沟通请使用简体中文进行。
 
-本项目是实现了一个AI 智能体和流程自动化平台。旨在让企业轻松构建、部署和管理 AI 智能体，系统提供一个用户友好的界面，让用户能够轻松地设计、部署和管理复杂的工作流程。
+本项目Inkwell 是模拟了一个**企业级 AI 内容生产平台**的完整实际应用场景。
 
 后台是基于.NET Core 10，使用C#实现，前端是使用React和TypeScript实现的SPA应用程序。
 后台代码位于：src
@@ -32,16 +32,16 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 - 需要写出完整的解决方案并标明清晰的中文注释，注释需要符合C#注释风格的标准
 - 系统中的错误消息和抛出的异常信息使用英文
 - 所有公共方法和类应包含 XML 文档注释，类、接口、方法写出完整的 summary 注释，例如：
-  ```
-      /// <summary>
-      /// 将项目加入队列
-      /// </summary>
-      /// <param name="item">要入队的项目</param>
-      /// <param name="queueName">队列名称</param>
-      /// <param name="cancellationToken">取消令牌</param>
-      /// <returns>表示异步操作的任务</returns>
-      Task EnqueueAsync(T item, string? queueName = null, CancellationToken cancellationToken = default);
-  ```
+    ```
+        /// <summary>
+        /// 将项目加入队列
+        /// </summary>
+        /// <param name="item">要入队的项目</param>
+        /// <param name="queueName">队列名称</param>
+        /// <param name="cancellationToken">取消令牌</param>
+        /// <returns>表示异步操作的任务</returns>
+        Task EnqueueAsync(T item, string? queueName = null, CancellationToken cancellationToken = default);
+    ```
 - 如果是属性的话根据属性的读写类型，注释中需要写出 `获取。。。。` `设置。。。。` 或者`获取或设置。。。。。`
 - 访问类成员时请使用 this. 前缀
 - 所有异步方法的名称应以 Async 结尾
@@ -91,4 +91,5 @@ Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
 2. VSCode SSH 到 Linux Ubuntu 24.04 + Docker
 3. Mac OS + VSCode + Mac Docker Desktop
 4. Windows + VSCode + Docker Desktop
-   在完成任务和修改代码的时候，需要保证在团队协作过程中各个平台和IDE均不受环境的影响，每个用户都不受影响，按照业界标准和最佳实践来修改和优化配置。
+
+在完成任务和修改代码的时候，需要保证在团队协作过程中各个平台和IDE均不受环境的影响，每个用户都不受影响，按照业界标准和最佳实践来修改和优化配置。

@@ -17,8 +17,9 @@ public static class ContentPipelineBuilder
     /// </summary>
     /// <param name="chatClient">LLM 客户端</param>
     /// <param name="maxRevisions">最大修订次数</param>
+    /// <param name="articleProvider">文章持久化提供程序（可选，用于 Workflow 完成后自动保存文章）</param>
     /// <returns>构建好的 Workflow 实例</returns>
-    public static Workflow Build(IChatClient chatClient, int maxRevisions = 3)
+    public static Workflow Build(IChatClient chatClient, int maxRevisions = 3, IArticlePersistenceProvider? articleProvider = null)
     {
         // ========== 创建 Agent ==========
 
@@ -89,7 +90,7 @@ public static class ContentPipelineBuilder
 
         // 人工审核端口：接收 Article，返回 bool（true=发布，false=退回）
         RequestPort reviewPort = RequestPort.Create<Article, bool>("HumanReview");
-        ReviewGateExecutor reviewGate = new();
+        ReviewGateExecutor reviewGate = new(articleProvider);
 
         // ========== 构建 Workflow ==========
 

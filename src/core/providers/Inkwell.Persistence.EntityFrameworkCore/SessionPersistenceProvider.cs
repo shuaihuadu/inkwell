@@ -7,7 +7,7 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// <summary>
 /// 基于 EF Core 的会话持久化提供程序
 /// </summary>
-public sealed class EfCoreSessionPersistenceProvider(InkwellDbContext dbContext) : ISessionPersistenceProvider
+public sealed class SessionPersistenceProvider(InkwellDbContext dbContext) : ISessionPersistenceProvider
 {
     /// <inheritdoc />
     public async Task SaveSessionAsync(string sessionId, string agentId, JsonElement sessionState, CancellationToken cancellationToken = default)

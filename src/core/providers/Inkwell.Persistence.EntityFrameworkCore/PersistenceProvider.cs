@@ -1,4 +1,4 @@
-﻿using Inkwell;
+using Inkwell;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inkwell.Persistence.EntityFrameworkCore;
@@ -10,7 +10,7 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// <typeparam name="TEntity">数据库实体类型</typeparam>
 /// <typeparam name="TModel">数据载体类型</typeparam>
 /// <typeparam name="TKey">主键类型</typeparam>
-public abstract class EfCorePersistenceProvider<TEntity, TModel, TKey>(InkwellDbContext dbContext)
+public abstract class PersistenceProvider<TEntity, TModel, TKey>(InkwellDbContext dbContext)
     : IPersistenceProvider<TModel, TKey> where TEntity : class where TModel : class where TKey : notnull
 {
     /// <summary>

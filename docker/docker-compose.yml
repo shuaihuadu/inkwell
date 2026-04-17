@@ -16,6 +16,9 @@ services:
       - AzureOpenAI__Primary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
       - AzureOpenAI__Primary__ApiKey=${AZURE_OPENAI_API_KEY:-}
       - AzureOpenAI__Primary__DeploymentName=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - AzureOpenAI__Secondary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
+      - AzureOpenAI__Secondary__ApiKey=${AZURE_OPENAI_API_KEY:-}
+      - AzureOpenAI__Secondary__DeploymentName=${AZURE_OPENAI_SECONDARY_DEPLOYMENT:-gpt-4o-mini}
       - AzureOpenAI__Embedding__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
       - AzureOpenAI__Embedding__ApiKey=${AZURE_OPENAI_API_KEY:-}
       - AzureOpenAI__Embedding__DeploymentName=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-3-large}
@@ -24,6 +27,9 @@ services:
       - Cors__Origins__1=http://localhost:5188
       # SQL Server 连接字符串（启用 sqlserver profile 时使用）
       - ConnectionStrings__InkwellDb=Server=sqlserver,1433;Database=InkwellDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Inkwell@2026!};TrustServerCertificate=true
+      # OpenTelemetry - 将遥测数据发送到 Aspire Dashboard
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+      - OTEL_SERVICE_NAME=inkwell-webapi
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1"]
@@ -83,8 +89,6 @@ services:
       - "8082:8082"
     environment:
       - DTS_USE_DYNAMIC_TASK_HUBS=true
-    profiles:
-      - durable
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' || exit 1"]
@@ -111,8 +115,6 @@ services:
     depends_on:
       dts-emulator:
         condition: service_healthy
-    profiles:
-      - durable
     restart: unless-stopped
     networks:
       - inkwell-network
@@ -132,8 +134,6 @@ services:
       - MSSQL_PID=Developer
     volumes:
       - sqlserver-data:/var/opt/mssql
-    profiles:
-      - sqlserver
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"${MSSQL_SA_PASSWORD:-Inkwell@2026!}\" -C -Q 'SELECT 1' -b || exit 1"]
@@ -141,6 +141,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - inkwell-network
+
+  # ============================================================
+  # Aspire Dashboard - 可观测性面板（日志、追踪、指标）
+  # ============================================================
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: inkwell-aspire-dashboard
+    ports:
+      - "18888:18888"
+      - "18889:18889"
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+    restart: unless-stopped
     networks:
       - inkwell-network
 

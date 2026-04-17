@@ -1,3 +1,4 @@
+using Inkwell;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,8 +24,20 @@ public static class WorkflowServiceCollectionExtensions
     {
         WorkflowRegistry registry = new();
 
+        // 查找已注册的文章持久化提供程序
+        IArticlePersistenceProvider? articleProvider = null;
+        foreach (ServiceDescriptor descriptor in services)
+        {
+            if (descriptor.ServiceType == typeof(IArticlePersistenceProvider)
+                && descriptor.ImplementationInstance is IArticlePersistenceProvider ap)
+            {
+                articleProvider = ap;
+                break;
+            }
+        }
+
         // 1. 内容生产流水线（串行 + 并行 + HITL）
-        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient);
+        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleProvider: articleProvider);
         registry.Register(new WorkflowRegistration
         {
             Id = "content-pipeline",

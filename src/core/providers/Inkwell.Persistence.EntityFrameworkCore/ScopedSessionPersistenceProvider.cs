@@ -7,12 +7,12 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// 基于 Scope 的会话持久化提供程序包装器
 /// 每次操作创建新的 scope 获取 DbContext，适合在 Singleton 上下文中使用
 /// </summary>
-public sealed class EfCoreScopedSessionPersistenceProvider(IServiceScopeFactory scopeFactory) : ISessionPersistenceProvider
+public sealed class ScopedSessionPersistenceProvider(IServiceScopeFactory scopeFactory) : ISessionPersistenceProvider
 {
-    private EfCoreSessionPersistenceProvider CreateProvider(IServiceScope scope)
+    private SessionPersistenceProvider CreateProvider(IServiceScope scope)
     {
         InkwellDbContext db = scope.ServiceProvider.GetRequiredService<InkwellDbContext>();
-        return new EfCoreSessionPersistenceProvider(db);
+        return new SessionPersistenceProvider(db);
     }
 
     /// <inheritdoc />

@@ -1,4 +1,4 @@
-﻿using Inkwell;
+using Inkwell;
 using Inkwell.Persistence.EntityFrameworkCore.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,8 +7,8 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// <summary>
 /// 基于 EF Core 的文章持久化提供程序
 /// </summary>
-public sealed class EfCoreArticlePersistenceProvider(InkwellDbContext dbContext)
-    : EfCorePersistenceProvider<ArticleEntity, ArticleRecord, string>(dbContext), IArticlePersistenceProvider
+public sealed class ArticlePersistenceProvider(InkwellDbContext dbContext)
+    : PersistenceProvider<ArticleEntity, ArticleRecord, string>(dbContext), IArticlePersistenceProvider
 {
     /// <inheritdoc />
     protected override string GetKey(ArticleRecord model) => model.Id;

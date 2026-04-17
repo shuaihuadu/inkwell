@@ -1,4 +1,3 @@
-﻿using Inkwell;
 using Inkwell.Persistence.EntityFrameworkCore.Entities;
 
 namespace Inkwell.Persistence.EntityFrameworkCore;
@@ -6,8 +5,8 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// <summary>
 /// 基于 EF Core 的分析报告持久化提供程序
 /// </summary>
-public sealed class EfCoreAnalysisPersistenceProvider(InkwellDbContext dbContext)
-    : EfCorePersistenceProvider<AnalysisEntity, AnalysisRecord, string>(dbContext), IAnalysisPersistenceProvider
+public sealed class AnalysisPersistenceProvider(InkwellDbContext dbContext)
+    : PersistenceProvider<AnalysisEntity, AnalysisRecord, string>(dbContext), IAnalysisPersistenceProvider
 {
     /// <inheritdoc />
     protected override string GetKey(AnalysisRecord model) => model.Id;

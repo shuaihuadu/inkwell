@@ -84,27 +84,36 @@ public static class Program
             // DurableTask 模式：通过 Keyed DI 获取代理
             await host.StartAsync();
 
-            AIAgent agentProxy = host.Services.GetRequiredKeyedService<AIAgent>(WriterAgentName);
-            AgentSession session = await agentProxy.CreateSessionAsync();
-
-            Console.WriteLine("请输入写作主题（输入 'exit' 退出）：");
-
-            while (true)
+            // 非交互模式（Docker 容器）：作为后台服务持续运行
+            if (!Console.IsInputRedirected && Environment.UserInteractive)
             {
-                Console.Write("> ");
-                string? input = Console.ReadLine();
-                if (string.IsNullOrWhiteSpace(input) || input.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                AIAgent agentProxy = host.Services.GetRequiredKeyedService<AIAgent>(WriterAgentName);
+                AgentSession session = await agentProxy.CreateSessionAsync();
+
+                Console.WriteLine("请输入写作主题（输入 'exit' 退出）：");
+
+                while (true)
                 {
-                    break;
+                    Console.Write("> ");
+                    string? input = Console.ReadLine();
+                    if (string.IsNullOrWhiteSpace(input) || input.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+
+                    AgentResponse response = await agentProxy.RunAsync(message: input, session: session);
+                    Console.WriteLine();
+                    Console.WriteLine(response.Text);
+                    Console.WriteLine();
                 }
 
-                AgentResponse response = await agentProxy.RunAsync(message: input, session: session);
-                Console.WriteLine();
-                Console.WriteLine(response.Text);
-                Console.WriteLine();
+                await host.StopAsync();
             }
-
-            await host.StopAsync();
+            else
+            {
+                Console.WriteLine("Running as background DurableTask worker (non-interactive mode)...");
+                await host.WaitForShutdownAsync();
+            }
         }
         else
         {

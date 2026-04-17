@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   MessageOutlined,
   ApartmentOutlined,
+  FileTextOutlined,
   BookOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -24,6 +25,11 @@ const menuItems = [
     key: "/workflows",
     icon: <ApartmentOutlined />,
     label: "Workflow 管理",
+  },
+  {
+    key: "/articles",
+    icon: <FileTextOutlined />,
+    label: "文章管理",
   },
   {
     key: "/knowledge",

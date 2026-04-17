@@ -9,16 +9,33 @@ namespace Inkwell.Workflows.Executors;
 /// </summary>
 [YieldsOutput(typeof(string))]
 [SendsMessage(typeof(TopicAnalysis))]
-internal sealed class ReviewGateExecutor() : Executor<bool>("ReviewGate")
+internal sealed class ReviewGateExecutor(IArticlePersistenceProvider? articleProvider = null) : Executor<bool>("ReviewGate")
 {
     /// <inheritdoc />
     public override async ValueTask HandleAsync(bool approved, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         if (approved)
         {
-            // 人工审核通过：从共享状态读取文章，产出最终输出
+            // 人工审核通过：从共享状态读取文章，持久化并产出最终输出
             Article? article = await context.ReadStateAsync<Article>("current",
                 scopeName: StateScopes.ArticleScope, cancellationToken);
+
+            // 持久化到文章存储
+            if (article is not null && articleProvider is not null)
+            {
+                ArticleRecord record = new()
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Topic = article.Topic,
+                    Title = article.Title,
+                    Content = article.Content,
+                    Status = nameof(ArticleStatus.Published),
+                    Revision = article.Revision,
+                    CreatedAt = article.CreatedAt,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+                await articleProvider.AddAsync(record, cancellationToken);
+            }
 
             await context.YieldOutputAsync(
                 $"[已发布] {article?.Title ?? "未知"}\n\n{article?.Content ?? ""}",

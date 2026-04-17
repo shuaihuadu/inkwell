@@ -1,4 +1,4 @@
-﻿using Inkwell;
+using Inkwell;
 using Inkwell.Persistence.EntityFrameworkCore.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,8 +7,8 @@ namespace Inkwell.Persistence.EntityFrameworkCore;
 /// <summary>
 /// 基于 EF Core 的审核记录持久化提供程序
 /// </summary>
-public sealed class EfCoreReviewPersistenceProvider(InkwellDbContext dbContext)
-    : EfCorePersistenceProvider<ReviewEntity, ReviewRecord, string>(dbContext), IReviewPersistenceProvider
+public sealed class ReviewPersistenceProvider(InkwellDbContext dbContext)
+    : PersistenceProvider<ReviewEntity, ReviewRecord, string>(dbContext), IReviewPersistenceProvider
 {
     /// <inheritdoc />
     protected override string GetKey(ReviewRecord model) => model.Id;
