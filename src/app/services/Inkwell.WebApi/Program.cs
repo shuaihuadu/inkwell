@@ -166,7 +166,8 @@ public static class Program
 
             // 用 WorkflowChatClient 将 Workflow 适配为 IChatClient，再包装为 ChatClientAgent
             // 这样 Agent 完整支持 ChatProtocol（List + TurnToken），AG-UI 端点可正常工作
-            WorkflowChatClient workflowClient = new(workflowReg.Workflow);
+            // 同时把 WorkflowCapabilities 传入，决定多轮/HITL 行为
+            WorkflowChatClient workflowClient = new(workflowReg.Workflow, workflowReg.Capabilities);
             AIAgent workflowAgent = new ChatClientAgent(workflowClient, new ChatClientAgentOptions
             {
                 ChatOptions = new()

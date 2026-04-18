@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import {
   Typography,
   Card,
@@ -15,9 +14,8 @@ import {
   PlayCircleOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import WorkflowTopologyModal from "../../components/workflow-topology-modal";
-import WorkflowRunModal from "../../components/workflow-run-modal";
-import { useAguiConversationController } from "../../hooks/use-agui-conversation-controller";
 import { useApiList } from "../../hooks/use-api-list";
 import { useWorkflowTopology } from "../../hooks/use-workflow-topology";
 
@@ -27,7 +25,14 @@ interface WorkflowInfo {
   description: string;
 }
 
+/**
+ * Workflow 列表页
+ * 点击“运行”跳转至 /workflows/:id/run 独立运行页，
+ * 运行页内含 Run 历史侧栏与 AG-UI 聊天窗（与 Agent 对话体验一致）
+ */
 export default function WorkflowPage() {
+  const navigate = useNavigate();
+
   const { items: workflows, loading } = useApiList<WorkflowInfo>({
     endpoint: "/api/workflows",
     onError: () => {
@@ -44,27 +49,6 @@ export default function WorkflowPage() {
   } = useWorkflowTopology(() => {
     message.error("加载拓扑图失败");
   });
-
-  // 运行弹窗
-  const [runVisible, setRunVisible] = useState(false);
-  const [runWorkflow, setRunWorkflow] = useState<WorkflowInfo | null>(null);
-  const runConversation = useAguiConversationController("/api/agui/writer");
-
-  const workflowRouteOptions = useMemo(
-    () =>
-      workflows.map((workflow) => ({
-        value: `/api/agui/workflow-${workflow.id}`,
-        label: workflow.name,
-        workflow,
-      })),
-    [workflows],
-  );
-
-  const openRunModal = (workflow: WorkflowInfo) => {
-    setRunWorkflow(workflow);
-    runConversation.changeRoute(`/api/agui/workflow-${workflow.id}`);
-    setRunVisible(true);
-  };
 
   if (loading) {
     return <Spin size="large" style={{ display: "block", marginTop: 100 }} />;
@@ -96,7 +80,7 @@ export default function WorkflowPage() {
                     size="small"
                     type="primary"
                     icon={<PlayCircleOutlined />}
-                    onClick={() => openRunModal(item)}
+                    onClick={() => navigate(`/workflows/${item.id}/run`)}
                   >
                     运行
                   </Button>
@@ -120,20 +104,6 @@ export default function WorkflowPage() {
         loading={topoLoading}
         data={topoData}
         onClose={closeTopology}
-      />
-
-      <WorkflowRunModal
-        visible={runVisible}
-        title={runWorkflow?.name ?? ""}
-        options={workflowRouteOptions}
-        conversation={runConversation}
-        onRouteChange={(route) => {
-          const selected = workflowRouteOptions.find(
-            (o) => o.value === route,
-          )?.workflow;
-          setRunWorkflow(selected ?? null);
-        }}
-        onClose={() => setRunVisible(false)}
       />
     </div>
   );

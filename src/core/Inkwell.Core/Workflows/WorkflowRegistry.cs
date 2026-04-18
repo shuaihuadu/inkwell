@@ -26,6 +26,32 @@ public sealed class WorkflowRegistration
     /// 获取或设置 Workflow 实例
     /// </summary>
     public required Workflow Workflow { get; init; }
+
+    /// <summary>
+    /// 获取或设置 Workflow 能力标签
+    /// </summary>
+    public WorkflowCapabilities Capabilities { get; init; } = new();
+}
+
+/// <summary>
+/// Workflow 能力标签
+/// 描述一个 Workflow 支持的运行模式，决定 AG-UI 适配层和前端 UI 的行为
+/// </summary>
+public sealed class WorkflowCapabilities
+{
+    /// <summary>
+    /// 获取或设置是否支持多轮对话
+    /// true 时 WorkflowChatClient 会将完整 ChatMessage 列表传给 Workflow（Workflow 入口 Executor 需接受 List&lt;ChatMessage&gt;）
+    /// false 时仅取最后一条用户消息作为输入（OneShot 语义）
+    /// </summary>
+    public bool SupportsMultiTurn { get; init; }
+
+    /// <summary>
+    /// 获取或设置是否包含人工介入节点（Human-in-the-loop）
+    /// true 时 Workflow 可能产生 RequestInfoEvent，需要外部响应才能继续
+    /// 前端可据此展示"继续/批准/退回"按钮
+    /// </summary>
+    public bool SupportsHumanInLoop { get; init; }
 }
 
 /// <summary>

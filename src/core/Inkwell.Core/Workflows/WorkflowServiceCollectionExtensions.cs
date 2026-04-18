@@ -43,7 +43,8 @@ public static class WorkflowServiceCollectionExtensions
             Id = "content-pipeline",
             Name = "内容生产流水线",
             Description = "选题分析(Fan-Out) → 写作(Writer-Critic Loop) → 人工审核(HITL)",
-            Workflow = contentPipeline
+            Workflow = contentPipeline,
+            Capabilities = new WorkflowCapabilities { SupportsHumanInLoop = true }
         });
 
         // 2. 多语言翻译流水线（Fan-Out / Fan-In）
