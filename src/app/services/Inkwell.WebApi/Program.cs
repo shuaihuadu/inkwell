@@ -159,11 +159,21 @@ public static class Program
             app.MapAGUI(registration.AguiRoute, wrappedAgent);
         }
 
-        // ========== 将 Workflow 包装为 Agent 并映射 AG-UI 端点（带会话持久化）==========
+        // ========== 将 Workflow 包装为 ChatClientAgent 并映射 AG-UI 端点 ==========
         foreach (WorkflowRegistration workflowReg in workflowRegistry.GetAll())
         {
             string agentId = $"workflow-{workflowReg.Id}";
-            AIAgent workflowAgent = workflowReg.Workflow.AsAIAgent(agentId, workflowReg.Name, includeWorkflowOutputsInResponse: true);
+
+            // 用 WorkflowChatClient 将 Workflow 适配为 IChatClient，再包装为 ChatClientAgent
+            // 这样 Agent 完整支持 ChatProtocol（List + TurnToken），AG-UI 端点可正常工作
+            WorkflowChatClient workflowClient = new(workflowReg.Workflow);
+            AIAgent workflowAgent = new ChatClientAgent(workflowClient, new ChatClientAgentOptions
+            {
+                ChatOptions = new()
+                {
+                    Instructions = $"你是 Inkwell 平台的 [{workflowReg.Name}] Workflow。{workflowReg.Description}"
+                }
+            });
 
             string aguiRoute = $"/api/agui/{agentId}";
             AIAgent wrappedWorkflowAgent = workflowAgent.WithSessionPersistence(agentId, sessionProvider, titleClient);
