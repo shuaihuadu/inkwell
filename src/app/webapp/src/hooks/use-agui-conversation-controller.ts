@@ -12,6 +12,11 @@ export interface UseAguiConversationControllerReturn {
   clear: () => void;
   changeRoute: (route: string) => void;
   switchSession: (sessionId: string) => Promise<void>;
+  respondHitl: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => Promise<void>;
 }
 
 export function useAguiConversationController(
@@ -26,6 +31,7 @@ export function useAguiConversationController(
     sendMessage,
     reset,
     loadMessages,
+    respondHitl,
   } = useAGUIAgent(route);
 
   const clear = useCallback(() => {
@@ -68,5 +74,6 @@ export function useAguiConversationController(
     clear,
     changeRoute,
     switchSession,
+    respondHitl,
   };
 }

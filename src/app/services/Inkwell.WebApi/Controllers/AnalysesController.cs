@@ -9,7 +9,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "EditorOrAdmin")]
+[Authorize(Policy = InkwellPolicies.EditorOrAdmin)]
 public sealed class AnalysesController(IAnalysisPersistenceProvider analysisProvider) : ControllerBase
 {
     /// <summary>

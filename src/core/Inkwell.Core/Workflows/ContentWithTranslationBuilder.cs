@@ -67,6 +67,7 @@ public static class ContentWithTranslationBuilder
 /// <summary>
 /// 简化版写作 Executor（直接将主题写成文章，输出 string）
 /// </summary>
+[YieldsOutput(typeof(string))]
 [SendsMessage(typeof(string))]
 internal sealed class SimpleWriterExecutor(AIAgent agent) : Executor<string>("SimpleWriter")
 {

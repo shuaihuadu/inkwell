@@ -42,11 +42,8 @@ public sealed class KnowledgePersistenceService(
 
         foreach (KnowledgeDocumentEntity doc in docs)
         {
-            // 同步添加（不触发 embedding，仅加载到内存）
-            knowledgeBase.AddDocument(doc.Title, doc.Content, doc.SourceLink);
-
-            // 用 DB 中的实际 ID 替换自动生成的 ID
-            // 这里简化处理：DB 数据以最后一次 AddDocument 的 ID 为准
+            // 使用 DB 中的 ID 加载到内存，避免 ID 漂移导致后续切片孤儿
+            knowledgeBase.AddDocumentWithId(doc.Id, doc.Title, doc.Content, doc.FileType, doc.SourceLink);
         }
 
         logger.LogInformation("[Knowledge] Loaded {Count} documents from database", docs.Count);

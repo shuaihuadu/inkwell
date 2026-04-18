@@ -9,7 +9,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "EditorOrAdmin")]
+[Authorize(Policy = InkwellPolicies.EditorOrAdmin)]
 public sealed class ReviewsController(
     IReviewPersistenceProvider reviewProvider,
     IArticlePersistenceProvider articleProvider) : ControllerBase
@@ -35,7 +35,7 @@ public sealed class ReviewsController(
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>操作结果</returns>
     [HttpPost("{articleId}/approve")]
-    [Authorize(Policy = "ReviewerOrAdmin")]
+    [Authorize(Policy = InkwellPolicies.ReviewerOrAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ApproveAsync(string articleId, CancellationToken cancellationToken)
@@ -75,7 +75,7 @@ public sealed class ReviewsController(
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>操作结果</returns>
     [HttpPost("{articleId}/reject")]
-    [Authorize(Policy = "ReviewerOrAdmin")]
+    [Authorize(Policy = InkwellPolicies.ReviewerOrAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RejectAsync(string articleId, [FromBody] RejectRequest? request, CancellationToken cancellationToken)

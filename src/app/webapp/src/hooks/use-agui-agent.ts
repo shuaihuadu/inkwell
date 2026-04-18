@@ -2,11 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunAgentInput } from "../services/agui-types";
 import { API_BASE } from "../services/api";
 
+export interface HitlRequest {
+  requestId: string;
+  payload: unknown;
+  decided: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   status: "pending" | "streaming" | "done" | "error";
+  hitl?: HitlRequest;
 }
 
 export interface UseAGUIAgentReturn {
@@ -17,7 +24,15 @@ export interface UseAGUIAgentReturn {
   reset: () => void;
   setThreadId: (id: string) => void;
   loadMessages: (sessionId: string) => Promise<void>;
+  respondHitl: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => Promise<void>;
 }
+
+// 与后端 WorkflowChatClient.HitlMarkerPrefix / Suffix 保持一致
+const HITL_MARKER_REGEX = /<<<HITL_REQUEST:(\{[\s\S]*?\})>>>/;
 
 export function useAGUIAgent(
   aguiRoute: string = "/api/agui/writer",
@@ -132,14 +147,34 @@ export function useAGUIAgent(
                 switch (event.type) {
                   case "TEXT_MESSAGE_CONTENT":
                     setMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === assistantMsgId
-                          ? {
+                      prev.map((m) => {
+                        if (m.id !== assistantMsgId) return m;
+                        const merged = m.content + (event.delta ?? "");
+                        // 检测 HITL 标记：<<<HITL_REQUEST:{...}>>>
+                        const match = merged.match(HITL_MARKER_REGEX);
+                        if (match) {
+                          try {
+                            const parsed = JSON.parse(match[1]) as {
+                              id: string;
+                              payload: unknown;
+                            };
+                            return {
                               ...m,
-                              content: m.content + (event.delta ?? ""),
-                            }
-                          : m,
-                      ),
+                              content: merged
+                                .replace(HITL_MARKER_REGEX, "")
+                                .trim(),
+                              hitl: {
+                                requestId: parsed.id,
+                                payload: parsed.payload,
+                                decided: false,
+                              },
+                            };
+                          } catch {
+                            // 解析失败，保留原文本不剥离
+                          }
+                        }
+                        return { ...m, content: merged };
+                      }),
                     );
                     break;
 
@@ -239,6 +274,39 @@ export function useAGUIAgent(
     setThreadIdState(newId);
   }, []);
 
+  const respondHitl = useCallback(
+    async (messageId: string, requestId: string, approved: boolean) => {
+      try {
+        const res = await fetch(`${API_BASE}/api/hitl/${requestId}/respond`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approved }),
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId && m.hitl
+              ? { ...m, hitl: { ...m.hitl, decided: true } }
+              : m,
+          ),
+        );
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "system",
+            content: `审核回写失败：${(err as Error).message}`,
+            status: "error",
+          },
+        ]);
+      }
+    },
+    [],
+  );
+
   return {
     messages,
     loading,
@@ -247,5 +315,6 @@ export function useAGUIAgent(
     reset,
     setThreadId,
     loadMessages,
+    respondHitl,
   };
 }

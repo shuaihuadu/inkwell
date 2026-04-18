@@ -1,5 +1,6 @@
 using Azure.AI.OpenAI;
 using Azure.Identity;
+using Inkwell.Agents;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.DurableTask;
 using Microsoft.DurableTask.Client.AzureManaged;
@@ -41,13 +42,9 @@ public static class Program
             .GetChatClient(deploymentName)
             .AsIChatClient();
 
-        // 创建 Writer Agent
-        AIAgent writerAgent = chatClient.AsAIAgent(
-            name: WriterAgentName,
-            instructions: """
-                你是一名专业内容写手。撰写引人入胜、结构清晰的文章。
-                请用中文回复。
-                """);
+        // 复用 InkwellAgents.CreateWriter（与 WebApi/A2AServer 一致）
+        AgentRegistration writerRegistration = InkwellAgents.CreateWriter(chatClient);
+        AIAgent writerAgent = writerRegistration.Agent;
 
         // 构建主机
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);

@@ -8,6 +8,7 @@ namespace Inkwell.Workflows.Executors;
 /// 将多个语言的翻译结果汇总为 MultiLanguageResult
 /// Fan-In Barrier 可能逐一传入每种语言的结果，需要收集齐后再输出
 /// </summary>
+[YieldsOutput(typeof(MultiLanguageResult))]
 [SendsMessage(typeof(MultiLanguageResult))]
 internal sealed class TranslationAggregationExecutor(int expectedCount = 3) : Executor<TranslationResult>("TranslationAggregation")
 {

@@ -25,16 +25,7 @@ public static class WorkflowServiceCollectionExtensions
         WorkflowRegistry registry = new();
 
         // 查找已注册的文章持久化提供程序
-        IArticlePersistenceProvider? articleProvider = null;
-        foreach (ServiceDescriptor descriptor in services)
-        {
-            if (descriptor.ServiceType == typeof(IArticlePersistenceProvider)
-                && descriptor.ImplementationInstance is IArticlePersistenceProvider ap)
-            {
-                articleProvider = ap;
-                break;
-            }
-        }
+        IArticlePersistenceProvider? articleProvider = services.FindSingletonInstance<IArticlePersistenceProvider>();
 
         // 1. 内容生产流水线（串行 + 并行 + HITL）
         Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleProvider: articleProvider);
@@ -113,26 +104,8 @@ public static class WorkflowServiceCollectionExtensions
     /// <returns>Workflow 注册表</returns>
     public static WorkflowRegistry AddInkwellWorkflows(this IServiceCollection services)
     {
-        IChatClient? primaryClient = null;
-        IChatClient? secondaryClient = null;
-
-        foreach (ServiceDescriptor descriptor in services)
-        {
-            if (descriptor.ServiceType == typeof(IChatClient) && descriptor.IsKeyedService)
-            {
-                if (descriptor.ServiceKey is string key)
-                {
-                    if (key == ModelServiceKeys.Primary && descriptor.KeyedImplementationInstance is IChatClient primary)
-                    {
-                        primaryClient = primary;
-                    }
-                    else if (key == ModelServiceKeys.Secondary && descriptor.KeyedImplementationInstance is IChatClient secondary)
-                    {
-                        secondaryClient = secondary;
-                    }
-                }
-            }
-        }
+        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Primary);
+        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Secondary);
 
         if (primaryClient is null)
         {

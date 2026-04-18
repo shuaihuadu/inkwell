@@ -34,18 +34,18 @@ public static class AuthServiceCollectionExtensions
             if (authOptions.Enabled)
             {
                 // 生产模式：要求角色
-                options.AddPolicy("AdminOnly", policy => policy.RequireRole(InkwellRoles.Admin));
-                options.AddPolicy("EditorOrAdmin", policy =>
+                options.AddPolicy(InkwellPolicies.AdminOnly, policy => policy.RequireRole(InkwellRoles.Admin));
+                options.AddPolicy(InkwellPolicies.EditorOrAdmin, policy =>
                     policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Editor));
-                options.AddPolicy("ReviewerOrAdmin", policy =>
+                options.AddPolicy(InkwellPolicies.ReviewerOrAdmin, policy =>
                     policy.RequireRole(InkwellRoles.Admin, InkwellRoles.Reviewer));
             }
             else
             {
                 // 开发模式：所有策略允许匿名访问
-                options.AddPolicy("AdminOnly", policy => policy.RequireAssertion(_ => true));
-                options.AddPolicy("EditorOrAdmin", policy => policy.RequireAssertion(_ => true));
-                options.AddPolicy("ReviewerOrAdmin", policy => policy.RequireAssertion(_ => true));
+                options.AddPolicy(InkwellPolicies.AdminOnly, policy => policy.RequireAssertion(_ => true));
+                options.AddPolicy(InkwellPolicies.EditorOrAdmin, policy => policy.RequireAssertion(_ => true));
+                options.AddPolicy(InkwellPolicies.ReviewerOrAdmin, policy => policy.RequireAssertion(_ => true));
             }
         });
 

@@ -1,8 +1,7 @@
-﻿using System.Text.Json;
-using Inkwell;
+﻿using Inkwell;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Workflows.Executors;
 
@@ -11,21 +10,29 @@ namespace Inkwell.Workflows.Executors;
 /// 基于选题分析报告撰写文章，或根据审核反馈修改文章
 /// </summary>
 [SendsMessage(typeof(Article))]
-internal sealed class WriterExecutor(AIAgent agent) : Executor<TopicAnalysis>("Writer")
+internal sealed class WriterExecutor(AIAgent agent, ILogger<WriterExecutor>? logger = null) : Executor<TopicAnalysis>("Writer")
 {
-    private int _revision;
+    /// <summary>
+    /// 修订计数在 Workflow 共享状态中的 key（每次 Workflow 运行独立）
+    /// </summary>
+    private const string RevisionStateKey = "writer-revision";
 
     /// <inheritdoc />
     public override async ValueTask HandleAsync(TopicAnalysis message, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
-        this._revision++;
+        // 从 Workflow 上下文读取并自增修订计数（每个 Run 独立，不再使用实例字段）
+        int revision = await context.ReadStateAsync<int>(RevisionStateKey,
+            scopeName: StateScopes.ArticleScope, cancellationToken);
+        revision++;
+        await context.QueueStateUpdateAsync(RevisionStateKey, revision,
+            scopeName: StateScopes.ArticleScope, cancellationToken);
 
         // 从共享状态读取已有的文章（如果是修改稿）
         Article? existingArticle = await context.ReadStateAsync<Article>("current",
             scopeName: StateScopes.ArticleScope, cancellationToken);
 
         string prompt;
-        if (existingArticle is not null && this._revision > 1)
+        if (existingArticle is not null && revision > 1)
         {
             // 修改稿：基于审核反馈重写
             ReviewDecision? review = await context.ReadStateAsync<ReviewDecision>("review",
@@ -63,6 +70,9 @@ internal sealed class WriterExecutor(AIAgent agent) : Executor<TopicAnalysis>("W
                 """;
         }
 
+        logger?.LogInformation("[Writer] Topic={Topic} Revision={Revision} IsRewrite={IsRewrite}",
+            message.Topic, revision, existingArticle is not null && revision > 1);
+
         AgentResponse response = await agent.RunAsync(prompt, cancellationToken: cancellationToken);
 
         Article article = new()
@@ -71,7 +81,7 @@ internal sealed class WriterExecutor(AIAgent agent) : Executor<TopicAnalysis>("W
             Title = message.Topic,
             Content = response.Text,
             Status = ArticleStatus.InReview,
-            Revision = this._revision
+            Revision = revision
         };
 
         // 存入共享状态

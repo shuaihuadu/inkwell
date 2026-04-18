@@ -70,6 +70,7 @@ export function useWorkflowRun(workflowId: string) {
     messages: conversation.messages,
     loading: conversation.loading,
     submit: conversation.submit,
+    respondHitl: conversation.respondHitl,
 
     // 运行历史（本质是 agentId=workflow-{id} 的 sessions）
     runs: sessions.sessions,

@@ -42,6 +42,7 @@ export default function WorkflowRunPage() {
     messages,
     loading,
     submit,
+    respondHitl,
     runs,
     runsLoading,
     activeRunId,
@@ -110,6 +111,7 @@ export default function WorkflowRunPage() {
         onSubmit={submit}
         onNewSession={newRun}
         preset={{ ...workflowRunConversationPreset, clearText: "新运行" }}
+        onHitlDecision={respondHitl}
         containerStyle={{ flex: 1, minHeight: 0 }}
       />
     </Flex>

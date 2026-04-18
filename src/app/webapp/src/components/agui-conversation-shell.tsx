@@ -25,6 +25,11 @@ interface AguiConversationShellProps {
   shellStyle?: CSSProperties;
   toolbarWrapperStyle?: CSSProperties;
   messageContainerStyle?: CSSProperties;
+  onHitlDecision?: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => void;
 }
 
 export default function AguiConversationShell({
@@ -48,6 +53,7 @@ export default function AguiConversationShell({
   shellStyle,
   toolbarWrapperStyle,
   messageContainerStyle,
+  onHitlDecision,
 }: AguiConversationShellProps) {
   return (
     <Flex vertical gap={0} style={{ height: "100%", ...shellStyle }}>
@@ -85,6 +91,7 @@ export default function AguiConversationShell({
         disableWhileLoading={disableWhileLoading}
         containerStyle={{ flex: 1, minHeight: 0 }}
         messageContainerStyle={messageContainerStyle}
+        onHitlDecision={onHitlDecision}
       />
     </Flex>
   );

@@ -1,3 +1,5 @@
+name: inkwell
+
 services:
   # ============================================================
   # WebApi - 主 API 服务（AGUI、会话管理、知识库、仪表盘等）
@@ -6,6 +8,8 @@ services:
     build:
       context: ..
       dockerfile: src/app/services/Inkwell.WebApi/Dockerfile
+    image: inkwell-webapi:latest
+    pull_policy: build
     container_name: inkwell-webapi
     ports:
       - "5000:5000"
@@ -47,6 +51,8 @@ services:
     build:
       context: ..
       dockerfile: src/app/webapp/Dockerfile
+    image: inkwell-webapp:latest
+    pull_policy: build
     container_name: inkwell-webapp
     ports:
       - "3000:80"
@@ -64,6 +70,8 @@ services:
     build:
       context: ..
       dockerfile: src/app/services/Inkwell.A2AServer/Dockerfile
+    image: inkwell-a2a-server:latest
+    pull_policy: build
     container_name: inkwell-a2a-server
     ports:
       - "5100:5100"
@@ -107,6 +115,8 @@ services:
     build:
       context: ..
       dockerfile: src/app/services/Inkwell.DurableHost/Dockerfile
+    image: inkwell-durable-host:latest
+    pull_policy: build
     container_name: inkwell-durable-host
     environment:
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}

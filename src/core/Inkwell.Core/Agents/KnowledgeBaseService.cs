@@ -181,7 +181,19 @@ public sealed class KnowledgeBaseService
     /// </summary>
     public void AddDocument(string title, string content, string? sourceLink = null)
     {
-        string id = Guid.NewGuid().ToString("N");
+        this.AddDocumentWithId(Guid.NewGuid().ToString("N"), title, content, "txt", sourceLink);
+    }
+
+    /// <summary>
+    /// 使用指定 ID 同步添加文档（用于从 DB 重新加载，保证内存与 DB ID 一致）
+    /// </summary>
+    /// <param name="id">文档 ID</param>
+    /// <param name="title">文档标题</param>
+    /// <param name="content">文档内容</param>
+    /// <param name="fileType">文件类型</param>
+    /// <param name="sourceLink">来源链接</param>
+    public void AddDocumentWithId(string id, string title, string content, string fileType = "txt", string? sourceLink = null)
+    {
         List<KnowledgeChunk> chunks = ChunkText(id, content);
 
         this._documents[id] = new KnowledgeDocument
@@ -189,7 +201,7 @@ public sealed class KnowledgeBaseService
             Id = id,
             Title = title,
             Content = content,
-            FileType = "txt",
+            FileType = fileType,
             SourceLink = sourceLink ?? $"inkwell://kb/{id}",
             ChunkCount = chunks.Count,
             AddedAt = DateTimeOffset.UtcNow

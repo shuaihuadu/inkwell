@@ -29,6 +29,13 @@ interface ConversationWorkspaceProps {
   // 可选：Shell 顶栏左侧插槽（例如 Agent 下拉选择器）
   shellLeftExtra?: ReactNode;
 
+  // 可选：人工审核决策回调（Workflow HITL 场景）
+  onHitlDecision?: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => void;
+
   // 样式覆写
   containerStyle?: CSSProperties;
 }
@@ -58,6 +65,7 @@ export default function ConversationWorkspace({
   onNewSession,
   preset,
   shellLeftExtra,
+  onHitlDecision,
   containerStyle,
 }: ConversationWorkspaceProps) {
   return (
@@ -87,6 +95,7 @@ export default function ConversationWorkspace({
           streamingText={preset.streamingText}
           statusText={preset.getStatusText(loading)}
           shellStyle={{ flex: 1, minHeight: 0 }}
+          onHitlDecision={onHitlDecision}
         />
       </Flex>
     </Flex>

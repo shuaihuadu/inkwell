@@ -153,18 +153,14 @@ public sealed class SessionPersistenceProvider(InkwellDbContext dbContext) : ISe
             dbContext.ChatMessages.AddRange(entities);
         }
 
-        // 更新消息计数
+        // 更新消息计数（语义上明确为“增量追加”，避免依赖未保存阶段的 EF 抓取行为）
         ChatSessionEntity? session = await dbContext.ChatSessions
             .FindAsync([sessionId], cancellationToken)
             .ConfigureAwait(false);
 
         if (session is not null)
         {
-            int totalCount = await dbContext.ChatMessages
-                .CountAsync(m => m.SessionId == sessionId, cancellationToken)
-                .ConfigureAwait(false);
-
-            session.MessageCount = totalCount + entities.Count;
+            session.MessageCount += entities.Count;
             session.UpdatedAt = DateTimeOffset.UtcNow;
         }
 

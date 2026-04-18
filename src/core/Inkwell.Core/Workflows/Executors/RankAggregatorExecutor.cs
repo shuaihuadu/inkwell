@@ -8,6 +8,7 @@ namespace Inkwell.Workflows.Executors;
 /// 收集所有文章评分，按综合得分降序排列输出报告
 /// Fan-In Barrier 可能逐一传入每篇文章的结果，需要收集齐后再输出
 /// </summary>
+[YieldsOutput(typeof(BatchEvaluationReport))]
 [SendsMessage(typeof(BatchEvaluationReport))]
 internal sealed class RankAggregatorExecutor(int expectedCount = 3) : Executor<ArticleScore>("RankAggregator")
 {

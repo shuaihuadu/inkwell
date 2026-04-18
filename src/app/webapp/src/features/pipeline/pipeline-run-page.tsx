@@ -29,6 +29,7 @@ export default function PipelineRunPage() {
     clear,
     changeRoute,
     switchSession,
+    respondHitl,
   } = useAguiConversationController("/api/agui/writer");
 
   const agentOptions = useMemo(
@@ -113,6 +114,7 @@ export default function PipelineRunPage() {
       onSubmit={submit}
       onNewSession={handleNewSession}
       preset={pipelineConversationPreset}
+      onHitlDecision={respondHitl}
       shellLeftExtra={
         <Space>
           <Typography.Text strong>选择 Agent</Typography.Text>

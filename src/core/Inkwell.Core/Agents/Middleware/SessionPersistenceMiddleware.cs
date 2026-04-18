@@ -188,9 +188,10 @@ public static class SessionPersistenceMiddleware
                     return generated;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // LLM 调用失败时回退到截取
+                // LLM 调用失败时回退到截取，但记录日志便于排查
+                System.Diagnostics.Debug.WriteLine($"[SessionPersistence] Title generation failed: {ex.Message}");
             }
         }
 

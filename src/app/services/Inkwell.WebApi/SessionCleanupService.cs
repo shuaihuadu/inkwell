@@ -45,6 +45,20 @@ public sealed class SessionCleanupService(
         logger.LogInformation("[SessionCleanup] Started. Interval: {Interval}h, Retention: {Days} days",
             config.IntervalHours, config.RetentionDays);
 
+        // 启动后先跑一次，避免频繁重启场景下永远不清理
+        try
+        {
+            await CleanupExpiredSessionsAsync(config.RetentionDays, stoppingToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[SessionCleanup] Initial cleanup failed");
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

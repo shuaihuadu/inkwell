@@ -58,41 +58,8 @@ public sealed class WorkflowCapabilities
 /// Workflow 注册表
 /// 管理所有已注册的 Workflow
 /// </summary>
-public sealed class WorkflowRegistry
+public sealed class WorkflowRegistry : Registry<WorkflowRegistration>
 {
-    private readonly Dictionary<string, WorkflowRegistration> _workflows = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// 注册一个 Workflow
-    /// </summary>
-    /// <param name="registration">Workflow 注册信息</param>
-    public void Register(WorkflowRegistration registration)
-    {
-        this._workflows[registration.Id] = registration;
-    }
-
-    /// <summary>
-    /// 根据 ID 获取 Workflow
-    /// </summary>
-    /// <param name="id">Workflow ID</param>
-    /// <returns>Workflow 注册信息，不存在时返回 null</returns>
-    public WorkflowRegistration? GetById(string id)
-    {
-        this._workflows.TryGetValue(id, out WorkflowRegistration? registration);
-        return registration;
-    }
-
-    /// <summary>
-    /// 获取所有已注册的 Workflow
-    /// </summary>
-    /// <returns>Workflow 注册信息列表</returns>
-    public IReadOnlyList<WorkflowRegistration> GetAll()
-    {
-        return this._workflows.Values.ToList().AsReadOnly();
-    }
-
-    /// <summary>
-    /// 获取已注册的 Workflow 数量
-    /// </summary>
-    public int Count => this._workflows.Count;
+    /// <inheritdoc />
+    protected override string GetId(WorkflowRegistration item) => item.Id;
 }

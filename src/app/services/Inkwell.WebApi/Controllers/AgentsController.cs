@@ -11,7 +11,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "EditorOrAdmin")]
+[Authorize(Policy = InkwellPolicies.EditorOrAdmin)]
 public sealed class AgentsController(AgentRegistry agentRegistry, ILogger<AgentsController> logger) : ControllerBase
 {
     /// <summary>

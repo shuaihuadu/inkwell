@@ -12,7 +12,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "EditorOrAdmin")]
+[Authorize(Policy = InkwellPolicies.EditorOrAdmin)]
 public sealed class PipelineController(
     WorkflowRegistry workflowRegistry,
     IPipelineRunPersistenceProvider runProvider,
@@ -158,7 +158,7 @@ public sealed class PipelineController(
             runRecord.CompletedAt = DateTimeOffset.UtcNow;
             await runProvider.UpdateAsync(runRecord);
 
-            logger.LogWarning("[Pipeline] 流水线被取消 RunId={RunId}", runRecord.Id);
+            logger.LogWarning("[Pipeline] 流水线被取消 RunId={RunId} Topic={Topic}", runRecord.Id, request.Topic);
         }
         catch (Exception ex)
         {
@@ -167,7 +167,7 @@ public sealed class PipelineController(
             runRecord.CompletedAt = DateTimeOffset.UtcNow;
             await runProvider.UpdateAsync(runRecord);
 
-            logger.LogError(ex, "[Pipeline] 流水线执行失败 RunId={RunId}", runRecord.Id);
+            logger.LogError(ex, "[Pipeline] 流水线执行失败 RunId={RunId} Topic={Topic}", runRecord.Id, request.Topic);
 
             try
             {

@@ -1,5 +1,6 @@
 using Azure.AI.OpenAI;
 using Azure.Identity;
+using Inkwell.Agents;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -37,13 +38,9 @@ public static class Program
             .GetChatClient(deploymentName)
             .AsIChatClient();
 
-        // 创建 Writer Agent（将暴露给远程 A2A 调用）
-        AIAgent writerAgent = chatClient.AsAIAgent(
-            name: "InkwellWriter",
-            instructions: """
-                你是 Inkwell 平台的远程内容写手 Agent。
-                通过 A2A 协议接收写作请求，撰写高质量文章。请用中文回复。
-                """);
+        // 复用 InkwellAgents.CreateWriter（包含护栏中间件）避免多个入口各自拼装 Agent
+        AgentRegistration writerRegistration = InkwellAgents.CreateWriter(chatClient);
+        AIAgent writerAgent = writerRegistration.Agent;
 
         builder.Services.AddSingleton(writerAgent);
 

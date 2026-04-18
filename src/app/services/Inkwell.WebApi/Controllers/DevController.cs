@@ -13,7 +13,7 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminOnly")]
+[Authorize(Policy = InkwellPolicies.AdminOnly)]
 public sealed class DevController(
     AgentRegistry agentRegistry,
     WorkflowRegistry workflowRegistry,

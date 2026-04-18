@@ -2,10 +2,12 @@ import {
   RobotOutlined,
   UserOutlined,
   InfoCircleOutlined,
+  CheckOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { Bubble, Sender } from "@ant-design/x";
 import { XMarkdown } from "@ant-design/x-markdown";
-import { Flex, Typography } from "antd";
+import { Button, Card, Flex, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChatMessage } from "../hooks/use-agui-agent";
@@ -24,12 +26,86 @@ interface AguiChatPanelProps {
   submitType?: "enter" | "shiftEnter";
   statusText?: string;
   disableWhileLoading?: boolean;
+  onHitlDecision?: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => void;
 }
 
-function toBubbleItems(messages: ChatMessage[], streamingText: string) {
+/**
+ * 人工审核卡片 —— 当 assistant 消息携带 hitl 字段时展示
+ */
+function HitlReviewCard({
+  message,
+  onDecide,
+}: {
+  message: ChatMessage;
+  onDecide: (approved: boolean) => void;
+}) {
+  if (!message.hitl) return null;
+  const decided = message.hitl.decided;
+  const payload = message.hitl.payload as {
+    title?: string;
+    body?: string;
+  } | null;
+
+  return (
+    <Card
+      size="small"
+      style={{ marginTop: 8, borderColor: "#faad14", background: "#fffbe6" }}
+      title={
+        <Space>
+          <Tag color="warning">人工审核</Tag>
+          <Typography.Text strong>
+            {payload?.title ?? "请审核以下内容"}
+          </Typography.Text>
+        </Space>
+      }
+      extra={decided ? <Tag color="success">已处理</Tag> : null}
+    >
+      {payload?.body && (
+        <Typography.Paragraph
+          style={{ whiteSpace: "pre-wrap", marginBottom: 12 }}
+        >
+          {payload.body}
+        </Typography.Paragraph>
+      )}
+      {!decided && (
+        <Space>
+          <Button
+            type="primary"
+            icon={<CheckOutlined />}
+            onClick={() => onDecide(true)}
+          >
+            通过
+          </Button>
+          <Button
+            danger
+            icon={<CloseOutlined />}
+            onClick={() => onDecide(false)}
+          >
+            退回
+          </Button>
+        </Space>
+      )}
+    </Card>
+  );
+}
+
+function toBubbleItems(
+  messages: ChatMessage[],
+  streamingText: string,
+  onHitlDecision?: (
+    messageId: string,
+    requestId: string,
+    approved: boolean,
+  ) => void,
+) {
   return messages.map((msg) => {
     const isStreaming = msg.status === "streaming";
     const hasContent = !!msg.content;
+    const hasHitl = !!msg.hitl;
 
     if (msg.role === "system") {
       return {
@@ -40,18 +116,30 @@ function toBubbleItems(messages: ChatMessage[], streamingText: string) {
       };
     }
 
+    const needCustomRender =
+      msg.role === "assistant" && (hasHitl || (hasContent && !isStreaming));
+
     return {
       key: msg.id,
       role: msg.role as string,
       content: msg.content || (isStreaming ? streamingText : ""),
-      // loading 仅在等待首个 token 时显示加载指示器
-      loading: isStreaming && !hasContent,
+      loading: isStreaming && !hasContent && !hasHitl,
       streaming: isStreaming,
-      // 流式期间不挂 contentRender，让 Bubble 逐字显示纯文本
-      // 完成后才用 XMarkdown 渲染格式化 Markdown
-      ...(msg.role === "assistant" && hasContent && !isStreaming
+      ...(needCustomRender
         ? {
-            contentRender: () => <XMarkdown content={msg.content} />,
+            contentRender: () => (
+              <div>
+                {hasContent && <XMarkdown content={msg.content} />}
+                {hasHitl && (
+                  <HitlReviewCard
+                    message={msg}
+                    onDecide={(approved) =>
+                      onHitlDecision?.(msg.id, msg.hitl!.requestId, approved)
+                    }
+                  />
+                )}
+              </div>
+            ),
           }
         : {}),
     };
@@ -72,13 +160,14 @@ export default function AguiChatPanel({
   submitType = "enter",
   statusText,
   disableWhileLoading = true,
+  onHitlDecision,
 }: AguiChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
   const bubbleItems = useMemo(
-    () => toBubbleItems(messages, streamingText),
-    [messages, streamingText],
+    () => toBubbleItems(messages, streamingText, onHitlDecision),
+    [messages, streamingText, onHitlDecision],
   );
 
   useEffect(() => {

@@ -149,6 +149,7 @@ internal sealed class LoopWriterExecutor(AIAgent agent) : Executor<TopicAnalysis
 /// <summary>
 /// 循环完成 Executor：接收审核通过的文章并输出
 /// </summary>
+[YieldsOutput(typeof(Article))]
 internal sealed class LoopCompletionExecutor() : Executor<Article>("LoopCompletion")
 {
     /// <inheritdoc />

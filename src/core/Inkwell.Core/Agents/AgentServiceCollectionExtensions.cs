@@ -17,28 +17,9 @@ public static class AgentServiceCollectionExtensions
     /// <returns>Agent 注册表</returns>
     public static AgentRegistry AddInkwellAgents(this IServiceCollection services, IConfiguration configuration)
     {
-        // 从已注册的服务中查找 UseAzureOpenAI 存储的 IChatClient 实例
-        // 通过 ServiceDescriptor 遍历找到 Keyed 注册
-        IChatClient? primaryClient = null;
-        IChatClient? secondaryClient = null;
-
-        foreach (ServiceDescriptor descriptor in services)
-        {
-            if (descriptor.ServiceType == typeof(IChatClient) && descriptor.IsKeyedService)
-            {
-                if (descriptor.ServiceKey is string key)
-                {
-                    if (key == ModelServiceKeys.Primary && descriptor.KeyedImplementationInstance is IChatClient primary)
-                    {
-                        primaryClient = primary;
-                    }
-                    else if (key == ModelServiceKeys.Secondary && descriptor.KeyedImplementationInstance is IChatClient secondary)
-                    {
-                        secondaryClient = secondary;
-                    }
-                }
-            }
-        }
+        // 从已注册的 Keyed Singleton 中查找 Primary / Secondary IChatClient
+        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Primary);
+        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Secondary);
 
         if (primaryClient is null)
         {
@@ -67,28 +48,10 @@ public static class AgentServiceCollectionExtensions
         AgentRegistry registry = new();
 
         // 查找已注册的知识库服务（用于 Writer RAG）
-        KnowledgeBaseService? knowledgeBase = null;
-        foreach (ServiceDescriptor descriptor in services)
-        {
-            if (descriptor.ServiceType == typeof(KnowledgeBaseService)
-                && descriptor.ImplementationInstance is KnowledgeBaseService kb)
-            {
-                knowledgeBase = kb;
-                break;
-            }
-        }
+        KnowledgeBaseService? knowledgeBase = services.FindSingletonInstance<KnowledgeBaseService>();
 
         // 查找已注册的记忆服务（用于 Writer / Coordinator 长期记忆）
-        AgentMemoryService? memoryService = null;
-        foreach (ServiceDescriptor descriptor in services)
-        {
-            if (descriptor.ServiceType == typeof(AgentMemoryService)
-                && descriptor.ImplementationInstance is AgentMemoryService ms)
-            {
-                memoryService = ms;
-                break;
-            }
-        }
+        AgentMemoryService? memoryService = services.FindSingletonInstance<AgentMemoryService>();
 
         // Primary 模型 Agent（Writer 集成 RAG + 长期记忆）
         List<Microsoft.Agents.AI.AIContextProvider> writerContextProviders = [];
