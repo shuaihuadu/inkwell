@@ -16,11 +16,11 @@
 
 ## 写在前面
 
-**Microsoft Agent Framework（MAF）** 把 Semantic Kernel 的工程能力和 AutoGen 的多 Agent 协作思路融到了一起，是目前 .NET 生态里最完整的 Agent 开发框架。
+**Microsoft Agent Framework（MAF）** 把 Semantic Kernel 的工程能力和 AutoGen 的多 Agent 协作思路合到了一起，目前是 .NET 生态里较完整的 Agent 开发框架之一。
 
-这个项目的目标是用 MAF **真刀真枪**地造出一个业务系统——不是 Hello World，也不是 Demo，而是一个能跑通完整业务闭环、经得起代码审查的**企业级 AI 内容生产平台**。
+这个项目的目标是用 MAF 把一个**完整业务闭环**跑通——不是 Hello World、也不是单文件 Demo，而是一个经得起代码审查、可以当模板拆解学习的**中等规模 AI 内容生产平台**。
 
-项目叫 **Inkwell**（墨水瓶），灵感来自内容创作者案头那件老物件。它可以对话、可以编排、可以自我审核，代码完全开源：
+项目叫 **Inkwell**（墨水瓶），灵感来自内容创作者案头那件老物件。它能对话、能编排、能自我审核，代码完全开源：
 
 **GitHub 仓库**：https://github.com/shuaihuadu/Inkwell
 
@@ -60,14 +60,14 @@
 
 这两个 Agent 用 `ChatResponseFormat.ForJsonSchema<TopicAnalysis>()` 强制输出结构化 JSON，回来后在 `AnalysisAggregationExecutor` 里 Fan-In 汇聚为统一的选题分析报告。
 
-这里踩过一个很典型的坑——最早汇聚节点用实例字段缓存结果，跑一次没问题，跑第二次就空输出了。后来才意识到 **MAF 的 Executor 是单例**，跨运行的状态必须托管给 `IWorkflowContext.QueueStateUpdateAsync`。修完这个 Bug 的那一刻，对 MAF「工作流即有状态图」的理念理解就深了一层。
+这里踩过一个很典型的坑——最早汇聚节点用实例字段缓存结果，跑一次没问题，跑第二次就空输出了。后来才意识到 **MAF 的 Executor 是单例**，跨运行的状态必须走 `IWorkflowContext.QueueStateUpdateAsync`。修正这个 Bug 的过程也加深了对 MAF「工作流即有状态图」这一理念的理解。
 
 ### 第二步：Writer-Critic 循环（自动修订）
 
-选题分析完成后进入创作环节。**WriterExecutor** 根据分析报告写文章，**CriticExecutor** 从质量、准确性、吸引力、完整性四个维度打分并决策：
+选题分析完成后进入创作环节。**WriterExecutor** 根据分析报告写文章，**CriticExecutor** 从清晰度、吸引力、准确性、完整性四个维度打分并决策：
 
 - 审核通过 → 进入人工终审
-- 审核退回 → 带着反馈意见回到 Writer，最多修订 3 次
+- 审核退回 → 带着反馈意见回到 Writer，最多修订 3 轮（超出上限则自动放行）
 
 这整个循环在 MAF 里是用 **AddSwitch** 实现的：
 
@@ -99,7 +99,7 @@ SSE 通道向前端发 <<<HITL_REQUEST:{json}>>> 标记
 StreamingRun.SendResponseAsync() 唤醒 Workflow 继续执行
 ```
 
-**长连接在用户思考期间一直保持打开**，Workflow 状态在服务端挂起等待，点击按钮的瞬间无缝恢复——这才是真正意义上的 HITL，不是「假装自动批准」的摆设。
+**长连接在用户思考期间保持打开**，Workflow 状态在服务端挂起等待，点击按钮后从断点恢复执行——而不是用「自动批准」等技巧绕开真正的外部交互。
 
 ### 第四步：发布与退回
 
@@ -155,7 +155,7 @@ Inkwell 的答案是一层薄薄的 `WorkflowChatClient : IChatClient`：
 - **JWT 认证 + 基于策略的授权**：EditorOrAdmin / ViewerOrAbove 等角色隔离
 - **DurableTask 托管**：长耗时 Workflow 可选用 DurableTask 跑，重启不丢状态
 - **A2A Server**：Agent-to-Agent 协议端口，可被其他系统远程调用
-- **Docker Compose 一键部署**：7 个服务一起起，WebApi、WebApp、A2A、DTS、SQL Server、Aspire Dashboard
+- **Docker Compose 一键启动**：`webapi` + `webapp` + `sqlserver` 三件套直接跑起来；`A2AServer` 和 `DurableHost` 作为可选独立进程补充
 
 ---
 
@@ -173,19 +173,20 @@ Inkwell 的答案是一层薄薄的 `WorkflowChatClient : IChatClient`：
 
 ---
 
-## 现已实现的完整能力清单
+## 现已实现的能力清单
 
-### 8 条 Workflow
-涵盖 **Fan-Out/Fan-In、Switch、HITL、GroupChat、Handoff、SubWorkflow、MapReduce、Checkpoint** 所有核心模式
+### 7 条 Workflow
 
-### 10+ 预定义 Agent
-内容写手 / 审核 / 市场分析 / 竞品分析 / SEO / 图片分析 / 智能调度 / 多语种翻译 / 声明式 YAML Agent
+涵盖 **Fan-Out/Fan-In、Switch、HITL、GroupChat、Handoff、SubWorkflow、MapReduce、Checkpoint** 等核心模式
+
+### 8 个预定义 Agent
+内容写手 / 审核 / 市场分析 / 竞品分析 / SEO / 图片分析 / 智能调度 / 多语种翻译；另支持声明式 YAML Agent 配置
 
 ### 完整中间件栈
-内容安全护栏（滑窗匹配） + 函数调用审计（流式支持）
+内容安全护栏（滑窗匹配）+ 函数调用审计（支持流式）
 
 ### Skills
-Markdown 校验、可读性分析、敏感词扫描（所有 Skill 都是独立进程执行）
+Markdown 校验、可读性分析、敏感词扫描，均以独立进程执行（宿主进程不嵌入业务规则）
 
 ### 记忆系统
 会话级：基于 MAF AgentSession 序列化，跨请求、跨重启保持上下文
@@ -200,10 +201,10 @@ AG-UI 流式 + 思维链可视化 + 会话侧栏（搜索/重命名/导出）+ W
 
 如果你：
 
-- 想学 **Microsoft Agent Framework** 又找不到足够完整的参考项目 → Inkwell 有几十个互相衔接的模块，每一个都是真实可跑的
-- 想把 AI Agent 落到 **企业级业务场景** → Inkwell 展示了从对话到工作流、从单 Agent 到多 Agent、从全自动到 HITL 的完整路径
-- 在做 **.NET + AI** 的工程实践 → 少见的不妥协的 .NET 10 + MAF 组合，没有为了赶潮流切回 Python
-- 想要一个**可以直接运行**的参考实现 → `docker compose up -d` 就能跑起来，不需要配环境
+- 想学 **Microsoft Agent Framework** 又找不到从对话到 Workflow再到 HITL 的完整参考项目 → Inkwell 涵盖了 MAF 的多数核心模式，每个模块都是能跑的实现
+- 想看 AI Agent 在 **企业级场景** 里的工程化落地 → Inkwell 展示了从对话到工作流、从单 Agent 到多 Agent、从全自动到 HITL 的端到端路径
+- 在做 **.NET + AI** 的工程实践 → 一个以 .NET 10 + MAF 为主轴的实现参考，不必为了跑机器学习生态回 Python
+- 想要一个**开箱即用**的参考实现 → `docker compose up -d` 就能启动，无需额外环境配置
 
 ---
 
