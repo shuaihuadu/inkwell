@@ -11,6 +11,7 @@ import { Button, Card, Flex, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChatMessage } from "../hooks/use-agui-agent";
+import WorkflowStepsView, { parseWorkflowSteps } from "./workflow-steps-view";
 
 interface AguiChatPanelProps {
   messages: ChatMessage[];
@@ -117,7 +118,9 @@ function toBubbleItems(
     }
 
     const needCustomRender =
-      msg.role === "assistant" && (hasHitl || (hasContent && !isStreaming));
+      msg.role === "assistant" && (hasHitl || hasContent);
+    const workflowSteps = hasContent ? parseWorkflowSteps(msg.content) : null;
+    const useSteps = !!workflowSteps && workflowSteps.length >= 2;
 
     return {
       key: msg.id,
@@ -129,7 +132,15 @@ function toBubbleItems(
         ? {
             contentRender: () => (
               <div>
-                {hasContent && <XMarkdown content={msg.content} />}
+                {hasContent &&
+                  (useSteps ? (
+                    <WorkflowStepsView
+                      content={msg.content}
+                      streaming={isStreaming}
+                    />
+                  ) : (
+                    <XMarkdown content={msg.content} />
+                  ))}
                 {hasHitl && (
                   <HitlReviewCard
                     message={msg}
