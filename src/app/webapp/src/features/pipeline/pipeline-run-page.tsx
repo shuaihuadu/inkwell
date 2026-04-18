@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { Flex, Select, Space, Typography } from "antd";
-import AguiConversationShell from "../../components/agui-conversation-shell";
-import SessionSidebar from "../../components/session-sidebar";
+﻿import { useCallback, useEffect, useMemo } from "react";
+import { Select, Space, Typography } from "antd";
+import ConversationWorkspace from "../../components/conversation-workspace";
 import { pipelineConversationPreset } from "../../components/agui-conversation-presets";
 import { useAguiConversationController } from "../../hooks/use-agui-conversation-controller";
 import { useApiList } from "../../hooks/use-api-list";
@@ -18,6 +17,7 @@ export default function PipelineRunPage() {
   const { items: agents, loading: agentsLoading } = useApiList<AgentInfo>({
     endpoint: "/api/agents",
   });
+
   const {
     route,
     inputValue,
@@ -53,7 +53,6 @@ export default function PipelineRunPage() {
     }
   }, [changeRoute, route, selectedRoute]);
 
-  // Extract agentId from route (e.g., "/api/agui/writer" -> "writer")
   const currentAgentId = useMemo(() => {
     const parts = route.split("/");
     return parts[parts.length - 1] || "writer";
@@ -69,7 +68,6 @@ export default function PipelineRunPage() {
     renameSession,
   } = useSessionList(currentAgentId);
 
-  // Refresh session list after each message completes
   useEffect(() => {
     if (!loading && messages.length > 0) {
       void refreshSessions();
@@ -101,46 +99,33 @@ export default function PipelineRunPage() {
   );
 
   return (
-    <Flex style={{ height: "100%" }}>
-      <SessionSidebar
-        sessions={sessions}
-        loading={sessionsLoading}
-        activeSessionId={activeSessionId}
-        onSelect={(id) => void handleSelectSession(id)}
-        onDelete={(id) => void handleDeleteSession(id)}
-        onRename={renameSession}
-      />
-
-      <Flex vertical style={{ flex: 1, height: "100%" }} gap={0}>
-        <AguiConversationShell
-          leftExtra={
-            <Space>
-              <Typography.Text strong>选择 Agent</Typography.Text>
-              <Select
-                value={selectedRoute}
-                onChange={changeRoute}
-                style={{ width: 200 }}
-                options={agentOptions}
-                placeholder="选择 Agent"
-                loading={agentsLoading}
-              />
-            </Space>
-          }
-          onClear={handleNewSession}
-          clearDisabled={loading}
-          clearText={pipelineConversationPreset.clearText}
-          messages={messages}
-          loading={loading}
-          inputValue={inputValue}
-          onInputChange={setInputValue}
-          onSubmit={submit}
-          placeholder={pipelineConversationPreset.placeholder}
-          emptyText={pipelineConversationPreset.emptyText}
-          streamingText={pipelineConversationPreset.streamingText}
-          statusText={pipelineConversationPreset.getStatusText(loading)}
-          shellStyle={{ flex: 1, minHeight: 0 }}
-        />
-      </Flex>
-    </Flex>
+    <ConversationWorkspace
+      sessions={sessions}
+      sessionsLoading={sessionsLoading}
+      activeSessionId={activeSessionId}
+      onSelectSession={(id) => void handleSelectSession(id)}
+      onDeleteSession={(id) => void handleDeleteSession(id)}
+      onRenameSession={renameSession}
+      messages={messages}
+      loading={loading}
+      inputValue={inputValue}
+      onInputChange={setInputValue}
+      onSubmit={submit}
+      onNewSession={handleNewSession}
+      preset={pipelineConversationPreset}
+      shellLeftExtra={
+        <Space>
+          <Typography.Text strong>选择 Agent</Typography.Text>
+          <Select
+            value={selectedRoute}
+            onChange={changeRoute}
+            style={{ width: 200 }}
+            options={agentOptions}
+            placeholder="选择 Agent"
+            loading={agentsLoading}
+          />
+        </Space>
+      }
+    />
   );
 }

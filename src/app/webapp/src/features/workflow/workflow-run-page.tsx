@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Button, Flex, Space, Spin, Tag, Typography } from "antd";
 import { ApartmentOutlined, ArrowLeftOutlined } from "@ant-design/icons";
-import AguiConversationShell from "../../components/agui-conversation-shell";
-import SessionSidebar from "../../components/session-sidebar";
+import ConversationWorkspace from "../../components/conversation-workspace";
 import { workflowRunConversationPreset } from "../../components/agui-conversation-presets";
 import { useApiList } from "../../hooks/use-api-list";
 import { useWorkflowRun } from "../../hooks/use-workflow-run";
@@ -16,16 +15,11 @@ interface WorkflowInfo {
 
 /**
  * Workflow 独立运行页面
+ * 外层：返回按钮 + Workflow 名称 / 描述
+ * 内层：ConversationWorkspace —— 与 Agent 对话页共用的骨架（Session 侧栏 + 对话壳）
  *
- * 布局与 PipelineRunPage 高度对齐：
- *   左栏 SessionSidebar —— 展示当前 Workflow 的运行历史（复用 Agent 的 session 持久化）
- *   右栏 AguiConversationShell —— 执行 Workflow、展示流式输出
- *
- * 关键复用：
- *   - useWorkflowRun 封装了 agentId=`workflow-{id}` 的 session 约定
- *   - /api/agui/workflow-{id} 与 Agent 走同一条 AG-UI 管线
- *   - HITL 节点由 WorkflowChatClient 自动批准，UI 仅展示 "[系统] 已自动批准" 文本
- *     （后续 P2 可在此位置渲染批准/退回按钮，驱动后端 SendResponseAsync）
+ * HITL 节点由 WorkflowChatClient 自动批准，聊天流中会显示 "[系统] 已自动批准"
+ * 后续 P2 可在 ConversationWorkspace 的 shellLeftExtra 位置注入批准/退回按钮
  */
 export default function WorkflowRunPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,34 +96,22 @@ export default function WorkflowRunPage() {
         </Typography.Text>
       </Flex>
 
-      <Flex style={{ flex: 1, minHeight: 0 }}>
-        <SessionSidebar
-          sessions={runs}
-          loading={runsLoading}
-          activeSessionId={activeRunId}
-          onSelect={(runId) => void selectRun(runId)}
-          onDelete={(runId) => void deleteRun(runId)}
-          onRename={renameRun}
-        />
-
-        <Flex vertical style={{ flex: 1, height: "100%" }} gap={0}>
-          <AguiConversationShell
-            onClear={newRun}
-            clearDisabled={loading}
-            clearText="新运行"
-            messages={messages}
-            loading={loading}
-            inputValue={inputValue}
-            onInputChange={setInputValue}
-            onSubmit={submit}
-            placeholder={workflowRunConversationPreset.placeholder}
-            emptyText={workflowRunConversationPreset.emptyText}
-            streamingText={workflowRunConversationPreset.streamingText}
-            statusText={workflowRunConversationPreset.getStatusText(loading)}
-            shellStyle={{ flex: 1, minHeight: 0 }}
-          />
-        </Flex>
-      </Flex>
+      <ConversationWorkspace
+        sessions={runs}
+        sessionsLoading={runsLoading}
+        activeSessionId={activeRunId}
+        onSelectSession={(runId) => void selectRun(runId)}
+        onDeleteSession={(runId) => void deleteRun(runId)}
+        onRenameSession={renameRun}
+        messages={messages}
+        loading={loading}
+        inputValue={inputValue}
+        onInputChange={setInputValue}
+        onSubmit={submit}
+        onNewSession={newRun}
+        preset={{ ...workflowRunConversationPreset, clearText: "新运行" }}
+        containerStyle={{ flex: 1, minHeight: 0 }}
+      />
     </Flex>
   );
 }
