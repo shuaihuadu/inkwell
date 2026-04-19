@@ -1,19 +1,5 @@
 # 用 Microsoft Agent Framework 造一个 AI 内容工厂：一次 Harness Engineering 实战
 
----
-
-> **声明 —— 一次 Harness Engineering 实战**
->
-> 本项目从命名、需求分析、架构设计、模块拆分、代码实现、Bug 修复到全部技术文档，**绝大多数由 AI 编写**，作者几乎不直接写业务代码，承担的是另外三件事：
->
-> - **编写 Copilot Instructions**：把架构约束、编码规范、领域知识沉淀成可被 AI 稳定消费的上下文
-> - **把控方向**：确认需求边界、审阅关键设计、决定取舍
-> - **反馈问题**：把运行结果、错误现象、Bad Case 精准地喂回给 AI，驱动它自我修正
->
-> 这里说的 **Harness Engineering**，和业界讨论 Agent 时说的 *agent harness* 是同一个词根——为 AI 构建能稳定运行的工程支架：清晰的指令、充分的上下文、可靠的反馈回路，以及让 AI 的产出能被验证、被审计、被复盘的一整套基础设施。换句话说，不是「AI 辅助人写代码」，而是「人工程化地组织 AI，让 AI 写代码」。这和近来常被提起的 **Spec-Driven Development** 与 **Context Engineering** 是同一脉思路。本文记录的，不只是一个 MAF 项目，也是这条工作方式的一份完整样本。
-
----
-
 ## 写在前面
 
 **Microsoft Agent Framework（MAF）** 把 Semantic Kernel 的工程能力和 AutoGen 的多 Agent 协作思路合到了一起，目前是 .NET 生态里较完整的 Agent 开发框架之一。
@@ -23,6 +9,18 @@
 **GitHub 仓库**：https://github.com/shuaihuadu/Inkwell
 
 如果你正在学 Microsoft Agent Framework，读完官方文档后想看一个从对话一路走到工作流再到人工审核的完整示例，Inkwell 的模块划分和接线方式或许能给你一些参考；如果问题更偏工程化那一侧——多 Agent 如何从沙盘走向企业应用、AI 应用怎么和现有身份、权限、可观测体系对接，Inkwell 里的实现能提供一个端到端的参照系；如果你是 .NET 开发者，想看看在 .NET 生态里怎么做 AI 应用的工程化落地，Inkwell 可以佐证：在 .NET 10 的土壤上，配合 MAF 和 Microsoft.Extensions.AI，足以支撑一个严肃的 AI 应用。如果只是想随意看看，`docker compose up -d` 也就够了。
+
+---
+
+## 一次 Harness Engineering 实战
+本项目从命名、需求分析、架构设计、模块拆分、代码实现、Bug 修复到全部技术文档，**绝大多数由 AI 编写**，作者几乎不直接写业务代码，承担的是另外三件事：
+
+- **编写 Copilot Instructions**：把架构约束、编码规范、领域知识沉淀成可被 AI 稳定消费的上下文
+- **把控方向**：确认需求边界、审阅关键设计、决定取舍
+- **反馈问题**：把运行结果、错误现象、Bad Case 精准地喂回给 AI，驱动它自我修正
+
+
+> **Harness Engineering**，和业界讨论 Agent 时说的 *agent harness* 是同一个词根——为 AI 构建能稳定运行的工程支架：清晰的指令、充分的上下文、可靠的反馈回路，以及让 AI 的产出能被验证、被审计、被复盘的一整套基础设施。换句话说，不是「AI 辅助人写代码」，而是「人工程化地组织 AI，让 AI 写代码」。这和近来常被提起的 **Spec-Driven Development** 与 **Context Engineering** 是同一脉思路。本文记录的，不只是一个 MAF 项目，也是这条工作方式的一份完整样本。
 
 ---
 
