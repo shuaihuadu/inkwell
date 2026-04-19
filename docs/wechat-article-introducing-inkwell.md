@@ -1,16 +1,16 @@
-# 我用 Microsoft Agent Framework 造了一个 AI 内容工厂：从选题到发稿全自动
+# 用 Microsoft Agent Framework 造一个 AI 内容工厂：一次 Harness Engineering 实战
 
 ---
 
-> **声明 —— 这是一次 Harness Engineering 实战**
+> **声明 —— 一次 Harness Engineering 实战**
 >
-> 本项目从命名、需求分析、架构设计、模块拆分、代码实现、Bug 修复到全部技术文档，**几乎 100% 由 AI 自主完成**。作者全程没有手写一行业务代码，承担的只有三件事：
+> 本项目从命名、需求分析、架构设计、模块拆分、代码实现、Bug 修复到全部技术文档，**绝大多数由 AI 编写**，作者几乎不直接写业务代码，承担的是另外三件事：
 >
 > - **编写 Copilot Instructions**：把架构约束、编码规范、领域知识沉淀成可被 AI 稳定消费的上下文
 > - **把控方向**：确认需求边界、审阅关键设计、决定取舍
 > - **反馈问题**：把运行结果、错误现象、Bad Case 精准地喂回给 AI，驱动它自我修正
 >
-> 这不是「AI 辅助编程」，而是 **Harness Engineering（AI 驾驭工程）**——人退到指挥位，把 AI 当作可以独立交付的工程团队来使用。本文记录的不只是一个项目，也是这条新工作方式的一个完整样本。
+> 这里说的 **Harness Engineering**，和业界讨论 Agent 时说的 *agent harness* 是同一个词根——为 AI 构建能稳定运行的工程支架：清晰的指令、充分的上下文、可靠的反馈回路，以及让 AI 的产出能被验证、被审计、被复盘的一整套基础设施。换句话说，不是「AI 辅助人写代码」，而是「人工程化地组织 AI，让 AI 写代码」。这和近来常被提起的 **Spec-Driven Development** 与 **Context Engineering** 是同一脉思路。本文记录的，不只是一个 MAF 项目，也是这条工作方式的一份完整样本。
 
 ---
 
@@ -18,142 +18,80 @@
 
 **Microsoft Agent Framework（MAF）** 把 Semantic Kernel 的工程能力和 AutoGen 的多 Agent 协作思路合到了一起，目前是 .NET 生态里较完整的 Agent 开发框架之一。
 
-这个项目的目标是用 MAF 把一个**完整业务闭环**跑通——不是 Hello World、也不是单文件 Demo，而是一个经得起代码审查、可以当模板拆解学习的**中等规模 AI 内容生产平台**。项目叫 **Inkwell**（墨水瓶），它能对话、能编排、能自我审核，代码完全开源：
+这个项目的目标是用 MAF 把一个**完整业务闭环**跑通——不是 Hello World、也不是单文件 Demo，而是一个经得起代码审查、可以当模板拆解学习的**有规模的 AI 内容生产平台**。项目叫 **Inkwell**（墨水瓶），它是AI取的名字，能对话、能编排、能自我审核，代码完全开源：
 
 **GitHub 仓库**：https://github.com/shuaihuadu/Inkwell
 
----
-
-## 这不是又一个 ChatGPT 套壳
-
-市面上的 AI 应用模板大多是「套个聊天框 + 调一下模型 API」。Inkwell 想做的事情不一样：
-
-**它模拟了一个真实内容团队的完整工作流**——从一个主题出发，走完「市场调研 → 竞品分析 → 写作 → 审核 → 人工终审 → 发布」，中间有多个 AI Agent 互相协作，也有人工审核介入，每一步都有迹可循。
-
-如果你见过企业内容运营团队是怎么跑流程的，在 Inkwell 里能找到对应：
-
-| 真实团队岗位  | Inkwell 对应的 Agent / Workflow               |
-| ------------- | --------------------------------------------- |
-| 市场研究员    | MarketAnalysisExecutor（输出结构化 JSON）     |
-| 竞品分析师    | CompetitorAnalysisExecutor                    |
-| 内容写手      | WriterAgent（支持多轮修订）                   |
-| 内容编辑/审核 | CriticAgent（打分 + JSON 决策）               |
-| 主编终审      | RequestPort（真实的 Human-in-the-Loop 端口）  |
-| SEO 专员      | SEO Agent（Function Tools 调用搜索）          |
-| 多语种翻译    | TranslationAggregationExecutor（Fan-In 聚合） |
-
-整条流水线通过 **MAF 的 Workflow 引擎** 编排，每个节点都是真实的 Executor，有真实的状态管理、错误处理和可观测性。
+如果你正在学 Microsoft Agent Framework，读完官方文档后想看一个从对话一路走到工作流再到人工审核的完整示例，Inkwell 的模块划分和接线方式或许能给你一些参考；如果问题更偏工程化那一侧——多 Agent 如何从沙盘走向企业应用、AI 应用怎么和现有身份、权限、可观测体系对接，Inkwell 里的实现能提供一个端到端的参照系；如果你是 .NET 开发者，想看看在 .NET 生态里怎么做 AI 应用的工程化落地，Inkwell 可以佐证：在 .NET 10 的土壤上，配合 MAF 和 Microsoft.Extensions.AI，足以支撑一个严肃的 AI 应用。如果只是想随意看看，`docker compose up -d` 也就够了。
 
 ---
 
-## 一个场景走完整条流水线
+## Inkwell 在做什么
 
-来看一个最典型的场景：**用户输入"效率革命与边界新思考"，平台自动产出一篇经过三重审核的文章**。
+Inkwell 把一个内容团队的完整工作流搬进了软件里。给它一个主题，它会自己走完市场调研、竞品分析、写作、自我审核，然后挂起等人工终审，确认后再发布。中间所有的协作、修改、重试、退回都有完整的迹可循。
 
-### 第一步：选题分析（Fan-Out / Fan-In 并行）
-
-用户一句话丢进去，`InputDispatchExecutor` 把它同时扇出到两个分支：
-- **市场趋势分析师**：调研该主题当前的市场热度、目标受众、内容机会
-- **竞品分析师**：分析市场上已有的同类内容，提出差异化角度
-
-这两个 Agent 用 `ChatResponseFormat.ForJsonSchema<TopicAnalysis>()` 强制输出结构化 JSON，回来后在 `AnalysisAggregationExecutor` 里 Fan-In 汇聚为统一的选题分析报告。
-
-这里踩过一个很典型的坑——最早汇聚节点用实例字段缓存结果，跑一次没问题，跑第二次就空输出了。后来才意识到 **MAF 的 Executor 是单例**，跨运行的状态必须走 `IWorkflowContext.QueueStateUpdateAsync`。修正这个 Bug 的过程也加深了对 MAF「工作流即有状态图」这一理念的理解。
-
-### 第二步：Writer-Critic 循环（自动修订）
-
-选题分析完成后进入创作环节。**WriterExecutor** 根据分析报告写文章，**CriticExecutor** 从清晰度、吸引力、准确性、完整性四个维度打分并决策：
-
-- 审核通过 → 进入人工终审
-- 审核退回 → 带着反馈意见回到 Writer，最多修订 3 轮（超出上限则自动放行）
-
-这整个循环在 MAF 里是用 **AddSwitch** 实现的：
-
-```csharp
-.AddSwitch(critic, sw => sw
-    .AddCase<Article>(a => a?.Status == ArticleStatus.Approved, reviewPort)
-    .WithDefault(writer))
-```
-
-一段代码就把"条件分支 + 循环回退"表达清楚，这比传统 BPMN 引擎友好太多了。
-
-### 第三步：真实的人工审核（Human-in-the-Loop）
-
-这是整个项目里最值得拿出来讲的一部分。
-
-MAF 提供了 `RequestPort.Create<TInput, TResponse>()`，Workflow 跑到这里会**真正挂起**，等待外部响应。Inkwell 把它接到了前端：
-
-```
-Workflow 命中 RequestPort
-    ↓
-HitlPendingRegistry 登记挂起态（RequestId + StreamingRun）
-    ↓
-SSE 通道向前端发 <<<HITL_REQUEST:{json}>>> 标记
-    ↓
-前端 ThoughtChain 节点里渲染「通过 / 退回」按钮
-    ↓
-用户点击 → POST /api/hitl/{id}/respond
-    ↓
-StreamingRun.SendResponseAsync() 唤醒 Workflow 继续执行
-```
-
-**长连接在用户思考期间保持打开**，Workflow 状态在服务端挂起等待，点击按钮后从断点恢复执行——而不是用「自动批准」等技巧绕开真正的外部交互。
-
-### 第四步：发布与退回
-
-人工点击「通过」：`ReviewGateExecutor` 把文章落库到 `Articles` 表，状态改为 Published，YieldOutputAsync 产出最终内容。
-
-人工点击「退回」：文章带着"Human reviewer requested revisions"的反馈回流到 WriterExecutor，触发下一轮修订。
+这条流水线里的角色几乎能和真实团队岗位一一对应：有负责市场趋势的分析师，有看同行怎么写的竞品研究员，有能按编辑建议反复修订的写手，有会打分也会打回稿的审核，有等你点头才让文章发出去的主编，还有 SEO 专员和多语种翻译。每一个都是一个独立的 Agent，由 MAF 的 Workflow 引擎编排在一起，结构化输入输出、状态管理、错误处理和可观测性都是开箱自带的。
 
 ---
 
-## 三个最值得展示的工程亮点
+## 从一个主题到一篇成稿
 
-### 亮点一：把 Workflow 伪装成 Chat Agent
+举个例子，用户输入一句「效率革命与边界新思考」，平台会帮你产出一篇经过多重审核的成稿。中间发生了什么？
 
-MAF 的 Workflow 和 Agent 天然是两套接口，AG-UI 协议又是 Agent 专用的——那 Workflow 怎么接到聊天界面？
+### 一、并行做选题分析
 
-Inkwell 的答案是一层薄薄的 `WorkflowChatClient : IChatClient`：
+这句话会同时分发给两个 Agent：一个负责看市场热度和目标受众，一个负责扫描已有同类内容、找差异化角度。他们并行跑，结果通过 MAF 的结构化输出约束回传，再由下游一个聚合节点合并成一份统一的选题分析报告。这就是 Workflow 教科书里讲的 Fan-Out / Fan-In。
 
-- 用户输入 → 从 ChatMessage 抽出文本 → 喂给 `InProcessExecution.RunStreamingAsync`
-- Workflow 流出的各种 Event → 映射成 `ChatResponseUpdate`
-  - `AgentResponseUpdateEvent` → 流式 token
-  - `WorkflowOutputEvent` → JSON 序列化为产出内容
-  - `RequestInfoEvent` → 发 HITL 标记
-  - `WorkflowErrorEvent` → 可见化错误
+这里踩过一个值得记下来的坑：最早聚合节点把结果暂存在自己的实例字段上，跑第一次没事，跑第二次就空输出了。后来才明白——MAF 里的 Executor 是单例，跨次运行的状态必须托管给工作流自己的状态机，不能放在实例里。修正这个问题之后，也真正理解了「Workflow 本质上就是一个状态图」这句话的分量。
 
-于是 Workflow 就成了「一个能执行复杂流程的 Agent」，Agent 的所有基础设施（AG-UI、会话持久化、AI Toolkit 调试、A2A 协议）**一行不改直接复用**。
+### 二、写作与审核的自动循环
 
-这是 MAF 设计最优雅的地方之一——**Agent 和 Workflow 是对偶的**。
+选题分析完成后进入创作环节。Writer 负责成文，Critic 从清晰度、吸引力、准确性、完整性四个维度打分：过了就继续往下走，不过就带上具体反馈退回给 Writer，最多修订三轮，超出上限则自动放行。
 
-### 亮点二：思维链式的可视化
+这个「条件分支 + 循环回退」结构在 MAF 里只需要一行声明式的分支描述就能写清楚，无需像传统 BPMN 引擎那样书写大段配置，也不用手动拼状态流转。
 
-流式文本很容易变成一坨混乱的信息。Inkwell 用 Ant Design X 的 **ThoughtChain** 把 Workflow 的每一步可视化了：
+### 三、等编辑点「通过」
 
-```
-✓ Workflow 已启动
-✓ 选题分析汇总
-    主题：效率革命与边界新思考
-    市场趋势：...
-    目标受众：...
-    内容角度：...
-✓ 内容写作
-✓ 内容审核
-⏳ 等待人工终审  [通过] [退回]
-```
+自动审核过后，工作流会**真的挂起**，等一个人来点「通过」或「退回」。
 
-前端通过正则解析 `[系统]` / `[AnalysisAggregation]` / `[已发布]` 等段落标记，自动映射为步骤节点，流式中最后一个节点为 loading 状态，完成后变成 ✓，出错变成 ✗。体验上接近 Claude、GitHub Copilot Agent 的「思考过程可视化」。
+这不是前端偶尔弹个确认框、后台想办法模拟人工点头。长连接在用户思考期间一直打开，工作流状态在服务端完整挂起，文章内容、选题分析、评分理由同时推给前端展示。用户点「通过」后，后端从断点唤醒继续跑；点「退回」则把人工意见打包成一条新的修订需求回传，继续下一轮 Writer-Critic。
 
-### 亮点三：可观测、可调试、可部署
+这种「真外部挂起」的模式是 MAF 原生支持的，而不靠轮询、定时器或「默认自动批准」绕开这步。对严肃的企业内容审核线来说，这个细节重要。
 
-一个严肃的 AI 应用必须能投入生产。Inkwell 在这方面下了不少功夫：
+### 四、落库或回溯
 
-- **OpenTelemetry 追踪**：每一次 Agent 调用、Workflow 执行都有完整的 Span
-- **Aspire Dashboard**：本地开发一键启动，日志/追踪/指标三合一
-- **JWT 认证 + 基于策略的授权**：EditorOrAdmin / ViewerOrAbove 等角色隔离
-- **DurableTask 托管**：长耗时 Workflow 可选用 DurableTask 跑，重启不丢状态
-- **A2A Server**：Agent-to-Agent 协议端口，可被其他系统远程调用
-- **Docker Compose 一键启动**：`webapi` + `webapp` + `sqlserver` 三件套直接跑起来；`A2AServer` 和 `DurableHost` 作为可选独立进程补充
+点通过，文章落到数据库、标为已发布，最终内容作为工作流产出返回给前端。点退回，文章和审核意见一起回流到 Writer，进入下一轮修订。整个循环回到第二步，没有特例。
+
+---
+
+## 几处值得聊聊的设计
+
+### 把 Workflow 当 Agent 用
+
+在 MAF 里，Agent 和 Workflow 天生是两类不同的东西：前者是聊天型的单点推理，后者是编排型的多步流程。前端的 AG-UI 协议、会话持久化、AI Toolkit 调试、跨服务调用的 A2A 协议，这些基础设施全部是为 Agent 设计的。
+
+Inkwell 里做了一层很薄的适配。用户输入过来的消息会被拆成文本交给 Workflow，Workflow 跑出来的每一个中间事件反过来包装成聊天消息的一个分片：子 Agent 输出的 Token 单播出去，工作流产出的最终对象被序列化后推给前端，人工审核（HITL，Human-in-the-Loop）的请求带上特定标记，错误事件被渲染成可见提示。
+
+这么做之后，一个 Workflow 对外看就和一个普通 Agent 一样——能挂到 AG-UI 上、能被 A2A 远程调用、能被 AI Toolkit 挖进去看调用栈，无需为它重写一套基础设施。Agent 和 Workflow 在实现上是两类东西，在用户视角下却是对等的——这是 MAF 设计里比较讨喜的一个细节。
+
+### 把流程的思考过程展给用户
+
+多 Agent 工作流跑起来很容易变成一坨滞后返回的文本，用户看不到过程就只能干等。Inkwell 把整个过程以「思维链」的形式展示出来：Workflow 已启动、选题分析汇总、内容写作、内容审核、等待人工终审……每一步按顺序点亮，当前进行中的步骤显示为 loading，完成后变成勾，失败则标红。点开某一步还能看到对应的中间产物。
+
+实现上基于 Ant Design X 的思维链组件，前后端约定一种简单的段落标记约定来区分不同阶段。体验上更接近目前主流编程工具里「思考过程可见化」的那种感觉。
+
+### 把工程化的底子铺好
+
+一个认真的 AI 应用要能顶得住生产环境，项目在这一块下了不少工夫：
+
+- 全链路的 OpenTelemetry 追踪，每一次模型调用、每一个工作流的步骤都有 Span
+- 本地开发配套 Aspire Dashboard，日志、追踪、指标一个面板看完
+- JWT 认证配合基于策略的授权，编辑、审核、访客三种角色能干的事情分开
+- 长耗时工作流可选分发给 DurableTask 托管，进程重启不丢状态
+- A2A 协议端口放在一个独立的服务里，方便其他系统把 Inkwell 里的 Agent 当作外部能力调用
+- 一份 Docker Compose 就能把主服务、前端和数据库三件套跑起来，其他独立进程按需挂载
+
+没有什么魔法，不过是 .NET 企业应用多年积累下来的章法，搬到 AI 应用上继续用。
 
 ---
 
@@ -171,38 +109,13 @@ Inkwell 的答案是一层薄薄的 `WorkflowChatClient : IChatClient`：
 
 ---
 
-## 现已实现的能力清单
+## 目前跑通的能力
 
-### 7 条 Workflow
+Inkwell 目前内置了七条工作流，覆盖 MAF 里主要的协作模式：扇出扇入的并行汇聚、条件分支、带人工审核的挂起恢复、多 Agent 群聊、任务交接、子工作流嵌套、MapReduce、检查点恢复——这些模式在不同工作流里按需组合，并非每条工作流对应一种模式。内置的预定义 Agent 有八个，对应内容写作、审核、市场分析、竞品分析、SEO、图片分析、智能调度与多语种翻译；新的 Agent 可以直接用声明式 YAML 配置注入。
 
-涵盖 **Fan-Out/Fan-In、Switch、HITL、GroupChat、Handoff、SubWorkflow、MapReduce、Checkpoint** 等核心模式
+中间件层有内容安全护栏和函数调用审计，前者使用滑窗匹配处理跨分片的敏感内容，后者在流式场景下也能完整记录调用轨迹。另外有一套以独立进程方式执行的 Skills，包括 Markdown 校验、可读性分析、敏感词扫描等——宿主进程里不会混入业务逻辑，也方便 Skill 单独迭代更新。
 
-### 8 个预定义 Agent
-内容写手 / 审核 / 市场分析 / 竞品分析 / SEO / 图片分析 / 智能调度 / 多语种翻译；另支持声明式 YAML Agent 配置
-
-### 完整中间件栈
-内容安全护栏（滑窗匹配）+ 函数调用审计（支持流式）
-
-### Skills
-Markdown 校验、可读性分析、敏感词扫描，均以独立进程执行（宿主进程不嵌入业务规则）
-
-### 记忆系统
-会话级：基于 MAF AgentSession 序列化，跨请求、跨重启保持上下文
-长期记忆：ChatHistoryMemoryProvider + 向量存储语义检索
-
-### 前端体验
-AG-UI 流式 + 思维链可视化 + 会话侧栏（搜索/重命名/导出）+ Workflow 拓扑图（Mermaid）
-
----
-
-## 为什么值得一看
-
-如果你：
-
-- 想学 **Microsoft Agent Framework** 又找不到从对话到 Workflow再到 HITL 的完整参考项目 → Inkwell 涵盖了 MAF 的多数核心模式，每个模块都是能跑的实现
-- 想看 AI Agent 在 **企业级场景** 里的工程化落地 → Inkwell 展示了从对话到工作流、从单 Agent 到多 Agent、从全自动到 HITL 的端到端路径
-- 在做 **.NET + AI** 的工程实践 → 一个以 .NET 10 + MAF 为主轴的实现参考，不必为了跑机器学习生态回 Python
-- 想要一个**开箱即用**的参考实现 → `docker compose up -d` 就能启动，无需额外环境配置
+记忆系统分两层：会话级记忆基于 MAF 的 Session 序列化能力，能跨请求、跨重启保持上下文；长期记忆走向量存储做语义检索。前端除了上面说的思维链以外，还配了会话侧栏的搜索与重命名、导出，以及 Mermaid 描绘的工作流拓扑图，调试时看节点走向比对着日志翻方便不少。
 
 ---
 
@@ -216,30 +129,19 @@ cp .env.example .env
 docker compose up -d
 ```
 
-浏览器打开 http://localhost:3000，开始你的第一次 AI 内容生产之旅。
+浏览器打开 http://localhost:3000  
 
 ---
 
 ## 结语：一份可回溯的 Harness Engineering 样本
 
-Inkwell 是一个**学习型开源项目**，不面向生产，而是两条主线的交汇：
+Inkwell 更像是一份两线交汇的样本——一线是系统地把 Microsoft Agent Framework 跑一遍，另一线是把 **Harness Engineering** 这种组织 AI 的工作方法完整走一遍。
 
-- **向内**：系统性掌握 Microsoft Agent Framework 的真实演练场
-- **向外**：一份完整的 **Harness Engineering 工作法**样本
+从空仓库走到一个能跑的平台，作者几乎不直接写业务代码。架构取舍、代码风格、Bug 定位过程都留在了仓库的 Git 历史、Copilot Instructions 和 Chat 对话记录里。AI 在哪些节点自己走对了方向、在哪里需要人介入矫偏、一份认真写的 Instructions 能把输出质量拉高多少，这些问题都能从提交历史里翻出来。
 
-从空仓库到一个能跑的平台，作者没有手写一行业务代码。所有架构取舍、代码风格、Bug 定位过程，全部沉淀在 **Git 提交历史 + Copilot Instructions + Chat 对话记录**里，任何人都能逐步回溯：
+如果你也在思考 AI 时代开发者的角色该怎么重新定义，Inkwell 或许能做一个小小的观察样本。
 
-- AI 在哪些节点自主做出了正确决策
-- 在哪里需要作者介入矫偏
-- 一份好的 Copilot Instructions 能把 AI 的输出质量提升多少
-
-如果你正在思考 **AI 时代开发者的角色该怎么重新定义**，Inkwell 或许能给你一个观察样本。
-
-如果觉得有帮助，欢迎：
-
-- **Star**：https://github.com/shuaihuadu/Inkwell
-- **Issue / PR**：任何问题、建议、补充都欢迎
-- **转发**：让更多 .NET + AI 开发者看到它
+如果觉得有一点收获，欢迎去仓库 Star，或者转给身边做 .NET 和 AI 的朋友。Issue 和 PR 都欢迎。
 
 ---
 

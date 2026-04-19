@@ -2,17 +2,82 @@
 
 我们的沟通请使用简体中文进行。
 
-本项目Inkwell 是模拟了一个**企业级 AI 内容生产平台**的完整实际应用场景。
+## 项目简介
 
-后台是基于.NET Core 10，使用C#实现，前端是使用React和TypeScript实现的SPA应用程序。
-后台代码位于：src
-前端的UI设计是基于Ant Design组件库进行构建，
-前端代码位于：src\app\webapp\src
-相关的参考资料如下：
-Ant Design组件库：https://ant.design/docs/spec/introduce-cn/
-智能体对话界面：https://ant-design-x.antgroup.com/components/introduce-cn
+Inkwell 模拟了一个 AI 内容生产平台的完整业务场景，核心目标是系统性地覆盖 Microsoft Agent Framework（MAF）在真实业务中的主要使用模式。
+
+- **后端**：.NET 10 + ASP.NET Core + Microsoft Agent Framework（MAF），C# 实现，代码位于 `src`
+- **前端**：React + TypeScript + Ant Design + Ant Design X，代码位于 `src/app/webapp/src`
+- **模型层**：通过 `Microsoft.Extensions.AI` 的 `IChatClient` 抽象，默认对接 Microsoft Foundry
+- **持久化**：Entity Framework Core（InMemory / SQL Server 可切）
+- **可观测**：OpenTelemetry + Aspire Dashboard
+- **部署**：Docker Compose（`webapi` / `webapp` / `sqlserver` 三件套为默认起法；`A2AServer` / `DurableHost` 作为可选独立进程）
+
+参考资料：
+
+- Ant Design：<https://ant.design/docs/spec/introduce-cn/>
+- Ant Design X（AI 对话组件）：<https://ant-design-x.antgroup.com/components/introduce-cn>
+- Microsoft Agent Framework：<https://github.com/microsoft/agent-framework>
+
+### 代码分层约定
+
+- `src/core/Inkwell.Core`：领域模型、Agent 定义、Workflow Builder、Executor、中间件、Skills、记忆系统等核心能力
+- `src/app/services/Inkwell.WebApi`：对外的 REST / SSE API 与控制器
+- `src/app/services/Inkwell.A2AServer`、`Inkwell.DurableHost`：可选的独立进程（A2A 协议、DurableTask 托管）
+- `src/app/webapp`：前端 SPA
+
+模块边界要清晰：Controller 只负责协议转换和会话路由，业务能力一律落到 `Inkwell.Core`，不要把 MAF / EF 的调用散落到 Web 层。
 
 在为本仓库贡献代码时，请遵循以下指南：
+
+## Microsoft Agent Framework 使用约定
+
+这一节沉淀项目里已经验证过的 MAF 使用方式和踩过的坑，新增 Executor / Workflow 时请按下面的规则来。
+
+### Executor 是单例，跨次运行的状态必须交给 WorkflowContext
+
+**这是最容易出错的一点。** MAF 的 Executor 在工作流中是单例持有的，同一个实例会被多次运行复用。把跨次运行需要保留或重置的状态放在 Executor 的实例字段上，会导致：
+
+- 第一次运行正常
+- 第二次运行时字段里还残留着上一轮的数据，出现空输出、重复输出或状态错乱
+
+正确做法是把状态托管给工作流自己的状态机——使用 `IWorkflowContext.ReadStateAsync<T>(key)` / `QueueStateUpdateAsync(key, value)`。参考 `AnalysisAggregationExecutor` / `RankAggregatorExecutor` / `TranslationAggregationExecutor`：它们都用 `BufferKey` 在 Context 里累积分支结果，处理完一批后主动把 buffer 重置为空。
+
+> 记忆点：**Workflow 本质上是一个状态图**。Executor 是图上的节点，节点本身应当是无状态的——一切跨调用的状态都属于这张图。
+
+### 特性标注不能省
+
+给 Executor 正确标注输入/输出的消息类型特性，MAF 的图构建和可视化都依赖它们：
+
+- `[SendsMessage(typeof(T))]`：Executor 会向下游发送 `T` 类型消息
+- `[YieldsOutput(typeof(T))]`：Executor 会产出工作流终态输出（`YieldOutputAsync`）
+
+终态输出缺失时 `WorkflowChatClient` 会打出 `未产出任何终态输出（YieldOutputAsync）` 的提示——大多数情况是忘了加 `[YieldsOutput]` 或没有调用 `YieldOutputAsync`。
+
+### 结构化输出优先用 JSON Schema
+
+需要 LLM 返回结构化数据时，用 `ChatResponseFormat.ForJsonSchema<T>()` 强制 Schema，而不是写一堆"请你以 JSON 回复"的自然语言提示。解析失败的回退逻辑放在 Executor 里统一处理（见 `CriticExecutor` 的 `TryParseReviewDecision`）。
+
+### HITL 走 RequestPort，而不是自定义 Hook
+
+人工介入点一律用 `RequestPort.Create<TInput, TResponse>()` 暴露：
+
+- 命中 RequestPort 时 Workflow 会真正挂起，等待外部 `SendResponseAsync`
+- 服务端用 `HitlPendingRegistry` 登记挂起态，通过 SSE 把 `<<<HITL_REQUEST:{json}>>>` 标记发给前端
+- 不要为了"跑得顺"把 HITL 写成自动批准的桩，那样会绕过 Workflow 的真实行为
+
+### 分支 / 并行用 MAF 的图原语
+
+- 条件分支 / 循环回退：`AddSwitch` + `AddCase<T>(predicate, target)` + `.WithDefault(...)`
+- 扇出 / 扇入：`AddFanOutEdge` + `AddFanInBarrierEdge`
+
+不要自己在 Executor 内部用 `if/while` 模拟跳转，交给 MAF 的图去做，可视化和状态管理都依赖这一点。
+
+### 新增 Workflow 的落位
+
+- Workflow Builder 放在 `src/core/Inkwell.Core/Workflows/*Builder.cs`
+- 通用 Executor 放在 `src/core/Inkwell.Core/Workflows/Executors/`
+- 仅供某个 Builder 使用的 Executor 可以作为同文件 `internal sealed` 类放在 Builder 文件末尾
 
 ## 文件编码要求
 
