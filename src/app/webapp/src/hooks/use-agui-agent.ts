@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunAgentInput } from "../services/agui-types";
 import { API_BASE } from "../services/api";
+import {
+  HITL_MARKER,
+  TOOL_CALL_MARKER,
+  TOOL_RESULT_MARKER,
+  extractMarkers,
+  tryParseMarkerPayload,
+} from "../services/stream-markers";
 
 export interface HitlRequest {
   requestId: string;
@@ -12,12 +19,35 @@ export interface HitlRequest {
   approvedValue?: boolean;
 }
 
+/**
+ * 工具调用（Agent 内部触发的 Function Call）的可视化模型
+ * 同一个 callId 在 TOOL_CALL 到达时创建为 running，TOOL_RESULT 到达时翻转为 done/error
+ */
+export interface ToolCallInfo {
+  /** 调用链上 Executor 的 Id，用于前端分组 */
+  executor?: string;
+  /** LLM 分配的 Function Call Id */
+  callId: string;
+  /** 函数名，例如 publish_article */
+  name?: string;
+  /** 序列化后的参数文本（JSON 或原始字符串） */
+  arguments?: string;
+  /** 序列化后的返回文本 */
+  result?: string;
+  /** 工具调用异常信息 */
+  error?: string;
+  /** 当前状态 */
+  status: "running" | "done" | "error";
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   status: "pending" | "streaming" | "done" | "error";
   hitl?: HitlRequest;
+  /** 本条 assistant 气泡里发生过的工具调用（按 callId 去重） */
+  toolCalls?: ToolCallInfo[];
 }
 
 export interface UseAGUIAgentReturn {
@@ -35,11 +65,101 @@ export interface UseAGUIAgentReturn {
   ) => Promise<void>;
 }
 
-// 与后端 WorkflowChatClient.HitlMarkerPrefix / Suffix 保持一致
-// 使用 g 标志以便一次剥离多个标记；非贪婪 JSON 体匹配
-const HITL_MARKER_REGEX = /<<<HITL_REQUEST:(\{[\s\S]*?\})>>>/g;
-// 仅匹配"前缀已到、尾标还没到"的残片，用于流式过程中隐藏未闭合的标记头
-const HITL_PARTIAL_PREFIX_REGEX = /<<<HITL_REQUEST:[\s\S]*$/;
+// 与后端 WorkflowChatClient 的 *MarkerPrefix 常量对齐。
+// 所有正则 / 剥离都走 services/stream-markers.ts，不在这里各写一份。
+
+interface HitlMarkerPayload {
+  id: string;
+  payload: unknown;
+}
+
+interface ToolCallPayload {
+  executor?: string;
+  callId?: string;
+  name?: string;
+  arguments?: string;
+}
+
+interface ToolResultPayload {
+  executor?: string;
+  callId?: string;
+  result?: string;
+  exception?: string;
+}
+
+/**
+ * 按 callId 合并 TOOL_CALL / TOOL_RESULT payload 列表到现有 toolCalls 数组
+ */
+function mergeToolCalls(
+  existing: ToolCallInfo[] | undefined,
+  callPayloads: readonly string[],
+  resultPayloads: readonly string[],
+): { next: ToolCallInfo[] | undefined; changed: boolean } {
+  if (callPayloads.length === 0 && resultPayloads.length === 0) {
+    return { next: existing, changed: false };
+  }
+
+  const map = new Map<string, ToolCallInfo>();
+  for (const item of existing ?? []) {
+    map.set(item.callId, { ...item });
+  }
+
+  for (const raw of callPayloads) {
+    const p = tryParseMarkerPayload<ToolCallPayload>(raw);
+    if (!p?.callId) continue;
+    const prev = map.get(p.callId);
+    map.set(p.callId, {
+      callId: p.callId,
+      executor: p.executor ?? prev?.executor,
+      name: p.name ?? prev?.name,
+      arguments: p.arguments ?? prev?.arguments,
+      result: prev?.result,
+      error: prev?.error,
+      status:
+        prev?.status === "done" || prev?.status === "error"
+          ? prev.status
+          : "running",
+    });
+  }
+
+  for (const raw of resultPayloads) {
+    const p = tryParseMarkerPayload<ToolResultPayload>(raw);
+    if (!p?.callId) continue;
+    const prev = map.get(p.callId) ?? {
+      callId: p.callId,
+      status: "running" as const,
+    };
+    map.set(p.callId, {
+      ...prev,
+      executor: p.executor ?? prev.executor,
+      result: p.result ?? prev.result,
+      error: p.exception ?? prev.error,
+      status: p.exception ? "error" : "done",
+    });
+  }
+
+  return { next: Array.from(map.values()), changed: true };
+}
+
+/**
+ * 从最新 payload 列表中挑选一个可解析的 HITL 请求（取最后一个能解析的）
+ */
+function pickLatestHitl(
+  payloads: readonly string[],
+  fallback: HitlRequest | undefined,
+): HitlRequest | undefined {
+  for (let i = payloads.length - 1; i >= 0; i--) {
+    const parsed = tryParseMarkerPayload<HitlMarkerPayload>(payloads[i]);
+    if (parsed?.id) {
+      return {
+        requestId: parsed.id,
+        payload: parsed.payload,
+        decided: false,
+      };
+    }
+  }
+  return fallback;
+}
 
 export function useAGUIAgent(
   aguiRoute: string = "/api/agui/writer",
@@ -158,48 +278,41 @@ export function useAGUIAgent(
                         if (m.id !== assistantMsgId) return m;
                         const merged = m.content + (event.delta ?? "");
 
-                        // 1) 先扫描所有已闭合的 HITL 标记，收集 payload 并逐个剥离
-                        let stripped = merged;
-                        let extractedHitl: HitlRequest | undefined = m.hitl;
-                        const matches = Array.from(
-                          merged.matchAll(HITL_MARKER_REGEX),
+                        // 从当前累积文本里提取 HITL / 工具调用 payload。
+                        // 注意：这里只用 payloads 更新结构化状态，正文依然保留原始 merged
+                        // （含 markers 原文）。原因是 marker 可能跨 SSE delta 到达，
+                        // 提前在 m.content 上剥离会导致"前缀在上一段被抹掉、尾部片段留在下一段"
+                        // 的残片（典型症状就是正文里出现 <<>> 等散落字符）。
+                        // 真正的剥离统一放到渲染组件里做一次。
+                        const { payloads } = extractMarkers(merged, [
+                          HITL_MARKER,
+                          TOOL_CALL_MARKER,
+                          TOOL_RESULT_MARKER,
+                        ]);
+
+                        const hitlPayloads = payloads.get(HITL_MARKER) ?? [];
+                        const callPayloads =
+                          payloads.get(TOOL_CALL_MARKER) ?? [];
+                        const resultPayloads =
+                          payloads.get(TOOL_RESULT_MARKER) ?? [];
+
+                        const hitl =
+                          hitlPayloads.length > 0
+                            ? pickLatestHitl(hitlPayloads, m.hitl)
+                            : m.hitl;
+                        const toolMerge = mergeToolCalls(
+                          m.toolCalls,
+                          callPayloads,
+                          resultPayloads,
                         );
-                        if (matches.length > 0) {
-                          // 统一剥离所有闭合标记，避免 JSON 解析失败时残留半截 <<<...>>>
-                          stripped = merged.replace(HITL_MARKER_REGEX, "");
-
-                          // 取最后一个可解析的 payload 作为当前待审核对象
-                          for (let i = matches.length - 1; i >= 0; i--) {
-                            try {
-                              const parsed = JSON.parse(matches[i][1]) as {
-                                id: string;
-                                payload: unknown;
-                              };
-                              extractedHitl = {
-                                requestId: parsed.id,
-                                payload: parsed.payload,
-                                decided: false,
-                              };
-                              break;
-                            } catch {
-                              // 这一个 payload 解析失败，尝试前一个
-                            }
-                          }
-                        }
-
-                        // 2) 对于"前缀已到、后缀还没到"的流式中途状态，
-                        //    暂时把前缀之后的未闭合片段从展示内容里摘掉，避免用户看到 <<<...
-                        if (HITL_PARTIAL_PREFIX_REGEX.test(stripped)) {
-                          stripped = stripped.replace(
-                            HITL_PARTIAL_PREFIX_REGEX,
-                            "",
-                          );
-                        }
 
                         return {
                           ...m,
-                          content: stripped.trim(),
-                          ...(extractedHitl ? { hitl: extractedHitl } : {}),
+                          content: merged,
+                          ...(hitl ? { hitl } : {}),
+                          ...(toolMerge.changed
+                            ? { toolCalls: toolMerge.next }
+                            : {}),
                         };
                       }),
                     );

@@ -122,8 +122,14 @@ public sealed class WorkflowsController(
         {
             CheckpointManager checkpointManager = CheckpointManager.Default;
 
+            // 走注册表的 InputAdapter：若 Workflow 入口 Executor 不接受 string（如 GroupChat / Handoff / BatchEvaluation），
+            // 适配器会把原始文本转换成入口需要的类型；否则直接透传
+            object workflowInput = registration.Capabilities.InputAdapter is { } adapter
+                ? (adapter(request.Input) ?? request.Input)
+                : request.Input;
+
             await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
-                registration.Workflow, request.Input, checkpointManager);
+                registration.Workflow, (dynamic)workflowInput, checkpointManager);
 
             // [H3 修复] 传入 CancellationToken
             await foreach (WorkflowEvent evt in run.WatchStreamAsync().WithCancellation(cancellationToken))

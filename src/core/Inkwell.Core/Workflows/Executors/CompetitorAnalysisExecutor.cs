@@ -15,11 +15,11 @@ internal sealed class CompetitorAnalysisExecutor(AIAgent agent) : Executor<strin
     /// <inheritdoc />
     public override async ValueTask<TopicAnalysis> HandleAsync(string topic, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
-        AgentResponse response = await agent.RunAsync(
+        string text = await agent.RunAndStreamAsync(
             $"请分析以下主题的竞品内容，并提出差异化的内容角度建议：{topic}",
-            cancellationToken: cancellationToken);
+            this.Id, context, cancellationToken);
 
-        TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(response.Text)
+        TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(text)
             ?? new TopicAnalysis { Topic = topic };
 
         analysis.Topic = topic;

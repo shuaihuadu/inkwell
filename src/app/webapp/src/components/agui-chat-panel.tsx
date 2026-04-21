@@ -9,6 +9,12 @@ import { Flex, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChatMessage } from "../hooks/use-agui-agent";
+import {
+  HITL_MARKER,
+  TOOL_CALL_MARKER,
+  TOOL_RESULT_MARKER,
+  extractMarkers,
+} from "../services/stream-markers";
 import HitlReviewCard from "./hitl-review-card";
 import WorkflowStepsView, { parseWorkflowSteps } from "./workflow-steps-view";
 
@@ -59,26 +65,37 @@ function toBubbleItems(
     const needCustomRender =
       msg.role === "assistant" && (hasHitl || hasContent);
     const workflowSteps = hasContent ? parseWorkflowSteps(msg.content) : null;
-    const useSteps = !!workflowSteps && workflowSteps.length >= 2;
+    const hasToolCalls = !!msg.toolCalls && msg.toolCalls.length > 0;
+    const useSteps =
+      (!!workflowSteps && workflowSteps.length >= 2) || hasToolCalls;
 
     return {
       key: msg.id,
       role: msg.role as string,
       content: msg.content || (isStreaming ? streamingText : ""),
-      loading: isStreaming && !hasContent && !hasHitl,
+      loading: isStreaming && !hasContent && !hasHitl && !hasToolCalls,
       streaming: isStreaming,
-      ...(needCustomRender
+      ...(needCustomRender || hasToolCalls
         ? {
             contentRender: () => (
               <div>
-                {hasContent &&
+                {(hasContent || hasToolCalls) &&
                   (useSteps ? (
                     <WorkflowStepsView
                       content={msg.content}
                       streaming={isStreaming}
+                      toolCalls={msg.toolCalls}
                     />
                   ) : (
-                    <XMarkdown content={msg.content} />
+                    <XMarkdown
+                      content={
+                        extractMarkers(msg.content, [
+                          HITL_MARKER,
+                          TOOL_CALL_MARKER,
+                          TOOL_RESULT_MARKER,
+                        ]).stripped
+                      }
+                    />
                   ))}
                 {hasHitl && (
                   <HitlReviewCard

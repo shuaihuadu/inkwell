@@ -33,6 +33,15 @@ public sealed class WorkflowChatClient(
     /// <summary>HITL 标记结束</summary>
     internal const string HitlMarkerSuffix = ">>>";
 
+    /// <summary>工具调用开始 / 参数 标记前缀</summary>
+    internal const string ToolCallMarkerPrefix = "<<<TOOL_CALL:";
+
+    /// <summary>工具调用结果标记前缀</summary>
+    internal const string ToolResultMarkerPrefix = "<<<TOOL_RESULT:";
+
+    /// <summary>工具调用标记结束（与 HITL 共用，节省前端正则复杂度）</summary>
+    internal const string ToolMarkerSuffix = ">>>";
+
     private static readonly JsonSerializerOptions s_jsonOutput = new()
     {
         WriteIndented = true,
@@ -106,10 +115,17 @@ public sealed class WorkflowChatClient(
         IEnumerable<ChatMessage> chatMessages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        string input = ExtractWorkflowInput(chatMessages, this._capabilities);
+        string rawInput = ExtractWorkflowInput(chatMessages, this._capabilities);
 
-        this._logger.LogInformation("[WorkflowChatClient] Run started. MultiTurn={MultiTurn} HITL={HITL} InputLen={InputLen}",
-            this._capabilities.SupportsMultiTurn, this._capabilities.SupportsHumanInLoop, input.Length);
+        // 默认以 string 直接喂给 Workflow；对入口类型不是 string 的 Workflow（GroupChat / Handoff / BatchEvaluation 等），
+        // 由注册方提供 InputAdapter 把原始文本转换成入口 Executor 期望的类型。
+        object input = this._capabilities.InputAdapter is { } adapter
+            ? (adapter(rawInput) ?? rawInput)
+            : rawInput;
+
+        this._logger.LogInformation(
+            "[WorkflowChatClient] Run started. MultiTurn={MultiTurn} HITL={HITL} InputLen={InputLen} InputType={InputType}",
+            this._capabilities.SupportsMultiTurn, this._capabilities.SupportsHumanInLoop, rawInput.Length, input.GetType().Name);
 
         // 先让前端立即看到"已开始"的反馈，避免长耗时 Workflow 前几秒什么都不显示
         yield return "[系统] Workflow 已启动，正在执行...\n\n";
@@ -118,7 +134,9 @@ public sealed class WorkflowChatClient(
         string? startupError = null;
         try
         {
-            run = await InProcessExecution.RunStreamingAsync(workflow, input, cancellationToken: cancellationToken)
+            // 使用 dynamic 触发运行时泛型分派，让 MAF 根据 input 的实际类型选择
+            // InProcessExecution.RunStreamingAsync&lt;TInput&gt; 的正确实例化
+            run = await InProcessExecution.RunStreamingAsync(workflow, (dynamic)input, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -138,6 +156,9 @@ public sealed class WorkflowChatClient(
         {
             int outputCount = 0;
             int hitlCount = 0;
+            // 记录上一次发出 token 的 Executor，用于在切换时插入段落头
+            // 让前端 parseWorkflowSteps 能把每个 Executor 的流式输出渲染成独立的 ThoughtChain 项
+            string? lastExecutorId = null;
 
             await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -146,11 +167,50 @@ public sealed class WorkflowChatClient(
                     // 1) 子 Agent 的流式 token（最先匹配，因为它继承自 WorkflowOutputEvent）
                     case AgentResponseUpdateEvent updateEvent:
                         {
-                            string? text = updateEvent.Update?.Text;
+                            AgentResponseUpdate? update = updateEvent.Update;
+                            if (update is null)
+                            {
+                                break;
+                            }
+
+                            // 1a) 扫描 Contents 里的工具调用 / 结果，转成前端可识别的文本标记
+                            if (update.Contents is { Count: > 0 })
+                            {
+                                foreach (AIContent content in update.Contents)
+                                {
+                                    switch (content)
+                                    {
+                                        case FunctionCallContent call:
+                                            this._logger.LogInformation(
+                                                "[WorkflowChatClient] FunctionCall emitted. Executor={Executor} CallId={CallId} Name={Name}",
+                                                updateEvent.ExecutorId, call.CallId, call.Name);
+                                            yield return EmitToolCallMarker(updateEvent.ExecutorId, call);
+                                            break;
+                                        case FunctionResultContent result:
+                                            this._logger.LogInformation(
+                                                "[WorkflowChatClient] FunctionResult emitted. Executor={Executor} CallId={CallId} HasException={HasException}",
+                                                updateEvent.ExecutorId, result.CallId, result.Exception is not null);
+                                            yield return EmitToolResultMarker(updateEvent.ExecutorId, result);
+                                            break;
+                                    }
+                                }
+                            }
+
+                            // 1b) 正文 token 继续透传
+                            string? text = update.Text;
                             if (!string.IsNullOrEmpty(text))
                             {
+                                // 切换到新 Executor 时先发一个段落头，让前端能把每个 Executor 的流式输出
+                                // 渲染成独立的 ThoughtChain 项，而不是把所有 token 堆进同一个块
+                                if (!string.Equals(lastExecutorId, updateEvent.ExecutorId, StringComparison.Ordinal))
+                                {
+                                    yield return $"\n\n[{updateEvent.ExecutorId}]\n";
+                                    lastExecutorId = updateEvent.ExecutorId;
+                                }
+
                                 yield return text;
                             }
+
                             break;
                         }
 
@@ -274,6 +334,50 @@ public sealed class WorkflowChatClient(
         this._logger.LogInformation("[WorkflowChatClient] HITL pending. RequestId={RequestId}", requestId);
 
         return $"\n\n{HitlMarkerPrefix}{payloadJson}{HitlMarkerSuffix}\n\n";
+    }
+
+    /// <summary>
+    /// 生成"工具调用开始"标记。前端会把它从正文中剥离，转成工具调用气泡。
+    /// </summary>
+    private static string EmitToolCallMarker(string executorId, FunctionCallContent call)
+    {
+        string argumentsText = call.Arguments is null
+            ? "{}"
+            : SafeSerializeCompact(call.Arguments);
+
+        string payload = SafeSerializeCompact(new
+        {
+            executor = executorId,
+            callId = call.CallId,
+            name = call.Name,
+            arguments = argumentsText
+        });
+
+        return $"\n\n{ToolCallMarkerPrefix}{payload}{ToolMarkerSuffix}\n\n";
+    }
+
+    /// <summary>
+    /// 生成"工具调用结果"标记。前端按 callId 与 TOOL_CALL 匹配闭合。
+    /// </summary>
+    private static string EmitToolResultMarker(string executorId, FunctionResultContent result)
+    {
+        object? value = result.Result;
+        string resultText = value switch
+        {
+            null => string.Empty,
+            string s => s,
+            _ => SafeSerializeCompact(value)
+        };
+
+        string payload = SafeSerializeCompact(new
+        {
+            executor = executorId,
+            callId = result.CallId,
+            result = resultText,
+            exception = result.Exception?.Message
+        });
+
+        return $"\n\n{ToolResultMarkerPrefix}{payload}{ToolMarkerSuffix}\n\n";
     }
 
     /// <summary>

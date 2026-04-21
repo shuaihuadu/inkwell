@@ -1,6 +1,7 @@
 using Inkwell;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Inkwell.Workflows;
 
@@ -29,27 +30,44 @@ public sealed class ArticleWriteGateway
     /// 异步写入一条文章记录；网关未就绪时静默跳过
     /// </summary>
     /// <param name="record">待持久化的文章记录</param>
-    /// <param name="logger">可选日志</param>
+    /// <param name="logger">可选日志（为 null 时会从 Scope 内解析 <see cref="ILogger{ArticleWriteGateway}"/>）</param>
     /// <param name="cancellationToken">取消令牌</param>
     public async Task AddAsync(ArticleRecord record, ILogger? logger = null, CancellationToken cancellationToken = default)
     {
         IServiceScopeFactory? factory = this.ScopeFactory;
         if (factory is null)
         {
-            logger?.LogWarning("[ArticleWriteGateway] ScopeFactory not initialized, skipping persistence. Id={Id}", record.Id);
+            (logger ?? NullLogger.Instance).LogWarning(
+                "[ArticleWriteGateway] ScopeFactory not initialized, skipping persistence. Id={Id}", record.Id);
             return;
         }
 
         await using AsyncServiceScope scope = factory.CreateAsyncScope();
-        IArticlePersistenceProvider? provider = scope.ServiceProvider.GetService<IArticlePersistenceProvider>();
 
+        // 外层没传 logger 时，从 Scope 里拿一个真实 logger，避免诊断信息被吞
+        ILogger effectiveLogger = logger
+            ?? scope.ServiceProvider.GetService<ILogger<ArticleWriteGateway>>()
+            ?? (ILogger)NullLogger.Instance;
+
+        IArticlePersistenceProvider? provider = scope.ServiceProvider.GetService<IArticlePersistenceProvider>();
         if (provider is null)
         {
-            logger?.LogWarning("[ArticleWriteGateway] IArticlePersistenceProvider not registered, skipping persistence. Id={Id}", record.Id);
+            effectiveLogger.LogWarning(
+                "[ArticleWriteGateway] IArticlePersistenceProvider not registered, skipping persistence. Id={Id}", record.Id);
             return;
         }
 
-        await provider.AddAsync(record, cancellationToken).ConfigureAwait(false);
-        logger?.LogInformation("[ArticleWriteGateway] Article persisted. Id={Id} Title={Title}", record.Id, record.Title);
+        try
+        {
+            await provider.AddAsync(record, cancellationToken).ConfigureAwait(false);
+            effectiveLogger.LogInformation(
+                "[ArticleWriteGateway] Article persisted. Id={Id} Title={Title}", record.Id, record.Title);
+        }
+        catch (Exception ex)
+        {
+            effectiveLogger.LogError(ex,
+                "[ArticleWriteGateway] Failed to persist article. Id={Id} Title={Title}", record.Id, record.Title);
+            throw;
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Inkwell;
 using Inkwell.Workflows.Executors;
+using Inkwell.Workflows.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -19,7 +20,7 @@ public static class ContentPipelineBuilder
     /// <param name="maxRevisions">最大修订次数</param>
     /// <param name="articleGateway">文章写入网关（可选，用于 Workflow 完成后自动保存文章）</param>
     /// <returns>构建好的 Workflow 实例</returns>
-    public static Workflow Build(IChatClient chatClient, int maxRevisions = 3, ArticleWriteGateway? articleGateway
+    public static Workflow Build(IChatClient chatClient, int maxRevisions = 3, ArticleWriteGateway? articleGateway = null)
     {
         // ========== 创建 Agent ==========
 
@@ -90,7 +91,34 @@ public static class ContentPipelineBuilder
 
         // 人工审核端口：接收 Article，返回 bool（true=发布，false=退回）
         RequestPort reviewPort = RequestPort.Create<Article, bool>("HumanReview");
-        ReviewGateExecutor reviewGate = new(articleGateway;
+
+        // 发布 Agent：挂载 publish_article AIFunction，强制 LLM 调用工具完成入库
+        // 网关为空（未配置持久化）时跳过工具注入，Executor 会走 YieldOutput 占位路径
+        AIAgent? publisherAgent = null;
+        if (articleGateway is not null)
+        {
+            ArticleWorkflowTools publishTools = new(articleGateway);
+            AIFunction publishFn = AIFunctionFactory.Create(
+                publishTools.PublishArticleAsync,
+                name: "publish_article");
+
+            publisherAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
+            {
+                Name = "Publisher",
+                ChatOptions = new ChatOptions
+                {
+                    Instructions = """
+                        你是一名内容发布员。必须且只能通过调用 publish_article 工具来发布文章。
+                        请把用户提供的 Article JSON 的字段如实映射到工具参数，不要改动文章内容。
+                        调用成功后不要输出其他文字。
+                        """,
+                    Tools = [publishFn],
+                    ToolMode = ChatToolMode.RequireAny
+                }
+            });
+        }
+
+        ReviewGateExecutor reviewGate = new(articleGateway, publisherAgent: publisherAgent);
 
         // ========== 构建 Workflow ==========
 

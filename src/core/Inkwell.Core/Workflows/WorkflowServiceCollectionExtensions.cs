@@ -34,12 +34,6 @@ public static class WorkflowServiceCollectionExtensions
         }
 
         // 1. 内容生产流水线（串行 + 并行 + HITL）
-        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleGateway: articleGateway
-        {
-            services.AddSingleton(articleGateway);
-        }
-
-        // 1. 内容生产流水线（串行 + 并行 + HITL）
         Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleGateway: articleGateway);
         registry.Register(new WorkflowRegistration
         {
@@ -74,7 +68,12 @@ public static class WorkflowServiceCollectionExtensions
             Id = "topic-discussion",
             Name = "选题讨论会",
             Description = "市场分析师 + 内容编辑 + SEO 专家围绕选题轮流讨论（GroupChat）",
-            Workflow = TopicDiscussionBuilder.Build(secondaryChatClient)
+            Workflow = TopicDiscussionBuilder.Build(secondaryChatClient),
+            Capabilities = new WorkflowCapabilities
+            {
+                // GroupChat 入口期望 List<ChatMessage>，需要把用户文本包成一条 User 消息
+                InputAdapter = static s => new List<ChatMessage> { new(ChatRole.User, s) }
+            }
         });
 
         // 5. 智能路由（Handoff）
@@ -83,7 +82,12 @@ public static class WorkflowServiceCollectionExtensions
             Id = "smart-routing",
             Name = "智能路由",
             Description = "Coordinator 根据问题类型自动切换到写作/SEO/翻译专家（Handoff）",
-            Workflow = SmartRoutingBuilder.Build(primaryChatClient, secondaryChatClient)
+            Workflow = SmartRoutingBuilder.Build(primaryChatClient, secondaryChatClient),
+            Capabilities = new WorkflowCapabilities
+            {
+                // Handoff 入口期望 List<ChatMessage>，同 GroupChat 处理
+                InputAdapter = static s => new List<ChatMessage> { new(ChatRole.User, s) }
+            }
         });
 
         // 6. 批量内容评估（MapReduce）
@@ -92,7 +96,14 @@ public static class WorkflowServiceCollectionExtensions
             Id = "batch-evaluation",
             Name = "批量内容评估",
             Description = "对 N 篇文章并行多维度评分，汇总排序（MapReduce 动态 Fan-Out）",
-            Workflow = BatchEvaluationBuilder.Build(secondaryChatClient)
+            Workflow = BatchEvaluationBuilder.Build(secondaryChatClient),
+            Capabilities = new WorkflowCapabilities
+            {
+                // 入口期望 List<ArticleEvaluation>；支持两种原始输入：
+                //   1) 完整 JSON 数组：[{"title":"...","content":"..."}, ...]
+                //   2) 纯文本：每段空行分隔，段首第一行作为标题，其余作为内容
+                InputAdapter = static s => BatchEvaluationInputAdapter.Parse(s)
+            }
         });
 
         // 7. 内容生产 + 翻译一体化（SubWorkflow）

@@ -48,9 +48,9 @@ internal sealed partial class CriticExecutor(AIAgent agent, int maxRevisions = 3
             {"approved": true/false, "feedback": "你的详细反馈", "score": 1-10}
             """;
 
-        AgentResponse response = await agent.RunAsync(prompt, cancellationToken: cancellationToken);
+        string text = await agent.RunAndStreamAsync(prompt, this.Id, context, cancellationToken);
 
-        ReviewDecision decision = TryParseReviewDecision(response.Text, logger);
+        ReviewDecision decision = TryParseReviewDecision(text, logger);
 
         // 如果达到最大修订次数，强制通过
         if (article.Revision >= maxRevisions && !decision.Approved)

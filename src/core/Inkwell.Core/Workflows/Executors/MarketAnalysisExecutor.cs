@@ -15,11 +15,11 @@ internal sealed class MarketAnalysisExecutor(AIAgent agent) : Executor<string, T
     /// <inheritdoc />
     public override async ValueTask<TopicAnalysis> HandleAsync(string topic, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
-        AgentResponse response = await agent.RunAsync(
+        string text = await agent.RunAndStreamAsync(
             $"请分析以下主题的市场趋势和目标受众：{topic}",
-            cancellationToken: cancellationToken);
+            this.Id, context, cancellationToken);
 
-        TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(response.Text)
+        TopicAnalysis analysis = JsonSerializer.Deserialize<TopicAnalysis>(text)
             ?? new TopicAnalysis { Topic = topic };
 
         analysis.Topic = topic;

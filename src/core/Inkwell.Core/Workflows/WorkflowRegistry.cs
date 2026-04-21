@@ -52,6 +52,25 @@ public sealed class WorkflowCapabilities
     /// 前端可据此展示"继续/批准/退回"按钮
     /// </summary>
     public bool SupportsHumanInLoop { get; init; }
+
+    /// <summary>
+    /// 获取或设置输入适配器
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// WorkflowChatClient 默认把 Chat 对话压缩成一个 <see cref="string"/> 作为 Workflow 输入，
+    /// 这只适用于入口 Executor 类型为 <c>Executor&lt;string&gt;</c> 的 Workflow。
+    /// </para>
+    /// <para>
+    /// 当入口 Executor 期望的消息类型不是 <c>string</c>（典型如：GroupChat / Handoff 要 <c>List&lt;ChatMessage&gt;</c>、
+    /// BatchEvaluation 要 <c>List&lt;ArticleEvaluation&gt;</c>），
+    /// 需要在注册时提供本适配器，把用户原始文本转换成入口 Executor 期望的类型。
+    /// </para>
+    /// <para>
+    /// 不设置时按 <c>string</c> 直传，保持向后兼容。
+    /// </para>
+    /// </remarks>
+    public Func<string, object>? InputAdapter { get; init; }
 }
 
 /// <summary>

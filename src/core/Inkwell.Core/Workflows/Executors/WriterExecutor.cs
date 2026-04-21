@@ -73,13 +73,13 @@ internal sealed class WriterExecutor(AIAgent agent, ILogger<WriterExecutor>? log
         logger?.LogInformation("[Writer] Topic={Topic} Revision={Revision} IsRewrite={IsRewrite}",
             message.Topic, revision, existingArticle is not null && revision > 1);
 
-        AgentResponse response = await agent.RunAsync(prompt, cancellationToken: cancellationToken);
+        string text = await agent.RunAndStreamAsync(prompt, this.Id, context, cancellationToken);
 
         Article article = new()
         {
             Topic = message.Topic,
             Title = message.Topic,
-            Content = response.Text,
+            Content = text,
             Status = ArticleStatus.InReview,
             Revision = revision
         };

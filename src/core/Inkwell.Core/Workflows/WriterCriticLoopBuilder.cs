@@ -44,6 +44,7 @@ public static class WriterCriticLoopBuilder
 
         // ========== 创建 Executor ==========
 
+        TopicBootstrapExecutor bootstrap = new();
         LoopWriterExecutor writer = new(writerAgent);
         CriticExecutor critic = new(criticAgent, maxRevisions);
         LoopCompletionExecutor completion = new();
@@ -53,7 +54,10 @@ public static class WriterCriticLoopBuilder
         /*
          *   拓扑结构:
          *
-         *   [输入: 主题(TopicAnalysis)]
+         *   [输入: 主题(string)]
+         *        │
+         *        ▼
+         *    Bootstrap(包装成 TopicAnalysis)
          *        │
          *        ▼
          *     Writer ◀───────┐
@@ -66,9 +70,10 @@ public static class WriterCriticLoopBuilder
          *    Completion → [输出: Article]
          */
 
-        return new WorkflowBuilder(writer)
+        return new WorkflowBuilder(bootstrap)
             .WithName("WriterCriticLoop")
             .WithDescription("Writer-Critic iterative loop until approval or max revisions")
+            .AddEdge(bootstrap, writer)
             .AddEdge(writer, critic)
             .AddSwitch(critic, sw => sw
                 .AddCase<Article>(a => a?.Status == ArticleStatus.Approved, completion)
@@ -80,23 +85,54 @@ public static class WriterCriticLoopBuilder
 }
 
 /// <summary>
+/// 把用户输入的主题字符串包装成 <see cref="TopicAnalysis"/>，作为 Writer-Critic Loop 的入口
+/// </summary>
+[SendsMessage(typeof(TopicAnalysis))]
+internal sealed class TopicBootstrapExecutor() : Executor<string>("TopicBootstrap")
+{
+    /// <inheritdoc />
+    public override async ValueTask HandleAsync(string message, IWorkflowContext context, CancellationToken cancellationToken = default)
+    {
+        TopicAnalysis analysis = new()
+        {
+            Topic = message,
+            MarketTrends = string.Empty,
+            TargetAudience = string.Empty,
+            ContentAngles = string.Empty
+        };
+
+        await context.SendMessageAsync(analysis, cancellationToken: cancellationToken);
+    }
+}
+
+/// <summary>
 /// 循环版写作 Executor（独立于内容流水线的简化版）
 /// </summary>
+/// <remarks>
+/// 修订计数通过 <see cref="IWorkflowContext"/> 的状态机托管，
+/// 保证 Executor 是无状态的（单例复用也不串数据）。
+/// </remarks>
 [SendsMessage(typeof(Article))]
 internal sealed class LoopWriterExecutor(AIAgent agent) : Executor<TopicAnalysis>("LoopWriter")
 {
-    private int _revision;
+    /// <summary>修订计数在工作流状态中的 key</summary>
+    private const string RevisionStateKey = "loop-revision";
 
     /// <inheritdoc />
     public override async ValueTask HandleAsync(TopicAnalysis message, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
-        this._revision++;
+        // 从状态机里读出当前轮次（首次 = 0），累加后再写回，避免用实例字段保存状态
+        int revision = await context.ReadOrInitStateAsync(RevisionStateKey, () => 0,
+            scopeName: StateScopes.ArticleScope, cancellationToken).ConfigureAwait(false);
+        revision++;
+        await context.QueueStateUpdateAsync(RevisionStateKey, revision,
+            scopeName: StateScopes.ArticleScope, cancellationToken).ConfigureAwait(false);
 
         Article? existingArticle = await context.ReadStateAsync<Article>("current",
             scopeName: StateScopes.ArticleScope, cancellationToken);
 
         string prompt;
-        if (existingArticle is not null && this._revision > 1)
+        if (existingArticle is not null && revision > 1)
         {
             ReviewDecision? review = await context.ReadStateAsync<ReviewDecision>("review",
                 scopeName: StateScopes.ArticleScope, cancellationToken);
@@ -128,15 +164,17 @@ internal sealed class LoopWriterExecutor(AIAgent agent) : Executor<TopicAnalysis
                 """;
         }
 
-        AgentResponse response = await agent.RunAsync(prompt, cancellationToken: cancellationToken);
+        // 走流式辅助方法：把 token / 工具调用事件透传到 WorkflowChatClient
+        string text = await agent.RunAndStreamAsync(prompt, this.Id, context, cancellationToken)
+            .ConfigureAwait(false);
 
         Article article = new()
         {
             Topic = message.Topic,
             Title = message.Topic,
-            Content = response.Text,
+            Content = text,
             Status = ArticleStatus.InReview,
-            Revision = this._revision
+            Revision = revision
         };
 
         await context.QueueStateUpdateAsync("current", article,
