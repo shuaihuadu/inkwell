@@ -24,11 +24,23 @@ public static class WorkflowServiceCollectionExtensions
     {
         WorkflowRegistry registry = new();
 
-        // 查找已注册的文章持久化提供程序
-        IArticlePersistenceProvider? articleProvider = services.FindSingletonInstance<IArticlePersistenceProvider>();
+        // 文章写入网关：Executor 可在运行时创建临时 Scope 调用 Scoped 的 IArticlePersistenceProvider
+        // 网关实例先注册、稍后由宿主在 DI 构建完成后赋值 ScopeFactory
+        ArticleWriteGateway articleGateway = services.FindSingletonInstance<ArticleWriteGateway>()
+            ?? new ArticleWriteGateway();
+        if (services.FindSingletonInstance<ArticleWriteGateway>() is null)
+        {
+            services.AddSingleton(articleGateway);
+        }
 
         // 1. 内容生产流水线（串行 + 并行 + HITL）
-        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleProvider: articleProvider);
+        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleGateway: articleGateway
+        {
+            services.AddSingleton(articleGateway);
+        }
+
+        // 1. 内容生产流水线（串行 + 并行 + HITL）
+        Workflow contentPipeline = ContentPipelineBuilder.Build(primaryChatClient, articleGateway: articleGateway);
         registry.Register(new WorkflowRegistration
         {
             Id = "content-pipeline",

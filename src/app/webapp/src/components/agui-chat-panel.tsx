@@ -2,15 +2,14 @@ import {
   RobotOutlined,
   UserOutlined,
   InfoCircleOutlined,
-  CheckOutlined,
-  CloseOutlined,
 } from "@ant-design/icons";
 import { Bubble, Sender } from "@ant-design/x";
 import { XMarkdown } from "@ant-design/x-markdown";
-import { Button, Card, Flex, Space, Tag, Typography } from "antd";
+import { Flex, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChatMessage } from "../hooks/use-agui-agent";
+import HitlReviewCard from "./hitl-review-card";
 import WorkflowStepsView, { parseWorkflowSteps } from "./workflow-steps-view";
 
 interface AguiChatPanelProps {
@@ -32,66 +31,6 @@ interface AguiChatPanelProps {
     requestId: string,
     approved: boolean,
   ) => void;
-}
-
-/**
- * 人工审核卡片 —— 当 assistant 消息携带 hitl 字段时展示
- */
-function HitlReviewCard({
-  message,
-  onDecide,
-}: {
-  message: ChatMessage;
-  onDecide: (approved: boolean) => void;
-}) {
-  if (!message.hitl) return null;
-  const decided = message.hitl.decided;
-  const payload = message.hitl.payload as {
-    title?: string;
-    body?: string;
-  } | null;
-
-  return (
-    <Card
-      size="small"
-      style={{ marginTop: 8, borderColor: "#faad14", background: "#fffbe6" }}
-      title={
-        <Space>
-          <Tag color="warning">人工审核</Tag>
-          <Typography.Text strong>
-            {payload?.title ?? "请审核以下内容"}
-          </Typography.Text>
-        </Space>
-      }
-      extra={decided ? <Tag color="success">已处理</Tag> : null}
-    >
-      {payload?.body && (
-        <Typography.Paragraph
-          style={{ whiteSpace: "pre-wrap", marginBottom: 12 }}
-        >
-          {payload.body}
-        </Typography.Paragraph>
-      )}
-      {!decided && (
-        <Space>
-          <Button
-            type="primary"
-            icon={<CheckOutlined />}
-            onClick={() => onDecide(true)}
-          >
-            通过
-          </Button>
-          <Button
-            danger
-            icon={<CloseOutlined />}
-            onClick={() => onDecide(false)}
-          >
-            退回
-          </Button>
-        </Space>
-      )}
-    </Card>
-  );
 }
 
 function toBubbleItems(

@@ -6,6 +6,10 @@ export interface HitlRequest {
   requestId: string;
   payload: unknown;
   decided: boolean;
+  /** 审核请求正在回写到服务端（按钮点击后、响应返回前） */
+  submitting?: boolean;
+  /** 已决策时的选择（true=通过, false=退回），用于展示不同的结果 Banner */
+  approvedValue?: boolean;
 }
 
 export interface ChatMessage {
@@ -32,7 +36,10 @@ export interface UseAGUIAgentReturn {
 }
 
 // 与后端 WorkflowChatClient.HitlMarkerPrefix / Suffix 保持一致
-const HITL_MARKER_REGEX = /<<<HITL_REQUEST:(\{[\s\S]*?\})>>>/;
+// 使用 g 标志以便一次剥离多个标记；非贪婪 JSON 体匹配
+const HITL_MARKER_REGEX = /<<<HITL_REQUEST:(\{[\s\S]*?\})>>>/g;
+// 仅匹配"前缀已到、尾标还没到"的残片，用于流式过程中隐藏未闭合的标记头
+const HITL_PARTIAL_PREFIX_REGEX = /<<<HITL_REQUEST:[\s\S]*$/;
 
 export function useAGUIAgent(
   aguiRoute: string = "/api/agui/writer",
@@ -150,30 +157,50 @@ export function useAGUIAgent(
                       prev.map((m) => {
                         if (m.id !== assistantMsgId) return m;
                         const merged = m.content + (event.delta ?? "");
-                        // 检测 HITL 标记：<<<HITL_REQUEST:{...}>>>
-                        const match = merged.match(HITL_MARKER_REGEX);
-                        if (match) {
-                          try {
-                            const parsed = JSON.parse(match[1]) as {
-                              id: string;
-                              payload: unknown;
-                            };
-                            return {
-                              ...m,
-                              content: merged
-                                .replace(HITL_MARKER_REGEX, "")
-                                .trim(),
-                              hitl: {
+
+                        // 1) 先扫描所有已闭合的 HITL 标记，收集 payload 并逐个剥离
+                        let stripped = merged;
+                        let extractedHitl: HitlRequest | undefined = m.hitl;
+                        const matches = Array.from(
+                          merged.matchAll(HITL_MARKER_REGEX),
+                        );
+                        if (matches.length > 0) {
+                          // 统一剥离所有闭合标记，避免 JSON 解析失败时残留半截 <<<...>>>
+                          stripped = merged.replace(HITL_MARKER_REGEX, "");
+
+                          // 取最后一个可解析的 payload 作为当前待审核对象
+                          for (let i = matches.length - 1; i >= 0; i--) {
+                            try {
+                              const parsed = JSON.parse(matches[i][1]) as {
+                                id: string;
+                                payload: unknown;
+                              };
+                              extractedHitl = {
                                 requestId: parsed.id,
                                 payload: parsed.payload,
                                 decided: false,
-                              },
-                            };
-                          } catch {
-                            // 解析失败，保留原文本不剥离
+                              };
+                              break;
+                            } catch {
+                              // 这一个 payload 解析失败，尝试前一个
+                            }
                           }
                         }
-                        return { ...m, content: merged };
+
+                        // 2) 对于"前缀已到、后缀还没到"的流式中途状态，
+                        //    暂时把前缀之后的未闭合片段从展示内容里摘掉，避免用户看到 <<<...
+                        if (HITL_PARTIAL_PREFIX_REGEX.test(stripped)) {
+                          stripped = stripped.replace(
+                            HITL_PARTIAL_PREFIX_REGEX,
+                            "",
+                          );
+                        }
+
+                        return {
+                          ...m,
+                          content: stripped.trim(),
+                          ...(extractedHitl ? { hitl: extractedHitl } : {}),
+                        };
                       }),
                     );
                     break;
@@ -276,6 +303,15 @@ export function useAGUIAgent(
 
   const respondHitl = useCallback(
     async (messageId: string, requestId: string, approved: boolean) => {
+      // 先标记 submitting，让按钮进入 loading 态
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.hitl
+            ? { ...m, hitl: { ...m.hitl, submitting: true } }
+            : m,
+        ),
+      );
+
       try {
         const res = await fetch(`${API_BASE}/api/hitl/${requestId}/respond`, {
           method: "POST",
@@ -288,13 +324,26 @@ export function useAGUIAgent(
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId && m.hitl
-              ? { ...m, hitl: { ...m.hitl, decided: true } }
+              ? {
+                  ...m,
+                  hitl: {
+                    ...m.hitl,
+                    submitting: false,
+                    decided: true,
+                    approvedValue: approved,
+                  },
+                }
               : m,
           ),
         );
       } catch (err) {
+        // 回写失败：清掉 submitting 让用户可以重试，并追加一条系统提示
         setMessages((prev) => [
-          ...prev,
+          ...prev.map((m) =>
+            m.id === messageId && m.hitl
+              ? { ...m, hitl: { ...m.hitl, submitting: false } }
+              : m,
+          ),
           {
             id: crypto.randomUUID(),
             role: "system",

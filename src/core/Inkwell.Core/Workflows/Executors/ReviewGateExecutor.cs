@@ -1,5 +1,6 @@
 ﻿using Inkwell;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Workflows.Executors;
 
@@ -9,7 +10,9 @@ namespace Inkwell.Workflows.Executors;
 /// </summary>
 [YieldsOutput(typeof(string))]
 [SendsMessage(typeof(TopicAnalysis))]
-internal sealed class ReviewGateExecutor(IArticlePersistenceProvider? articleProvider = null) : Executor<bool>("ReviewGate")
+internal sealed class ReviewGateExecutor(
+    ArticleWriteGateway? articleGateway = null,
+    ILogger<ReviewGateExecutor>? logger = null) : Executor<bool>("ReviewGate")
 {
     /// <inheritdoc />
     public override async ValueTask HandleAsync(bool approved, IWorkflowContext context, CancellationToken cancellationToken = default)
@@ -21,7 +24,7 @@ internal sealed class ReviewGateExecutor(IArticlePersistenceProvider? articlePro
                 scopeName: StateScopes.ArticleScope, cancellationToken);
 
             // 持久化到文章存储
-            if (article is not null && articleProvider is not null)
+            if (article is not null && articleGateway is not null)
             {
                 ArticleRecord record = new()
                 {
@@ -34,7 +37,15 @@ internal sealed class ReviewGateExecutor(IArticlePersistenceProvider? articlePro
                     CreatedAt = article.CreatedAt,
                     UpdatedAt = DateTimeOffset.UtcNow
                 };
-                await articleProvider.AddAsync(record, cancellationToken);
+
+                try
+                {
+                    await articleGateway.AddAsync(record, logger, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "[ReviewGateExecutor] Failed to persist article. Id={Id} Title={Title}", record.Id, record.Title);
+                }
             }
 
             await context.YieldOutputAsync(

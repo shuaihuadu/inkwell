@@ -62,6 +62,12 @@ public static class Program
         // ---------- Build ----------
         WebApplication app = builder.Build();
 
+        // 为文章写入网关注入 Scope 工厂：
+        // ReviewGateExecutor 是单例，无法直接依赖 Scoped 的 IArticlePersistenceProvider，
+        // 这里在 DI 构建完成后把 ScopeFactory 回填到 Gateway，让它在持久化时按需创建 Scope。
+        ArticleWriteGateway articleWriteGateway = app.Services.GetRequiredService<ArticleWriteGateway>();
+        articleWriteGateway.ScopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+
         // 加载声明式 Agent / Workflow（YAML），使用宿主 LoggerFactory
         WebApiStartup.LoadDeclarativeArtifacts(app, agentRegistry, workflowRegistry, primaryClient);
 
