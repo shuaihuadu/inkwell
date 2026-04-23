@@ -61,6 +61,14 @@ Inkwell/
 |   |   |   |   +-- SmartRoutingBuilder.cs           # 智能路由（Handoff）
 |   |   |   |   +-- ContentWithTranslationBuilder.cs # 内容+翻译（SubWorkflow）
 |   |   |   |   +-- BatchEvaluationBuilder.cs        # 批量评估（MapReduce）
+|   |   |   |   +-- BatchEvaluationInputAdapter.cs   # 批量评估输入适配器（JSON/文本块解析）
+|   |   |   |   +-- WorkflowRegistry.cs              # 注册表 + WorkflowCapabilities（InputAdapter）
+|   |   |   |   +-- WorkflowChatClient.cs            # Workflow 包装为 IChatClient，驱动 AG-UI
+|   |   |   |   +-- HitlPendingRegistry.cs           # HITL 挂起态登记
+|   |   |   |   +-- AgentStreamingHelpers.cs         # Executor 内 Agent 流式事件辅助
+|   |   |   |   +-- ArticleWriteGateway.cs           # 文章落库网关（供 Executor/Tool 共用）
+|   |   |   |   +-- Tools/                           # Workflow 专用函数工具
+|   |   |   |   |   +-- ArticleWorkflowTools.cs      # 文章发布/状态更新工具
 |   |   |   |   +-- Executors/                       # 13 个 Executor
 |   |   |   +-- Queue/                               # InMemory 队列 + PubSub
 |   |   |   +-- Storage/                             # 本地文件存储
@@ -237,18 +245,42 @@ AgentMemoryService（长期记忆）
 
 ### 4.1 Workflow 清单
 
-| Workflow               | MAF 能力                   | 说明                             |
-| ---------------------- | -------------------------- | -------------------------------- |
-| ContentPipeline        | Fan-Out/Fan-In、Loop、HITL | 选题分析 -> 写作 -> 审核 -> 发布 |
-| WriterCriticLoop       | Loop、Switch               | Writer-Critic 迭代循环           |
-| TranslationPipeline    | Fan-Out/Fan-In             | 多语言并行翻译                   |
-| TopicDiscussion        | GroupChat                  | 多 Agent 轮流讨论选题            |
-| SmartRouting           | Handoff                    | 根据问题类型路由到专家 Agent     |
-| ContentWithTranslation | SubWorkflow                | 内容创作 + 翻译子流程            |
-| BatchEvaluation        | MapReduce、Checkpoint      | 批量文章评估                     |
-| 声明式 YAML Workflow   | Declarative                | 从 YAML 文件加载                 |
+| Workflow                       | MAF 能力                   | 入口消息类型              | 说明                             |
+| ------------------------------ | -------------------------- | ------------------------- | -------------------------------- |
+| ContentPipeline                | Fan-Out/Fan-In、Loop、HITL | `string`                  | 选题分析 -> 写作 -> 审核 -> 发布 |
+| WriterCriticLoop               | Loop、Switch               | `string`                  | Writer-Critic 迭代循环           |
+| TranslationPipeline            | Fan-Out/Fan-In             | `string`                  | 多语言并行翻译                   |
+| TopicDiscussion                | GroupChat                  | `List<ChatMessage>`       | 多 Agent 轮流讨论选题            |
+| SmartRouting                   | Handoff                    | `List<ChatMessage>`       | 根据问题类型路由到专家 Agent     |
+| ContentWithTranslation         | SubWorkflow                | `string`                  | 内容创作 + 翻译子流程            |
+| BatchEvaluation                | MapReduce、Checkpoint      | `List<ArticleEvaluation>` | 批量文章评估                     |
+| declarative-quickcontentreview | Declarative YAML           | `string`                  | 从 YAML 文件加载的快速审核流     |
 
-### 4.2 内容流水线拓扑
+### 4.2 WorkflowCapabilities 与 InputAdapter
+
+MAF 的 Workflow 入口 Executor 类型固定（`Executor<T>`），而 AG-UI 只能传文本。注册层通过 `WorkflowCapabilities` 弥合两者：
+
+```csharp
+new WorkflowRegistration
+{
+    Id = "batch-evaluation",
+    Workflow = BatchEvaluationBuilder.Build(...),
+    Capabilities = new WorkflowCapabilities
+    {
+        SupportsMultiTurn = false,
+        SupportsHumanInLoop = false,
+        InputAdapter = static s => BatchEvaluationInputAdapter.Parse(s)
+    }
+};
+```
+
+- `InputAdapter == null` -> 按 `string` 直传（ContentPipeline / WriterCriticLoop 等）。
+- `GroupChat / Handoff` -> 适配器把文本包装成 `List<ChatMessage>`。
+- `BatchEvaluation` -> 适配器解析 JSON 数组或空行分隔的文本块为 `List<ArticleEvaluation>`。
+
+`WorkflowChatClient` 在运行时用 `(dynamic)input` 做泛型派发，调用 `InProcessExecution.RunStreamingAsync<TInput>`，保持各 Workflow 入口类型类型安全。
+
+### 4.3 内容流水线拓扑
 
 ```
 [输入: 主题(string)]
@@ -319,6 +351,20 @@ POST /api/agui/coordinator     # 智能调度 Agent
 POST /api/agui/workflow-{id}   # Workflow（AsAIAgent 包装）
 ```
 
+### 5.3 流内文本标记协议
+
+Workflow / Agent 的结构化事件（人工介入请求、工具调用、工具结果）需要随 SSE 文本流传给前端。MAF 的 AG-UI 只发纯文本消息增量，因此在 `Inkwell.Core` 与前端之间约定一组夹带标记：
+
+| 标记                              | 方向       | 载荷                          | 用途                        |
+| --------------------------------- | ---------- | ----------------------------- | --------------------------- |
+| `<<<HITL_REQUEST:{json}>>>`       | 后端 → 前端 | RequestPort 入参              | 暂停 Workflow 等待人工响应  |
+| `<<<TOOL_CALL:{json}>>>`          | 后端 → 前端 | `FunctionCallContent` 序列化  | 展示 Agent 正在调用的工具   |
+| `<<<TOOL_RESULT:{json}>>>`        | 后端 → 前端 | `FunctionResultContent` 序列化 | 展示工具调用结果            |
+| `\n\n[{ExecutorId}]\n`            | 后端 → 前端 | 段头                          | 前端按 Executor 切段渲染    |
+
+- 后端：`AgentStreamingHelpers` 负责把 Executor 内部的 Agent 流式事件转成 `AgentResponseUpdateEvent` 并注入标记；`HitlPendingRegistry` 登记挂起态，待前端 `/api/hitl/respond` 回调后 `SendResponseAsync` 放行。
+- 前端：`services/stream-markers.ts` 提供 `extractMarkers` / `stripAllMarkers`，跨 delta 合并原始文本后再统一解析，避免 `<<<...>>>` 被分片截断出现残片。`workflow-steps-view.tsx` 消费切段结果渲染 `ThoughtChain`，`ReviewDecisionCard` 识别 Critic 的 JSON 审核输出，`ShimmerText` 表达流式进行中状态。
+
 ---
 
 ## 六、前端架构
@@ -335,12 +381,14 @@ POST /api/agui/workflow-{id}   # Workflow（AsAIAgent 包装）
 
 ### 6.2 页面结构
 
-| 路由         | 页面       | 功能                                    |
-| ------------ | ---------- | --------------------------------------- |
-| `/`          | Dashboard  | 统计卡片 + 最近运行                     |
-| `/pipeline`  | 流水线运行 | Agent 选择 + 对话 + 会话管理            |
-| `/workflow`  | Workflow   | Workflow 选择 + 拓扑可视化 + 对话式运行 |
-| `/knowledge` | 知识库     | 文档列表 + 上传（文本/文件）+ 分块预览  |
+| 路由                  | 页面           | 功能                                        |
+| --------------------- | -------------- | ------------------------------------------- |
+| `/`                   | Dashboard      | 统计卡片 + 最近运行                         |
+| `/chat`               | Agent 对话     | Agent 选择 + 对话 + 会话侧栏（历史/删除）   |
+| `/workflows`          | Workflow 列表  | Workflow 选择 + 拓扑（Mermaid）预览         |
+| `/workflows/:id/run`  | Workflow 运行  | 对话式运行 + ThoughtChain 切段 + HITL 审批  |
+| `/articles`           | 文章           | 文章列表与详情                              |
+| `/knowledge`          | 知识库         | 文档列表 + 上传（文本/文件）+ 分块预览      |
 
 ---
 
