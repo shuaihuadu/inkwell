@@ -18,13 +18,13 @@ public static class AgentServiceCollectionExtensions
     public static AgentRegistry AddInkwellAgents(this IServiceCollection services, IConfiguration configuration)
     {
         // 从已注册的 Keyed Singleton 中查找 Primary / Secondary IChatClient
-        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Primary);
-        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Secondary);
+        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(AIProviderKeys.Primary);
+        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(AIProviderKeys.Secondary);
 
         if (primaryClient is null)
         {
             throw new InvalidOperationException(
-                "Primary IChatClient not found. Call UseAzureOpenAI() before AddInkwellAgents().");
+                "Primary IChatClient not found. Call UseAIProviders() before AddInkwellAgents().");
         }
 
         // 若 Secondary 未配置，回退到 Primary

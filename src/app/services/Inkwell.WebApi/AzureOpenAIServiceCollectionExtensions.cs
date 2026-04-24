@@ -34,12 +34,14 @@ public static class AzureOpenAIServiceCollectionExtensions
         coreBuilder.Services.Configure<AzureOpenAIOptions>(section);
 
         IChatClient primaryChatClient = CreateChatClient(options.Primary);
+#pragma warning disable CS0618 // 老入口保留对 ModelServiceKeys 的直接引用，新代码应使用 UseAIProviders
         coreBuilder.Services.AddKeyedSingleton<IChatClient>(ModelServiceKeys.Primary, primaryChatClient);
         coreBuilder.Services.AddSingleton(primaryChatClient);
 
         AzureOpenAIModelOptions secondaryConfig = FallbackTo(options.Secondary, options.Primary);
         IChatClient secondaryChatClient = CreateChatClient(secondaryConfig);
         coreBuilder.Services.AddKeyedSingleton<IChatClient>(ModelServiceKeys.Secondary, secondaryChatClient);
+#pragma warning restore CS0618
 
         return coreBuilder;
     }

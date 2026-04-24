@@ -127,13 +127,13 @@ public static class WorkflowServiceCollectionExtensions
     /// <returns>Workflow 注册表</returns>
     public static WorkflowRegistry AddInkwellWorkflows(this IServiceCollection services)
     {
-        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Primary);
-        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Secondary);
+        IChatClient? primaryClient = services.FindKeyedSingletonInstance<IChatClient>(AIProviderKeys.Primary);
+        IChatClient? secondaryClient = services.FindKeyedSingletonInstance<IChatClient>(AIProviderKeys.Secondary);
 
         if (primaryClient is null)
         {
             throw new InvalidOperationException(
-                "Primary IChatClient not found. Call UseAzureOpenAI() before AddInkwellWorkflows().");
+                "Primary IChatClient not found. Call UseAIProviders() before AddInkwellWorkflows().");
         }
 
         secondaryClient ??= primaryClient;

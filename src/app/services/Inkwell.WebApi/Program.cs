@@ -23,11 +23,12 @@ public static class Program
 
         builder.Services.AddInkwellCore()
             .UseInMemoryDatabase()
-            .UseAzureOpenAI(builder.Configuration)
-            .UseAzureOpenAIEmbedding(builder.Configuration);
+            .AddAzureOpenAIProvider()
+            .AddOpenAIProvider()
+            .UseAIProviders(builder.Configuration);
 
-        IChatClient primaryClient = builder.Services.FindKeyedSingletonInstance<IChatClient>(ModelServiceKeys.Primary)
-            ?? throw new InvalidOperationException("Primary IChatClient not registered. Ensure UseAzureOpenAI() is called before this point.");
+        IChatClient primaryClient = builder.Services.FindKeyedSingletonInstance<IChatClient>(AIProviderKeys.Primary)
+            ?? throw new InvalidOperationException("Primary IChatClient not registered. Ensure UseAIProviders() is called before this point.");
 
         // 向量存储 + 记忆
         VectorStore vectorStore = new InMemoryVectorStore();
@@ -105,8 +106,9 @@ public static class Program
         // ---------- AG-UI 端点映射 ----------
         ISessionPersistenceProvider sessionProvider = app.Services.GetRequiredService<ISessionPersistenceProvider>();
 
-        // 明确从 Keyed Primary 拿 title client，避免未来引入其他非 Keyed IChatClient 后随机命中
-        IChatClient? titleClient = app.Services.GetKeyedService<IChatClient>(ModelServiceKeys.Primary);
+        // 明确从 Keyed Title 拿 title client（经 AIProviders.Routing.Title 路由，默认回落到 Primary），
+        // 避免未来引入其他非 Keyed IChatClient 后随机命中
+        IChatClient? titleClient = app.Services.GetKeyedService<IChatClient>(AIProviderKeys.Title);
 
         WebApiStartup.MapAgentAguiEndpoints(app, agentRegistry, sessionProvider, titleClient);
         WebApiStartup.MapWorkflowAguiEndpoints(app, workflowRegistry, agentRegistry, sessionProvider, titleClient);
