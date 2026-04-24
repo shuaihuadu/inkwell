@@ -2,7 +2,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 
-namespace Inkwell.WebApi.Providers;
+namespace Inkwell.AI.AzureOpenAI;
 
 /// <summary>
 /// Azure OpenAI 客户端构造工厂，统一处理凭据回退逻辑

@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\core\Inkwell.Core\Inkwell.Core.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.AI.AzureOpenAI\Inkwell.AI.AzureOpenAI.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.AI.OpenAI\Inkwell.AI.OpenAI.csproj" />
     <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.InMemory\Inkwell.Persistence.InMemory.csproj" />
     <ProjectReference Include="..\..\aspire\Inkwell.ServiceDefaults\Inkwell.ServiceDefaults.csproj" />
   </ItemGroup>

@@ -1,14 +1,12 @@
-using Azure;
 using Azure.AI.OpenAI;
-using Azure.Identity;
 using Microsoft.Extensions.AI;
 
-namespace Inkwell.WebApi.Providers;
+namespace Inkwell.AI.AzureOpenAI;
 
 /// <summary>
-/// Azure OpenAI Chat Provider 实现
+/// Azure OpenAI Embedding Provider 实现
 /// </summary>
-internal sealed class AzureOpenAIChatProvider : IAIChatProvider
+internal sealed class AzureOpenAIEmbeddingProvider : IAIEmbeddingProvider
 {
     /// <summary>
     /// Provider 名称常量
@@ -19,22 +17,22 @@ internal sealed class AzureOpenAIChatProvider : IAIChatProvider
     public string Name => ProviderName;
 
     /// <inheritdoc />
-    public IChatClient CreateChatClient(AIEndpointOptions options)
+    public IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(AIEndpointOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.Endpoint))
         {
-            throw new InvalidOperationException($"{ProviderName} provider requires 'Endpoint'.");
+            throw new InvalidOperationException($"{ProviderName} embedding provider requires 'Endpoint'.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Deployment))
         {
-            throw new InvalidOperationException($"{ProviderName} provider requires 'Deployment'.");
+            throw new InvalidOperationException($"{ProviderName} embedding provider requires 'Deployment'.");
         }
 
         AzureOpenAIClient client = AzureOpenAIClientFactory.Create(options);
 
         return client
-            .GetChatClient(options.Deployment)
-            .AsIChatClient();
+            .GetEmbeddingClient(options.Deployment)
+            .AsIEmbeddingGenerator();
     }
 }

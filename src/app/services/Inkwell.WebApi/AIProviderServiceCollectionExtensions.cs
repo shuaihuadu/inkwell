@@ -1,4 +1,3 @@
-using Inkwell.WebApi.Providers;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,30 +38,6 @@ public static class AIProviderServiceCollectionExtensions
     private static EmbeddingGeneratorBuilder<string, Embedding<float>> DefaultEmbeddingPipeline(
         EmbeddingGeneratorBuilder<string, Embedding<float>> builder)
         => builder.UseOpenTelemetry(sourceName: ChatClientTelemetrySourceName);
-
-    /// <summary>
-    /// 注册 Azure OpenAI Chat 与 Embedding Provider 到 DI 容器（以实例形式注册，便于 <see cref="UseAIProviders"/> 内省）
-    /// </summary>
-    /// <param name="coreBuilder">Inkwell 核心构建器</param>
-    /// <returns>Inkwell 核心构建器</returns>
-    public static InkwellCoreBuilder AddAzureOpenAIProvider(this InkwellCoreBuilder coreBuilder)
-    {
-        coreBuilder.Services.AddSingleton<IAIChatProvider>(new AzureOpenAIChatProvider());
-        coreBuilder.Services.AddSingleton<IAIEmbeddingProvider>(new AzureOpenAIEmbeddingProvider());
-        return coreBuilder;
-    }
-
-    /// <summary>
-    /// 注册 OpenAI 官方与 OpenAI 兼容协议 Chat Provider 到 DI 容器（以实例形式注册）
-    /// </summary>
-    /// <param name="coreBuilder">Inkwell 核心构建器</param>
-    /// <returns>Inkwell 核心构建器</returns>
-    public static InkwellCoreBuilder AddOpenAIProvider(this InkwellCoreBuilder coreBuilder)
-    {
-        coreBuilder.Services.AddSingleton<IAIChatProvider>(new OpenAIChatProvider());
-        coreBuilder.Services.AddSingleton<IAIChatProvider>(new OpenAICompatibleChatProvider());
-        return coreBuilder;
-    }
 
     /// <summary>
     /// 根据配置立即实例化所有命名槽位的 <see cref="IChatClient"/> 与 <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/>，
