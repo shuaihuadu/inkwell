@@ -141,6 +141,15 @@ npm run dev
 dotnet run --project src/app/aspire/Inkwell.AppHost
 ```
 
+## 交流群
+
+项目在持续迭代，如果你对 Microsoft Agent Framework 或 Inkwell 的实现细节感兴趣，欢迎扫码加入微信交流群，一起讨论 MAF 的使用经验、踩坑记录与最佳实践。
+
+<img src="wechat-group.jpg" alt="Inkwell 微信交流群" width="240" />
+
+
+> 二维码失效时欢迎在 Issues 中反馈。
+
 ## 许可证
 
 MIT
