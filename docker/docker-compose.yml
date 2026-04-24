@@ -16,16 +16,20 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
-      # Azure OpenAI 配置（通过环境变量注入，不要在此处填写真实密钥）
-      - AzureOpenAI__Primary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
-      - AzureOpenAI__Primary__ApiKey=${AZURE_OPENAI_API_KEY:-}
-      - AzureOpenAI__Primary__DeploymentName=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
-      - AzureOpenAI__Secondary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
-      - AzureOpenAI__Secondary__ApiKey=${AZURE_OPENAI_API_KEY:-}
-      - AzureOpenAI__Secondary__DeploymentName=${AZURE_OPENAI_SECONDARY_DEPLOYMENT:-gpt-4o-mini}
-      - AzureOpenAI__Embedding__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
-      - AzureOpenAI__Embedding__ApiKey=${AZURE_OPENAI_API_KEY:-}
-      - AzureOpenAI__Embedding__DeploymentName=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-3-large}
+      # AI Provider 配置（通过环境变量注入，不要在此处填写真实密钥）
+      # 新 Schema：AIProviders:Chat:<slot>:{Provider,Endpoint,ApiKey,Deployment}
+      - AIProviders__Chat__primary__Provider=AzureOpenAI
+      - AIProviders__Chat__primary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
+      - AIProviders__Chat__primary__ApiKey=${AZURE_OPENAI_API_KEY:-}
+      - AIProviders__Chat__primary__Deployment=${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      - AIProviders__Chat__secondary__Provider=AzureOpenAI
+      - AIProviders__Chat__secondary__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
+      - AIProviders__Chat__secondary__ApiKey=${AZURE_OPENAI_API_KEY:-}
+      - AIProviders__Chat__secondary__Deployment=${AZURE_OPENAI_SECONDARY_DEPLOYMENT:-gpt-4o-mini}
+      - AIProviders__Embedding__default__Provider=AzureOpenAI
+      - AIProviders__Embedding__default__Endpoint=${AZURE_OPENAI_ENDPOINT:-}
+      - AIProviders__Embedding__default__ApiKey=${AZURE_OPENAI_API_KEY:-}
+      - AIProviders__Embedding__default__Deployment=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-text-embedding-3-large}
       # CORS - 允许 webapp 容器访问
       - Cors__Origins__0=http://localhost:3000
       - Cors__Origins__1=http://localhost:5188

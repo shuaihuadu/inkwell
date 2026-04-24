@@ -10,6 +10,8 @@ COPY Inkwell.slnx ./
 # 复制所有 csproj 以利用 Docker 层缓存
 COPY src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj src/core/Inkwell.Abstractions/
 COPY src/core/Inkwell.Core/Inkwell.Core.csproj src/core/Inkwell.Core/
+COPY src/core/providers/Inkwell.AI.AzureOpenAI/Inkwell.AI.AzureOpenAI.csproj src/core/providers/Inkwell.AI.AzureOpenAI/
+COPY src/core/providers/Inkwell.AI.OpenAI/Inkwell.AI.OpenAI.csproj src/core/providers/Inkwell.AI.OpenAI/
 COPY src/core/providers/Inkwell.Persistence.EntityFrameworkCore/Inkwell.Persistence.EntityFrameworkCore.csproj src/core/providers/Inkwell.Persistence.EntityFrameworkCore/
 COPY src/core/providers/Inkwell.Persistence.InMemory/Inkwell.Persistence.InMemory.csproj src/core/providers/Inkwell.Persistence.InMemory/
 COPY src/core/providers/Inkwell.Persistence.SqlServer/Inkwell.Persistence.SqlServer.csproj src/core/providers/Inkwell.Persistence.SqlServer/
