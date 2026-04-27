@@ -1,0 +1,30 @@
+# 自研 Runtime 加载本 Agent 的最小配置示例
+# 字段含义由具体 Runtime 解释；本文件仅给出常见维度，不绑定任何特定实现。
+
+agent:
+  name: {{AGENT_NAME}}
+  description: {{ONE_LINER}}
+  spec: {{AGENT_DIR}}/AGENT.md          # 输入输出契约
+  system_prompt: {{AGENT_DIR}}/prompt.md # 系统提示
+
+model:
+  # 不绑定具体厂商；任何具备工具调用能力的模型都可装载
+  family: any
+  temperature: 0.2
+
+tools:
+  # 必须与 AGENT.md §工具集 一致，多余权限不要给
+  allow:
+    # 例：read_file, write_file, search_code, run_tests
+  deny:
+    # 例：network, shell（默认禁用，按需打开）
+
+execution:
+  isolation: per_invocation        # 单次调用独立上下文，避免跨阶段污染
+  max_tokens: null                 # 由 Runtime 默认值决定
+  on_blocked: structured_error     # 必须按 io-contracts.md §5 返回
+
+observability:
+  log_inputs: true
+  log_outputs: true
+  redact_secrets: true

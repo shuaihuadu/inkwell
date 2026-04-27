@@ -1,0 +1,25 @@
+---
+description: '{{ONE_LINER}}'
+tools: {{TOOL_LIST}}
+---
+
+# {{AGENT_NAME}}
+
+本 chatmode 是 [Harness Engineering 配套 Agent](../../harness-engineering/agents/README.md) 在 GitHub Copilot Chat 中的包装。系统提示与契约保持单点维护：
+
+- 系统提示：见 `{{AGENT_DIR}}/prompt.md`
+- 输入输出契约：见 `{{AGENT_DIR}}/AGENT.md`
+
+> 落地时把上面两个路径的内容通过工具的 include 机制注入。Copilot Chat 当前不支持远程 include 时，复制内容并保留来源注释，更新时同步两端。
+
+## 触发约定
+
+- 仅在用户显式选择本 chatmode 时启用
+- 不在工作区默认 chatmode 列表中（避免与默认编码 Chat 冲突）
+
+## 落地清单
+
+- [ ] 已替换全部 `{{...}}` 占位符
+- [ ] `tools` 字段与 `AGENT.md` §工具集 一致
+- [ ] 已确认本 chatmode 不会被自动选中
+- [ ] 已在仓库 `.github/copilot-instructions.md` 中说明何时切换到本 chatmode
