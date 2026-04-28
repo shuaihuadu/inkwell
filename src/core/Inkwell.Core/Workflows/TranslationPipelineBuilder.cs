@@ -39,7 +39,8 @@ public static class TranslationPipelineBuilder
             translators.Add(new TranslatorExecutor(translatorAgent, language));
         }
 
-        TranslationAggregationExecutor aggregation = new();
+        // 聚合器需要按照实际目标语言数量等待 Fan-In，否则永远凑不齐 expectedCount，导致工作流不输出
+        TranslationAggregationExecutor aggregation = new(targetLanguages.Length);
 
         // ========== 构建 Workflow ==========
 

@@ -62,7 +62,14 @@ public static class DeclarativeWorkflowLoader
                     Id = workflowId,
                     Name = $"[声明式] {definition.Name}",
                     Description = definition.Description ?? definition.Name,
-                    Workflow = workflow
+                    Workflow = workflow,
+                    Documentation = new WorkflowDocumentation
+                    {
+                        Purpose = definition.Description ?? "由 YAML 声明式定义的工作流，按 Executors / Edges 顺序串联多个 LLM 步骤。",
+                        InputHint = "输入要交给该声明式工作流处理的内容（自由文本）",
+                        OutputHint = "工作流终态节点产出的文本结果",
+                        Tags = ["Declarative", "YAML"]
+                    }
                 });
 
                 logger?.LogInformation("[DeclarativeWorkflow] Registered: {WorkflowId}", workflowId);
@@ -159,7 +166,13 @@ public static class DeclarativeWorkflowLoader
 /// <summary>
 /// 声明式 Executor：通用 AI 执行器，根据类型名称生成对应的 Prompt
 /// </summary>
+/// <remarks>
+/// 必须显式声明 <c>[YieldsOutput(typeof(string))]</c>：MAF 通过该特性把允许 yield 的类型登记到 executor 协议，
+/// 缺失时调用 <c>YieldOutputAsync(string)</c> 会抛 <c>Cannot output object of type String. Expecting one of [].</c>。
+/// 真正会被前端读到的 <c>WorkflowOutputEvent</c> 仍由 <c>WithOutputFrom</c> 标记的终态 executor 决定，中间节点的 yield 在内部会被过滤掉。
+/// </remarks>
 [SendsMessage(typeof(string))]
+[YieldsOutput(typeof(string))]
 internal sealed class DeclarativeExecutor : Executor<string>
 {
     private readonly AIAgent _agent;

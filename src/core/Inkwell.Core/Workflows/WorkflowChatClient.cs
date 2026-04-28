@@ -152,6 +152,20 @@ public sealed class WorkflowChatClient(
             yield break;
         }
 
+        // GroupChat / Handoff 等基于 ChatProtocolExecutor 的工作流需要 TurnToken 才会真正开始一轮对话；
+        // 入参的 List<ChatMessage> 只会被累积进 host 的内部 buffer，不发 TurnToken 则 superstep 直接结束。
+        if (this._capabilities.RequiresTurnToken)
+        {
+            try
+            {
+                await run.TrySendMessageAsync(new TurnToken(emitEvents: true)).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                this._logger.LogWarning(ex, "[WorkflowChatClient] Failed to send TurnToken; workflow may stall.");
+            }
+        }
+
         await using (run.ConfigureAwait(false))
         {
             int outputCount = 0;

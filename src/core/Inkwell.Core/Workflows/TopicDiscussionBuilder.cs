@@ -68,13 +68,6 @@ public static class TopicDiscussionBuilder
                 }
             });
 
-        // ========== 创建 GroupChat Manager ==========
-
-        TopicDiscussionManager manager = new([marketAnalyst, contentEditor, seoExpert])
-        {
-            MaximumIterationCount = maxRounds
-        };
-
         // ========== 构建 Workflow ==========
 
         /*
@@ -95,9 +88,13 @@ public static class TopicDiscussionBuilder
          *   [输出: 讨论结论]
          */
 
+        // Manager 工厂每次创建新实例：GroupChatHost.ResetAsync 只清掉自己的 _manager 引用，不会调用 Reset()，
+        // 若 factory 共享同一实例，IterationCount 会跨 run 累积，第二次执行直接 ShouldTerminate=true 跳过讨论
+        AIAgent[] participants = [marketAnalyst, contentEditor, seoExpert];
+
         return AgentWorkflowBuilder
-            .CreateGroupChatBuilderWith(_ => manager)
-            .AddParticipants(marketAnalyst, contentEditor, seoExpert)
+            .CreateGroupChatBuilderWith(agents => new TopicDiscussionManager([.. agents]) { MaximumIterationCount = maxRounds })
+            .AddParticipants(participants)
             .Build();
     }
 }

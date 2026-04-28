@@ -23,6 +23,8 @@ interface WorkflowInfo {
   id: string;
   name: string;
   description: string;
+  tags?: string[];
+  supportsHumanInLoop?: boolean;
 }
 
 /**
@@ -91,9 +93,15 @@ export default function WorkflowPage() {
                 {item.description}
               </Typography.Text>
               <br />
-              <Tag color="blue" style={{ marginTop: 8 }}>
-                {item.id}
-              </Tag>
+              <Space size={[4, 8]} wrap style={{ marginTop: 8 }}>
+                <Tag color="blue">{item.id}</Tag>
+                {item.supportsHumanInLoop && <Tag color="orange">HITL</Tag>}
+                {item.tags?.map((tag) => (
+                  <Tag key={tag} color="geekblue">
+                    {tag}
+                  </Tag>
+                ))}
+              </Space>
             </Card>
           </Col>
         ))}

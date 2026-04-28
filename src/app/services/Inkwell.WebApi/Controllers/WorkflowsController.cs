@@ -30,7 +30,11 @@ public sealed class WorkflowsController(
         {
             w.Id,
             w.Name,
-            w.Description
+            w.Description,
+            // 列表只透出能力标签，让前端卡片能直观展示工作流类别（GroupChat / HITL 等）
+            tags = w.Documentation?.Tags ?? Array.Empty<string>(),
+            // 工作流是否含人工介入节点，前端可据此为卡片加角标
+            supportsHumanInLoop = w.Capabilities.SupportsHumanInLoop
         }));
     }
 
@@ -55,7 +59,17 @@ public sealed class WorkflowsController(
         {
             registration.Id,
             registration.Name,
-            registration.Description
+            registration.Description,
+            supportsHumanInLoop = registration.Capabilities.SupportsHumanInLoop,
+            // 详情接口给前端运行页提供完整使用说明
+            documentation = registration.Documentation is null ? null : new
+            {
+                purpose = registration.Documentation.Purpose,
+                inputHint = registration.Documentation.InputHint,
+                inputExample = registration.Documentation.InputExample,
+                outputHint = registration.Documentation.OutputHint,
+                tags = registration.Documentation.Tags
+            }
         });
     }
 
