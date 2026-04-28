@@ -26,7 +26,88 @@
 
 > A2A 是 Agent-to-Agent 开放协议，基于 HTTP + SSE + JSON-RPC，自带 `AgentCard`（描述 name/description/capabilities/skills），是天然的服务契约与发现入口。
 
-## 3. 整体拓扑
+## 3. Agent 异构混编：Workflow 抽象的统一与边界
+
+上一节得出的“参与者只是 `AIAgent`”这条规律可以推广到所有 Agent 实现，而不仅是 A2A。落地时要分清三层“统一”。
+
+### 3.1 哪些 Agent 都能进 Workflow
+
+MAF 的 Workflow 节点最终归到两类：自定义 `Executor<TIn[, TOut]>` 与 `AIAgentHostExecutor`（由 `agent.AsExecutor()` 包出来）。所有面向 Agent 的编排原语（`HandoffWorkflowBuilder` / `AgentWorkflowBuilder.CreateGroupChatBuilderWith` / `WithHandoff` / `AddParticipants` / `BindAsExecutor` …）签名上接的都是 `AIAgent`，不绑死任何具体厂商。`AIAgent` 抽象只规定三件事：`RunAsync` / `RunStreamingAsync` / `CreateSessionAsync`。
+
+| Agent 类型 | 实现来源 | 部署形态 |
+|---|---|---|
+| 本地 LLM Agent | `ChatClientAgent`（基于 `IChatClient`） | 进程内 |
+| Azure OpenAI / OpenAI / Foundry / Anthropic / Bedrock / Ollama / DeepSeek / Qwen ... | 都是 `IChatClient` 的不同实现，套同一个 `ChatClientAgent` | 进程内 |
+| Foundry 托管 Agent | `Microsoft.Agents.AI.Foundry` 提供的 Agent 类型 | 远端托管 |
+| Claude Agent / Anthropic Managed | 通过对应 SDK 适配的 `IChatClient` 或专用 Agent 类 | 进程内或远端 |
+| OpenAI Assistants / Responses | OpenAI Assistants 实现包成 `AIAgent` | 远端托管 |
+| 任意 A2A 端点 | `A2AAgent`（包客户端） | 跨进程/跨服务 |
+| 自定义 Agent | 继承 `AIAgent` | 任意 |
+
+也就是说，**Workflow 不区分 Agent 是在进程内跑、OpenAI 后端跑、Foundry 托管，还是远端 A2A 端点**。区别在于“`AIAgent` 子类内部是怎么 `RunAsync` 的”，对编排者透明。
+
+### 3.2 三层“统一”
+
+这是关键，否则容易以为只要包成 `AIAgent` 就万事大吉。
+
+**第 1 层：调用接口统一 —— 总成立**
+
+`agent.RunAsync()` / `agent.AsExecutor()` / 塞进 Builder。这一层是 100% 抽象住的。
+
+**第 2 层：消息载体统一 —— 大部分成立，少数有差异**
+
+`ChatMessage` / `IList<ChatMessage>` 是大家共同的语义。但是：
+
+- **工具调用**：本地 `ChatClientAgent` 可以挂 `AITool`（你的 C# 函数）；远端 Foundry/Claude/OpenAI Managed Agent 用的是它们各自托管的工具，**不一定能从客户端直接挂工具进去**——这些工具由对方平台在创建 Agent 时确定。
+- **结构化输出**：`ChatResponseFormat.ForJsonSchema<T>()` 在多数 IChatClient 上有效，远端 Managed Agent 的支持需按平台逐个确认。
+- **多模态附件**：`UriContent` / `DataContent` 各家支持程度不一致。
+
+**第 3 层：状态/能力对等 —— 不一定成立，必须显式对齐**
+
+这一层最容易踩坑：
+
+| 能力 | 本地 ChatClientAgent | Foundry / OpenAI Managed | A2A Remote |
+|---|---|---|---|
+| 会话状态归属 | 由你持有（middleware 持久化） | 由对方平台持有（thread / assistantThread） | 由远端服务持有（contextId） |
+| HITL（RequestPort） | Workflow 层正常工作 | 远端节点内部触发的 HITL **不会**自动透传到 Triage | 同 Foundry，需自定义协议传递 |
+| Checkpoint | 完整保存图状态 | 仅保存图状态，远端 thread 中间态由对方平台持有 | 同 Foundry |
+| 取消 / 超时 | CancellationToken 直传 | 取决于 SDK 实现 | HTTP 超时 + 客户端取消 |
+| 可观测 | 直接 ActivitySource | OTLP 链路要看 SDK 是否传 W3C TraceContext | `A2AAgent` 已内建 span |
+| 失败语义 | 异常即上抛 | 平台错误码 + 重试策略 | HTTP 错误 + 自定义重试策略 |
+
+### 3.3 Workflow 里的混合编排
+
+实际场景里很常见的混合：
+
+```
+Workflow:
+  Coordinator      = ChatClientAgent  (本地 IChatClient，便宜的小模型路由)
+  WriterExpert     = ChatClientAgent  (本地，对接 Azure OpenAI)
+  SeoExpert        = A2AAgent         (跨进程，团队 B 维护)
+  ResearchExpert   = FoundryAgent     (Foundry 托管，含 Code Interpreter / File Search)
+  TranslatorExpert = OpenAIAssistant  (OpenAI Assistants 托管)
+```
+
+`WithHandoff(coordinator, writer)` / `WithHandoff(coordinator, seo)`... 写起来一模一样。**编排层完全统一，差异只在适配层和工程治理上**。
+
+### 3.4 几个反直觉但重要的点
+
+1. **托管 Agent ≠ 省事**：能力强（自带工具 / 知识 / RAG）但失去对内部状态的控制权，恢复语义、可观测、成本归集都更复杂。
+2. **Workflow 不是 Pub/Sub 总线**：Workflow 是有向图状态机，所有节点共享同一个 run lifetime。需要“事件驱动 + 长生命周期 + 多租户独立”的协作时，应使用消息队列 + Durable Workflow，而不是把 N 个远端 Agent 全堆进一个图里。
+3. **位置不是关键，语义契约才是**：远端 Agent 输入/输出格式、可用工具、状态副作用清单必须像 API 一样有版本、有契约。MAF 给了 `AgentCard` 这层壳，业务字段（SEO Agent 期望什么样的 prompt、返回什么样的 JSON）需要业务侧自己治理。
+
+### 3.5 在 Inkwell 中的演进顺序
+
+按“由近及远”的成本顺序：
+
+1. **进程内多模型**：现状即如此，`SmartRoutingBuilder` 中三个 `ChatClientAgent` 走不同 IChatClient（这是最省的“分布”）。
+2. **A2A 自家服务**：把专家拆到 `Inkwell.A2AServer`（见后文落地路径）。MAF 直接支持。
+3. **Foundry 托管 Agent**：Coordinator 留本地，把依赖 Foundry 内置工具（File Search / Code Interpreter）的专家放 Foundry。等于业务把“重工具 / 重知识”外包给 Foundry，把“路由 + 流程 + HITL”留在自己手里。
+4. **Claude / OpenAI Managed**：把它们当作“远端能力供应商”，注意工具与状态由它们自己持有。
+
+一句话：**Workflow 是“哪些 Agent 怎么协作”，不在乎“Agent 跑在哪儿”**；但跑在哪儿决定了“会话 / HITL / 失败 / 工具”这些工程语义的边界，这是架构决策时必须显式取舍的部分。
+
+## 4. 整体拓扑
 
 ```
                  +---------------------------------------------+
@@ -53,7 +134,7 @@
 - 远端服务只负责"接到一段消息 → 跑自己的 Agent → 返回结果"，不感知 Handoff 的存在。
 - Coordinator 仍是本地 `ChatClientAgent`，因为它要消费 HITL、流式回写前端，与 Web 层耦合更紧。
 
-## 4. 服务端：把任意 Agent 暴露为 A2A 端点
+## 5. 服务端：把任意 Agent 暴露为 A2A 端点
 
 每个专家 Agent 部署成独立服务（或同一镜像通过环境变量区分加载哪个 Agent）。
 
@@ -75,7 +156,7 @@ app.Run();
 | `/.well-known/agent.json` | AgentCard：name/description/skills/version |
 | `POST /agents/writer` | A2A JSON-RPC + SSE 流，承担实际对话 |
 
-## 5. 客户端：把 A2A 端点包成 AIAgent，加入 Handoff
+## 6. 客户端：把 A2A 端点包成 AIAgent，加入 Handoff
 
 ```csharp
 A2AAgent writer = await new A2AClient(new Uri(writerUrl))
@@ -96,7 +177,7 @@ Workflow workflow = new HandoffWorkflowBuilder(coordinator)
 
 跟 Inkwell 现有的 `SmartRoutingBuilder` 比，**只有专家 Agent 的构造方式变了**，整个 Workflow 拓扑构建代码不变。
 
-## 6. 路由策略选择
+## 7. 路由策略选择
 
 | 策略 | MAF 原语 | 适用场景 |
 |---|---|---|
@@ -104,7 +185,7 @@ Workflow workflow = new HandoffWorkflowBuilder(coordinator)
 | 规则 / 分类器路由 | `WorkflowBuilder.AddSwitch` + `AddCase<T>(predicate, target)` | 入口意图明确（关键词、类型字段） |
 | 混合 | 前置 Classifier executor 把请求分桶 → 桶里再让 Coordinator 精细路由 | 流量大、需省 token |
 
-## 7. 工程问题清单
+## 8. 工程问题清单
 
 ### 7.1 会话延续（context propagation）
 
@@ -154,7 +235,7 @@ A2A 协议本身不规定鉴权。落地方案：
 - 工具留在远端 Agent 自己进程内（推荐）：Triage 完全不感知 Tool 实现。
 - 工具下沉到 MCP server：所有 Agent 通过 `IChatClient` 的 MCP 桥接调用。
 
-## 8. 在 Inkwell 中的落地路径
+## 9. 在 Inkwell 中的落地路径
 
 分阶段，避免一步到位带来的过度工程。
 
@@ -190,13 +271,13 @@ A2A 协议本身不规定鉴权。落地方案：
 - 部署形态截然不同 → 体现 A2A 在微服务化场景的价值
 - 失败模式、可观测、鉴权差异 → 提供学习材料
 
-## 9. 风险与未决问题
+## 10. 风险与未决问题
 
 1. **A2A 异步 task 模式尚未接入 `A2AAgent`**：长耗时专家（比如批量翻译）短期需要走同步 + 客户端超时；想要可恢复就得自建状态机。
 2. **HITL 跨进程语义**：远端 Agent 内部触发的 `RequestPort` 当前不会原样回到 Triage 的 SSE 流，需要在 A2A 协议层定义"远端 HITL 请求 → 客户端 SSE 转发"的传递方式。Inkwell 层面建议：**HITL 节点只放在 Coordinator 一侧**，远端 Agent 不要含 HITL。
 3. **Checkpoint 跨进程**：`Workflow.SaveCheckpointAsync` 只保存 Triage 这一侧的图状态；远端 Agent 在自己进程内的中间态不在 checkpoint 里。这要求"远端 Agent 调用必须是幂等且无中间态"，否则恢复点会失效。
 
-## 10. 与 MAF 生态的关系
+## 11. 与 MAF 生态的关系
 
 | MAF 提供 | Inkwell 应承担 |
 |---|---|
@@ -206,7 +287,7 @@ A2A 协议本身不规定鉴权。落地方案：
 | OpenTelemetry 内建 | Aspire Dashboard 接线、跨服务 trace 验证 |
 | 协议规范 + AgentCard | 内部 AgentCard 字段约定（version / skills 名称空间） |
 
-## 11. 后续动作建议
+## 12. 后续动作建议
 
 - [ ] 在 `Inkwell.A2AServer` 里跑通单一 Writer Agent，验证 AgentCard 与 `POST /agents/writer` 的最小回路。
 - [ ] 设计 `DistributedSmartRoutingBuilder`，给配置 schema 留位（数组：`{ name, url, role }`）。
