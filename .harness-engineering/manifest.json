@@ -1,0 +1,262 @@
+{
+  "schema": "v1",
+  "harness_version": "0.0.1",
+  "harness_commit": "e335029",
+  "installed_at": "2026-05-01T00:48:35.0467164+08:00",
+  "targets": [
+    "copilot"
+  ],
+  "vendor_dir": ".harness-engineering",
+  "replacements": {
+    "PROJECT_NAME": "inkwell",
+    "PROJECT_ONE_LINER": "<未配置>",
+    "PRIMARY_LANGUAGE": "C#",
+    "TECH_STACK": ".NET 10",
+    "TEST_COMMAND": "dotnet test",
+    "LINT_COMMAND": "dotnet format --verify-no-changes",
+    "HARNESS_REPO_REF": ".harness-engineering",
+    "HARNESS_REPO_REF_FROM_GITHUB": "../.harness-engineering"
+  },
+  "files": [
+    {
+      "kind": "rendered",
+      "sha256": "84e745e2ecbf8bdb99e9e97ba8a52f4f778553b4b764892669f291f42591edb7",
+      "path": ".github/copilot-instructions.md"
+    },
+    {
+      "kind": "rendered",
+      "sha256": "ce735e24b5f11a73655cc976470533ad4b26b308550bd21d7c61fe0c18fd9aae",
+      "path": ".github/instructions/coding-style.instructions.md"
+    },
+    {
+      "kind": "rendered",
+      "sha256": "c7343f32d8c9152ce56815aae6a2fc113078234502637fdb400b1ced486f1aa3",
+      "path": ".github/instructions/commit-format.instructions.md"
+    },
+    {
+      "kind": "rendered",
+      "sha256": "1bef45a708fdb4b4a83b3f4f42e3db8abb2286d3c78b9ad00d72ac77686b40b5",
+      "path": ".github/instructions/docs-style.instructions.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "163147ab2301c1a21be66d5b147b325e9b9068e41374150d1b08ba757c2755b6",
+      "path": ".harness-engineering/agents/_integrations/claude-code/agent.md.template"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "2717284d250882d6b0ab468de972a1588d8bab6d4f663c496ac32d1cae91e89a",
+      "path": ".harness-engineering/agents/_integrations/codex/agents.md.snippet"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "b0487910380a7d766dd4bf0f5ed5d6d747c4236c7fc0aa488c0ef11ee523db51",
+      "path": ".harness-engineering/agents/_integrations/copilot/chatmode.md.template"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "ee735ba3c79dd84afd6323e8e6d1943db6543d688695c0cc6905991aa9caef5f",
+      "path": ".harness-engineering/agents/_integrations/copilot/chatmodes/commit-auditor.chatmode.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "4771d60f6a75cf7aeeb713b8a4d0eab15399fe0823d496957aa2e25f36ac6f57",
+      "path": ".harness-engineering/agents/_integrations/copilot/chatmodes/design-reviewer.chatmode.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "054150b6513888d8f82325405262392c4d2823e5a7708764b7d0d49507fa6507",
+      "path": ".harness-engineering/agents/_integrations/copilot/chatmodes/test-case-author.chatmode.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "915bed91068f8bc9ceda44217c9e71f262f4e52d9499317b413b7021f9c6329d",
+      "path": ".harness-engineering/agents/_integrations/copilot/copilot-instructions.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "1dc8093bc8c13c41532494f406a4077262d54084fa326b96b31b4a63f11d239f",
+      "path": ".harness-engineering/agents/_integrations/copilot/install.ps1"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "958ecd6e7226ff49f1f72beddfb40a26e3bacb26d37e44e73137aa7eef5c67b2",
+      "path": ".harness-engineering/agents/_integrations/copilot/install.sh"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "f2e5d1e4ef75c67ccc783bee4b07b356405689d2592d8a330533d76a95bfd778",
+      "path": ".harness-engineering/agents/_integrations/copilot/instructions/coding-style.instructions.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "b2f7162b9b227ab300d1a3c414266ae24193715fe4d88dbe40f8c419832ef38b",
+      "path": ".harness-engineering/agents/_integrations/copilot/instructions/commit-format.instructions.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "527f660e313d63b31e7ed340e8a0371632d976c8a62f5d1660cd6d4327a3d0eb",
+      "path": ".harness-engineering/agents/_integrations/copilot/instructions/docs-style.instructions.template.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "5ee550bb262e5c0cda18fccdf7718025626d294216895b0bf2d5a99a585c4827",
+      "path": ".harness-engineering/agents/_integrations/copilot/README.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "5fa03f9240a9e3dcfa92a09fbb9bc8478376d6d8f90f42a29c8d58df51d9b4b8",
+      "path": ".harness-engineering/agents/_integrations/copilot/target.json"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "decb07f7665dc7d624670dc7d1d43443671c61d44ff7bc03cb8a358ca33bb711",
+      "path": ".harness-engineering/agents/_integrations/generic/runtime-config.yaml.template"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "e2c5c34d44da10ca54d626d4ae4d962f05b54e48342b4120f6e1f52b86d487d7",
+      "path": ".harness-engineering/agents/_integrations/README.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "3061b84c1c26da9b3eb922018dbf9ae12c54b5e49994e2d0f7bada6a91eb6b3b",
+      "path": ".harness-engineering/agents/_shared/AGENT.md.template"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "b41e112e10dc917e8a13793ac8f5ae4452a891da52318d878328bb5c96abc06f",
+      "path": ".harness-engineering/agents/_shared/glossary.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "d67fede025c062429b1cc39d5d4c8ed96866c981f309e801bc554c89658b9fa1",
+      "path": ".harness-engineering/agents/_shared/io-contracts.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "b73a1a1b6959f6692ff6f41d7c01baa86d11c1c696636dd70c16b46abf56a43f",
+      "path": ".harness-engineering/agents/_shared/prompt.md.template"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "94a64059b306f619e596679bcdefbda11b0e913d089324e0ace13d75725042c2",
+      "path": ".harness-engineering/agents/_shared/tool-vocabulary.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "705d4f2a7301037062a7cd5461381866f38cef53dad0253c07f6818cf826b11e",
+      "path": ".harness-engineering/agents/coding-executor/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "6e7c964a498838a0994904d126dbb2185dd057984b8bcfb523c25d2f9b84d7ec",
+      "path": ".harness-engineering/agents/coding-executor/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "bc799b1d83071ed852585b45dda58244a335a1f77814f4224c8b33f0983b1d4f",
+      "path": ".harness-engineering/agents/commit-auditor/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "405e74b247535d2d9e190e6b1ddd5b665948ba223ba1ff0b89aca34245b394e3",
+      "path": ".harness-engineering/agents/commit-auditor/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "6bd341f205fce5a2660404c7669f5cc2074ba96c3f4e11f13a275476dbc49ff1",
+      "path": ".harness-engineering/agents/design-reviewer/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "96577991ecb13941f12d5ee6547881e959486760b6cf3537300030a2bf666bbb",
+      "path": ".harness-engineering/agents/design-reviewer/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "7a257f3728c3e74ed8c642f0a20da4de03818a85b363acebc0ef6fe5856b2ca5",
+      "path": ".harness-engineering/agents/doc-gardener/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "8d49eeb6d1a84693e129828c10ed3a36ac75426608ff6fa2bc9128ff077d2798",
+      "path": ".harness-engineering/agents/doc-gardener/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "852aca8961ad933fed69c732f30336b79dba154baf860fa893510a81f0751195",
+      "path": ".harness-engineering/agents/README.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "abddafc76b082ea9ebc1f6fed7b26c24091d6c3f7d81b69e363557b8fdf4dc25",
+      "path": ".harness-engineering/agents/release-note-writer/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "42374011bd007b505ce6ffaeaa02c364c8c8bfd817dcdf243c35459eaf989d84",
+      "path": ".harness-engineering/agents/release-note-writer/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "675e33abbb29a4a90483718bfbf26a6b729384969646fddf6bb0939a3256fad5",
+      "path": ".harness-engineering/agents/repo-impact-mapper/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "9dac0105f2d60450636456af30f83e92f7c6f43f7f42723e9e33d6478dc17c11",
+      "path": ".harness-engineering/agents/repo-impact-mapper/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "fbe50e1da791393fedcea044c15f041d9de527e7e57bce2dcd83dada44578076",
+      "path": ".harness-engineering/agents/requirements-interviewer/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "bac2ad624ceb38c9f5ad9fb88b47a8d435b6862a1a6501ed13898b56d81a667e",
+      "path": ".harness-engineering/agents/requirements-interviewer/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "fecc0d512101b04f7a8b7cba0582bbdddb00e9ed1ca2e6422b6c961b8300fc18",
+      "path": ".harness-engineering/agents/test-case-author/AGENT.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "b46708fb4d84a1cb5134ef4ed0ed8ce1e502f8cffd41e84ea477a635d8110a9e",
+      "path": ".harness-engineering/agents/test-case-author/prompt.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "0372ef1efe2d57188de01b1ab5b05470dceb489894183732cf2358b69c76b9df",
+      "path": ".harness-engineering/docs/repo-layout.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "c137eadef4e6a74159c5ff6134c50a6f658313b59659d4e9a2ddfc18f1dde648",
+      "path": ".harness-engineering/docs/stages.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "fdaf5e5e2caa61b2a1d7da61ff80f377064512f87113ddfdd257712cc71e1804",
+      "path": ".harness-engineering/README.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "6b76696ec15f156309c9f4b1f51cfaa01f71f6fcd56f3e4c40cad262c884fe08",
+      "path": ".harness-engineering/templates/ai-task-brief.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "3b4a015736974508338324cee76445d8a85c2beb6cd26f912c00f0a822778649",
+      "path": ".harness-engineering/templates/phase-gate-checklist.md"
+    },
+    {
+      "kind": "vendored",
+      "sha256": "9ee58af2ce45f57fa4e66c57b5ad6cd40b6866a2a70651b7ab261c47b4005330",
+      "path": ".harness-engineering/templates/review-record.md"
+    }
+  ]
+}
