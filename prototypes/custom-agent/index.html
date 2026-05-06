@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inkwell · 自定义 Agent 功能 · H1 原型</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 60%);
+        }
+
+        .landing {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 48px 24px;
+        }
+
+        .landing__hero {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .landing__hero h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 12px;
+        }
+
+        .landing__hero .subtitle {
+            color: var(--color-text-secondary);
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+
+        .landing__hero .meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: var(--color-text-tertiary);
+        }
+
+        .landing__hero .meta strong {
+            color: var(--color-text-secondary);
+        }
+
+        .landing__logo {
+            width: 96px;
+            height: 96px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #1677ff 0%, #69b1ff 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            font-size: 36px;
+        }
+
+        .landing__sect-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 32px 0 12px;
+        }
+
+        .page-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .page-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 0.15s, transform 0.15s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .page-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+            color: inherit;
+        }
+
+        .page-card__no {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #e6f4ff;
+            color: var(--color-primary);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .page-card__name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .page-card__path {
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            color: var(--color-text-tertiary);
+            margin-bottom: 12px;
+        }
+
+        .page-card__desc {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+        }
+
+        .page-card__refs {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--color-border-secondary);
+            font-size: 11px;
+            color: var(--color-text-tertiary);
+        }
+
+        .page-card__refs code {
+            background: var(--color-fill-quaternary);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .scenario-list {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .scenario-list ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .scenario-list li {
+            padding: 6px 0;
+            line-height: 1.7;
+        }
+
+        .scenario-list code {
+            background: var(--color-fill-quaternary);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .footer-note {
+            margin-top: 32px;
+            padding: 16px 20px;
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            color: #874d00;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .traceability-table {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .traceability-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .traceability-table th,
+        .traceability-table td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--color-border-secondary);
+        }
+
+        .traceability-table th {
+            background: var(--color-fill-quaternary);
+            font-weight: 600;
+        }
+
+        .traceability-table tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="landing">
+        <header class="landing__hero">
+            <div>
+                <h1>Inkwell · 自定义 Agent 功能 · H1 原型</h1>
+                <p class="subtitle">
+                    中保真可交互原型，覆盖 <strong>P1 / P2 / P3 / P4 / P5</strong> 五个页面与全部关键状态。<br />
+                    直接双击 <code>index.html</code> 即可在浏览器中打开，无需 npm / 网络资源。
+                </p>
+                <div class="meta">
+                    <span><strong>对应阶段：</strong>H1（需求 + UI）</span>
+                    <span><strong>视觉骨架：</strong>Ant Design 5 视觉语言（手写 CSS）</span>
+                    <span><strong>原型日期：</strong>2026-05-06</span>
+                </div>
+            </div>
+            <div class="landing__logo">Ik</div>
+        </header>
+
+        <section>
+            <div class="landing__sect-title">页面入口</div>
+            <div class="page-list">
+                <a class="page-card" href="./agents.html">
+                    <div class="page-card__no">P1</div>
+                    <div class="page-card__name">我的 Agent 列表页</div>
+                    <div class="page-card__path">/agents</div>
+                    <div class="page-card__desc">卡片网格 + 全部 / 已删除 tab 切换 + 右上"新建 Agent"按钮 + 卡片 编辑 / 复制 / 删除 操作 + 已删除卡片"剩余
+                        N 天"角标。</div>
+                    <div class="page-card__refs"><code>REQ-001</code> · <code>REQ-002</code> · <code>DB-004</code> ·
+                        AC-001-1 ~ 6</div>
+                </a>
+
+                <a class="page-card" href="./agent-edit.html?id=agent-001">
+                    <div class="page-card__no">P2</div>
+                    <div class="page-card__name">Agent 编辑（已存在）</div>
+                    <div class="page-card__path">/agents/agent-001/edit</div>
+                    <div class="page-card__desc">三栏：基本信息 / Instructions / 能力配置（Skill / Tool / MCP）；下半屏：试运行（聊天 + 摘要面板）。
+                    </div>
+                    <div class="page-card__refs"><code>REQ-002</code> · <code>REQ-003</code> · <code>REQ-004</code> ·
+                        <code>REQ-010</code> · <code>REQ-011</code> · <code>REQ-012</code></div>
+                </a>
+
+                <a class="page-card" href="./agent-edit.html?id=new">
+                    <div class="page-card__no">P2</div>
+                    <div class="page-card__name">Agent 编辑（新建空白态）</div>
+                    <div class="page-card__path">/agents/new</div>
+                    <div class="page-card__desc">展示新建态：表单空、试运行下半屏可见但默认无对话；保存按钮 disabled，dirty 后启用。</div>
+                    <div class="page-card__refs"><code>AC-001-1</code> · <code>AC-002-5/6</code></div>
+                </a>
+
+                <a class="page-card" href="./login.html?return=./agents.html">
+                    <div class="page-card__no">P5</div>
+                    <div class="page-card__name">未登录跳转占位</div>
+                    <div class="page-card__path">/login?return=...</div>
+                    <div class="page-card__desc">平台登录页占位（<strong>不属于</strong>本特性，ND-009 / R7）。路由守卫拦截后跳本页，登录后回到
+                        <code>?return</code>。</div>
+                    <div class="page-card__refs"><code>R7</code> · <code>D2</code></div>
+                </a>
+            </div>
+        </section>
+
+        <section>
+            <div class="landing__sect-title">P3 / P4 / E6 / E7 状态入口（在 P2 内部触发）</div>
+            <div class="scenario-list">
+                <ol>
+                    <li><strong>P3 Skill 编辑器抽屉</strong>：进 P2 → 右栏 <code>Skill</code> tab → 点 <code>+ 新建 Skill</code> 或
+                        <code>编辑</code>。</li>
+                    <li><strong>P3 Skill 表单校验失败</strong>：抽屉里 <code>name</code> 留空 / 含 <code>_</code> / 含大写 → 点保存看 Alert。
+                    </li>
+                    <li><strong>E7 导入解析失败</strong>：P2 → Skill tab → 点 <code>导入 SKILL.md</code>（多次点击会随机出现：解析失败 Alert / 重名
+                        ConfirmModal / 成功）。</li>
+                    <li><strong>E6 首次启用须知</strong>：P2 → Tool tab → 勾选 <code>联网搜索</code> → 弹用户须知 Modal；同一用户后续不再弹。</li>
+                    <li><strong>P4 删除确认</strong>：P1 卡片 <code>删除</code> 或 P2 顶栏 <code>删除</code> → 弹二次确认 Modal。</li>
+                    <li><strong>已删除恢复</strong>：P1 → 顶部 <code>已删除</code> tab → 点卡片 <code>恢复</code>；或点 <code>永久删除</code>
+                        二次确认。</li>
+                    <li><strong>E1 重试机制</strong>：P2 试运行区右上 <code>模拟 1 次抖动</code> / <code>模拟 3 次失败</code>。</li>
+                    <li><strong>E5 网络断开顶栏</strong>：P1 顶栏 <code>模拟离线</code> 按钮（再点一次关闭）。</li>
+                    <li><strong>MCP 占位灰显</strong>：P2 → Tool tab 旁的 <code>MCP</code> tab，点击后显示"即将上线"占位。</li>
+                    <li><strong>移动端响应式</strong>：把窗口宽度调到 < 768 px，看导航折叠 + 卡片单列 + FAB。</li>
+                </ol>
+            </div>
+        </section>
+
+        <section>
+            <div class="landing__sect-title">追溯：原型 → 文档</div>
+            <div class="traceability-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>原型部分</th>
+                            <th>对应文档</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>页面布局 / Ant Design Pro AppShell</td>
+                            <td><a href="../../docs/01-requirements/ui-spec.md">ui-spec.md</a> 第 1 / 2 节</td>
+                        </tr>
+                        <tr>
+                            <td>P1 ~ P5 页面</td>
+                            <td>ui-spec.md 2.1 ~ 2.5 节</td>
+                        </tr>
+                        <tr>
+                            <td>状态矩阵（加载 / 空 / 错误 / 重试 / 网络断开）</td>
+                            <td>ui-spec.md 第 3 节</td>
+                        </tr>
+                        <tr>
+                            <td>移动端响应式</td>
+                            <td>ui-spec.md 第 4 节</td>
+                        </tr>
+                        <tr>
+                            <td>错误文案（E1 / E5 / E6 / E7）</td>
+                            <td>ui-spec.md 第 5 节 / requirements.md 第 9 节</td>
+                        </tr>
+                        <tr>
+                            <td>F1 ~ F4 流程演示</td>
+                            <td><a href="../../docs/01-requirements/user-flow.md">user-flow.md</a></td>
+                        </tr>
+                        <tr>
+                            <td>每个交互的可验收命题</td>
+                            <td><a href="../../docs/01-requirements/acceptance-criteria.md">acceptance-criteria.md</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>15 + 14 = 29 条 OQ 关闭依据</td>
+                            <td><a href="../../docs/01-requirements/open-questions.md">open-questions.md</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="footer-note">
+            <strong>评审者注意：</strong>
+            原型用 <strong>手写 CSS 模拟 Ant Design 5 视觉语言</strong>，<strong>不</strong>预先承诺前端技术栈选型（仍属 H2 决策）。
+            原型存在的目的是验证「页面 + 状态 + 流程」是否齐备，<strong>不</strong>对实际颜色 token、组件库版本、动效曲线做最终决定。
+            请重点评：(1) 状态覆盖是否完整 (2) 交互是否符合非技术用户预期 (3) 文案是否清晰。
+        </div>
+    </div>
+</body>
+
+</html>

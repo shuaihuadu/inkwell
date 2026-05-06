@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>P5 · 登录跳转占位 · Inkwell 原型</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 60%);
+        }
+
+        .login-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 48px 40px;
+            box-shadow: var(--shadow-md);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-card__logo-mark {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #1677ff 0%, #69b1ff 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        .login-card h1 {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
+
+        .login-card p {
+            color: var(--color-text-secondary);
+            margin: 0 0 24px;
+            line-height: 1.6;
+        }
+
+        .login-form .form-item {
+            text-align: left;
+        }
+
+        .login-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .login-actions .btn {
+            flex: 1;
+        }
+
+        .login-tip {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--color-border-secondary);
+            font-size: 12px;
+            color: var(--color-text-tertiary);
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <div class="login-card__logo-mark">Ik</div>
+        <h1>登录到 Inkwell</h1>
+        <p id="return-tip">登录后将返回 <span id="return-path">/</span></p>
+
+        <div class="login-form">
+            <div class="form-item">
+                <label class="form-item__label">账号</label>
+                <input class="input" placeholder="user@example.com" />
+            </div>
+            <div class="form-item">
+                <label class="form-item__label">密码</label>
+                <input class="input" type="password" placeholder="••••••••" />
+            </div>
+
+            <div class="login-actions">
+                <button class="btn" onclick="history.back()">取消</button>
+                <button class="btn btn--primary" onclick="doLogin()">登录</button>
+            </div>
+        </div>
+
+        <div class="login-tip">
+            <strong>原型说明（P5）：</strong>本页是平台登录页占位，<strong>不属于</strong>本特性范围（ND-009 / R7）。
+            路由守卫（D2）拦截未登录访问 <code>/agents/*</code> 时跳到本页，并在 URL 带 <code>?return=</code>。
+            登录由 Inkwell 平台层提供，本特性以"已登录用户"作为输入。
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(location.search);
+        const ret = params.get('return') || './agents.html';
+        document.getElementById('return-path').textContent = ret;
+
+        function doLogin() {
+            // 演示：直接跳回
+            location.href = ret;
+        }
+    </script>
+</body>
+
+</html>

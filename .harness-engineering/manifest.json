@@ -1,0 +1,184 @@
+{
+  "schema": "v1",
+  "harness_version": "0.0.1",
+  "harness_commit": "09dd0c3",
+  "installed_at": "2026-05-06T21:32:26.8120032+08:00",
+  "targets": [
+    "copilot"
+  ],
+  "vendor_dir": ".harness-engineering",
+  "replacements": {
+    "TEST_COMMAND": "dotnet test",
+    "LINT_COMMAND": "dotnet format --verify-no-changes",
+    "HARNESS_REPO_REF": ".harness-engineering",
+    "HARNESS_VERSION": "0.0.1",
+    "HARNESS_REPO_REF_FROM_GITHUB": "../.harness-engineering"
+  },
+  "files": [
+    {
+      "path": ".github/agents/h1-prototype-reviewer.agent.md",
+      "sha256": "aa2342520096d9422394f3b0c68f6bb56ee7cc48678f17612d71ada94551e9e6",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h1-repo-impact-mapper.agent.md",
+      "sha256": "9db23b1cb61c603da57765998c0bb3b6acea703222e6c5dad0d3658c2f209441",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h1-requirements-interviewer.agent.md",
+      "sha256": "bbb15f18d460b4358728adfa09565225e958ac19f6dfab58d5c4ae4991888cc9",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h1-ui-spec-author.agent.md",
+      "sha256": "e825db329e7967d813119d8d9f86b4c5f41f6070417fc2b8ed0863ee56d9b90b",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h2-architect-advisor.agent.md",
+      "sha256": "d5700ed33409a7402d45c47485c1312b10f649c77d32785a00afa3283d2881ff",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h3-design-reviewer.agent.md",
+      "sha256": "85ae4f2cb72383fa2e8c9382bb2d3059a2208ba84d7b938ae14d1772b7baa0ed",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h4-test-case-author.agent.md",
+      "sha256": "ed7e921a89c1f4b2ae80e569ce4a1d5dd23a2754abb777dd91d94d0f16764329",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h5-coding-executor.agent.md",
+      "sha256": "5e428e8a0409c399d3d14efef843360d889e651e79d04d0b720a76a914d7d781",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h5-commit-auditor.agent.md",
+      "sha256": "6c8914b741d26095536b6cbf27466e227490e6e0b5c296ac9dfc3855539c5efe",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h6-release-note-writer.agent.md",
+      "sha256": "186c678b56c3daee216478211716e3c81cee18b93a7bca39073c5c089c2f589c",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/hx-doc-gardener.agent.md",
+      "sha256": "9c6578d6d015211129c97f6b61ed11245dd8107b9d7898b238119708190935b5",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "sha256": "4937e2ab7188d68e3eda9002cf839c9dab07e64b02807bd33ea9232df85e1fa7",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/instructions/coding-style.instructions.md",
+      "sha256": "63d313644a696cfd1fe56a77803f96c40973b816a1a43086b0dd080a75f568f9",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/instructions/commit-format.instructions.md",
+      "sha256": "2b5d774c4fb8fcdf640ddfc2f0e947c0672fc546fef8780ffbff1ef9e635cb87",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/instructions/docs-style.instructions.md",
+      "sha256": "dcf4105fc54ac128a89728f30c41df965c089e80412a3c953f4380f4a9567ee4",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/prompts/log-review.prompt.md",
+      "sha256": "cb9a62c3433fb37525bac51ad3f15f8171b1351f00b40c189888133976893cb0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/prompts/new-task.prompt.md",
+      "sha256": "4dfed298f0fa1edd887a507b3b0c842a6cefe839257dd5b820418d6218d60cc5",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/prompts/run-gate.prompt.md",
+      "sha256": "abbd61c3e5924dc6e944700fea9bfc8fb4f7b36e296d42747cd1bf7c9229621b",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/prompts/sync-board.prompt.md",
+      "sha256": "ae961b78d64cbbdd47cbcc068530499dc84e5cd143309a271650b8db5c22b8c5",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/ai-task-brief-writer/SKILL.md",
+      "sha256": "16ed9aac846a4dba42e6d554a5767554516068a25a496586d3ed299d57185099",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/commit-message-formatter/SKILL.md",
+      "sha256": "d74b6e53902c189cd5a4feb07b4a79ca6864314e349ec422cf56cfbbf97ab9c0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/phase-gate-runner/SKILL.md",
+      "sha256": "27c036f7d5c260aa424f541b957746546b61460e657b83bf81fb884959671821",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/traceability-linker/SKILL.md",
+      "sha256": "33a7c10931e638d872db55a45476274c390d260872b6a8ef55b36cd898f85a6d",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/ai-task-brief.md",
+      "sha256": "6b76696ec15f156309c9f4b1f51cfaa01f71f6fcd56f3e4c40cad262c884fe08",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/phase-gate-checklist.md",
+      "sha256": "6e1ed80721745022838ca62fce58595dc7db8ead61454dd111356d9f23e97fd0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/review-record.md",
+      "sha256": "9ee58af2ce45f57fa4e66c57b5ad6cd40b6866a2a70651b7ab261c47b4005330",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/task-board.md",
+      "sha256": "2e25b5b1a0404429db228b051540a2e93c7deb738c17e25dce574da70c7bbf27",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/docs/repo-layout.md",
+      "sha256": "29239302155730167e24dbbf1637edc2992b67924e17655bc5e927033dfdf6c2",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/docs/stages.md",
+      "sha256": "028d408260b30069dd3acb1e692b23e6e47ea8be71ab386e47204f991451bae5",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/docs/tech-debt-gc.md",
+      "sha256": "64cd575dc15802abf1d03cb68e49cc7a5a28ada95695467f992f0ef688815ca5",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/HANDBOOK.md",
+      "sha256": "4f2fa4ecb3fa572bfa366c173c1a4f8eb276aadd53d38bd8a599ce8ace5498e0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/README.md",
+      "sha256": "87425e230d4861b8db4126405270782b277c51853f411cc993c557caba0da369",
+      "kind": "rendered"
+    },
+    {
+      "path": ".harness-engineering/uninstall.ps1",
+      "sha256": "0730cc8468102f61846b2414df2de42dd960c6922da5085e25f496cda91597c2",
+      "kind": "rendered"
+    }
+  ]
+}

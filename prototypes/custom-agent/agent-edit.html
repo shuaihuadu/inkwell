@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>P2 · Agent 编辑 · Inkwell 原型</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+        /* --------- P2 局部样式：三栏 + 下半屏 --------- */
+        .edit-toolbar {
+            background: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .edit-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr 380px;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .edit-panel {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            min-height: 360px;
+        }
+
+        .edit-panel__title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--color-border-secondary);
+        }
+
+        /* 试运行下半屏 */
+        .run-panel {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            min-height: 360px;
+            overflow: hidden;
+        }
+
+        .run-chat {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--color-border-secondary);
+        }
+
+        .run-chat__header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .run-chat__msgs {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            max-height: 320px;
+        }
+
+        .msg {
+            margin-bottom: 12px;
+            max-width: 85%;
+        }
+
+        .msg--user {
+            margin-left: auto;
+        }
+
+        .msg--assistant {
+            margin-right: auto;
+        }
+
+        .msg--system {
+            margin: 8px auto;
+            max-width: 90%;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .msg__bubble {
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            display: inline-block;
+        }
+
+        .msg--user .msg__bubble {
+            background: var(--color-primary);
+            color: #fff;
+        }
+
+        .msg--assistant .msg__bubble {
+            background: var(--color-fill-quaternary);
+            color: var(--color-text);
+        }
+
+        .msg--system .msg__bubble {
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            color: #874d00;
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .msg--system--error .msg__bubble {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #a8071a;
+        }
+
+        .msg__meta {
+            font-size: 11px;
+            color: var(--color-text-tertiary);
+            margin-top: 4px;
+        }
+
+        .msg--user .msg__meta {
+            text-align: right;
+        }
+
+        .run-chat__input {
+            border-top: 1px solid var(--color-border-secondary);
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .run-chat__input .input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .run-chat__input .btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .run-summary {
+            padding: 16px;
+            background: var(--color-fill-quaternary);
+        }
+
+        .run-summary__group {
+            margin-bottom: 16px;
+        }
+
+        .run-summary__title {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .run-summary__value {
+            font-size: 13px;
+            color: var(--color-text);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .token-badge {
+            position: relative;
+            display: inline-flex;
+            font-size: 11px;
+            color: var(--color-text-tertiary);
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--color-fill-quaternary);
+        }
+
+        /* Skill / Tool / MCP tab 内容 */
+        .tab-pane {
+            padding: 12px 0;
+        }
+
+        .skill-row,
+        .tool-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 10px 8px;
+            border-radius: 6px;
+        }
+
+        .skill-row:hover,
+        .tool-row:hover {
+            background: var(--color-fill-quaternary);
+        }
+
+        .skill-row+.skill-row,
+        .tool-row+.tool-row {
+            border-top: 1px solid var(--color-border-secondary);
+        }
+
+        .mcp-empty {
+            text-align: center;
+            padding: 32px 16px;
+            color: var(--color-text-quaternary);
+        }
+
+        .mcp-empty__title {
+            color: var(--color-text-tertiary);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .mcp-empty__hint {
+            font-size: 12px;
+        }
+
+        @media (max-width: 1280px) {
+            .edit-grid {
+                grid-template-columns: 240px 1fr 340px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .edit-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .run-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .run-summary {
+                border-top: 1px solid var(--color-border-secondary);
+            }
+        }
+
+        @media (max-width: 767px) {
+            .edit-toolbar {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app-shell" data-active="agents" data-title="编辑 Agent" data-user="张三"></div>
+
+    <script src="./assets/mock-data.js"></script>
+    <script src="./assets/shell.js"></script>
+    <script>
+        /**
+         * P2 Agent 编辑页（含 P3 Skill 抽屉、P4 删除确认、E6 须知 Modal、E7 解析失败 Alert）
+         * 对应 ui-spec.md 第 2.2 / 2.3 节、acceptance-criteria.md AC-001-3 / AC-002 / AC-003 / AC-004 / AC-010 / AC-011 / AC-012
+         */
+        const { el, icon, toast, showModal, showDrawer } = UI;
+
+        // -------- 解析 ?id= --------
+        const urlParams = new URLSearchParams(location.search);
+        const id = urlParams.get('id') || 'new';
+        const isNew = id === 'new';
+
+        // 当前编辑对象（深拷贝，便于 dirty 跟踪 / 取消还原）
+        const original = isNew
+            ? { id: 'new', name: '', avatar: '🤖', description: '', prompt: '', skills: [], tools: [] }
+            : JSON.parse(JSON.stringify(MOCK.agents.find((a) => a.id === id) || MOCK.agents[0]));
+        let draft = JSON.parse(JSON.stringify(original));
+        let dirty = false;
+        function markDirty() { dirty = true; document.getElementById('save-btn').disabled = false; }
+
+        let activeTab = 'skill'; // skill | tool | mcp
+
+        const main = document.getElementById('pro-main');
+
+        function render() {
+            main.innerHTML = '';
+
+            // Toolbar
+            const breadcrumb = el('div', { class: 'breadcrumb' }, [
+                el('a', { href: './agents.html' }, ['我的 Agent']),
+                el('span', { class: 'breadcrumb__sep' }, ['/']),
+                el('span', { class: 'breadcrumb__current' }, [isNew ? '新建 Agent' : '编辑：' + (draft.name || '未命名')]),
+            ]);
+            const toolbar = el('div', { class: 'edit-toolbar' }, [
+                breadcrumb,
+                el('div', { class: 'flex gap-8' }, [
+                    isNew ? null : el('button', { class: 'btn btn--danger', onClick: doDelete }, ['删除']),
+                    el('button', { class: 'btn', onClick: doCancel }, ['取消']),
+                    el('button', { class: 'btn btn--primary', id: 'save-btn', disabled: dirty ? null : 'disabled', onClick: doSave }, ['保存']),
+                ]),
+            ]);
+            main.appendChild(toolbar);
+
+            // 三栏
+            const grid = el('div', { class: 'edit-grid' }, [
+                renderBasicInfo(),
+                renderPrompt(),
+                renderCapabilities(),
+            ]);
+            main.appendChild(grid);
+
+            // 下半屏：试运行
+            main.appendChild(renderRunPanel());
+
+            // 启动时刷新 disabled 状态
+            document.getElementById('save-btn').disabled = !dirty;
+        }
+
+        // -------- 左：基本信息 --------
+        function renderBasicInfo() {
+            const nameLen = (draft.name || '').length;
+            const descLen = (draft.description || '').length;
+            const nameOver = nameLen > 50;
+            const descOver = descLen > 200;
+
+            return el('div', { class: 'edit-panel' }, [
+                el('div', { class: 'edit-panel__title' }, ['基本信息']),
+
+                // 头像
+                el('div', { class: 'form-item' }, [
+                    el('label', { class: 'form-item__label' }, ['头像']),
+                    el('div', { class: 'flex gap-8', style: 'align-items:center' }, [
+                        el('div', { class: 'card__avatar', style: 'width:48px;height:48px;font-size:22px' }, [draft.avatar]),
+                        el('button', {
+                            class: 'btn btn--sm', onClick: () => {
+                                const next = prompt('用 emoji 替代头像（演示）', draft.avatar);
+                                if (next) { draft.avatar = next; markDirty(); render(); }
+                            }
+                        }, ['更换']),
+                    ]),
+                    el('div', { class: 'form-item__hint' }, ['原型用 emoji 占位；H3 决定实际上传规格（PNG / JPG ≤ 2 MB）']),
+                ]),
+
+                // 名称
+                el('div', { class: 'form-item' + (nameOver ? ' form-item--error' : '') }, [
+                    el('label', { class: 'form-item__label form-item__label--required' }, ['名称']),
+                    el('input', {
+                        class: 'input',
+                        value: draft.name || '',
+                        placeholder: '例如：客服小助手',
+                        maxlength: 100,
+                        onInput: (e) => { draft.name = e.target.value; markDirty(); refreshNameCounter(e.target); },
+                    }),
+                    el('div', { class: 'form-item__hint', id: 'name-counter' }, [
+                        el('span', { class: 'input-counter' + (nameOver ? ' input-counter--error' : '') }, [nameLen + '/50']),
+                        '允许中英文 + emoji（OQ-014 = A）',
+                    ]),
+                    el('div', { class: 'form-item__error' }, ['名称不能超过 50 字符（AC-002-6）']),
+                ]),
+
+                // 描述
+                el('div', { class: 'form-item' + (descOver ? ' form-item--error' : '') }, [
+                    el('label', { class: 'form-item__label' }, ['描述']),
+                    el('textarea', {
+                        class: 'textarea',
+                        placeholder: '简单描述这个 Agent 是干什么的',
+                        maxlength: 500,
+                        onInput: (e) => { draft.description = e.target.value; markDirty(); refreshDescCounter(e.target); },
+                    }, [draft.description || '']),
+                    el('div', { class: 'form-item__hint' }, [
+                        el('span', { class: 'input-counter' + (descOver ? ' input-counter--error' : '') }, [descLen + '/200']),
+                        '可见于列表卡片（AC-002-3 / AC-002-4）',
+                    ]),
+                    el('div', { class: 'form-item__error' }, ['描述不能超过 200 字符']),
+                ]),
+            ]);
+        }
+
+        function refreshNameCounter(input) {
+            const n = input.value.length;
+            const counter = input.parentElement.querySelector('.input-counter');
+            counter.textContent = n + '/50';
+            counter.classList.toggle('input-counter--error', n > 50);
+            input.parentElement.classList.toggle('form-item--error', n > 50);
+        }
+        function refreshDescCounter(area) {
+            const n = area.value.length;
+            const counter = area.parentElement.querySelector('.input-counter');
+            counter.textContent = n + '/200';
+            counter.classList.toggle('input-counter--error', n > 200);
+            area.parentElement.classList.toggle('form-item--error', n > 200);
+        }
+
+        // -------- 中：Instructions --------
+        function renderPrompt() {
+            const len = (draft.prompt || '').length;
+            const warn = len > 8000;
+            return el('div', { class: 'edit-panel' }, [
+                el('div', { class: 'edit-panel__title' }, ['Instructions']),
+                el('div', { class: 'form-item' }, [
+                    el('label', { class: 'form-item__label form-item__label--required' }, ['告诉 Agent 它是谁、要怎么回应']),
+                    el('textarea', {
+                        class: 'textarea',
+                        style: 'min-height: 360px; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size:13px',
+                        placeholder: '例如：\n你是一名礼貌的电商客服…',
+                        onInput: (e) => {
+                            draft.prompt = e.target.value; markDirty();
+                            const c = e.target.parentElement.querySelector('.input-counter');
+                            c.textContent = e.target.value.length + ' 字符';
+                            c.classList.toggle('input-counter--error', e.target.value.length > 8000);
+                        },
+                    }, [draft.prompt || '']),
+                    el('div', { class: 'form-item__hint' }, [
+                        el('span', { class: 'input-counter' + (warn ? ' input-counter--error' : '') }, [len + ' 字符']),
+                        '> 8000 字符仅警告，不阻塞保存（AC-003-3）。后端不审核内容（OQ-012 = A，R3）。',
+                    ]),
+                ]),
+            ]);
+        }
+
+        // -------- 右：Skill / Tool / MCP --------
+        function renderCapabilities() {
+            const tabs = el('div', { class: 'tabs' }, [
+                capTab('skill', 'Skill', false),
+                capTab('tool', 'Tool', false),
+                capTab('mcp', 'MCP', true /* disabled */),
+            ]);
+
+            const pane = el('div', { class: 'tab-pane', id: 'cap-pane' }, []);
+            renderCapPane(pane);
+
+            return el('div', { class: 'edit-panel' }, [
+                el('div', { class: 'edit-panel__title' }, ['能力配置']),
+                tabs,
+                pane,
+            ]);
+        }
+
+        function capTab(key, label, disabled) {
+            return el('div', {
+                class: 'tabs__item'
+                    + (activeTab === key ? ' tabs__item--active' : '')
+                    + (disabled ? ' tabs__item--disabled' : ''),
+                title: disabled ? 'MCP 服务即将上线 · 本期未开放' : '',
+                onClick: () => {
+                    if (disabled) {
+                        toast('MCP 服务即将上线，vNext 启用（AC-012-1）', 'success');
+                        activeTab = key; renderCapPane(document.getElementById('cap-pane'));
+                        // 触发 active 高亮（仅视觉），不影响 disabled
+                        return;
+                    }
+                    activeTab = key;
+                    renderCapPane(document.getElementById('cap-pane'));
+                },
+            }, [label]);
+        }
+
+        function renderCapPane(container) {
+            container.innerHTML = '';
+            // 重新渲染 tabs 高亮
+            const tabsEl = container.previousElementSibling;
+            if (tabsEl && tabsEl.classList.contains('tabs')) {
+                tabsEl.querySelectorAll('.tabs__item').forEach((t, i) => {
+                    const keys = ['skill', 'tool', 'mcp'];
+                    t.classList.toggle('tabs__item--active', activeTab === keys[i]);
+                });
+            }
+
+            if (activeTab === 'skill') container.appendChild(renderSkillPane());
+            else if (activeTab === 'tool') container.appendChild(renderToolPane());
+            else container.appendChild(renderMcpPane());
+        }
+
+        function renderSkillPane() {
+            const wrap = el('div', null, []);
+            // toolbar
+            wrap.appendChild(el('div', { class: 'flex gap-8 mb-16' }, [
+                el('button', { class: 'btn btn--sm btn--primary', onClick: () => openSkillDrawer(null) }, ['+ 新建 Skill']),
+                el('button', { class: 'btn btn--sm', onClick: () => simulateImport() }, ['导入 SKILL.md']),
+                el('span', { class: 'text-tertiary', style: 'font-size:12px;align-self:center;margin-left:auto' }, ['仅支持单个 .md 文件']),
+            ]));
+
+            if (MOCK.skills.length === 0) {
+                wrap.appendChild(el('div', { class: 'empty', style: 'padding:32px 8px' }, [
+                    el('div', { class: 'empty__title' }, ['还没有 Skill']),
+                    el('div', { class: 'empty__desc' }, ['点击"+ 新建 Skill"开始']),
+                ]));
+                return wrap;
+            }
+
+            MOCK.skills.forEach((s) => {
+                const checked = draft.skills.includes(s.id);
+                const row = el('div', { class: 'skill-row' }, [
+                    el('label', { class: 'checkbox', style: 'flex:1' }, [
+                        el('input', {
+                            type: 'checkbox', checked: checked ? 'checked' : null,
+                            onChange: (e) => {
+                                draft.skills = e.target.checked
+                                    ? Array.from(new Set([...draft.skills, s.id]))
+                                    : draft.skills.filter((x) => x !== s.id);
+                                markDirty();
+                                render(); // 刷新右侧摘要
+                            },
+                        }),
+                        el('div', null, [
+                            el('div', { class: 'checkbox__label-main' }, [s.name]),
+                            el('div', { class: 'checkbox__label-desc' }, [s.description]),
+                        ]),
+                    ]),
+                    el('button', { class: 'btn btn--sm btn--text', onClick: () => openSkillDrawer(s) }, ['编辑']),
+                ]);
+                wrap.appendChild(row);
+            });
+            return wrap;
+        }
+
+        function renderToolPane() {
+            const wrap = el('div', null, []);
+            MOCK.tools.forEach((t) => {
+                const checked = draft.tools.includes(t.id);
+                const row = el('div', { class: 'tool-row' }, [
+                    el('label', { class: 'checkbox', style: 'flex:1' }, [
+                        el('input', {
+                            type: 'checkbox', checked: checked ? 'checked' : null,
+                            onChange: (e) => onToolToggle(t, e),
+                        }),
+                        el('div', null, [
+                            el('div', { class: 'checkbox__label-main' }, [
+                                t.name,
+                                t.externalCall
+                                    ? el('span', { class: 'tag tag--warning', style: 'margin-left:8px' }, ['会外发数据'])
+                                    : el('span', { class: 'tag', style: 'margin-left:8px' }, ['本地']),
+                            ]),
+                            el('div', { class: 'checkbox__label-desc' }, [t.description]),
+                        ]),
+                    ]),
+                ]);
+                wrap.appendChild(row);
+            });
+
+            wrap.appendChild(el('div', { class: 'alert alert--info', style: 'margin-top:16px' }, [
+                el('span', { class: 'alert__icon' }, ['ⓘ']),
+                el('div', null, [
+                    'Tool 调用产生的 token 与模型调用计入 ', el('strong', null, ['同一计费桶']), '（NFR-005 / OQ-020 = A1）。',
+                    el('br', null, []),
+                    '本期内置首批 = 联网搜索 + 当前日期（AC-011-1 / OQ-029）；其他工具与自定义工具均不开放（ND-013）。',
+                ]),
+            ]));
+            return wrap;
+        }
+
+        function onToolToggle(tool, e) {
+            const checking = e.target.checked;
+            if (!checking) {
+                draft.tools = draft.tools.filter((x) => x !== tool.id);
+                markDirty(); render();
+                return;
+            }
+            // 启用：会外发 + 首次未确认 → 弹 E6
+            if (tool.externalCall && !MOCK.user.acknowledgedTools.includes(tool.id)) {
+                e.target.checked = false; // 暂时回退，等用户确认
+                showE6Modal(tool, () => {
+                    MOCK.user.acknowledgedTools.push(tool.id);
+                    draft.tools = Array.from(new Set([...draft.tools, tool.id]));
+                    markDirty(); render();
+                }, () => {
+                    // 取消：保持未启用
+                    markDirty(); render();
+                });
+                return;
+            }
+            draft.tools = Array.from(new Set([...draft.tools, tool.id]));
+            markDirty(); render();
+        }
+
+        function showE6Modal(tool, onOk, onCancel) {
+            showModal({
+                title: '用户须知 · ' + tool.name,
+                body:
+                    '<p><strong>本工具会把对话内容发送给「' + tool.name + ' 服务方」</strong>。</p>' +
+                    '<p class="text-secondary" style="font-size:12px;margin-top:8px">每个用户、每个会外发的工具仅首次启用时弹出本提示（DB-007）。本期首批仅「联网搜索」需走本流程（AC-011-3 / E6）。</p>',
+                okText: '我知道了',
+                cancelText: '取消',
+                onOk, onCancel,
+            });
+        }
+
+        function renderMcpPane() {
+            return el('div', { class: 'mcp-empty' }, [
+                el('div', { style: 'font-size:48px; margin-bottom: 8px' }, ['🔌']),
+                el('div', { class: 'mcp-empty__title' }, ['MCP 服务即将上线']),
+                el('div', { class: 'mcp-empty__hint' }, ['通过 MCP server 接入更多第三方能力 · vNext 启用（AC-012-1 / OQ-025 = A）']),
+            ]);
+        }
+
+        // -------- P3 Skill Drawer --------
+        function openSkillDrawer(skill /* null = 新建 */) {
+            const isCreate = !skill;
+            const s = skill ? JSON.parse(JSON.stringify(skill)) : {
+                name: '', description: '', license: '', compatibility: '', metadata: [], body: '',
+            };
+
+            const body = el('div', null, []);
+            const errorBox = el('div', { class: 'alert alert--error hidden', id: 'skill-error', style: 'margin-bottom:16px' }, [
+                el('span', { class: 'alert__icon' }, ['✗']),
+                el('div', { id: 'skill-error-text' }, ['']),
+            ]);
+            body.appendChild(errorBox);
+
+            // name
+            body.appendChild(el('div', { class: 'form-item' }, [
+                el('label', { class: 'form-item__label form-item__label--required' }, ['name']),
+                el('input', {
+                    class: 'input', value: s.name, placeholder: 'polite-cn',
+                    onInput: (e) => s.name = e.target.value,
+                }),
+                el('div', { class: 'form-item__hint' }, ['1–64 字符；仅小写字母 / 数字 / 连字符；不允许 emoji 或多语言（agentskills.io 规范）']),
+            ]));
+
+            // description
+            body.appendChild(el('div', { class: 'form-item' }, [
+                el('label', { class: 'form-item__label form-item__label--required' }, ['description']),
+                el('textarea', {
+                    class: 'textarea', placeholder: '一句话说明此 Skill 的用途，模型在调用前会读到',
+                    onInput: (e) => s.description = e.target.value,
+                }, [s.description]),
+                el('div', { class: 'form-item__hint' }, ['1–1024 字符']),
+            ]));
+
+            // license
+            body.appendChild(el('div', { class: 'form-item' }, [
+                el('label', { class: 'form-item__label' }, ['license（可选）']),
+                el('input', {
+                    class: 'input', value: s.license, placeholder: 'MIT / Apache-2.0 / Proprietary / 自填',
+                    onInput: (e) => s.license = e.target.value,
+                }),
+            ]));
+
+            // compatibility
+            body.appendChild(el('div', { class: 'form-item' }, [
+                el('label', { class: 'form-item__label' }, ['compatibility（可选）']),
+                el('textarea', {
+                    class: 'textarea', style: 'min-height:60px',
+                    placeholder: 'gpt-4.1, claude-3.5-sonnet',
+                    onInput: (e) => s.compatibility = e.target.value,
+                }, [s.compatibility]),
+            ]));
+
+            // metadata 键值
+            const metaWrap = el('div', null, []);
+            const metaList = el('div', null, []);
+            function rerenderMeta() {
+                metaList.innerHTML = '';
+                s.metadata.forEach((kv, idx) => {
+                    metaList.appendChild(el('div', { class: 'flex gap-8 mb-16' }, [
+                        el('input', { class: 'input', placeholder: 'key', value: kv.key, onInput: (e) => kv.key = e.target.value }),
+                        el('input', { class: 'input', placeholder: 'value', value: kv.value, onInput: (e) => kv.value = e.target.value }),
+                        el('button', { class: 'btn btn--sm btn--text', onClick: () => { s.metadata.splice(idx, 1); rerenderMeta(); } }, ['删除']),
+                    ]));
+                });
+            }
+            rerenderMeta();
+            metaWrap.appendChild(el('label', { class: 'form-item__label' }, ['metadata（可选 · 键值对）']));
+            metaWrap.appendChild(metaList);
+            metaWrap.appendChild(el('button', {
+                class: 'btn btn--sm', onClick: () => { s.metadata.push({ key: '', value: '' }); rerenderMeta(); },
+            }, ['+ 新增一行']));
+            body.appendChild(el('div', { class: 'form-item' }, [metaWrap]));
+
+            // body
+            body.appendChild(el('div', { class: 'form-item' }, [
+                el('label', { class: 'form-item__label form-item__label--required' }, ['Skill 正文（Markdown）']),
+                el('textarea', {
+                    class: 'textarea',
+                    style: 'min-height: 200px; font-family: ui-monospace, monospace; font-size:13px',
+                    placeholder: '# 我的 Skill\n\n描述本 Skill 在对话中应当如何指导模型行为…',
+                    onInput: (e) => s.body = e.target.value,
+                }, [s.body]),
+                el('div', { class: 'form-item__hint' }, ['Markdown 编辑器；保存时由平台拼回完整 SKILL.md，用户不接触 YAML（AC-010-2 / NFR-001）']),
+            ]));
+
+            const drawer = showDrawer({
+                title: isCreate ? '新建 Skill' : '编辑 Skill · ' + (skill && skill.name),
+                body,
+                footer: [
+                    el('button', { class: 'btn', onClick: () => drawer.close() }, ['取消']),
+                    el('button', {
+                        class: 'btn btn--primary',
+                        onClick: () => {
+                            const err = validateSkill(s);
+                            if (err) {
+                                showSkillError(err);
+                                return;
+                            }
+                            // 保存：覆盖 / 新增
+                            if (isCreate) {
+                                MOCK.skills.push({ ...s, id: s.name, usedBy: [] });
+                                toast('已新建 Skill：' + s.name);
+                            } else {
+                                Object.assign(skill, s);
+                                toast('已保存 Skill：' + s.name);
+                            }
+                            drawer.close();
+                            render();
+                        },
+                    }, ['保存']),
+                ],
+            });
+
+            function showSkillError(msg) {
+                const box = document.getElementById('skill-error');
+                box.classList.remove('hidden');
+                document.getElementById('skill-error-text').textContent = msg;
+            }
+        }
+
+        function validateSkill(s) {
+            if (!s.name) return 'name 必填（agentskills.io 规范）';
+            if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(s.name)) {
+                return 'name 必须为小写字母 / 数字 / 连字符，不以连字符开始 / 结尾，不允许连续连字符（AC-010-1）';
+            }
+            if (s.name.length > 64) return 'name 长度不能超过 64 字符';
+            if (!s.description) return 'description 必填';
+            if (!s.body) return '正文不能为空';
+            return null;
+        }
+
+        // -------- E7 模拟导入失败 --------
+        function simulateImport() {
+            // 50% 失败演示
+            const cases = [
+                { ok: false, line: 3, msg: 'name 包含不允许的字符 \'_\'' },
+                { ok: false, line: 1, msg: 'description 不能为空' },
+                { ok: true },
+            ];
+            const pick = cases[Math.floor(Math.random() * cases.length)];
+
+            if (pick.ok) {
+                // 模拟重名
+                showModal({
+                    title: '已存在同名 Skill：polite-cn',
+                    body:
+                        '<p>导入文件中的 Skill 与你现有的同名（OQ-028 = D2）。请选择处理方式：</p>' +
+                        '<div style="margin-top:12px"><label class="checkbox"><input type="radio" name="import-name-action" value="overwrite" checked /> 覆盖现有（保留版本号 +1）</label><br/>' +
+                        '<label class="checkbox" style="margin-top:8px"><input type="radio" name="import-name-action" value="rename" /> 另存为新名称（建议 polite-cn-2）</label></div>',
+                    okText: '继续',
+                    cancelText: '取消',
+                    onOk: () => toast('（演示）已按所选方式处理'),
+                });
+            } else {
+                showModal({
+                    title: '无法导入 SKILL.md',
+                    body:
+                        '<div class="alert alert--error" style="margin-bottom:12px">' +
+                        '<span class="alert__icon">✗</span>' +
+                        '<div><strong>第 ' + pick.line + ' 行：</strong>' + pick.msg + '</div>' +
+                        '</div>' +
+                        '<p class="text-secondary" style="font-size:12px">设计原则：用户必须能看到该怎么改，但不公开 YAML 语法讲解（E7 / NFR-001）。</p>',
+                    okText: '知道了',
+                    cancelText: null,
+                });
+            }
+        }
+
+        // -------- 下半屏：试运行 --------
+        let chatHistory = [
+            { role: 'user', text: '你好，我刚下了订单 ORD-2026050601，能帮我看下发货时间吗？', time: '14:32' },
+            { role: 'assistant', text: '您好！已收到您的订单 ORD-2026050601 查询。请稍候，我为您查询发货状态…', time: '14:32' },
+        ];
+
+        function renderRunPanel() {
+            const enabledSkillNames = draft.skills.map((id) => MOCK.skills.find((s) => s.id === id)?.name || id).join(', ') || '（未启用）';
+            const enabledToolNames = draft.tools.map((id) => MOCK.tools.find((t) => t.id === id)?.name || id).join(', ') || '（未启用）';
+
+            const msgs = el('div', { class: 'run-chat__msgs', id: 'chat-msgs' }, []);
+            chatHistory.forEach((m) => msgs.appendChild(renderMsg(m)));
+
+            return el('div', { class: 'run-panel' }, [
+                // 左：聊天
+                el('div', { class: 'run-chat' }, [
+                    el('div', { class: 'run-chat__header' }, [
+                        el('div', null, [
+                            el('strong', null, ['试运行']),
+                            el('span', { class: 'text-tertiary', style: 'margin-left:8px;font-size:12px' }, ['REQ-004 · 边改边试 · 不需切 tab · 落地形态待定（OQ-030：可能改为 iframe 接入独立子页）']),
+                        ]),
+                        el('div', { class: 'flex gap-8' }, [
+                            el('button', { class: 'btn btn--sm', onClick: () => simulateRetry() }, ['模拟 1 次抖动 → 成功']),
+                            el('button', { class: 'btn btn--sm btn--danger', onClick: () => simulateFail() }, ['模拟 3 次失败']),
+                            el('button', { class: 'btn btn--sm btn--text', onClick: () => { chatHistory = []; refreshMsgs(); } }, ['清空']),
+                        ]),
+                    ]),
+                    msgs,
+                    el('div', { class: 'run-chat__input' }, [
+                        el('input', {
+                            class: 'input', id: 'chat-input',
+                            placeholder: '试着对你的 Agent 说点什么…',
+                            onKeydown: (e) => { if (e.key === 'Enter') sendChat(); },
+                        }),
+                        el('button', { class: 'btn btn--primary', onClick: sendChat }, ['发送']),
+                    ]),
+                ]),
+
+                // 右：摘要面板
+                el('div', { class: 'run-summary' }, [
+                    el('div', { class: 'run-summary__group' }, [
+                        el('div', { class: 'run-summary__title' }, ['当前生效 Instructions（只读）']),
+                        el('div', { class: 'run-summary__value', style: 'max-height:120px;overflow:auto' }, [
+                            draft.prompt || '（未填写）',
+                        ]),
+                    ]),
+                    el('div', { class: 'run-summary__group' }, [
+                        el('div', { class: 'run-summary__title' }, ['已启用 Skill']),
+                        el('div', { class: 'run-summary__value' }, [enabledSkillNames]),
+                    ]),
+                    el('div', { class: 'run-summary__group' }, [
+                        el('div', { class: 'run-summary__title' }, ['已启用 Tool']),
+                        el('div', { class: 'run-summary__value' }, [enabledToolNames]),
+                    ]),
+                    el('div', { class: 'run-summary__group' }, [
+                        el('div', { class: 'run-summary__title' }, ['本次会话已消耗']),
+                        el('div', { class: 'token-badge' }, ['~ 826 tokens（NFR-005 主桶）']),
+                    ]),
+                ]),
+            ]);
+        }
+
+        function renderMsg(m) {
+            if (m.role === 'system' || m.role === 'system-error') {
+                return el('div', { class: 'msg msg--system' + (m.role === 'system-error' ? ' msg--system--error' : '') }, [
+                    el('span', { class: 'msg__bubble' }, [m.text]),
+                ]);
+            }
+            return el('div', { class: 'msg msg--' + m.role }, [
+                el('span', { class: 'msg__bubble' }, [m.text]),
+                el('div', { class: 'msg__meta' }, [m.time || '']),
+            ]);
+        }
+
+        function refreshMsgs() {
+            const c = document.getElementById('chat-msgs');
+            c.innerHTML = '';
+            chatHistory.forEach((m) => c.appendChild(renderMsg(m)));
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function nowHHmm() {
+            const d = new Date();
+            return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            chatHistory.push({ role: 'user', text, time: nowHHmm() });
+            input.value = '';
+            refreshMsgs();
+            // 简化：直接回个 mock 回复
+            setTimeout(() => {
+                chatHistory.push({ role: 'assistant', text: '（演示回复）已收到：' + text, time: nowHHmm() });
+                refreshMsgs();
+            }, 600);
+        }
+
+        function simulateRetry() {
+            chatHistory.push({ role: 'system', text: '网络抖动，正在自动重试 1/3…' });
+            refreshMsgs();
+            setTimeout(() => {
+                chatHistory.push({ role: 'assistant', text: '（演示）抖动后第 2 次重试成功。', time: nowHHmm() });
+                refreshMsgs();
+            }, 1200);
+        }
+        function simulateFail() {
+            chatHistory.push({ role: 'system', text: '网络抖动，正在自动重试 1/3…' });
+            refreshMsgs();
+            setTimeout(() => { chatHistory.push({ role: 'system', text: '…正在自动重试 2/3…' }); refreshMsgs(); }, 800);
+            setTimeout(() => { chatHistory.push({ role: 'system', text: '…正在自动重试 3/3…' }); refreshMsgs(); }, 1600);
+            setTimeout(() => {
+                chatHistory.push({ role: 'system-error', text: '出错了，请稍后重试（OQ-010 = B：本次失败不计费）' });
+                refreshMsgs();
+            }, 2400);
+        }
+
+        // -------- 操作按钮 --------
+        function doSave() {
+            // 校验
+            if (!draft.name) { toast('请填写名称', 'error'); return; }
+            if (draft.name.length > 50) { toast('名称不能超过 50 字符', 'error'); return; }
+            if (draft.description && draft.description.length > 200) { toast('描述不能超过 200 字符', 'error'); return; }
+
+            if (isNew) {
+                draft.id = 'agent-' + Date.now();
+                draft.updatedAt = Date.now();
+                MOCK.agents.unshift(draft);
+                toast('已创建：' + draft.name);
+            } else {
+                const idx = MOCK.agents.findIndex((a) => a.id === id);
+                if (idx >= 0) {
+                    draft.updatedAt = Date.now();
+                    MOCK.agents[idx] = draft;
+                }
+                toast('已保存');
+            }
+            dirty = false;
+            setTimeout(() => location.href = './agents.html', 800);
+        }
+
+        function doCancel() {
+            if (!dirty) { location.href = './agents.html'; return; }
+            showModal({
+                title: '放弃修改？',
+                body: '<p>当前页面有未保存的修改，离开会丢失。</p>',
+                okText: '放弃修改',
+                danger: true,
+                onOk: () => location.href = './agents.html',
+            });
+        }
+
+        function doDelete() {
+            const a = MOCK.agents.find((x) => x.id === id);
+            if (!a) return;
+            showModal({
+                title: '删除「' + a.name + '」？',
+                body: '<p>将进入<strong>已删除</strong>列表保留 <strong>7 天</strong>，期间可恢复。</p>',
+                okText: '删除', danger: true,
+                onOk: () => {
+                    a.deletedAt = Date.now();
+                    toast('已移到已删除');
+                    setTimeout(() => location.href = './agents.html', 600);
+                },
+            });
+        }
+
+        render();
+    </script>
+</body>
+
+</html>

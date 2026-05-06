@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>P1 · 我的 Agent · Inkwell 原型</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+</head>
+
+<body>
+    <div id="app-shell" data-active="agents" data-title="我的 Agent" data-user="张三"></div>
+
+    <script src="./assets/mock-data.js"></script>
+    <script src="./assets/shell.js"></script>
+    <script>
+        /**
+         * P1 我的 Agent 列表页
+         * 对应 ui-spec.md 第 2.1 节、acceptance-criteria.md AC-001-1 ~ AC-001-6
+         *
+         * 状态切换演示：
+         *  - 全部 / 已删除 tab 切换
+         *  - 卡片操作：编辑 / 复制 / 删除（删除走 P4 Modal）
+         *  - 已删除卡片：恢复 / 永久删除（永久删除二次确认 type=danger）
+         *  - 删除后实时更新两 tab；恢复后回到全部 tab
+         *  - 网络断开 Alert（顶部黄条）演示按钮放在右上角"工具"
+         */
+        const { el, icon, toast, showModal } = UI;
+
+        let activeTab = 'all'; // all | deleted
+        const main = document.getElementById('pro-main');
+
+        function activeAgents() { return MOCK.agents.filter((a) => !a.deletedAt); }
+        function deletedAgents() { return MOCK.agents.filter((a) => a.deletedAt); }
+
+        function render() {
+            main.innerHTML = '';
+
+            // PageHeader
+            const tabs = el('div', { class: 'tabs' }, [
+                tabItem('all', '全部 (' + activeAgents().length + ')'),
+                tabItem('deleted', '已删除 (' + deletedAgents().length + ')'),
+            ]);
+
+            const header = el('div', { class: 'page-header' }, [
+                el('div', null, [
+                    el('div', { class: 'page-header__title' }, ['我的 Agent']),
+                    el('div', { class: 'page-header__subtitle' }, ['创建、编辑、试运行你的专属 Agent']),
+                ]),
+                el('div', { class: 'flex gap-8' }, [
+                    el('button', { class: 'btn btn--text', onClick: showNetworkOfflineDemo, title: '演示 E5 网络断开' }, ['模拟离线']),
+                    el('button', { class: 'btn btn--primary', onClick: () => location.href = './agent-edit.html?id=new' }, [
+                        '+ 新建 Agent',
+                    ]),
+                ]),
+            ]);
+            main.appendChild(header);
+
+            // Tabs
+            const tabBar = el('div', { class: 'page-header', style: 'padding:0 24px' }, [tabs]);
+            main.appendChild(tabBar);
+
+            // Card grid or empty
+            const list = activeTab === 'all' ? activeAgents() : deletedAgents();
+            if (list.length === 0) {
+                main.appendChild(renderEmpty());
+            } else {
+                const grid = el('div', { class: 'card-grid', id: 'card-grid' }, []);
+                list.forEach((a) => grid.appendChild(renderCard(a)));
+                main.appendChild(grid);
+            }
+
+            // FAB（移动端）
+            const fab = el('div', { class: 'fab', onClick: () => location.href = './agent-edit.html?id=new' }, ['+']);
+            main.appendChild(fab);
+        }
+
+        function tabItem(key, text) {
+            return el('div', {
+                class: 'tabs__item' + (activeTab === key ? ' tabs__item--active' : ''),
+                onClick: () => { activeTab = key; render(); },
+            }, [text]);
+        }
+
+        function renderCard(agent) {
+            const isDeleted = !!agent.deletedAt;
+
+            const card = el('div', { class: 'card' }, [
+                isDeleted
+                    ? el('div', { class: 'card__deleted-badge' }, ['剩余 ' + daysLeftSoftDelete(agent.deletedAt) + ' 天'])
+                    : null,
+
+                el('div', { class: 'card__header' }, [
+                    el('div', { class: 'card__avatar' }, [agent.avatar]),
+                    el('div', { class: 'card__title' }, [agent.name]),
+                    isDeleted ? null : el('span', {
+                        class: 'card__menu-trigger',
+                        title: '更多操作',
+                        onClick: (e) => { e.stopPropagation(); toggleMenu(card, agent); },
+                    }, [icon('more')]),
+                ]),
+
+                el('div', { class: 'card__desc' }, [agent.description]),
+
+                el('div', { class: 'card__meta' }, [
+                    el('span', null, ['更新于 ' + formatRelativeTime(agent.updatedAt)]),
+                    el('span', null, [
+                        agent.skills.length > 0 ? agent.skills.length + ' 个 Skill' : '无 Skill',
+                        agent.tools.length > 0 ? ' · ' + agent.tools.length + ' 个 Tool' : '',
+                    ]),
+                ]),
+
+                el('div', { class: 'card__actions' },
+                    isDeleted
+                        ? [
+                            el('button', { class: 'btn btn--sm', onClick: () => doRestore(agent) }, ['恢复']),
+                            el('button', { class: 'btn btn--sm btn--danger', onClick: () => doPermanentDelete(agent) }, ['永久删除']),
+                        ]
+                        : [
+                            el('button', { class: 'btn btn--sm btn--primary', onClick: () => location.href = './agent-edit.html?id=' + agent.id }, ['编辑']),
+                            el('button', { class: 'btn btn--sm', onClick: () => doCopy(agent) }, ['复制']),
+                            el('button', { class: 'btn btn--sm btn--danger', onClick: () => doDelete(agent) }, ['删除']),
+                        ]
+                ),
+            ]);
+            return card;
+        }
+
+        function renderEmpty() {
+            const isDeletedTab = activeTab === 'deleted';
+            const wrap = el('div', { class: 'card', style: 'background:#fff' }, [
+                el('div', { class: 'empty' }, [
+                    el('div', { class: 'empty__icon' }, [icon('inbox', { size: 64, strokeWidth: 1.2 })]),
+                    el('div', { class: 'empty__title' }, [
+                        isDeletedTab ? '已删除列表为空' : '还没有 Agent',
+                    ]),
+                    el('div', { class: 'empty__desc' }, [
+                        isDeletedTab ? '7 天内删除的 Agent 会出现在这里' : '点击右上角"新建 Agent"开始',
+                    ]),
+                    isDeletedTab
+                        ? null
+                        : el('button', { class: 'btn btn--primary', onClick: () => location.href = './agent-edit.html?id=new' }, ['+ 新建 Agent']),
+                ]),
+            ]);
+            return wrap;
+        }
+
+        // -------- 操作 --------
+        function doCopy(agent) {
+            const copy = JSON.parse(JSON.stringify(agent));
+            copy.id = 'agent-copy-' + Date.now();
+            copy.name = agent.name + ' 副本';
+            copy.updatedAt = Date.now();
+            copy.deletedAt = null;
+            MOCK.agents.unshift(copy);
+            toast('已复制为「' + copy.name + '」');
+            render();
+        }
+
+        function doDelete(agent) {
+            // P4 删除确认 Modal
+            showModal({
+                title: '删除「' + agent.name + '」？',
+                body: '<p>将进入<strong>已删除</strong>列表保留 <strong>7 天</strong>，期间可恢复；7 天后将永久删除。</p><p class="text-secondary" style="font-size:12px;margin-top:8px">DB-004 · 软删除策略 · OQ-013 = B</p>',
+                okText: '删除',
+                danger: true,
+                onOk: () => {
+                    agent.deletedAt = Date.now();
+                    toast('已移到已删除，7 天内可恢复');
+                    render();
+                },
+            });
+        }
+
+        function doRestore(agent) {
+            agent.deletedAt = null;
+            toast('已恢复「' + agent.name + '」');
+            render();
+        }
+
+        function doPermanentDelete(agent) {
+            showModal({
+                title: '永久删除「' + agent.name + '」？',
+                body: '<p>永久删除后<strong>无法恢复</strong>。请确认。</p>',
+                okText: '永久删除',
+                danger: true,
+                onOk: () => {
+                    MOCK.agents = MOCK.agents.filter((a) => a.id !== agent.id);
+                    toast('已永久删除', 'error');
+                    render();
+                },
+            });
+        }
+
+        // -------- 卡片操作菜单（更多）--------
+        function toggleMenu(card, agent) {
+            // 简化处理：直接弹一个轻量提示，Modal 演示已经在按钮区
+            toast('卡片更多操作菜单（演示用，详见底部按钮）', 'success');
+        }
+
+        // -------- E5 网络断开顶部条 --------
+        function showNetworkOfflineDemo() {
+            let bar = document.querySelector('.network-alert');
+            if (bar) { bar.remove(); return; }
+            bar = el('div', { class: 'network-alert' }, [
+                el('span', null, ['⚠ 网络已断开，正在重试…最近一次保存于 14:30:12']),
+                el('button', { class: 'btn btn--sm', onClick: () => bar.remove() }, ['关闭']),
+            ]);
+            document.querySelector('.pro-header').after(bar);
+        }
+
+        render();
+    </script>
+</body>
+
+</html>
