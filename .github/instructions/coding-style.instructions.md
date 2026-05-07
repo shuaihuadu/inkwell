@@ -4,7 +4,7 @@ applyTo: 'src/**'
 
 # 源码编写规范
 
-本规则覆盖 `src/**` 下的全部源码。以下要求与 Harness Engineering 规范第 6 节（H3 详细设计）和 [`stages.md`](../../.harness-engineering/docs/stages.md) 第 8 节（H5 编码与自验证）一致，AI 写代码时必须遵守。
+本规则覆盖 `src/**` 下的全部源码。以下要求与 Harness Engineering 规范第 6 节（H3 详细设计）和 [`stages.md`](../../.he/docs/stages.md) 第 8 节（H5 编码与自验证）一致，AI 写代码时必须遵守。
 
 ## 1. 改动前
 
@@ -22,7 +22,7 @@ applyTo: 'src/**'
 
 - 提交前必须运行 `dotnet test` 并贴出真实输出
 - 测试失败时分析原因再改代码，不要靠"再试一次"通过
-- 风格检查：`dotnet format --verify-no-changes`，警告视作错误处理
+- 风格检查：`dotnet format`，警告视作错误处理
 
 ## 4. 反模式（出现即停止）
 

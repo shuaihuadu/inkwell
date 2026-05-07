@@ -9,7 +9,7 @@
 1. [装完后该干啥](#1-装完后该干啥按项目状态分流)
 2. [全流程一览：H1 → H6 + Hx](#2-全流程一览h1--h6--hx)
 3. [`.github/` 里都装了什么](#3-github-里都装了什么)
-4. [`.harness-engineering/` 里都装了什么](#4-harness-engineering-里都装了什么)
+4. [`.he/` 里都装了什么](#4-he-里都装了什么)
 5. [Templates 怎么用、怎么改](#5-templates-怎么用怎么改)
 6. [Skills / Prompts / Agents 速查](#6-skills--prompts--agents-速查)
 7. [给 Agent / Prompt 配置工具白名单](#7-给-agent--prompt-配置工具白名单)
@@ -32,58 +32,81 @@
 
 依次切 Agent 跑下去，每一步的产出会成为下一步的输入；不要跳级，跳级会让追溯链断在你身上。
 
+> **前置步骤 · 项目身份初始化**：在仓库根创建一份最小 `AGENTS.md`（约 60 行的目录式骨架，最小可工作版本见 [Q8](#q8-我只用-github-copilot仓库根的-agentsmd-还要不要写)）。这是 `H1-RepoImpactMapper` 后续运行的硬性输入（缺它会被报 GAP-001 硬阻塞）。空仓下 H1 走完前不必写满，但“项目身份”那一句必须由项目负责人亲手签下——`AGENTS.md` 是项目对所有 AI 工具的对外声明，AI 代笔 = 闭环漏洞，与 `requirements.md` 的 `status` 签字同源。
+>
+> **完成后下一步**：
+>
+> 1. 第 1 节"项目身份"亲手签字（≤ 2 行讲清目标用户 + 核心价值）；第 4 节"模块边界 / 禁区"在 H1 阶段保留 TODO 即可，H2 完成后回来补。
+> 2. 进下一节"1. H1 上半段 · 需求文本"切 `h1-requirements-interviewer`。
+> 3. 在 H1 影响图（第 4 步）跑完后，如果 `repo-impact-map.md` 报了 `GAP-001 仓库根 AGENTS.md 不存在` —— 回到本前置步骤补完，把那条 GAP 标记为 `已关闭`。
+
 1. **H1 上半段 · 需求文本**：Copilot Chat 输入框下方的 Agent 下拉切到 `h1-requirements-interviewer`，用一段大白话描述目标用户、核心场景、必做与可选——它会反问、追问、把回答落成 `docs/01-requirements/requirements.md` 草稿，分配 `REQ-001`、`REQ-002`…，没答清的进 `open-questions.md`，**不会自动用 `<TBD>` 占位**。
 
-   _示例输入_（粗暴说目标，把模糊点交给它反问）：
+   _示例输入_（直接说目标，把模糊点交给它反问出来）：
 
    ```text
-   做一个 AI 内容工厂：
-   - 目标用户：个人技术博客作者
-   - 核心场景：输入题目 → AI 多轮迭代 → 输出可发布的 markdown
-   - 必做：本地运行 + 多 LLM 厂商可切换
-   - 可选：直接发布到微信公众号
-   先把模糊点反问出来，再起草 requirements.md。
+   我想做一个给自己写技术博客用的 AI 内容工厂：
+   输入一个题目，AI 多轮迭代帮我磨稿子，最后吐出能直接发的 markdown。
+   要求本地能跑，多家 LLM 厂商可以切——OpenAI / Azure OpenAI / 通义千问都得支持。
+   一键发到微信公众号是加分项，不强求。
+   先别急着写 requirements.md，先把你觉得我没说清的地方一条条问我。
    ```
 
 2. **H1 下半段 · UI 说明 + 原型 + 评审 + 留档**：H1 不是只写 `requirements.md` 就结束了。完整 H1 还包含「UI 说明、可交互原型、评审、留档」四件事，按顺序切两个专属 Agent + 一个外部工具走完：
    - **UI 说明**：切到 `h1-ui-spec-author`，给它 `requirements.md` + 你手头的截图或参考页面，它会按 [stages.md 第 4.5 节](../../docs/stages.md#45-ui-说明必须包含) 那 10 项反问一轮，然后产出 `docs/01-requirements/ui-spec.md` / `user-flow.md` / `acceptance-criteria.md`，没答清的**追加**到同一份 `open-questions.md`。
 
-     _示例输入_（明确上游凭证 + 手头素材 + 推不清走 open-questions）：
+     _示例输入_（明确上游凭证 + 手头素材 + 推不清的就丢回 open-questions）：
 
      ```text
-     上游：docs/01-requirements/requirements.md 里 REQ-001~REQ-005。
-     手头素材：prototypes/ai-content-factory/screenshots/draft-{1,2,3}.png
-     任务：按 stages.md 4.5 节 10 项反问一轮，
-     产出 ui-spec.md / user-flow.md / acceptance-criteria.md；
-     你不能推出的项追加到 open-questions.md，不要用 <TBD> 占位。
+     上游需求看 docs/01-requirements/requirements.md 里 REQ-001 到 REQ-005，
+     我手上还有三张草图在 prototypes/ai-content-factory/screenshots/ 下。
+     按 stages.md 4.5 节那 10 个维度挨个问我，
+     答得清的写进 ui-spec.md / user-flow.md / acceptance-criteria.md，
+     答不清的全部追加到 open-questions.md——别给我用 <TBD> 占位，我会忘记回来补。
      ```
 
    - **可交互原型**：你自己挑工具做（HTML/CSS 静态页面、Figma 导出、V0、Lovable、手绘扫描都行），落到 `prototypes/<feature>/` 目录，关键屏幕被截图在 `prototypes/<feature>/screenshots/` 下。
    - **原型评审**：切到 `h1-prototype-reviewer`，它会只读 `ui-spec.md` + `prototypes/<feature>/` + `phase-gate-checklist.md`，按 H1 那 12 条逼出 `PASS / FAIL / UNKNOWN`与补救动作；**它只读不写，不会替你产出 `prototype-review.md`**（评审纪要由人写，避免 AI 给自己开绿灯）。
 
-     _示例输入_（上游证据、评审目标、打分口径，三件说清就行）：
+     _示例输入_（说清原型在哪、UI 文档在哪、按哪份清单打分，三件齐就行）：
 
      ```text
-     评审目标：prototypes/ai-content-factory/
-     上游证据：
-     - docs/01-requirements/ui-spec.md
-     - docs/01-requirements/user-flow.md
-     - docs/01-requirements/acceptance-criteria.md
-     打分口径：.github/templates/phase-gate-checklist.md 里 H1 那 12 条。
-     逐项给 PASS / FAIL / UNKNOWN + 补救动作；不写任何文件，输出在聊天里。
+     可交互原型在 prototypes/ai-content-factory/ 下，
+     UI 三件套（ui-spec / user-flow / acceptance-criteria）都在 docs/01-requirements/ 里。
+     按 .github/templates/phase-gate-checklist.md 里 H1 那 12 条挨个打分，
+     能过的标 PASS，不能过的告诉我缺啥、下一步怎么补，模糊的直接 UNKNOWN。
+     结果聊天里告诉我就行，别动我的任何文件。
      ```
 
    - **纪要留档**：拿上一步的 PASS/FAIL 报告作为评审纪要起点，补充你的调整后请人评审一轮，走 `/log-review` 落到 `docs/07-reviews/YYYY-MM-DD-h1-review.md`，同时把评审结论摘要回写到 `docs/02-prototype/prototype-review.md`（这份是 H2 架构选型的输入凭证之一，不能省）。
 
-     _示例输入_（叫出 `/log-review`，主题 + 参与者 + 结论摘要三者齐）：
+     _示例输入_（叫出 `/log-review`，主题 + 参与者 + 结论摘要三件齐）：
 
      ```text
-     /log-review h1-review-2026-05-06
-     参与者：产品 / 设计 / 后端 / 前端
-     结论摘要：12 条门禁通过 9 条，
-     待补 3 条（页面状态 / 错误提示 / 权限差异），
-     由 X 负责本周内补齐后重跑 /run-gate H1。
+     /log-review 主题是今天的 H1 原型评审，
+     参与的有产品、设计、后端、前端各一人。
+     结论：12 条门禁过了 9 条，
+     剩下 3 条（页面状态、错误提示、权限差异）这周内由我补齐，
+     补完重跑一次 /run-gate H1 再进 H2。
      ```
+
+   - **签字位回写**：`/log-review` 只会产出 `docs/07-reviews/<纪要>.md`，**不会**改任何上游产物的 frontmatter。评审纪要落档后，你需要亲手把上游三份文档（`requirements.md` / `ui-spec.md` / `acceptance-criteria.md`，以及有 `user-flow.md` 的话也算一份）的 frontmatter `status: draft` 改成 `reviewed`（纪要 `approved` / `approved-with-changes` 都可以进 `reviewed`；`rejected` / `pending` 保留 `draft`），同时在 `reviewers:` 里加一行记录评审人、决议、日期。这一步是设计上的人工签字位，是 H2 `H1-RepoImpactMapper` / `H2-ArchitectAdvisor` 能不能开始工作的硬门槛。后面 Q7 说明为什么任何 Agent 都不会替你动 `status` 这个字段。
+
+     _示例变更_（以 `requirements.md` 为例，`ui-spec.md` / `user-flow.md` / `acceptance-criteria.md` 同样处理）：
+
+     ```yaml
+     ---
+     id: REQ-001
+     stage: H1
+     status: reviewed              # 从 draft 进
+     reviewers:                    # 原本为空，人工补一行
+       - name: <你自己或评审人>
+         decision: approved-with-changes   # 跟纪要保持一致
+         date: 2026-05-07
+     ---
+     ```
+
+   > **完成后下一步**：上面三件（H1 上半段、UI / 原型 / 评审、签字位回写）走完之后，跑下一节"3. 跑一次 `/run-gate H1`"做机械复核。`/run-gate` 失败回头补对应文档，**不要硬切 H2**。
 
 3. **跑一次 `/run-gate H1`**：在 Copilot Chat 输入 `/run-gate`，它会按上面那 12 条机械核对，给出 PASS / FAIL / UNKNOWN。**只有全 PASS 才能进 H2**——这是设计上的硬卡口，绕过去后面的 commit 审计会让你在 H5 阶段重新偿还。
 
@@ -93,68 +116,129 @@
    /run-gate H1
    ```
 
-4. **（可选）H1 影响图**：切 `h1-repo-impact-mapper`。全新空仓基本是全部新建，可跳过；老仓改造时它会列出受影响的模块 / 文件 / 接口 / 测试。
+   > **完成后下一步**：
+   >
+   > - **全 PASS**：进下一步"4. H1 影响图"切 `H1-RepoImpactMapper`。
+   > - **任一 FAIL / UNKNOWN**：把缺项登记到 `docs/06-tasks/task-board.md` 第 2 节"等待人工决策"，按提示回去补对应文档，再重跑 `/run-gate H1`。**不要硬切 H2**——下游 Agent 会在 frontmatter `status` 上拒收，到时候返工成本只会更高。
 
-   _示例输入_（老仓改造场景，强调不凭命名臆造）：
+4. **H1 影响图**：切 `h1-repo-impact-mapper`，落 `docs/01-requirements/repo-impact-map.md`。
+
+   **它是干啥的**：一份“这次要做的需求，落到这个仓库里会牼动哪些东西”的对账单。它**不**选技术栈、**不**设计 API、**不**写代码，只回答“现在长啥样、谁会被改、谁会被破坏、有没有禁区”。横在 H1 与 H2 之间的一道对账闸门，避免 H2/H3/H5 在沙地上盖楼。
+
+   **不是可选**：`H2-ArchitectAdvisor` 与 `H3-DesignReviewer` 的输入契约都把它列为“必需”（参见 [`agents/architect-advisor/AGENT.md`](../../agents/architect-advisor/AGENT.md) 第 3 节、[`agents/design-reviewer/AGENT.md`](../../agents/design-reviewer/AGENT.md) 第 3 节），缺它两个 Agent 会同时阻塞。区别只在于产出形态不同：
+
+   - **老仓改造**：扫真实代码，列受影响模块 / 文件 / 接口 / 测试，每条给置信度（high / medium / low）。**不在图上的文件，`H5-CodingExecutor` 不会改**——这是约束层的核心机制。
+   - **全新空仓**：影响面表的“已存在”列全为“无”是常态，但付要做——它会用占位符（`<frontend>` / `<backend>` / `<dal>`）锁定**功能簇**作为 H2 ADR 的输入信号，并用“缺失发现 GAP-NNN”列出 H2 启动会议必须当面回答的硬依赖（登录方案 / 模型网关 / 第三方服务商等）。
+
+   **下游怎么用它**：
+
+   - H2 `h2-architect-advisor` 读它识别“必须复用”与“可替换”的既有组件
+   - H3 `h3-design-reviewer` 拿设计中引用的路径与它反向交叉验证，疑似凭空编造的全部抦下
+   - H5 `/new-task` 起任务卡时，从这里的“已存在”列拽出“允许修改的文件”列表。**AI 改不改一个文件，不取决于它觉得该不该改，取决于这份图列没列**。
+
+   _示例输入_（老仓改造场景，强调查不到就标 UNKNOWN，不凭命名臆造）：
 
    ```text
-   上游：docs/01-requirements/requirements.md REQ-001~REQ-005。
-   列出受影响的模块 / 文件 / 接口 / 测试，
-   每条标置信度（高 / 中 / 低）；
-   查不到的不要凭命名臆造，直接标 UNKNOWN，
+   把 docs/01-requirements/requirements.md 里 REQ-001 到 REQ-005，
+   映射到我现有的 src/ 目录上：
+   哪些项目 / 文件 / 接口 / 测试会被动到，每条按高 / 中 / 低标置信度。
+   仓库里 grep 不到的别瞎猜，直接标 UNKNOWN；
    结果落到 docs/01-requirements/repo-impact-map.md。
    ```
 
-5. **H2 架构 / ADR**：切 `h2-architect-advisor`。它基于上一步的 requirements + ui-spec 给一份初版架构（项目划分、技术栈、依赖关系）+ 关键 `ADR-NNN`（每条含"选择 / 为什么 / 替代 / 放弃理由 / 维护成本 / 性能-安全-交付影响"六字段）。这一步决定源码树长什么样、用什么栈。
-
-   _示例输入_（上游凭证 + 硬约束，让 ADR 有边界）：
+   _示例输入_（全新空仓场景，明说用占位符锁功能簇、用 GAP 列硬依赖）：
 
    ```text
-   上游：docs/01-requirements/{requirements.md, ui-spec.md}。
-   硬约束：.NET 8、单仓多项目（src/core/* + src/app/*）、
-   本地优先（不强依赖云）、可选 Docker。
-   交付：
-   - 初版架构说明（项目划分 / 技术栈 / 依赖关系）
-   - 3~5 条关键 ADR-NNN，每条六字段：
-     选择 / 为什么 / 替代 / 放弃理由 / 维护成本 / 影响
+   仓库是 greenfield，还没任何产品代码。
+   把 docs/01-requirements/requirements.md 里本期 MVP 的 REQ 全部扫一遍。
+   “已存在”列为空是常态，在“预计新增模块”列
+   用 <frontend> / <backend> / <dal> 这种占位符写功能簇，
+   具体路径交给 H2 ADR 决定。
+   另外把你扫出来、但需求不负责的硬依赖（登录方案 / 模型网关 /
+   搜索服务商等）逐条列到“缺失发现”节，给 GAP-NNN 编号，
+   H2 启动会议会一条条过。
    ```
+
+   > **完成后下一步**：
+   >
+   > 1. 人工评审 `docs/01-requirements/repo-impact-map.md`，把 frontmatter `status: draft → reviewed`、`reviewers:` 加一行（与 `requirements.md` 的签字位逻辑相同）。
+   > 2. 把里面登记的 `GAP-NNN` 逐条搬到 `docs/06-tasks/task-board.md` 第 2 节"等待人工决策"——这是规范层的人工出口，不要让 GAP 只停在 repo-impact-map 里。
+   > 3. 切到下一步"5. H2 架构 / ADR"`H2-ArchitectAdvisor`，它会读这份图识别"必须复用"与"可替换"的既有组件。
+
+5. **H2 架构 / ADR**：切 `h2-architect-advisor`。它基于上一步的 requirements + ui-spec 给一份初版架构（项目划分、技术栈、依赖关系）+ 关键 `ADR-NNN`（每条含"选择 / 为什么 / 替代 / 放弃理由 / 维护成本 / 性能-安全-交付影响"六字段）。这一步决定源码树长什么样、用什么栈。
+
+   _示例输入_（先说硬约束，再说想要的交付物，让 ADR 有边界）：
+
+   ```text
+   看 docs/01-requirements/ 下的 requirements.md 和 ui-spec.md。
+   约束先说清：用 .NET 8、单仓多项目（src/core/* 放领域层，src/app/* 放宿主），
+   本地能跑就行不强依赖云，Docker 是可选项。
+   给我两份东西：
+   一份初版架构（项目怎么划、用啥技术栈、谁依赖谁），
+   再挑 3~5 条最关键的决策写成 ADR——
+   每条都得讲清楚：选了啥、为啥选、有啥替代、为啥不要、维护贵不贵、对性能 / 安全 / 交付有啥影响。
+   ```
+
+   > **完成后下一步**：
+   >
+   > 1. 评审 `docs/03-architecture/architecture.md` / `tech-selection.md` / `risk-analysis.md` + `adr/` 下每条 ADR，把 `status: draft → reviewed`，`reviewers:` 加一行。
+   > 2. **回填根目录 `AGENTS.md` 第 4 节"模块边界 / 禁区"**——把 H2 决定的跨模块允许 / 禁止规则写清楚，这是 H3 / H5 的边界依据。空仓时这一节是 TODO，H2 完成后必须落地。
+   > 3. 跑一次 `/run-gate H2` 做机械复核；全 PASS 后挑一个或多个最小 feature 切到 H3 起草详细设计。
 
 6. **H3 详细设计**：人手起草 `docs/04-detailed-design/<feature>/HD-NNN.md`（接口、数据模型、错误码、并发与失败语义）。写完切 `h3-design-reviewer` 让它逐项核对完备性，挡住"设计还没写清"流入下一阶段。
 
-   _示例输入_（只评审不修改，明确口径 + 期望交付）：
+   _示例输入_（只评审不修改，给评审口径 + 给期望交付）：
 
    ```text
-   评审 docs/04-detailed-design/ai-content-factory/HD-001.md。
-   口径：stages.md 第 6 节那份章节列表（接口 / 数据模型 / 错误码 /
-   并发与失败语义 / 可观测性 / 发布与回滚）。
-   逐项给 PASS/FAIL，缺项列出 + 下一步行动；本次只评审，不修改文档。
+   帮我看一下 docs/04-detailed-design/ai-content-factory/HD-001.md。
+   按 stages.md 第 6 节那份章节列表对——
+   接口、数据模型、错误码、并发与失败语义、可观测性、发布回滚，每一项都看看写没写清。
+   缺啥列出来告诉我下一步该补啥；这轮只评审，别动我的文档。
    ```
+
+   > **完成后下一步**：
+   >
+   > 1. 按评审反馈补完详细设计后，把 `HD-NNN.md` / `database-design.md` / `api-design.md` 的 `status: draft → reviewed`，`reviewers:` 加一行。
+   > 2. 跑 `/run-gate H3` 做机械复核（其中"在现有仓库结构下的落点已确认"对应 RepoImpactMapper 输出，全 PASS 才放行）。
+   > 3. 切到 `H4-TestCaseAuthor` 反推测试用例。
 
 7. **H4 测试用例**：切 `h4-test-case-author`。它从 REQ + HD 反推 `docs/05-test-design/test-cases.md`（每条 `TC-NNN`），保证每个 `REQ-NNN` 都有至少一条机械可判断的覆盖。
 
-   _示例输入_（上游 + 覆盖下限 + 分组约束）：
+   _示例输入_（说清覆盖下限和分组要求，让用例不至于模糊）：
 
    ```text
-   上游：REQ-001~REQ-005 + HD-001~HD-003。
-   反推到 docs/05-test-design/test-cases.md：
-   - 每条 REQ 至少一条 TC-NNN 覆盖
-   - 每条 TC 必须可机械判断（命令 / 期望输出 / 失败标准）
-   分组：契约测试 / 集成测试 / E2E 关键流。
+   对着 REQ-001 到 REQ-005 和 HD-001 到 HD-003，
+   反推一份测试用例矩阵到 docs/05-test-design/test-cases.md。
+   两条硬要求：
+   每条需求至少有一条 TC 兜底；
+   每条 TC 都得是机器能判定的——给具体命令、期望输出、什么算失败。
+   分三组写：契约测试、集成测试、E2E 关键流。
    ```
+
+   > **完成后下一步**：
+   >
+   > 1. 评审 `docs/05-test-design/test-cases.md` / `test-matrix.md`，`status: draft → reviewed`。
+   > 2. 跑 `/run-gate H4` 做机械复核。
+   > 3. 切到下一节"8. H5 起任务 → 编码 → 审提交"，用 `/new-task` 起第一张任务卡。
 
 8. **H5 起任务 → 编码 → 审提交**：上游凭证齐全后，就可以走 [1.2 节](#12-已有项目从-h5-起跳) 那四步把每条任务跑完。
 9. **H6 发版说明**：版本切出来时切 `h6-release-note-writer`，从 commit 抽取生成 `docs/07-release/release-notes.md`，回写追溯矩阵。
 
-   _示例输入_（版本 + commit 范围 + 破坏性变更隔离要求）：
+   _示例输入_（版本号 + commit 范围 + 破坏性变更要单独成章）：
 
    ```text
-   版本：v0.2.0
-   commit 范围：afa72c7..HEAD
-   产出 docs/08-releases/v0.2.0.md：
-   - 特性 / 修复 / 文档 / 重构 分类
-   - 破坏性变更单独章节，每条给迁移指引
-   - 同步回写追溯矩阵（REQ ↔ HD ↔ TC ↔ Task ↔ Commit）
+   准备发 v0.2.0，commit 范围从上一个 tag v0.1.0 到 HEAD。
+   给我写一份 docs/08-releases/v0.2.0.md：
+   特性 / 修复 / 文档 / 重构 分四类列；
+   破坏性变更单独开一节，每条都得告诉用户怎么迁移；
+   最后顺手把追溯矩阵（REQ ↔ HD ↔ TC ↔ Task ↔ Commit）回写一下。
    ```
+
+   > **完成后下一步**：
+   >
+   > 1. 评审 `docs/08-releases/v<X.Y.Z>.md` 与 `traceability-matrix.md`，`status: draft → reviewed`，发版后 `status: approved`（这是签字位的特例）。
+   > 2. 跑一次 `Hx-DocGardener`（横切，不阻塞）扫一遍 `docs/`，对已腐化的文档加 `status: deprecated`，**不要物理删除**。
+   > 3. 把已完成的任务从 `docs/06-tasks/task-board.md` 第 1 节迁到第 3 节"已交付任务"，回填 `发布说明` / `追溯矩阵` 两列。
 
 > 第 1+2 步产出的 `requirements.md` / `ui-spec.md` / `acceptance-criteria.md` 是后面所有阶段的"上游凭证"——commit message 里的 `Design: REQ-001` / `Tests: TC-NNN` / `Task: TASK-NNN` 都是顺着它们往下挂的。**没有这两步，提交格式校验会一路把你打回来**。
 
@@ -167,32 +251,48 @@
    _示例输入_（一句话说清要做什么 + 上游凭证号）：
 
    ```text
-   /new-task 给 ChatHistoryService 增加 SQL Server 持久化实现，
-   对应 REQ-007 + HD-012；先给我任务草稿 + 板上登记，暂不动代码。
+   /new-task 想给 ChatHistoryService 加一个 SQL Server 持久化实现，
+   对应 REQ-007 + HD-012。
+   先出任务卡草稿、登记到看板，代码先别碰，等我审完再动。
    ```
+
+   > **完成后下一步**：把任务卡 `docs/06-tasks/T-NNN-xxx.md` 打开人工审一遍，进下一节"2. 人工审任务说明"——`/new-task` 只起草，不替你确认范围。
 
 2. **人工审任务说明**：核对 `允许修改的文件` 与 `Verify 命令` 是否合理；OK 之后把 `docs/06-tasks/task-board.md` 里这一行的 `status` 改成 `ready`。
+
+   > **完成后下一步**：状态改成 `ready` 之后切下一节"3. 切到 `H5-CodingExecutor`"。`status` 没改 `ready` 时 Executor 不会真正执行，会要求你先确认范围。
+
 3. **切到 `H5-CodingExecutor`**：在 Copilot Chat 输入框下方的 Agent 下拉里选它，让它按任务说明执行。
 
-   _示例输入_（明确任务卡 + 不越界 + 每改必验）：
+   _示例输入_（指定任务卡 + 不越界 + 每改必跑 verify）：
 
    ```text
-   按 docs/06-tasks/T-007-sqlserver-chat-history.md 执行：
-   - 只改任务卡里“允许修改的文件”列出的范围；
-   - 每改完一处跑 Verify：dotnet test；
-   - 超出范围或 Verify 失败时阻塞返回，不要自作主张扩大改动。
+   按 docs/06-tasks/T-007-sqlserver-chat-history.md 这张任务卡干。
+   范围别越界——卡里“允许修改的文件”以外的别碰；
+   每改完一处都跑一下 dotnet test 看跑不跑得过；
+   范围不够或者测试挂了，停下来告诉我，别自己想办法绕过去。
    ```
+
+   > **完成后下一步**：
+   >
+   > - **Verify 通过**：把 `docs/06-tasks/task-board.md` 这一行的 `status` 改成 `coded`，进下一节"4. 提交前切到 `H5-CommitAuditor`"。
+   > - **阻塞返回（`status: blocked`）**：把 `suggested_next_action` 直接搬进 `docs/06-tasks/task-board.md` 第 2 节"等待人工决策"，按提示补完上游再回到本节重跑——**不要复用旧的 chat 上下文**（参见 `agents/_shared/io-contracts.md` 第 6 节）。
 
 4. **提交前切到 `H5-CommitAuditor`**：让它逐字段校验 commit message（Design / Tests / Verify / Docs / Risk / Task）。
 
-   _示例输入_（说清本次 commit 范围 + 期望被否决的下限）：
+   _示例输入_（说清本次 commit 覆盖什么 + 缺字段就否决，别帮我编号）：
 
    ```text
-   准备提交：HEAD 这次改动覆盖 T-007（SQL Server 聊天历史）。
-   校验 commit message 的六字段：
+   我刚把 T-007（SQL Server 聊天历史）改完准备提交。
+   帮我看一下 commit message 那六字段够不够格——
    Design / Tests / Verify / Docs / Risk / Task。
-   不合格直接拒绝，告诉我缺哪条、怎么补；不要代笔编造编号。
+   缺啥告诉我，别帮我编号——编号必须是我能从仓库里查到的真东西。
    ```
+
+   > **完成后下一步**：
+   >
+   > - **审核通过**：执行 `git commit`，把 `docs/06-tasks/task-board.md` 对应行从第 1 节"在跑任务"迁到第 3 节"已交付任务"，回填 `发布说明 / 追溯矩阵` 两列（暂无 release 时填 `pending`）。
+   > - **审核拒绝**：CommitAuditor 报哪个字段缺，回上游补对应凭证（`Design` 缺找 H3，`Tests` 缺找 H4），**不要自己编号**——编号必须能在仓库内被查到。
 
 > 中小变更允许跳过 H1–H4 直接从 H5 起跳，但底线是：**每个 commit 至少要能映射到一条 `REQ-NNN`**。如果这次改动连 REQ 都对不上，先回 1.1 节第 1 步把 requirements 补齐再来——`H5-CommitAuditor` 不会替你豁免这条。
 
@@ -209,7 +309,7 @@
 │                                                   人手回写 docs/02-prototype/│
 │                                                   prototype-review.md        │
 │  H1 原型实践      → 你自选原型工具              → prototypes/<feature>/      │
-│  H1 影响图（可选）→ H1-RepoImpactMapper         → docs/01-requirements/      │
+│  H1 影响图        → H1-RepoImpactMapper         → docs/01-requirements/      │
 │  H2 架构 / ADR    → H2-ArchitectAdvisor         → docs/03-architecture/      │
 │  H3 详细设计评审  → H3-DesignReviewer           → docs/04-detailed-design/   │
 │  H4 测试用例      → H4-TestCaseAuthor           → docs/05-test-design/       │
@@ -273,10 +373,10 @@
 
 ---
 
-## 4. `.harness-engineering/` 里都装了什么
+## 4. `.he/` 里都装了什么
 
 ```
-.harness-engineering/
+.he/
 ├── HANDBOOK.md       ← 你正在读的这份手册
 ├── README.md         ← 解释这个目录的角色 + .gitignore 建议
 ├── docs/             ← 设计文档（stages.md / repo-layout.md / tech-debt-gc.md）
@@ -290,7 +390,7 @@
 如果觉得它和项目本身无关、不想入版本库，**推荐把它加进 `.gitignore`**：
 
 ```gitignore
-.harness-engineering/
+.he/
 ```
 
 代价：团队其他人 `git pull` 后看不到这份手册，需要自己再跑一次 `install.ps1`。如果想让所有人都能直接读，就保留入版本库。
@@ -375,7 +475,7 @@ Copy-Item .github\templates\ai-task-brief.md docs\06-tasks\T-001-<slug>.md
 | `H1-RequirementsInterviewer` | H1    | 反问把模糊需求转成可评审 `requirements.md`                                                  |
 | `H1-UISpecAuthor`            | H1    | 反问把 UI 细节逼出，按 stages.md 4.5 节 10 项产出 ui-spec / user-flow / acceptance-criteria |
 | `H1-PrototypeReviewer`       | H1    | 只读评审：读原型 + UI 文档，按 phase-gate H1 12 条 PASS/FAIL，不写文件                      |
-| `H1-RepoImpactMapper`        | H1↔H3 | 把已 reviewed 需求映射到真实仓库代码                                                        |
+| `H1-RepoImpactMapper`        | H1↔H3 | 产出“需求 ↔ 真实代码”对账单；H2 / H3 必需输入；H5 阶段用作 AI “允许修改文件”的边界              |
 | `H2-ArchitectAdvisor`        | H2    | 起草架构选型 + ADR，每条选型留六字段                                                        |
 | `H3-DesignReviewer`          | H3    | 评审详细设计是否可进 H4                                                                     |
 | `H4-TestCaseAuthor`          | H4    | 从需求与设计反推测试用例矩阵                                                                |
@@ -545,7 +645,7 @@ tools:
 - 选 `A`：本次后续所有冲突一律覆盖
 - 选 `B`：中断本次 install
 
-只有传 `-Force` 才会全部静默覆盖。想长期 own 某个文件，每次升级时按 `K` 即可；想彻底脱钩、连询问都不要，从 `.harness-engineering/manifest.json` 里删掉对应那一行。
+只有传 `-Force` 才会全部静默覆盖。想长期 own 某个文件，每次升级时按 `K` 即可；想彻底脱钩、连询问都不要，从 `.he/manifest.json` 里删掉对应那一行。
 
 ### Q3: 升级到新版本
 
@@ -561,7 +661,7 @@ pwsh -File <harness-source-repo>/install.ps1 -TargetRepo .
 ### Q4: 一键卸载
 
 ```powershell
-pwsh -File .\.harness-engineering\uninstall.ps1
+pwsh -File .\.he\uninstall.ps1
 ```
 
 按 `manifest.json` 反向移除全部装过的文件。本地改过的文件默认**保留**并打 `keep` 标记，加 `-Force` 才会一并删除；不在 manifest 里的文件全程不动。
@@ -569,7 +669,7 @@ pwsh -File .\.harness-engineering\uninstall.ps1
 ### Q5: 我想看完整安装日志
 
 ```powershell
-Get-Content .\.harness-engineering\install.log
+Get-Content .\.he\install.log
 ```
 
 每次 install / uninstall 追加一行：时间戳 / harness commit / 目标列表 / 文件计数。可作为变更审计来源。
@@ -578,6 +678,140 @@ Get-Content .\.harness-engineering\install.log
 
 不会。**模板只是新文档的起点**。已存在的产物文档完全归你管，install 与模板更新都不会动它们；想用上新模板的字段，需要自己手动 backport。
 
+### Q7: 为什么跑完 `/log-review` / 走完 H1，`requirements.md` 的 `status` 还是 `draft`？
+
+这不是 bug，是设计。整套体系里的 `status` 字段（`draft` → `reviewed` → `approved` → `deprecated`）**被刻意保留为人工签字位**：
+
+- 起草类 Agent（如 `H1-RequirementsInterviewer` / `H1-UISpecAuthor`）只产出 `draft`；
+- 只读评审员（如 `H1-PrototypeReviewer`）的工具集里**没有 `edit/*`**，物理上就写不了任何文件；
+- `/log-review` 只往 `docs/07-reviews/` 落评审纪要，不反向动上游产物的 frontmatter；
+- 下游消费者（如 `H2-ArchitectAdvisor`）只检查 `status >= reviewed`，从不生产 `status`。
+
+为什么这么设计：如果 Agent 能自动把自己起草的东西改成 `approved`，就出现"AI 起草 → AI 评审 → AI 签字"的闭环，两道闸门全部失效。类比 CI 跑过了仍需人点 merge，`status` 就是文档维度的 merge 按钮。
+
+怎么处理：评审纪要落档后（`/log-review` 运行完），人工去上游三份文档里把 `status: draft` 改成 `reviewed`、在 `reviewers:` 添一行，参考 [1.1 节第 2 步 · 签字位回写](#11-全新项目从-h1-起步) 的 YAML 示例。走完这一步之后 `H1-RepoImpactMapper` / `H2-ArchitectAdvisor` 才会放你过。
+
+> **改完 status 后下一步**：直接回到 [1.1 节第 3 步](#11-全新项目从-h1-起步) 跑 `/run-gate H1`；通过则切到第 4 步 `H1-RepoImpactMapper`，没通过按 gate 报告补缺的字段——不需要再问 Agent 接下来做啥。
+
+### Q8: 我只用 GitHub Copilot，仓库根的 `AGENTS.md` 还要不要写？
+
+要写，但不需要写得像百科全书。
+
+先把三件事重新划清边界：
+
+- 仓库根 `AGENTS.md`：**项目对所有 AI 工具的对外声明**。跨工具单一事实源（参见 [`docs/repo-layout.md` 第 10.1 节](../../docs/repo-layout.md#101-agentsmd-的使用约定)），负责项目身份、模块边界、文档目录。是项目负责人的**签字位**，不是工具链产物。顶层控制在 100 行以内，只写索引、不复述细节。
+- `.github/copilot-instructions.md`：**Copilot 实施细节**。硬约束、指令集路径、专用 Agent 速查。是 `install.ps1` 装的标准件，manifest 跟踪、升级会检测本地修改。
+- 两者互相 reference，**不重复内容**：`AGENTS.md` 一句话指向 `copilot-instructions.md` 讲硬约束，`copilot-instructions.md` 顶部一句话指向 `AGENTS.md` 讲项目身份。
+
+为什么 GitHub Copilot 原生不读 `AGENTS.md`也还是得写：
+
+- `H1-RepoImpactMapper` 的输入契约硬性要求读 `AGENTS.md` 识别“模块边界禁区”——这是规范层的约束，与底层调用哪个工具无关。
+- `AGENTS.md` 是跨工具开放约定（OpenAI / Cursor / Factory 等 2025-08 联合提出）：你今天只用 Copilot，明天切 Codex / Claude Code / Cursor 时它们会直接读，这份文件保证不用重复维护项目身份。
+- `install.ps1` 不装它，是因为签字位不能由工具代签（跟 Q7 的 `status` 同源）：AI 写一份“我自己暂时无限制”的声明与 AI 给自己改 `status: reviewed` 是同一种漏洞。
+
+最小可工作版本（约 60 行）：
+
+```markdown
+# <项目名>
+
+> AI 协作单一事实源——遵循 [AGENTS.md 跨工具开放约定](https://agents.md/)。
+> 本仓库采用 [Harness Engineering 规范](.he/HANDBOOK.md) 作为工程骨架。
+
+## 1. 项目身份
+
+<!--
+项目负责人签字位。AI 不能替写。
+一句话讲清：目标用户是谁、核心价值是什么。最多 2 行。
+
+模板示例：
+> Inkwell 是给个人技术博客作者用的 AI 内容工厂：
+> 输入题目 → AI 多轮迭代磨稿 → 输出可直接发布的 Markdown。
+
+完成签字后下一步：
+1. 改 docs/01-requirements/repo-impact-map.md 第 3 节，把 GAP-001 标为"已关闭（写日期）"，
+   同时把 0.1 节"AGENTS.md"行从"无"改"有"。
+2. 提交一条 commit 记录这次签字，参考 .github/instructions/commit-format.instructions.md。
+3. 第 4 节"模块边界 / 禁区"维持 TODO 不动——H2 选型完成后再回来填。
+-->
+> **TODO（项目负责人签字位）**：1 句话项目定位待补。
+
+**当前阶段**：H1 / H2 / ...
+
+## 2. AI 工具与入口
+
+本项目当前唯一启用 GitHub Copilot Chat。
+
+- 工具入口：`.github/copilot-instructions.md`（Copilot 自动加载）
+- Agent / Skill / Prompt 速查与白名单改法：`.he/HANDBOOK.md` 第 6 节、第 7 节
+
+> 切到 Codex / Claude Code / Cursor 时本文件作为跨工具事实源不变。
+
+## 3. 硬约束
+
+详见 `.github/copilot-instructions.md` 第 1 节。本文件不复述。
+
+## 4. 模块边界 / 禁区
+
+<!--
+H2 架构选型完成后由项目负责人补充：
+  - 哪些目录是其他模块的私有领域，跨模块调用的允许 / 禁止清单
+  - 哪些目录禁止 AI 自动修改（须人工评审）
+  - 与外部依赖（登录 / 模型网关 / 搜索服务商等）耦合的边界
+
+H1-RepoImpactMapper、H3-DesignReviewer、H5-CodingExecutor 都依赖本节做边界判断。
+
+完成本节签字后下一步：
+1. 跑一次 /run-gate H2 做机械复核。
+2. 评审 docs/03-architecture/ 下产出，把 status: draft → reviewed。
+3. 切到 H3 起草 docs/04-detailed-design/<feature>/HD-NNN.md。
+-->
+> **TODO（H2 选型完成后由项目负责人补充）**：空仓 / greenfield 阶段暂无既有禁区。
+
+## 5. 文档入口
+
+| 内容 | 位置 |
+| --- | --- |
+| 操作手册 | `.he/HANDBOOK.md` |
+| 当前需求 | `docs/01-requirements/requirements.md` |
+| 仓库影响图 | `docs/01-requirements/repo-impact-map.md` |
+| H1 评审纪要 | `docs/07-reviews/` |
+| 任务看板 | `docs/06-tasks/task-board.md` |
+
+## 6. 提交规范
+
+详见 `.github/instructions/commit-format.instructions.md`。每条 commit 含 `Design / Tests / Verify / Docs / Risk / Task` 六字段。
+```
+
+在这份最小版本中，只有第 1 节（项目身份）与第 4 节（模块边界）是你需要亲手签的签字位。其他都是指针，不需要你另外维护。**两个签字位的 HTML 注释里都内嵌了"完成签字后下一步"**——签完不知道接下来做什么时直接回头看注释，不需要再问 Agent。
+
+为什么这里不能让 AI 代笔：这两节付与项目负责人的同一套逻辑——谁都不能替项目说“我是谁”“我该受什么限制”。`H1-RepoImpactMapper` / `H3-DesignReviewer` / `Hx-DocGardener` 都是这两节的下游消费者；AI 代笔 = 让下游评审在架空凭证上跑。
+### Q9: Agent 起草的文档里有"待填"位置，我应该在哪里改？怎么改？
+
+简短答：**搜 `[ 待填 ]`**。
+
+整套规范统一约定：所有需要人工填答 / 决策 / 签字的位置都用 markdown blockquote + 粗体方括号标记：
+
+```markdown
+> **[ 待填 ]**：<提示语>
+```
+
+这是 `agents/_shared/io-contracts.md` 第 7 节（[源仓](https://github.com/shuaihuadu/harness-engineering/blob/main/agents/_shared/io-contracts.md)）的硬约束。在 VS Code 里直接 `Ctrl+Shift+F` 搜 `[ 待填 ]` 就能列出整个仓库还有哪些位置等你动手。
+
+最常见的 5 类落点：
+
+| 落点                                         | 怎么填                                                                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `open-questions*.md` 每条 OQ 的 **回答 / 决策日期 / 决策人** 行 | 整行替换 `> **[ 待填 ]**：...`，写下你的选择（A / B / C / 自定义）+ 1 句理由。模板见 [`templates/open-questions.md`](../../.github/templates/open-questions.md) |
+| 文档 frontmatter 的 `reviewers: []`          | `/log-review` 后人工追加一行（`name / role / decision: approved / date`），格式见 `agents/_shared/io-contracts.md` 第 2 节（[源仓](https://github.com/shuaihuadu/harness-engineering/blob/main/agents/_shared/io-contracts.md)）            |
+| 文档 frontmatter 的 `status: draft`          | 评审通过后人工改 `draft → reviewed`（参见 [Q7](#q7-为什么跑完-log-review--走完-h1requirementsmd-的-status-还是-draft)）                      |
+| `phase-gate-checklist.md` 表格"结论"列       | `/run-gate` 跑完汇总后，人工把 `[ ]` 勾成 `[x]`，再切下一阶段                                                                     |
+| `AGENTS.md` 第 1 节项目身份 / 第 4 节模块边界 | 项目负责人亲手签字，HTML 注释里内嵌了"完成签字后下一步"指引（参见 [Q8](#q8-我只用-github-copilot仓库根的-agentsmd-还要不要写)）           |
+
+约束：
+
+- **整行替换**：把 `> **[ 待填 ]**：...` 整行替换成你的内容，不要在原行后追加（追加 = grep 还会把这行匹配出来，看起来还没填）。
+- **不要让 Agent 代填**：任何标了 `[ 待填 ]` 的位置，Agent 没有权限填——它只会在 `suggested_next_action` 里指出"哪份文件的哪行需要人工填"（参见第 5 节阻塞返回）。如果 Agent 试图替你填，那是它越权，请在 PR 评审时退回。
+- **新建产物时**：如果你自己起草一份新的 OQ / review-record，按 `templates/` 下对应模板复制一份；模板自带 `[ 待填 ]` placeholder，复制后只需要替换。
 ---
 
 对手册本身有疑问或建议，去 [Harness Engineering 源仓库](https://github.com/shuaihuadu/harness-engineering) 提 Issue。

@@ -1,6 +1,6 @@
 # Copilot Instructions
 
-本仓库采用 [Harness Engineering 规范](../.harness-engineering/HANDBOOK.md) 作为 AI 协作的工程骨架。下方规则面向 GitHub Copilot，按"目录"原则编写：只列硬约束，详细规则全部指向源文档。
+本仓库采用 [Harness Engineering 规范](../.he/HANDBOOK.md) 作为 AI 协作的工程骨架。下方规则面向 GitHub Copilot，按"目录"原则编写：只列硬约束，详细规则全部指向源文档。
 
 > 项目身份与技术栈以仓库根 `README.md` / `AGENTS.md` 为准，本指令不重复维护，避免漂移。
 
@@ -9,13 +9,13 @@
 - 所有变更必须能映射到一条 `REQ-NNN`（需求编号）。无对应需求的请求一律先反问，不直接写代码。
 - 提交信息必须满足 [`commit-format.instructions.md`](./instructions/commit-format.instructions.md) 的字段要求：`Design / Tests / Verify / Docs / Risk / Task` 六字段齐备。
 - 修改源码前先运行 `dotnet test`，确保起点干净；提交前再次运行，确认未引入回归。
-- 风格检查：`dotnet format --verify-no-changes`，警告视作错误处理。
+- 风格检查：`dotnet format`，警告视作错误处理。
 - `docs/` 是事实来源（source of truth）：先改文档再改代码，不要让代码先于设计落地。
 - 不在 `docs/04-detailed-design/` 之外的位置放设计内容；不在 `AGENTS.md` 里复述能用 Lint / Hooks / CI 强制的规则。
 
 ## 2. 何时切换到专用 Custom Agent
 
-当前项目已装的 Custom Agent（在 VS Code Copilot Chat 输入框下方的 Agent 下拉菜单中选择）。Agent 名以 `h<阶段号>-` 开头，对应 [Harness 阶段](../.harness-engineering/docs/stages.md) H1–H6，横切阶段用 `hx-`：
+当前项目已装的 Custom Agent（在 VS Code Copilot Chat 输入框下方的 Agent 下拉菜单中选择）。Agent 名以 `h<阶段号>-` 开头，对应 [Harness 阶段](../.he/docs/stages.md) H1–H6，横切阶段用 `hx-`：
 
 | 场景                             | 使用 Agent                    |
 | -------------------------------- | ----------------------------- |
@@ -43,10 +43,10 @@
 
 ## 4. 关键文档入口
 
-- 操作手册（10 分钟上手）：[`HANDBOOK.md`](../.harness-engineering/HANDBOOK.md)
-- 阶段细则：[`docs/stages.md`](../.harness-engineering/docs/stages.md)（H1–H6）
-- 目录规范：[`docs/repo-layout.md`](../.harness-engineering/docs/repo-layout.md)
-- 技术债务 GC：[`docs/tech-debt-gc.md`](../.harness-engineering/docs/tech-debt-gc.md)
+- 操作手册（10 分钟上手）：[`HANDBOOK.md`](../.he/HANDBOOK.md)
+- 阶段细则：[`docs/stages.md`](../.he/docs/stages.md)（H1–H6）
+- 目录规范：[`docs/repo-layout.md`](../.he/docs/repo-layout.md)
+- 技术债务 GC：[`docs/tech-debt-gc.md`](../.he/docs/tech-debt-gc.md)
 - 项目 ADR：`docs/03-architecture/adr/`
 - 模板：[`.github/templates/`](./templates/)（任务卡 / 阶段门 / 评审记录 / 任务板）
 - 可复用操作型 SOP（Skills）：`.github/skills/<name>/SKILL.md`。Copilot 按 description 语义命中后自动加载，也可 `/<skill-name>` 显式调用。

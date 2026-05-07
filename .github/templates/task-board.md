@@ -12,7 +12,18 @@ maintainer: <人或调度 Agent>
 > 维护原则：谁推进任务，谁顺手更新对应行；不允许只挂"漂亮但没人维护"的状态。
 >
 > **运行时位置**：本模板在采用方仓库的运行时实例位于 `docs/06-tasks/task-board.md`。`/new-task` 第一次运行时会自动按本模板创建到该路径，**不要把它复制到仓库根**。
-> 阶段定义见 `.harness-engineering/docs/stages.md`，仓库结构入口见 `.harness-engineering/docs/repo-layout.md`。
+> 阶段定义见 `.he/docs/stages.md`，仓库结构入口见 `.he/docs/repo-layout.md`。
+
+## 0. 维护本看板的常见动作
+
+| 你想做的事 | 去哪里做 | 看板上同步改哪一节 |
+| --- | --- | --- |
+| 新增一条任务 | Copilot Chat 输入 `/new-task <一句话需求>` | 自动追加到第 1 节"在跑任务"，状态 `draft` |
+| 任务卡草稿评审过了，可以开工 | 手动改本看板对应行的 `状态` 列 `draft → ready` | 第 1 节 |
+| 任务被 `H5-CodingExecutor` 阻塞返回 / 卡上游 / 缺凭证 | 把阻塞登记进第 2 节 | 第 2 节"等待人工决策" |
+| 任务编码完且 commit 过 CommitAuditor | 把对应行迁出第 1 节、迁入第 3 节 | 第 1 节 → 第 3 节 |
+| 任务暂缓 / 取消 | 把对应行迁入第 4 节 | 第 4 节 |
+| 跑一次"看板与代码 / commit 是否对齐"的体检 | Copilot Chat 输入 `/sync-board` | 由 sync-board 报告失同步项，按报告改 |
 
 ## 1. 在跑任务（H1–H5）
 
@@ -21,7 +32,7 @@ maintainer: <人或调度 Agent>
 | TASK-YYYY-MM-DD-001 |  | H1 / H2 / H3 / H4 / H5 | `docs/0X-xxx/...` |  | YYYY-MM-DD |
 
 字段约定：
-- **当前阶段**：取自 H1–H6（阶段定义见 `.harness-engineering/docs/stages.md`）；阶段切换时更新本字段，旧阶段的产物路径在文档目录字段保留可点
+- **当前阶段**：取自 H1–H6（阶段定义见 `.he/docs/stages.md`）；阶段切换时更新本字段，旧阶段的产物路径在文档目录字段保留可点
 - **文档目录**：当前阶段的主要产物落点（如 `docs/04-detailed-design/feature-x/`）；缺失时填 "—"
 - **阻塞 / 风险**：写"阻塞了谁、需要谁解"，不写"觉得有点问题"
 - **最近一次推进**：上次有 commit / 评审记录 / 文档更新的日期，超过两周未动应进入"暂缓"
@@ -50,8 +61,8 @@ maintainer: <人或调度 Agent>
 
 ## 5. 与其他索引的关系
 
-- 代码侧的"从哪进门"：见 `.harness-engineering/docs/repo-layout.md`（仓库结构、目录职责、模块落点）
-- 阶段定义与门禁：见 `.harness-engineering/docs/stages.md`
+- 代码侧的"从哪进门"：见 `.he/docs/repo-layout.md`（仓库结构、目录职责、模块落点）
+- 阶段定义与门禁：见 `.he/docs/stages.md`
 - 当前活跃执行计划：`docs/06-implementation/exec-plans/active/`
 
 任务看板偏需求侧（"在做什么、做到哪了"），repo-layout 偏代码侧（"该改在哪"）。两个入口配合使用，新接手的人或下一轮的需求分析 Agent 才能在不重读全部历史的前提下建立全局视野。

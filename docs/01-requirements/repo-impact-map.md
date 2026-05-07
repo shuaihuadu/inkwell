@@ -5,7 +5,10 @@ status: reviewed
 authors:
   - name: H1-RepoImpactMapper
     role: agent
-reviewers: []
+reviewers:
+  - name: self-review
+    decision: approved-with-changes
+    date: 2026-05-07
 created: 2026-05-07
 updated: 2026-05-07
 upstream:
@@ -28,15 +31,15 @@ downstream: []
 
 ### 0.1 仓库基线（2026-05-07 扫描结果）
 
-| 维度 | 状态 | 证据 |
-| --- | --- | --- |
-| 产品源码 | **无** | `**/*.{cs,csproj,sln,ts,tsx,json}` 仅命中 [.harness-engineering/manifest.json](../../.harness-engineering/manifest.json)（元配置） |
-| 仓库根 `README.md` | **无** | `**/README.md` 仅命中 [.harness-engineering/README.md](../../.harness-engineering/README.md)（工程骨架文档） |
-| 仓库根 `AGENTS.md` | **无** | `**/AGENTS.md` 0 命中 |
-| 既有 ADR | **无** | `docs/03-architecture/` 不存在 |
-| 既有详细设计 | **无** | `docs/04-detailed-design/` 不存在 |
-| 已有原型 | 有 | [prototypes/custom-agent/](../../prototypes/custom-agent/) 5 页 + assets，**仅 H1 评审用**，**不是**产品代码 |
-| Harness 工程骨架 | 有 | [.harness-engineering/](../../.harness-engineering/) `harness_version: 0.0.1`，targets=copilot |
+| 维度               | 状态   | 证据                                                                                                                               |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 产品源码           | **无** | `**/*.{cs,csproj,sln,ts,tsx,json}` 仅命中 [.he/manifest.json](../../.he/manifest.json)（元配置） |
+| 仓库根 `README.md` | **无** | `**/README.md` 仅命中 [.he/README.md](../../.he/README.md)（工程骨架文档）                       |
+| 仓库根 `AGENTS.md` | **有**（2026-05-07 项目负责人签字） | [AGENTS.md](../../AGENTS.md) 第 1 / 4 节签字位均已落字；GAP-001 已关闭（见 [第 3 节](#3-缺失发现43)）                   |
+| 既有 ADR           | **无** | `docs/03-architecture/` 不存在                                                                                                     |
+| 既有详细设计       | **无** | `docs/04-detailed-design/` 不存在                                                                                                  |
+| 已有原型           | 有     | [prototypes/custom-agent/](../../prototypes/custom-agent/) 5 页 + assets，**仅 H1 评审用**，**不是**产品代码                       |
+| Harness 工程骨架   | 有     | [.he/](../../.he/) `harness_version: 0.0.1`，targets=copilot                                     |
 
 ### 0.2 验收豁免说明
 
@@ -61,15 +64,15 @@ downstream: []
 > - **风险**：兼容性 / 性能 / 数据迁移 / 外部依赖等
 > - **置信度**：见 0.2 节豁免说明
 
-| REQ | 受影响模块（已存在） | 受影响文件（已存在） | 预计新增模块（建议） | 受影响接口 / 数据结构 | 受影响测试 | 风险 | 置信度 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| [REQ-001](./requirements.md#req-001) Agent 生命周期 | 无 | 无 | `<frontend>/我的 Agent 列表页`、`<backend>/Agent CRUD 服务`、`<dal>/Agent 持久化（含软删除 7 天）`、`<frontend>/路由守卫` | 无既有接口；新接口由 H3 定义 | 新增：列表 / 创建 / 复制 / 重命名 / 删除 / 软删除恢复 / 跨用户隔离 单测与集成测；端到端见 [F1 / F4](./user-flow.md) | R7 登录子系统硬依赖（[requirements.md R7](./requirements.md#121-风险)） | low |
-| [REQ-002](./requirements.md#req-002) Agent 基础元数据 | 无 | 无 | `<frontend>/Agent 编辑页 · 基本信息子区`、`<backend>/Agent 元数据校验`、`<object-storage>/头像存储` | 无 | 新增：名称 / 头像 / 描述 校验单测；头像上传集成测 | 头像存储后端选型未定（用户偏好"本地 + 云存储多 provider"，待 H2 决策） | low |
-| [REQ-003](./requirements.md#req-003-instructions系统指令-mvp) Instructions | 无 | 无 | `<frontend>/Agent 编辑页 · Instructions 子区`、`<backend>/Instructions 持久化` | 无 | 新增：长文本字符数提示 / dirty 状态 / 取消二次确认 单测 | NFR-001 不暴露开发者概念（无后端审核） | low |
-| [REQ-004](./requirements.md#req-004-在线试运行--对话调试-mvp) 试运行 / 对话调试 | 无 | 无 | `<frontend>/Agent 编辑页 · 试运行下半屏`、`<backend>/对话编排服务（MAF）`、`<chat-protocol>/AGUI 服务端`、`<frontend>/AGUI 客户端` | 无 | 新增：流式对话 / 重试 3 次 / Tool 调用串接 / E6 首次启用须知 集成测 | OQ-030 落地形态待定（同页组件 vs iframe）；AGUI 协议成熟度未在仓库内验证；MAF 商业支持状态需 H2 核 | low |
-| [REQ-010](./requirements.md#req-010-skill-管理agentskillsio-标准-mvp) Skill 管理 | 无 | 无 | `<frontend>/Skill 编辑器抽屉 P3`、`<backend>/SKILL.md 解析器`、`<dal>/用户级 Skill 库 + Agent-Skill 引用关系（[DB-006](./requirements.md#8-数据边界)）` | agentskills.io 规范（[外部规范](https://agentskills.io/specification)） | 新增：YAML frontmatter 解析 / name 正则 / 字段缺失诊断（[E7](./requirements.md#9-异常场景)）单测；导入 .md 集成测 | 外部规范跟随成本（规范若变更需追跟） | low |
-| [REQ-011](./requirements.md#req-011-内置-tool-启用-mvp) 内置 Tool 启用 | 无 | 无 | `<frontend>/Agent 编辑页 · Tool tab`、`<backend>/Tool 启用配置（DB-007）`、`<backend>/Tool T-1 联网搜索适配器`、`<backend>/Tool T-3 当前日期适配器` | 无；首批仅 T-1 / T-3（[ND-013](./requirements.md#11-不做范围)） | 新增：T-1 联网搜索调用失败重试 3 次 / E6 首次启用须知 / Tool 启用配置 单测 | R8 第三方 Tool 合规与可用性外发依赖（[requirements.md R8](./requirements.md#121-风险)） | low |
-| [REQ-012](./requirements.md#req-012-mcp-server-集成-mvp-ui-占位--vnext-后端) MCP UI 占位 | 无 | 无 | `<frontend>/Agent 编辑页 · MCP tab（disabled + Empty）` | 无；后端 MCP 调用本期不做（[ND-010](./requirements.md#11-不做范围)） | 新增：占位 tab disabled 渲染 / Empty 文案 单测 | vNext 后端启用时不能因 MVP UI 占位而锁死 contract（H3 留扩展点） | low |
+| REQ                                                                                      | 受影响模块（已存在） | 受影响文件（已存在） | 预计新增模块（建议）                                                                                                                                    | 受影响接口 / 数据结构                                                   | 受影响测试                                                                                                          | 风险                                                                                               | 置信度 |
+| ---------------------------------------------------------------------------------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------ |
+| [REQ-001](./requirements.md#req-001) Agent 生命周期                                      | 无                   | 无                   | `<frontend>/我的 Agent 列表页`、`<backend>/Agent CRUD 服务`、`<dal>/Agent 持久化（含软删除 7 天）`、`<frontend>/路由守卫`                               | 无既有接口；新接口由 H3 定义                                            | 新增：列表 / 创建 / 复制 / 重命名 / 删除 / 软删除恢复 / 跨用户隔离 单测与集成测；端到端见 [F1 / F4](./user-flow.md) | R7 登录子系统硬依赖（[requirements.md R7](./requirements.md#121-风险)）                            | low    |
+| [REQ-002](./requirements.md#req-002) Agent 基础元数据                                    | 无                   | 无                   | `<frontend>/Agent 编辑页 · 基本信息子区`、`<backend>/Agent 元数据校验`、`<object-storage>/头像存储`                                                     | 无                                                                      | 新增：名称 / 头像 / 描述 校验单测；头像上传集成测                                                                   | 头像存储后端选型未定（用户偏好"本地 + 云存储多 provider"，待 H2 决策）                             | low    |
+| [REQ-003](./requirements.md#req-003-instructions系统指令-mvp) Instructions               | 无                   | 无                   | `<frontend>/Agent 编辑页 · Instructions 子区`、`<backend>/Instructions 持久化`                                                                          | 无                                                                      | 新增：长文本字符数提示 / dirty 状态 / 取消二次确认 单测                                                             | NFR-001 不暴露开发者概念（无后端审核）                                                             | low    |
+| [REQ-004](./requirements.md#req-004-在线试运行--对话调试-mvp) 试运行 / 对话调试          | 无                   | 无                   | `<frontend>/Agent 编辑页 · 试运行下半屏`、`<backend>/对话编排服务（MAF）`、`<chat-protocol>/AGUI 服务端`、`<frontend>/AGUI 客户端`                      | 无                                                                      | 新增：流式对话 / 重试 3 次 / Tool 调用串接 / E6 首次启用须知 集成测                                                 | OQ-030 落地形态待定（同页组件 vs iframe）；AGUI 协议成熟度未在仓库内验证；MAF 商业支持状态需 H2 核 | low    |
+| [REQ-010](./requirements.md#req-010-skill-管理agentskillsio-标准-mvp) Skill 管理         | 无                   | 无                   | `<frontend>/Skill 编辑器抽屉 P3`、`<backend>/SKILL.md 解析器`、`<dal>/用户级 Skill 库 + Agent-Skill 引用关系（[DB-006](./requirements.md#8-数据边界)）` | agentskills.io 规范（[外部规范](https://agentskills.io/specification)） | 新增：YAML frontmatter 解析 / name 正则 / 字段缺失诊断（[E7](./requirements.md#9-异常场景)）单测；导入 .md 集成测   | 外部规范跟随成本（规范若变更需追跟）                                                               | low    |
+| [REQ-011](./requirements.md#req-011-内置-tool-启用-mvp) 内置 Tool 启用                   | 无                   | 无                   | `<frontend>/Agent 编辑页 · Tool tab`、`<backend>/Tool 启用配置（DB-007）`、`<backend>/Tool T-1 联网搜索适配器`、`<backend>/Tool T-3 当前日期适配器`     | 无；首批仅 T-1 / T-3（[ND-013](./requirements.md#11-不做范围)）         | 新增：T-1 联网搜索调用失败重试 3 次 / E6 首次启用须知 / Tool 启用配置 单测                                          | R8 第三方 Tool 合规与可用性外发依赖（[requirements.md R8](./requirements.md#121-风险)）            | low    |
+| [REQ-012](./requirements.md#req-012-mcp-server-集成-mvp-ui-占位--vnext-后端) MCP UI 占位 | 无                   | 无                   | `<frontend>/Agent 编辑页 · MCP tab（disabled + Empty）`                                                                                                 | 无；后端 MCP 调用本期不做（[ND-010](./requirements.md#11-不做范围)）    | 新增：占位 tab disabled 渲染 / Empty 文案 单测                                                                      | vNext 后端启用时不能因 MVP UI 占位而锁死 contract（H3 留扩展点）                                   | low    |
 
 ### 1.1 vNext / 撤销 REQ 不在本图范围
 
@@ -131,21 +134,21 @@ downstream: []
 
 ### 2.2 已知技术债务
 
-仓库内无既有代码，**无技术债务可登记**。Harness 工程骨架内[`docs/tech-debt-tracker.md`](../../.harness-engineering/docs/tech-debt-gc.md) 提供了未来登记入口，本期暂无内容。
+仓库内无既有代码，**无技术债务可登记**。Harness 工程骨架内[`docs/tech-debt-tracker.md`](../../.he/docs/tech-debt-gc.md) 提供了未来登记入口，本期暂无内容。
 
 ## 3. 缺失发现（4.3）
 
 > 扫描中发现但**不在任何 REQ 内**的潜在缺口。**不**直接补到 REQ，由项目负责人判断是否补需求或留 H2 处理。
 
-| 编号 | 缺失项 | 影响 | 建议处理者 / 时机 |
-| --- | --- | --- | --- |
-| GAP-001 | 仓库根 `AGENTS.md` 不存在 | 模块边界与禁区无显式声明；本图无法核对"REQ 与禁区冲突"；H5 编码任务卡的"允许 / 禁止修改"清单缺权威依据 | 项目负责人在 H2 启动前补；至少声明"当前无禁区，按空白处理" |
-| GAP-002 | 仓库根 `README.md` 不存在 | 项目身份未声明；[.github/copilot-instructions.md](../../.github/copilot-instructions.md#L5) "项目身份与技术栈以仓库根 README.md / AGENTS.md 为准"无锚点 | 项目负责人在 H2 选型完成后补 |
-| GAP-003 | R7 登录子系统在仓库内无任何证据 | REQ-001 ~ REQ-004 全部依赖"已登录用户"输入；若平台无 SSO/OIDC，本特性无法上线 | H2-ArchitectAdvisor 启动时第一件事确认平台登录方案；写入 ADR-?-平台鉴权依赖 |
-| GAP-004 | 模型网关 / gpt-4.1 接入在仓库内无证据 | REQ-004 试运行 / 对话调试无法验证 | H2 启动时与 GAP-003 一并核 |
-| GAP-005 | 第三方联网搜索（T-1）服务商未指定 | REQ-011 试运行无法跑通；R8 SLA 缺数 | H2 选型时指定具体服务商（如 Bing Search / Google CSE / 自建） |
-| GAP-006 | `docs/03-architecture/` 与 `docs/04-detailed-design/` 目录不存在 | H2 / H3 启动后第一动作就是创建这些目录 | H2-ArchitectAdvisor 首次产出时创建 |
-| GAP-007 | 5 份 H1 文档自身不引用任何具体源码路径（H1 阶段是正确的不越界） | 本图缺"现成的落点假设可以验证" | 不视作缺陷；H2 选型完成后由本图重写 v0.2 |
+| 编号    | 缺失项                                                           | 影响                                                                                                                                                    | 建议处理者 / 时机                                                           |
+| ------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| GAP-001 | ~~仓库根 `AGENTS.md` 不存在~~                                    | 模块边界与禁区无显式声明；本图无法核对"REQ 与禁区冲突"；H5 编码任务卡的"允许 / 禁止修改"清单缺权威依据                                                  | **已关闭 2026-05-07**：项目负责人亲手补入 [AGENTS.md](../../AGENTS.md)，项目身份与 greenfield 无禁区均签字          |
+| GAP-002 | 仓库根 `README.md` 不存在（已降级：仅影响对外访客说明）          | 项目身份错误未声明一事已被 [AGENTS.md](../../AGENTS.md) 覆盖（[.github/copilot-instructions.md L5](../../.github/copilot-instructions.md#L5) "以仓库根 README.md / AGENTS.md 为准"二选一即可）；`README.md` 仅不影响对外访客的一句话身份阐述 | 项目负责人在 H2 选型完成后补（不阻塞 H2 启动）                                                |
+| GAP-003 | R7 登录子系统在仓库内无任何证据                                  | REQ-001 ~ REQ-004 全部依赖"已登录用户"输入；若平台无 SSO/OIDC，本特性无法上线                                                                           | H2-ArchitectAdvisor 启动时第一件事确认平台登录方案；写入 ADR-?-平台鉴权依赖 |
+| GAP-004 | 模型网关 / gpt-4.1 接入在仓库内无证据                            | REQ-004 试运行 / 对话调试无法验证                                                                                                                       | H2 启动时与 GAP-003 一并核                                                  |
+| GAP-005 | 第三方联网搜索（T-1）服务商未指定                                | REQ-011 试运行无法跑通；R8 SLA 缺数                                                                                                                     | H2 选型时指定具体服务商（如 Bing Search / Google CSE / 自建）               |
+| GAP-006 | `docs/03-architecture/` 与 `docs/04-detailed-design/` 目录不存在 | H2 / H3 启动后第一动作就是创建这些目录                                                                                                                  | H2-ArchitectAdvisor 首次产出时创建                                          |
+| GAP-007 | 5 份 H1 文档自身不引用任何具体源码路径（H1 阶段是正确的不越界）  | 本图缺"现成的落点假设可以验证"                                                                                                                          | 不视作缺陷；H2 选型完成后由本图重写 v0.2                                    |
 
 ## 4. 与下游的交付物
 
@@ -153,7 +156,7 @@ downstream: []
 
 - 第 1 节影响面表的"预计新增模块"列里所有 `<占位符>` 都需要在 H2 ADR 中给出明确的工程根 / 包结构 / 持久层抽象 / 协议适配点
 - 第 2 节依赖图里所有"外部依赖"都需要在 H2 ADR 中明确接入方案（登录、模型网关、联网搜索、对象存储、AGUI 协议、MAF 框架）
-- 第 3 节 GAP-001 ~ GAP-005 需要在 H2 启动会议上当面回答；不答完不进入选型评审
+- 第 3 节 GAP-003 ~ GAP-005 需要在 H2 启动会议上当面回答；不答完不进入选型评审。GAP-001 已于 2026-05-07 关闭（[AGENTS.md](../../AGENTS.md) 已补），GAP-002 已降级为非阻塞。
 - 用户已提交的 6 项技术偏好（见 0.3 节）**仅作为输入信号**进入 H2 反问轮，不替代备选项打分
 
 ### 4.2 给 H5-CodingExecutor（间接，经 H3）
@@ -170,6 +173,7 @@ downstream: []
 
 ## 6. 变更记录
 
-| 版本 | 日期       | 变更人              | 变更内容                                                                                |
-| ---- | ---------- | ------------------- | --------------------------------------------------------------------------------------- |
-| 0.1  | 2026-05-07 | H1-RepoImpactMapper | 首版。Greenfield 仓库基线确认；7 条 MVP REQ 影响面表；7 条缺失发现；与 H2 / H5 交付物边界。 |
+| 版本   | 日期       | 变更人              | 变更内容                                                                                |
+| ------ | ---------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| 0.1    | 2026-05-07 | H1-RepoImpactMapper | 首版。Greenfield 仓库基线确认；7 条 MVP REQ 影响面表；7 条缺失发现；与 H2 / H5 交付物边界。 |
+| 0.1.1  | 2026-05-07 | H1-RepoImpactMapper | 关闭 GAP-001（[AGENTS.md](../../AGENTS.md) 已由项目负责人补入，项目身份与 greenfield 无禁区均签字）；降级 GAP-002 为非阻塞（AGENTS.md 已覆盖项目身份声明能力，README.md 仅不影响对外访客说明）；第 4.1 节 H2 启动会议必答清单由 GAP-001~005 收敛为 GAP-003~005。 |

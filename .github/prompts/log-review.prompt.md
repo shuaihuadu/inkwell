@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: '把会议/PR/Issue 评审记录誊写到 review-record.md：保留发言人、决议、行动项、争议未决，机械化、不脑补'
 tools:
   [

@@ -103,11 +103,12 @@ tools:
 
 ### 4.2 待澄清清单
 
-`docs/01-requirements/open-questions.md`，记录所有未在访谈中得到答复、但又会影响后续阶段的问题。每条包含：
+`docs/01-requirements/open-questions.md`，记录所有未在访谈中得到答复、但又会影响后续阶段的问题。结构严格遵循 [`templates/open-questions.md`](../../templates/open-questions.md)，每条包含：
 
-- 问题描述
+- 问题描述 + 为什么需要答
 - 影响范围（哪些 REQ / UI / 架构方向会受影响）
-- 建议的默认值（如有）
+- 候选答（A/B/C/D，每条带"选这条会带来什么后果"）——**不代用户拍默认值**
+- 三个人工输入位（回答 / 决策日期 / 决策人），格式为 `> **[ 待填 ]**：...`，详见 `io-contracts.md` 第 7 节
 - 卡点等级：`blocking` / `non-blocking`
 
 ### 4.3 阻塞返回
@@ -213,7 +214,17 @@ tools:
 
 ### 第四步：产出待澄清清单
 
-把访谈中所有未解决的问题写入 `docs/01-requirements/open-questions.md`，每条包含：问题、影响范围、建议默认值（若有）、卡点等级。
+把访谈中所有未解决的问题写入 `docs/01-requirements/open-questions.md`，**结构严格遵循** [`templates/open-questions.md`](../../templates/open-questions.md)。每条 OQ 必须包含：
+
+- 问题、为什么需要答、影响范围（哪些 REQ / NFR / PB / DB 会被改写）、候选答（A/B/C/D，每条带"选这条会带来什么后果"）
+- **三个人工输入位**（按 `_shared/io-contracts.md` 第 7 节统一格式）：
+  - **回答**：`> **[ 待填 ]**：在下一行替换本行——写下你的选择（A / B / C / 自定义），1–2 句话补充理由。`
+  - **决策日期**：`> **[ 待填 ]**：YYYY-MM-DD`
+  - **决策人**：`> **[ 待填 ]**：<姓名 / 角色>`
+- 卡点等级：`blocking` / `non-blocking`
+- 回写：留空，等关闭时由 Agent 在评审中回填
+
+**禁止**只列候选答而不留人工输入位——用户必须能一眼看到"我应该把答案写在哪里"。**禁止**用 `<TBD>` / 空白 / HTML 注释代替 `[ 待填 ]` 标记。
 
 ### 第五步：交付前自检
 

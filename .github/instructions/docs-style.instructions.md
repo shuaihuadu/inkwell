@@ -50,5 +50,5 @@ last_reviewed: YYYY-MM-DD
 
 ## 6. AI 协作时的输出
 
-- 当请求"补全这份设计文档"时，按本规则与 [`stages.md` 第 6 节](../../.harness-engineering/docs/stages.md) 的章节列表逐项补齐，不引入额外口味。
+- 当请求"补全这份设计文档"时，按本规则与 [`stages.md` 第 6 节](../../.he/docs/stages.md) 的章节列表逐项补齐，不引入额外口味。
 - 当用户要求"把代码同步到文档"时，先生成 diff 预览，让用户确认后再写盘。

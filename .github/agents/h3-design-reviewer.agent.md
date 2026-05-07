@@ -142,7 +142,7 @@ tools:
 | `read.search.text` | 是   | 校验设计中引用的源码路径是否真实存在         |
 | `write.file`       | 是   | 写 `design-review-report.md`                 |
 
-**禁用**：`exec.*`、`pr.*`、`write.patch`，以及对 `docs/04-detailed-design/` 下设计文档与 `harness-engineering/` 自身的任何写操作。
+**禁用**：`exec.*`、`pr.*`、`write.patch`，以及对 `docs/04-detailed-design/` 下设计文档与 `.he/` 自身的任何写操作。
 
 ## 6. 行为约束
 

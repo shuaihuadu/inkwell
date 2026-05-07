@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: '跑一次当前 H 阶段的 phase-gate-checklist：逐项核对、给出 PASS/FAIL/UNKNOWN，不达标即列出阻塞清单与补救建议'
 tools:
   [

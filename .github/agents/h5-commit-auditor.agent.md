@@ -197,7 +197,7 @@ suggested_fixes:
 
 ### 第三步：追溯字段解析
 
-- `Task:` 必须能在 `harness-engineering/templates/ai-task-brief.md` 派生路径或 `docs/06-implementation/coding-tasks.md` 索引中找到对应任务
+- `Task:` 必须能在 `.he/templates/ai-task-brief.md` 派生路径或 `docs/06-implementation/coding-tasks.md` 索引中找到对应任务
 - `Design:` 中每个 `HD-NNN` / `API-NNN` / `DB-NNN` 必须能在 `docs/04-detailed-design/` 下找到对应条目
 - `Tests:` 中每个 `TC-NNN` 必须能在 `docs/05-test-design/` 下找到对应条目
 - `Docs:` 取值必须为 `updated` 或 `not needed`，不接受其他值
@@ -208,7 +208,7 @@ suggested_fixes:
 - 读取 `Task:` 对应的 `ai-task-brief.md`，提取"允许修改的文件"和"禁止修改的文件"清单
 - PR 中所有改动文件必须在"允许修改的文件"清单内
 - PR 中没有任何文件出现在"禁止修改的文件"清单内
-- PR 中**不得**包含 `harness-engineering/` 目录下任何文件（除非 `Task` 显式标记为规范修订任务）
+- PR 中**不得**包含 `.he/` 目录下任何文件（除非 `Task` 显式标记为规范修订任务）
 
 ### 第五步：输出结论
 

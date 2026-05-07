@@ -4,7 +4,7 @@
     Harness Engineering · 卸载脚本（基于 manifest）。
 
 .DESCRIPTION
-    根据 <TargetRepo>/.harness-engineering/manifest.json 反向移除安装时落下的文件。
+    根据 <TargetRepo>/.he/manifest.json 反向移除安装时落下的文件。
 
     安全策略：
     - 优先用 manifest 精确卸载（按 sha256 比对）。
@@ -15,17 +15,17 @@
     - 全程支持 -DryRun。
 
     Manifest 缺失时的兜底（残留清理）：
-    - 例如 install 中途按 Ctrl+C，manifest 还没写入但 .harness-engineering/
+    - 例如 install 中途按 Ctrl+C，manifest 还没写入但 .he/
       或 .github/ 下已经有部分文件落地。
     - 此时脚本不报错退出，而是启动 best-effort 残留扫描：
-      * 整体清理 <TargetRepo>/.harness-engineering/ 目录（纯属本工具产物）。
+      * 整体清理 <TargetRepo>/.he/ 目录（纯属本工具产物）。
       * 对 .github/copilot-instructions.md / .github/instructions/*.instructions.md /
         .github/agents/*.agent.md，仅当文件内含 "Harness Engineering" 标记时才删。
       * 交互模式下会列出候选并请求确认；非交互模式必须显式 -Force 才执行删除。
 
 .PARAMETER TargetRepo
     采用方仓库根目录的绝对路径。
-    省略时：若脚本位于 <TargetRepo>/.harness-engineering/ 下（即装到目标的副本），自动取脚本所在目录的父目录；
+    省略时：若脚本位于 <TargetRepo>/.he/ 下（即装到目标的副本），自动取脚本所在目录的父目录；
     否则报错要求显式传入。
 
 .PARAMETER Force
@@ -38,8 +38,8 @@
 .EXAMPLE
     # 源仓库直接卸载某采用方
     ./uninstall.ps1 -TargetRepo D:\Path\To\YourRepo
-    # 在采用方仓库内一键卸载（脚本已被装到 .harness-engineering/ 下）
-    pwsh -File .\.harness-engineering\uninstall.ps1
+    # 在采用方仓库内一键卸载（脚本已被装到 .he/ 下）
+    pwsh -File .\.he\uninstall.ps1
 #>
 
 [CmdletBinding()]
@@ -53,14 +53,14 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# TargetRepo 智能默认：若脚本位于 .harness-engineering/ 内，取上级目录
+# TargetRepo 智能默认：若脚本位于 .he/ 内，取上级目录
 if (-not $TargetRepo) {
     $hereLeaf = Split-Path -Leaf $PSScriptRoot
-    if ($hereLeaf -eq '.harness-engineering') {
+    if ($hereLeaf -eq '.he') {
         $TargetRepo = Split-Path -Parent $PSScriptRoot
     }
     else {
-        throw '请用 -TargetRepo <path> 指定采用方仓库根，或把脚本放到 <TargetRepo>/.harness-engineering/ 下再运行'
+        throw '请用 -TargetRepo <path> 指定采用方仓库根，或把脚本放到 <TargetRepo>/.he/ 下再运行'
     }
 }
 
@@ -69,10 +69,10 @@ if (-not (Test-Path $TargetRepo -PathType Container)) {
 }
 $TargetRepo = (Resolve-Path $TargetRepo).Path
 
-$manifestDir = Join-Path $TargetRepo '.harness-engineering'
+$manifestDir = Join-Path $TargetRepo '.he'
 $manifestPath = Join-Path $manifestDir 'manifest.json'
 
-# 如果脚本是在 .harness-engineering\ 里被启动的，这个目录会被记录为进程的
+# 如果脚本是在 .he\ 里被启动的，这个目录会被记录为进程的
 # 当前工作目录，最后一步删自身会被 Windows 拒以 "文件正在被使用"。
 # 提前切出去（同时同步进程级 cwd）。
 $startCwd = (Get-Location).ProviderPath
@@ -118,12 +118,12 @@ function Invoke-BestEffortCleanup {
 
     $candidates = New-Object System.Collections.Generic.List[object]
 
-    # 1) .harness-engineering/ 目录：完全是本工具产物，整目录可删
+    # 1) .he/ 目录：完全是本工具产物，整目录可删
     if (Test-Path $ManifestDir -PathType Container) {
         $entry = New-Object PSObject -Property @{
             Kind   = 'dir'
             Path   = $ManifestDir
-            Rel    = '.harness-engineering/'
+            Rel    = '.he/'
             Reason = '整目录（本工具专属）'
             Safe   = $true
         }
@@ -327,23 +327,23 @@ else {
 
     if ($shouldRemoveManifest) {
         Remove-Item -LiteralPath $manifestPath -Force
-        Write-Host "   delete .harness-engineering/manifest.json" -ForegroundColor Magenta
+        Write-Host "   delete .he/manifest.json" -ForegroundColor Magenta
         # install.log 是审计日志、不在 manifest 里；clean uninstall 时一并移除以让目录归零
         if (Test-Path $logPath -PathType Leaf) {
             Remove-Item -LiteralPath $logPath -Force
-            Write-Host "   delete .harness-engineering/install.log" -ForegroundColor Magenta
+            Write-Host "   delete .he/install.log" -ForegroundColor Magenta
         }
         if ((Test-Path $manifestDir) -and -not @(Get-ChildItem -LiteralPath $manifestDir -Force)) {
             try {
                 Remove-Item -LiteralPath $manifestDir -Force -ErrorAction Stop
-                Write-Host "   rmdir  .harness-engineering" -ForegroundColor DarkMagenta
+                Write-Host "   rmdir  .he" -ForegroundColor DarkMagenta
             }
             catch {
-                # 例如脚本是从 .harness-engineering\ 内部被启动的，进程仍持有该 cwd 句柄，
+                # 例如脚本是从 .he\ 内部被启动的，进程仍持有该 cwd 句柄，
                 # 内核会拒绝删除。此时不报错退出，只提示手动收尾。
-                Write-Host "   [!] .harness-engineering/ 仍被本脚本进程占用，无法自动删除" -ForegroundColor Yellow
+                Write-Host "   [!] .he/ 仍被本脚本进程占用，无法自动删除" -ForegroundColor Yellow
                 Write-Host "       退出后手动执行：" -ForegroundColor Yellow
-                Write-Host "         cd '$TargetRepo'; Remove-Item .harness-engineering -Force" -ForegroundColor Yellow
+                Write-Host "         cd '$TargetRepo'; Remove-Item .he -Force" -ForegroundColor Yellow
             }
         }
     }

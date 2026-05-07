@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: '从一个高层目标起一个 H5 编码任务：起草 ai-task-brief.md、登记 task-board.md，给出范围闭包与 Verify 命令；不直接改代码'
 tools:
   [

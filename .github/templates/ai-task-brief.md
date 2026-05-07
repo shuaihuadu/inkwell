@@ -96,3 +96,27 @@ Docs:
 Risk: 
 Task: 
 ```
+
+---
+
+## 完成后下一步
+
+本任务卡的生命周期分三段，**每段结束都有明确的下一动作**——不要只把卡填完就放着。
+
+### 起草完成（你刚填完字段）
+
+1. 把本任务在 `docs/06-tasks/task-board.md` 第 1 节"在跑任务"的对应行 `状态` 列写为 `draft`，并填入 `任务编号 / 标题 / 文档目录 / 最近一次推进` 四个字段。
+2. 找一个人 review 一遍："允许修改的文件"是不是真的够、`Verify` 命令在你机器上能不能跑通；review 通过后把那一行的 `状态` 改成 `ready`。
+3. 在 Copilot Chat Agent 下拉切到 `H5-CodingExecutor`，把"按 `docs/06-tasks/T-NNN-xxx.md` 这张任务卡执行"作为输入。
+
+### 编码完成（Verify 命令通过后）
+
+1. 在 `docs/06-tasks/task-board.md` 把这一行的 `状态` 改成 `coded`，更新 `最近一次推进` 日期。
+2. 切到 `H5-CommitAuditor` 校验六字段（`Design / Tests / Verify / Docs / Risk / Task`），不合格不要硬提交，先回上游补凭证。
+3. 提交后把 `状态` 改成 `merged`，把这一行迁到第 3 节"已交付任务"，回填 `发布说明 / 追溯矩阵` 两列。
+
+### 阻塞了（Executor 返回 `status: blocked` / `Verify` 跑不通 / 范围不够）
+
+1. **不要让 AI 自己绕**——把当前阻塞登记到 `docs/06-tasks/task-board.md` 第 2 节"等待人工决策"，写清"阻塞点 / 需要谁拍板 / 暂缓后果"。
+2. 回头看本任务卡的"3. 上游文档"——多半是某份上游文档的 `status` 还没进 `reviewed`，或者"4. 允许修改的文件"漏了某个真实需要改的文件，按结构化错误的 `suggested_next_action` 改任务卡。
+3. 上游补完后回到本节起草段第 3 步重跑 Executor，**不要复用旧的 chat 上下文**（会污染追溯链，参见 `agents/_shared/io-contracts.md` 第 6 节）。

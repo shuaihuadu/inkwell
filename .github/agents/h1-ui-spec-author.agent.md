@@ -117,11 +117,12 @@ frontmatter 按 `io-contracts.md` 第 2 节 填写，正文必须覆盖 `docs/st
 
 ### 4.2 待澄清清单（追加）
 
-向 `docs/01-requirements/open-questions.md` **追加**所有未在访谈中得到答复的 UI 维度问题——不要新建文件，与上游 RequirementsInterviewer 共用同一份清单。每条包含：
+向 `docs/01-requirements/open-questions.md` **追加**所有未在访谈中得到答复的 UI 维度问题——不要新建文件，与上游 `RequirementsInterviewer` 共用同一份清单。结构严格遵循 [`templates/open-questions.md`](../../templates/open-questions.md)，每条包含：
 
-- 问题描述
+- 问题描述 + 为什么需要答
 - 影响范围（哪些 UI-NNN / REQ-NNN 会受影响）
-- 建议的默认值（如有）
+- 候选答（A/B/C/D，每条带后果说明）——**不代用户拍默认值**
+- 三个人工输入位（回答 / 决策日期 / 决策人），格式为 `> **[ 待填 ]**：...`，详见 `io-contracts.md` 第 7 节
 - 卡点等级：`blocking` / `non-blocking`
 
 ### 4.3 阻塞返回
@@ -255,7 +256,16 @@ frontmatter 按 `io-contracts.md` 第 2 节 填写，正文必须覆盖 `docs/st
 
 ### 第五步：追加待澄清清单
 
-把访谈中所有未解决的 UI 维度问题**追加**到 `docs/01-requirements/open-questions.md`（不要新建文件、不要覆盖上游 RequirementsInterviewer 已写的内容）。每条包含：问题、影响范围（UI-NNN / REQ-NNN）、建议默认值（若有）、卡点等级。
+把访谈中所有未解决的 UI 维度问题**追加**到 `docs/01-requirements/open-questions.md`（不要新建文件、不要覆盖上游 `RequirementsInterviewer` 已写的内容）。**结构严格遵循** [`templates/open-questions.md`](../../templates/open-questions.md)，每条 OQ 必须包含：
+
+- 问题、为什么需要答、影响范围（UI-NNN / REQ-NNN）、候选答（A/B/C/D 带后果说明）
+- **三个人工输入位**（按 `_shared/io-contracts.md` 第 7 节统一格式）：
+  - **回答**：`> **[ 待填 ]**：...`
+  - **决策日期**：`> **[ 待填 ]**：YYYY-MM-DD`
+  - **决策人**：`> **[ 待填 ]**：<姓名 / 角色>`
+- 卡点等级：`blocking` / `non-blocking`
+
+**禁止**只列候选答而不留人工输入位——用户必须能一眼看到"我应该把答案写在哪里"。
 
 ### 第六步：交付前自检
 

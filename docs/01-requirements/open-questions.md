@@ -441,7 +441,7 @@ T-1 + T-3
 
 ## OQ-030 P2 试运行下半屏的落地形态
 
-待 H2 决策
+closed 2026-05-07
 
 - **问题**：H1 评审会（2026-05-06）反馈：试运行下半屏未来可能改为「Inkwell 平台已有聊天页面 + 通过 iframe 接入 P2」，以避免在本特性内重复实现一套对话 UI、并复用平台的会话 / 历史 / 工具调用渲染等基础能力。本期先按"同页 React 组件"画原型。
 - **为什么需要答**：决定 H2 前端选型时是否预留 iframe `postMessage` 桥接、Agent 调用上下文（未保存的 draft `Instructions` / 已勾选 Skill / Tool）如何传给子页、计费桶（NFR-005）如何归并、对话历史是否回写到 P2、网络断开 / E1 重试等状态如何在父子页之间联动。同时影响 H3 详细设计（接口 + 消息协议）。
@@ -450,5 +450,9 @@ T-1 + T-3
   - A. **同页 React 组件**（当前原型形态）：直接复用平台聊天组件作为 P2 的内嵌区域。
   - B. **iframe 接入独立子页**：试运行复用平台已有完整聊天页面，`<iframe src="/chat?agent=draft&...">`；通过 `postMessage` 同步 draft Instructions 与 Skill / Tool 启用项，及失败 / 重试 / 断网状态。
   - C. **本期 A，vNext 切 B**：先用同页组件交付，待平台聊天页面稳定后切 iframe；切换时不破坏 UI 交互模型。
-- **卡点等级**：non-blocking（H1 不卡——UI 交互模型在两种实现下都成立；H2 选型前必须收敛）
-- **回写**：H2 阶段（架构）正式选定 A / B / C 之一，补回 ui-spec.md 第 2.2 节"未来实施形态"备注、并在 H3 详细设计里产出对应契约。
+- **卡点等级**：closed（原 non-blocking，已于 H2 架构评审中拍板）
+- **承接者**：h2-architect-advisor
+- **截止**：H2 选型评审前
+- **H1 阶段决议**（2026-05-07）：本期按 A 同页 React 组件画原型，A/B/C 最终选项延后到 H2 拍板；登记为 [task-board.md TASK-2026-05-07-001](../06-tasks/task-board.md)
+- **H2 阶段决议**（2026-05-07，[架构评审 D-4](../07-reviews/2026-05-07-h2-architecture-custom-agent.md)）：**选 C——本期 A 同页 React 组件 / vNext 视平台聊天页面成熟度切 B**；OQ-A-004 = C 同步关闭。
+- **回写**：[architecture.md 第 0 节上游约束概要](../03-architecture/architecture.md) 已记录「本期 A 同页 / vNext 切 iframe」锁定值；H3 详细设计在 P2 ↔ 试运行子页之间的契约里（可能是 `RuntimeChatHost` 组件接口）预留 iframe 宿主切换能力。

@@ -1,4 +1,4 @@
-# `.harness-engineering/`
+# `.he/`
 
 这个目录是 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) v0.0.1 的**安装产物保管区**。
 
@@ -26,7 +26,7 @@
 - `install.log` 进版本库可以变成事实上的「Harness 版本变更记录」
 - 体积约 100 KB 量级，开销可忽略
 
-### 选择 B：忽略（在 `.gitignore` 里加 `.harness-engineering/`）
+### 选择 B：忽略（在 `.gitignore` 里加 `.he/`）
 
 - 仓库更"干净"——主分支看不到这个目录
 - 团队其他人需要自己再跑一次安装命令才能用
@@ -35,7 +35,7 @@
 如果选 B，把这一行加到仓库根 `.gitignore`：
 
 ```gitignore
-.harness-engineering/
+.he/
 ```
 
 ⚠ **不要把 `.github/` 加进 `.gitignore`** ——那会让 Copilot 完全看不到 Agent / Skill / Prompt。
@@ -45,10 +45,10 @@
 不想再用 Harness Engineering 了？
 
 ```powershell
-pwsh -File .\.harness-engineering\uninstall.ps1
+pwsh -File .\.he\uninstall.ps1
 ```
 
-它会按 `manifest.json` 把 install 写过的 `.github/*`、`.harness-engineering/*` 全部清掉，**不动**你自己改过、不在 manifest 里的文件。
+它会按 `manifest.json` 把 install 写过的 `.github/*`、`.he/*` 全部清掉，**不动**你自己改过、不在 manifest 里的文件。
 
 ## 升级
 

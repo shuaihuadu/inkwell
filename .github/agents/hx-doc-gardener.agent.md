@@ -111,7 +111,7 @@ tools:
 
 ### 4.3 不做
 
-- 不直接修改 `harness-engineering/` 下的规范与 Agent 文件
+- 不直接修改 `.he/` 下的规范与 Agent 文件
 - 不删除 `docs/` 中的内容（只能标记 deprecated 或开 PR 让人工裁决）
 
 ## 5. 工具集
@@ -128,7 +128,7 @@ tools:
 | `write.file`       | 是   | 写 `doc-gc-report.md`                              |
 | `pr.create`        | 否   | `high` 项可自动开修复 PR / issue（按部署环境而定） |
 
-**禁用**：`exec.*`、`write.patch` 对源码 / 规范文件的写动作——本 Agent 不动源码、不动 `harness-engineering/` 自身。
+**禁用**：`exec.*`、`write.patch` 对源码 / 规范文件的写动作——本 Agent 不动源码、不动 `.he/` 自身。
 
 ## 6. 行为约束
 
@@ -171,7 +171,7 @@ tools:
 1. 严格遵循 Harness Engineering 规范 第 10 节（熵与技术债务 GC）。
 2. 严格遵循 输入输出契约。
 3. **不要**删除任何文档。可以建议 `mark-deprecated` 或开 PR 让人工裁决。
-4. **不要**修改 `harness-engineering/` 目录下任何文件。
+4. **不要**修改 `.he/` 目录下任何文件。
 5. 每一条不一致都必须附"证据"。没有证据不写。
 
 ## 工作流程
@@ -179,7 +179,7 @@ tools:
 ### 第一步：确定本轮扫描范围
 
 - 扫描 `docs/01-requirements/` 至 `docs/07-release/`
-- 排除：`docs/_generated/`（如有）、显式标记为自动生成的目录、`harness-engineering/` 自身
+- 排除：`docs/_generated/`（如有）、显式标记为自动生成的目录、`.he/` 自身
 
 如果 `docs/` 体量大，按子目录拆分多轮，每轮聚焦一段。
 
