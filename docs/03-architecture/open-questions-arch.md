@@ -1,110 +1,218 @@
 ---
-id: open-questions-arch-custom-agent
+id: open-questions-arch-inkwell-agent-platform
 stage: H2
-status: reviewed
+status: closed
 authors:
   - name: H2-ArchitectAdvisor
     role: agent
-reviewers:
-  - name: self-review
-    decision: approved
-    date: 2026-05-07
-created: 2026-05-07
-updated: 2026-05-07
+reviewers: []
+created: 2026-05-08
+updated: 2026-05-08
 upstream:
-  - architecture-custom-agent
+  - REQ-inkwell-agent-platform
+  - repo-impact-map-inkwell-agent-platform
 downstream: []
 ---
 
-# 自定义 Agent 功能 · H2 待澄清清单
+# Inkwell Agent 平台 · 架构待澄清清单（H2）
 
-> 本表登记 H2 反问轮中**未在会话中得到答复**或**得到答复但需后续验证**的项；按 [agents/_shared/io-contracts.md 第 5 节](../../.he/) 规范每条都标 `blocking` / `non-blocking`。`blocking` 项关闭前 H2 不视作 approved。
-
-## 字段说明
-
-- **影响范围**：哪些 REQ / RISK / 模块会被这条 OQ 答案改写
-- **建议默认值**：H2-ArchitectAdvisor 推荐项；项目负责人可覆盖但需明确
-- **卡点等级**：`blocking` 阻塞 H2 评审通过；`non-blocking` 不阻塞但需在 H3 / H5 之前关闭
-- **关闭时机**：何时必须有答案
-
----
-
-## OQ-A-001 平台登录子系统的 IdP 与协议
-
-- **问题**：生产期 OIDC handler 接的具体 IdP 是哪个？协议（OIDC / SAML / OAuth2）是哪种？token 中的用户主键 claim 名是什么？
-- **影响范围**：[RISK-004](./risk-analysis.md)；[ADR-004](./adr/ADR-004-platform-login-dev-mock.md)；[architecture.md 第 7 节](./architecture.md#7-鉴权与权限模型)；[GAP-003](../01-requirements/repo-impact-map.md#3-缺失发现43)；R7
-- **建议默认值**：H3 详细设计前给出至少候选 IdP 短列表（如 Azure Entra ID / Auth0 / Keycloak），H5 编码任务卡里固定一个
-- **卡点等级**：non-blocking（H2 + H3 不阻塞，dev mock 路径可继续推进；H5 之前必须关闭，否则生产无法部署）
-- **关闭时机**：H5 编码任务启动前
-
-## OQ-A-002 联网搜索（T-1）服务商
-
-- **问题**：T-1 真实实现服务商是哪家？SLA / 单查询成本 / 数据驻留如何？
-- **影响范围**：[RISK-005](./risk-analysis.md)；[ADR-005](./adr/ADR-005-web-search-mock-first.md)；REQ-011 / AC-011-3/4/5；[R8](../01-requirements/requirements.md)；[GAP-005](../01-requirements/repo-impact-map.md#3-缺失发现43)
-- **建议默认值**：候选 = Bing Web Search API / Tavily / Brave Search API / Google CSE；H5 编码任务卡里固定一个
-- **卡点等级**：non-blocking（本期 Mock 实现已可覆盖 [E6 首次启用须知](../01-requirements/requirements.md) 全部交互测试；H6 release notes 之前必须关闭，否则不能切真实用户）
-- **关闭时机**：H6 阶段切真实搜索前
-
-## OQ-A-003 MAF + AG-UI 集成的具体 NuGet 包（已关闭 2026-05-07）
-
-- **问题**：[docs.ag-ui.com](https://docs.ag-ui.com/) 列出 "Microsoft Agent Framework · 1st Party · Supported"，但具体集成是哪个 NuGet 包？包名 / 命名空间 / 端点入口形状如何？
-- **答案**（H2-ArchitectAdvisor 2026-05-07 在用户授权下查证 [microsoft/agent-framework `dotnet/src/`](https://github.com/microsoft/agent-framework/tree/main/dotnet/src)）：
-  - **协议层 / 客户端**：[`Microsoft.Agents.AI.AGUI`](https://github.com/microsoft/agent-framework/tree/main/dotnet/src/Microsoft.Agents.AI.AGUI)（含 `AGUIChatClient` / `AGUIHttpService`）—— 用于把远程 AGUI agent 包装成 `AIAgent` 在客户端 / 调用方使用
-  - **服务端 hosting**：[`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore`](https://github.com/microsoft/agent-framework/tree/main/dotnet/src/Microsoft.Agents.AI.Hosting.AGUI.AspNetCore)（含 `AGUIEndpointRouteBuilderExtensions` / `ServiceCollectionExtensions` / `AGUIServerSentEventsResult` / `AGUIChatResponseUpdateStreamExtensions` / `AGUIJsonSerializerOptions`）—— 标准 ASP.NET Core "DI 注册 + Endpoint 映射" 模式，默认 transport = SSE（与 [ADR-002](./adr/ADR-002-agui-as-chat-protocol.md) 设计前提一致）
-  - **维护状态**：服务端 hosting 包 3 周前刚加 session storage 支持，活跃；协议层 2 个月前 bugfix
-  - **次级风险**：[Microsoft Learn Integrations 页](https://learn.microsoft.com/en-us/agent-framework/integrations/) 标 **"AG UI · Preview"**（不是 Released）—— 落入 [RISK-001](./risk-analysis.md) 跟踪范围，但不构成 H2 阻塞
-- **影响范围**：[RISK-001](./risk-analysis.md) / [RISK-009](./risk-analysis.md)（缓解已更新为引用具体包）；[ADR-002](./adr/ADR-002-agui-as-chat-protocol.md)（已固化包名）；[architecture.md 第 3.4 节](./architecture.md#34-ag-ui-端点)（已固化包名）
-- **状态**：✅ resolved 2026-05-07
-- **关闭时机**：~~H2 选型评审前~~ 已在 H2 选型阶段关闭
-
-## OQ-A-004 OQ-030 试运行下半屏最终形态（H1 转入）
-
-- **问题**：本期同页 React 组件 vs vNext 切 iframe 的最终形态决策（A / B / C 三选一）
-- **影响范围**：REQ-004；[OQ-030](../01-requirements/open-questions.md)；[ui-spec.md 第 2.2 节](../01-requirements/ui-spec.md)；H3 P2 ↔ 试运行子页之间的契约
-- **建议默认值**：**C 本期 A / vNext 视平台聊天页面成熟度切 B**；与 [评审记录第 5 节 C-1](../07-reviews/2026-05-07-h1-prototype-custom-agent.md) 暂定立场一致
-- **卡点等级**：non-blocking（本期 A 同页组件已落锤；C 选项允许 vNext 切换）
-- **关闭时机**：H2 选型评审前由项目负责人确认 C；写回 [task-board.md TASK-2026-05-07-001](../06-tasks/task-board.md)
-
-## OQ-A-005 K8s 集群基线
-
-- **问题**：生产 K8s 版本基线？Ingress 控制器（NGINX / Traefik / 其他）？Redis 部署形态（Sentinel / Cluster / Azure Cache for Redis）？K8s 集群是 AKS / EKS / 自建 K3s？
-- **影响范围**：[RISK-006](./risk-analysis.md)；[ADR-006](./adr/ADR-006-deployment-split.md)；[architecture.md 第 9 节](./architecture.md#9-部署方式)；H3 Helm chart 编写
-- **建议默认值**：Kubernetes ≥ 1.28；NGINX Ingress Controller；Azure Cache for Redis Sentinel；AKS（与 Azure OpenAI / Blob 同生态）
-- **卡点等级**：non-blocking（H3 Helm chart 阶段必须关闭，否则模板无法定型）
-- **关闭时机**：H3 详细设计开始前
-
-## OQ-A-006 Azure OpenAI region 与数据驻留
-
-- **问题**：Azure OpenAI gpt-4.1 部署 region 是哪个？是否与 Azure Blob 同 region（[NFR-004](../01-requirements/requirements.md) 数据驻留）？
-- **影响范围**：[architecture.md 第 13 节](./architecture.md#13-安全设计)；NFR-004；GAP-004
-- **建议默认值**：默认 East US 2 或 Sweden Central（gpt-4.1 公开可用 region）；与 Azure Blob 同 region
-- **卡点等级**：non-blocking（H3 详细设计可继续；H6 release notes 之前必须关闭，写入运维须知）
-- **关闭时机**：H6 release notes 之前
-
-## OQ-A-007 [评估] 是否引入 CopilotKit React UI
-
-- **问题**：前端是否引入 CopilotKit 的 React UI 组件库（[copilotkit.ai](https://copilotkit.ai/)）作为 AG-UI 客户端的 UI 包装？
-- **影响范围**：[architecture.md 第 2.1 节](./architecture.md#21-技术栈)；[RISK-001](./risk-analysis.md)
-- **建议默认值**：**不引入**。理由：AntD 5 已提供完整 UI 套件，引入 CopilotKit UI 会与 AntD 主题冲突；前端只用 `@ag-ui/client`（HttpAgent + SSE 协议层），UI 自建于 AntD 之上
-- **卡点等级**：non-blocking
-- **关闭时机**：H3 详细设计前由前端代表确认
-
-## OQ-A-008 Outbox 模式具体落地
-
-- **问题**：架构第 6 节"OutboxMessages 表 + DB → Queue → 处理器"模式的具体细节（消息 schema、retry 策略、dead-letter 处理、消费者幂等性）
-- **影响范围**：[architecture.md 第 4.3 节](./architecture.md#43-主要表h3-细化) / [第 6 节](./architecture.md#6-消息机制队列-multi-provider)；H3 详细设计
-- **建议默认值**：H2 不替 H3 决定具体形态；H3 阶段细化
-- **卡点等级**：non-blocking
-- **关闭时机**：H3 详细设计
+> **本文件谁动手 / 在哪填**：
+>
+> - **Agent 起草** OQ-A001 起的题干 + 候选答 + 影响范围 + 建议默认值（status: `pending`）。
+> - **人工填答**：每条 OQ 末尾的 `回答 / 决策日期 / 决策人` 三行就是输入位——把 `> **[ 待填 ]**：...` 整行替换成实际答案。允许写"接受默认值"。
+> - **Agent 回写**：人工答完后由 `H2-ArchitectAdvisor` 在评审中把 `卡点等级` 改为 `closed YYYY-MM-DD`，并把"回写"行指向具体落点。
+>
+> **本文件存在的用途**：本次会话中，Owner 在 [对话](../../) 里授权"按建议默认值推进 Q-A4-followup 与 Q-A6-followup"。按 [agents/architect-advisor/prompt.md §第三步](../../.he/agents/architect-advisor/prompt.md)：所有"由 Agent 默认 + 待评审接受"的项必须显式写到本文件。`status: draft → reviewed` 的人工评审环节里，每条 OQ 都要被 Owner 接受或推翻。
 
 ---
 
-## 卡点统计
+## OQ-A001 数据库切换的"可切换"边界（Q-A4-followup）
 
-| 等级 | 数量 | 编号 |
-| --- | --- | --- |
-| **blocking** | 0 | — |
-| non-blocking | 7 | OQ-A-001 / 002 / 004 / 005 / 006 / 007 / 008 |
-| resolved | 1 | OQ-A-003（2026-05-07） |
+- **问题**：[Q-A4](../01-requirements/repo-impact-map.md) 已锁"InMemory / SQL Server / PostgreSQL 三库可切换"。但具体边界未定——向量检索是否跟随 Provider 切换？
+- **为什么需要答**：决定 [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 与 [Inkwell.KnowledgeBase / Inkwell.Memory / Inkwell.Traces 模块](../01-requirements/repo-impact-map.md) 的存储拓扑。
+- **影响范围**：REQ-009 / REQ-010 / REQ-014 / NFR-005；ADR-004；[Inkwell.KnowledgeBase / Inkwell.Memory / Inkwell.Traces](../01-requirements/repo-impact-map.md)。
+- **候选答**：
+  - **A**（Agent 默认推进）。仅 EF Core Provider 切换关系数据；向量库另选独立服务（推荐 [Qdrant](https://qdrant.tech/) 跨 dev / prod 一致部署）。后果：实现最干净；运维多一个服务；向量库与三种关系库正交。
+  - **B**. 三种引擎都支持向量检索（SQL Server 2025 vector / pgvector / InMemory 内存索引）。后果：三套向量实现 + 切换抽象漏出，与 [OQ-006 closed §A](../01-requirements/open-questions.md) 范围风险冲突。
+  - **C**. v1 仅 PostgreSQL + pgvector 真做，SQL Server / InMemory 仅占位。后果：等于锁 PostgreSQL，与 Q-A4"三库切换"承诺不符。
+  - **D**. 其他（请显式列出）。
+- **回答**：
 
-H2 评审前不再有 blocking 项。non-blocking 项分别在 H3（OQ-A-005）/ H5（OQ-A-001 / 008 / 007）/ H6（OQ-A-002 / 006）/ H2 选型评审会（OQ-A-004）关闭。
+  > 2026-05-09。接受 A（Agent 默认）。仅 EF Core Provider 切换关系数据（[IPersistenceProvider 抽象](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + InMemory / SQL Server 2025 / PostgreSQL 17）；向量库由 Qdrant 1.x 独立服务承担，与关系层正交。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) §决策；[tech-selection.md §4](./tech-selection.md)；[architecture.md §4](./architecture.md)。
+
+---
+
+## OQ-A002 在途任务跨锁屏存活机制（Q-A6-followup）
+
+- **问题**：[Q-A6](../01-requirements/repo-impact-map.md) 已锁"REST + AG-UI Protocol"；但 [NFR-003 + OQ-017 closed](../01-requirements/open-questions.md) 要求"锁屏期间录音 / 上传 / 流式继续，解锁后用户能看到结果"。这要求协议层支持跨锁屏的会话续接。
+- **为什么需要答**：决定 [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md) 与 [ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md) 的协同方式。
+- **影响范围**：NFR-003 / REQ-016 / EX-001 ~ EX-008；ADR-011；ADR-012；[Inkwell.Traces / Inkwell.Conversations](../01-requirements/repo-impact-map.md)。
+- **候选答**：
+  - **A**. 仅 AG-UI 一通到底：Electron 主进程持 SSE，UI 进程切锁屏页，主进程在背后维持订阅。后果：实现最简单；要求主进程在用户合上盖子 / 系统休眠时仍持连接，长链可靠性依赖电源与网络调优 — 已表述为 [RISK-007](./risk-analysis.md)。
+  - **B**. AG-UI（对话流）+ SignalR（锁屏推送 / 多端协同）。后果：双通道职责清晰；运维多一根线；与 .NET 生态原生支持的 AG-UI 已形成功能重叠。
+  - **C**（Agent 默认推进）。AG-UI + Run resume：锁屏前断 SSE，解锁后用 `run_id + cursor` 重连续传；后端把事件落 store。后果：符合 AG-UI 协议本身的事件 store + replay 模式；后端必须实现事件持久化（已有 [Inkwell.Traces](../01-requirements/repo-impact-map.md)）；最贴 NFR-003 / OQ-017 的预期。
+  - **D**. 其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-09。接受 A。Owner 考虑后认为 v1 在 “单用户 + 主进程可保活” 场景下“AG-UI 一通到底＋主进程背后维持 SSE”实现成本最低；不引入 Run resume cursor、不引入 RunEventStore；可靠性问题走 [RISK-007](./risk-analysis.md) 表述 + DurableTask 兑底。与默认值 C 的反转说明：Run resume 所需的事件 store + cursor 语义与 v1 范围代价不成比例。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md) 重写；[ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md) 删除 Run resume 端点 + cursor 语义；[risk-analysis.md RISK-007](./risk-analysis.md) 重写为“主进程长 SSE 跨锁屏可靠性”；[architecture.md §6 / §7 / §14](./architecture.md)。
+
+---
+
+## OQ-A003 W-003 NFR-003 字面缺 OQ-017 特例的处理
+
+- **问题**：[requirements.md §6 NFR-003 / §11 NFR-003 验收口径](../01-requirements/requirements.md) 字面仍是"硬锁定"措辞，未补 [OQ-017 closed](../01-requirements/open-questions.md) 的"在途任务保留"特例；下游 [ui-spec.md / user-flow.md / acceptance-criteria.md](../01-requirements/) 已写入特例。本 H2 是把这条"文字漂移"显式记入 [risk-analysis.md RISK-003](./risk-analysis.md)，还是回 H1 由 [`H1-RequirementsInterviewer`](../../.he/agents/requirements-interviewer/) 在 §9 上游决策追加一条特例说明？
+- **为什么需要答**：影响 H4 测试用例如何引用 NFR-003：若文字不补，AC-076 ~ AC-079 与 §11 验收口径互相打架；若回 H1 补，H1 status 需要重新走一遍 review。
+- **影响范围**：NFR-003；[acceptance-criteria.md AC-076 ~ AC-079](../01-requirements/acceptance-criteria.md)；ADR-011；RISK-003。
+- **候选答**：
+  - **A**（Agent 默认推进）。本 H2 在 [risk-analysis.md RISK-003](./risk-analysis.md) 显式记入文字漂移风险，残余风险由 Owner 接受；下一次 H1 修订自然把字面带过去。后果：H1 status 不动；H2 / H3 / H4 不阻塞；H4 引用 NFR-003 时同步引用 ADR-011 + AC-076 ~ AC-079 的特例口径。
+  - **B**. 回炉 H1 由 `H1-RequirementsInterviewer` 在 §6 NFR-003 表行 + §11 NFR-003 验收口径补"特例见 OQ-017 / ADR-011"，重走一遍 H1 review。后果：H1 多一轮迭代；H2 必须等 H1 重新 reviewed 后才能 lock ADR-011。
+  - **C**. 其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-09。接受 A（Agent 默认）。本 H2 在 [risk-analysis.md RISK-003](./risk-analysis.md) 显式记入文字漂移；H4 引用 NFR-003 时同步引用 [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md) + [AC-076 ~ AC-079](../01-requirements/acceptance-criteria.md) 的特例口径；下一次 H1 修订自然补上字面。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [risk-analysis.md RISK-003](./risk-analysis.md)。
+
+---
+
+## OQ-A004 v1 是否引入独立缓存层（Redis）
+
+- **问题**：架构中是否引入独立的 Redis 缓存层（用于 session / model response cache / rate limit）？
+- **为什么需要答**：决定 [Inkwell.Health / Inkwell.PublicApi](../01-requirements/repo-impact-map.md) 与 [架构图](./architecture.md)；影响 dev Compose 与 AKS Helm chart 的依赖项数量。
+- **影响范围**：REQ-013（Public API rate limit）/ NFR-001 / [部署形态](./architecture.md#部署方式)；ADR-005。
+- **候选答**：
+  - **A**（Agent 默认推进）。v1 不引入独立 Redis；用 ASP.NET Core `IMemoryCache` + Microsoft Agent Framework 内置 thread state；Public API rate limit 用 `Microsoft.AspNetCore.RateLimiting`（基于内存 token bucket）。后果：依赖更少；多副本部署时缓存语义不强一致（用户量级 ~100 可忍）；后续真有性能瓶颈再升级 Redis。
+  - **B**. v1 即引入 Redis（dev Azurite + AKS Azure Cache for Redis），所有 cache + rate limit 统一走分布式语义。后果：依赖多一个；多副本部署强一致；运维成本多一项。
+  - **C**. 其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-09。接受 B。Owner 反转默认值，v1 即引入 Redis：dev = 本机 Redis 8 容器 / prod = [Azure Cache for Redis](https://learn.microsoft.com/azure/azure-cache-for-redis/)；抽象为 `ICacheProvider`（与 [IPersistenceProvider](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [IFileStorageProvider](./adr/ADR-015-object-storage-provider-switchable.md) 同构）；session / model response cache / Public API rate limit 全部走分布式语义。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [ADR-016 缓存层：ICacheProvider + Redis](./adr/ADR-016-cache-provider-redis.md) 新建；[tech-selection.md §16 缓存层](./tech-selection.md)；[architecture.md §5 缓存策略](./architecture.md)；[ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md) Compose / AKS 中加 Redis service。
+
+---
+
+## OQ-A005 v1 文件存储方案
+
+- **问题**：用户上传的图片 / 语音 / 文档（REQ-016 + REQ-009）如何存储？候选：(a) Azure Blob Storage（prod） + [Azurite emulator](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) (dev)，(b) MinIO 跨环境一致，(c) 数据库 BLOB 字段，(d) 三 Provider 切换（本地 / Azure Blob / MinIO）。
+- **为什么需要答**：决定 [Inkwell.Multimodal / Inkwell.KnowledgeBase](../01-requirements/repo-impact-map.md) 的依赖项；影响 OQ-001 数据出境合规（DPA 范围）。
+- **影响范围**：REQ-009 / REQ-016；NFR-006；ADR-005；ADR-009；ADR-015。
+- **候选答**：
+  - **A**. Azure Blob Storage（prod） + Azurite emulator（dev）。后果：与 Q-A5 AKS 部署一致；dev 用 emulator 避免账号配置；NFR-006 已签 DPA 厂商范围内。
+  - **B**. MinIO 跨环境一致部署。后果：脱离 Azure 锁定；运维多一个 MinIO 实例；与 Q-A5 AKS 部署形态不对齐。
+  - **C**. 直接存数据库 BLOB 字段。后果：实现最简单；数据库膨胀；不适合 ≥ MB 级文件。
+  - **D**（由 Owner 在 H2 阶段提出，已接受）。三 Provider 切换：`LocalFileSystem` / `AzureBlob` / `MinIO`，同一 `IFileStorageProvider` 抽象，启动时按配置选择。与 [ADR-004 IPersistenceProvider](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 同构；dev 默认 MinIO，单元测试默认 LocalFileSystem，prod 由客户选。成本：三 Provider contract test matrix；Helm Chart 三套 values 模板。
+- **回答**：
+
+  > 2026-05-08（初始决议） / 2026-05-09（复议保留）。接受 D。Owner 在 H2 阶段提出“本地 + Azure Blob + MinIO”三 Provider 要求，与 [ADR-004 IPersistenceProvider](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 同构；详见 [ADR-015 文件存储：Provider 可切换](./adr/ADR-015-object-storage-provider-switchable.md)。抽象接口名 `IFileStorageProvider`（与 `IPersistenceProvider` / `ICacheProvider` 保持 `*Provider` 后缀一致）。
+
+- **决策日期**：
+
+  > 2026-05-08
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：ADR-015 新增；tech-selection.md §15 新增文件存储选型（抽象名变为 IFileStorageProvider）；architecture.md §8 文件存储方案重写；[ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md) Compose 默认 minio + override azurite；[ADR-009](./adr/ADR-009-multimodal-azure-speech.md) 多模态文件路径改引用 IFileStorageProvider。
+
+---
+
+## OQ-A006 模型与外部 API 凭据存储
+
+- **问题**：Azure OpenAI / Azure Speech / 其他模型厂商 API key 如何存储？
+- **为什么需要答**：决定 [Inkwell.Models / Inkwell.Multimodal](../01-requirements/repo-impact-map.md) 的配置加载方式；NFR-006 合规相关。
+- **影响范围**：REQ-005 / REQ-016；NFR-006；ADR-005。
+- **候选答**：
+  - **A**（Agent 默认推进）。Azure Key Vault（prod） + ASP.NET Core User Secrets（dev）；通过 [Microsoft.Extensions.Configuration.AzureKeyVault](https://learn.microsoft.com/azure/key-vault/secrets/quick-create-net) 注入。后果：与 AKS Managed Identity 配套；dev 不写明文配置文件；NFR-006 凭据不出 Azure 边界。
+  - **B**. 环境变量 + Docker Compose `.env` / Kubernetes Secret。后果：实现最简单；机密以 Kubernetes Secret base64 存储，不如 KeyVault 防泄漏；轮换需要 Pod 重启。
+  - **C**. 其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-09。接受 B。Owner 反转默认值，v1 凭据走环境变量 + Docker Compose `.env` / Kubernetes Secret，不引入 Azure Key Vault。限制与补偿措施：env 文件不进仓库（`.gitignore`）；K8s Secret 启用 [静态加密](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)；RBAC 限制 Pod 启动事件不出现 Secret 原文；轮换以 Pod 重启代价接受。[risk-analysis.md RISK-013](./risk-analysis.md) 显式记录“未使用 KeyVault”的残余风险；v2 评估升级为 Key Vault + CSI driver。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [tech-selection.md §18 配置与凭据](./tech-selection.md)；[architecture.md §13 安全设计](./architecture.md)；[ADR-005 §后果](./adr/ADR-005-deployment-docker-compose-aks.md)；[risk-analysis.md RISK-013](./risk-analysis.md) 新增。
+
+---
+
+## OQ-A007 测试与 CI 工具链
+
+- **问题**：测试与 CI 平台选型：(a) xUnit（后端）+ Vitest（前端）+ Playwright（E2E）+ GitHub Actions，(b) NUnit + Jest + Cypress + Azure DevOps，(c) 其他组合。
+- **为什么需要答**：决定 H4 测试用例编写时的命名 / 断言风格；影响 [.github/copilot-instructions.md](../../.github/copilot-instructions.md) 中 `dotnet test` 的实际执行链路。
+- **影响范围**：H4 全部测试用例；H5 编码任务的 Verify 命令格式；CI 流水线。
+- **候选答**：
+  - **A**（Agent 默认推进，Owner 修正后部分采纳）。后端 [MSTest v3](https://github.com/microsoft/testfx)（[`MSTest.Sdk`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-mstest-intro) 最新稳定版 + [`Microsoft.Testing.Platform`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro)） + Vitest + Playwright + GitHub Actions。后果：与 .NET 10 + C# 14 默认生态一致；`MSTest.Sdk` 提供零配置项目模板；Microsoft.Testing.Platform 带来冷启动提速；与 GitHub Actions matrix 原生兼容。
+  - **B**. NUnit + Jest + Cypress + Azure DevOps。后果：脱离 GitHub 平台；Jest 与 Vite 集成需要 babel-jest；Cypress 不支持多 tab E2E。
+  - **C**. 其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-09。接受 A（修正后）。Owner 明确：后端从 xUnit 换为 [MSTest v3](https://github.com/microsoft/testfx) 最新稳定版（`MSTest.Sdk` + `Microsoft.Testing.Platform`），代表微软官方当前推荐的实践；前端保留 Vitest；E2E 保留 Playwright；CI 平台保留 GitHub Actions。
+
+- **决策日期**：
+
+  > 2026-05-09
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [tech-selection.md §19 测试与 CI](./tech-selection.md)；[architecture.md §10 可观测性方案](./architecture.md)。
+
+---
+
+> **完成后下一步**：
+>
+> 1. 7 条 OQ-A 均已 closed（2026-05-08 初谈 + 2026-05-09 复议补齐）。详见各条 §回答 + §回写。
+> 2. 评审纪要走 `/log-review`（见 [.github/copilot-instructions.md §3](../../.github/copilot-instructions.md)），同时人工把本文件 `status: pending → closed`（本轮已随决策同步更新） + 各 ADR / tech-selection.md / risk-analysis.md / architecture.md `status: draft → reviewed`。
+> 3. H3 详细设计需接重点足迹：三 Provider 抽象接口 contract（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider`）、主进程长 SSE 在 macOS App Nap / Windows 节能模式下的保活策略、凭据轮换与 Pod 重启联动。
