@@ -22,7 +22,7 @@ applyTo: 'src/**'
 
 - 提交前必须运行 `dotnet test` 并贴出真实输出
 - 测试失败时分析原因再改代码，不要靠"再试一次"通过
-- 风格检查：`dotnet format`，警告视作错误处理
+- 风格检查：`dotnet format --verify-no-changes`，警告视作错误处理
 
 ## 4. 反模式（出现即停止）
 

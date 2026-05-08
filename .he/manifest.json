@@ -2,192 +2,190 @@
   "schema": "v1",
   "harness_version": "0.0.1",
   "harness_commit": "849ff27",
-  "installed_at": "2026-05-07T21:41:28.3311253+08:00",
+  "installed_at": "2026-05-08T01:16:12Z",
   "targets": [
     "copilot"
   ],
   "vendor_dir": ".he",
   "replacements": {
     "TEST_COMMAND": "dotnet test",
-    "LINT_COMMAND": "dotnet format",
-    "HARNESS_REPO_REF": ".he",
-    "HARNESS_VERSION": "0.0.1",
-    "HARNESS_REPO_REF_FROM_GITHUB": "../.he"
+    "LINT_COMMAND": "dotnet format --verify-no-changes",
+    "HARNESS_REPO_REF": ".he"
   },
   "files": [
     {
-      "sha256": "aa2342520096d9422394f3b0c68f6bb56ee7cc48678f17612d71ada94551e9e6",
       "path": ".github/agents/h1-prototype-reviewer.agent.md",
+      "sha256": "5ba89030fa34bbed42561e1b8c238ed9e9dbd58b89db96dde7102b1a4778c09d",
       "kind": "rendered"
     },
     {
-      "sha256": "9db23b1cb61c603da57765998c0bb3b6acea703222e6c5dad0d3658c2f209441",
       "path": ".github/agents/h1-repo-impact-mapper.agent.md",
+      "sha256": "d464a9b12d649ba4887f91b43a2ac8a04710663c4a65cf2be93e7cd3620a6bb6",
       "kind": "rendered"
     },
     {
-      "sha256": "dc36f449846b0f5dbd68a36c9de0a66295e1d9eeb5d1fc0ecbb500a680b79b27",
       "path": ".github/agents/h1-requirements-interviewer.agent.md",
+      "sha256": "7bc4d87304e7e5585124e9367701f8677ddf24a25efc9d6c42a8534811750e7d",
       "kind": "rendered"
     },
     {
-      "sha256": "5e7b20afdf894eb50acae792c5ec69e38514e21c286cc6ba5d86f37e1b86e7ef",
       "path": ".github/agents/h1-ui-spec-author.agent.md",
+      "sha256": "5742e13619ea86efe8441aa38d2a0c37a79e6677552fd9e24839688838931d91",
       "kind": "rendered"
     },
     {
-      "sha256": "fb66234aeb6c3d20aac8566e4fcd8125716a370016326f25a62fedf303894a92",
       "path": ".github/agents/h2-architect-advisor.agent.md",
+      "sha256": "6af96dfdf515bb3b0ed48af1d180a61eb2df65b89bc74346af392412b3fe3827",
       "kind": "rendered"
     },
     {
-      "sha256": "c8c7c2458c9cf3b738fd3df290a7debe0f72e438b745337070625221eced1fec",
       "path": ".github/agents/h3-design-reviewer.agent.md",
+      "sha256": "c2af6ecbbc2a5493a43e652d72ef693541cf83738ed36ed3fb5e1379314c2417",
       "kind": "rendered"
     },
     {
-      "sha256": "ed7e921a89c1f4b2ae80e569ce4a1d5dd23a2754abb777dd91d94d0f16764329",
       "path": ".github/agents/h4-test-case-author.agent.md",
+      "sha256": "3a6a39f0e583c3c40eb895bd85a918d48cb35ea450cc9584e6ec8150ffa989d6",
       "kind": "rendered"
     },
     {
-      "sha256": "f51c1dc6a87c3b8ce0929e15396050935a59136c68527121c4d48de73917d414",
       "path": ".github/agents/h5-coding-executor.agent.md",
+      "sha256": "b07af02c8306cc6899da00cc0fe5af4f64bcfd1339971697495cbed0f57d16b0",
       "kind": "rendered"
     },
     {
-      "sha256": "b0d3e10860f74452fb2a16bdb8359de39a43403e3016a19be5c739d2d3c501f8",
       "path": ".github/agents/h5-commit-auditor.agent.md",
+      "sha256": "5ef130a7af78163668f01266a9ef8f33f9c84613b33f67e6916ed8abd5bba912",
       "kind": "rendered"
     },
     {
-      "sha256": "186c678b56c3daee216478211716e3c81cee18b93a7bca39073c5c089c2f589c",
       "path": ".github/agents/h6-release-note-writer.agent.md",
+      "sha256": "760fb5e9387f9fab547ae064db9cbfd0d047aeb50a1d8fc828abe2a43979aa6b",
       "kind": "rendered"
     },
     {
-      "sha256": "c4999bda43619f8be025ef9dc44125151a520d2343e295c349bf5246266165a7",
       "path": ".github/agents/hx-doc-gardener.agent.md",
+      "sha256": "bbd0c8494ed40ffcae986c8cae121169a159ef3d4e315bc6692e1b5cf15aa538",
       "kind": "rendered"
     },
     {
-      "sha256": "fb5a04a10f9409bd94cbd3c4322fa995bc7283cce23fe3dfaa1ecedbadcf55eb",
       "path": ".github/copilot-instructions.md",
+      "sha256": "b9b00c19ffec606aefcd12f23ef4abd73f3dfa6ed590142aff27283081e3009e",
       "kind": "rendered"
     },
     {
-      "sha256": "1bca479cfce6af16db25c9e75d1a05e0dfea4dfc05740dab5558e6dc61c1e110",
       "path": ".github/instructions/coding-style.instructions.md",
+      "sha256": "bda0308022f44de66aaa5b56a13ace8db9464d7be41c08a9724113f248c0ef0f",
       "kind": "rendered"
     },
     {
-      "sha256": "2b5d774c4fb8fcdf640ddfc2f0e947c0672fc546fef8780ffbff1ef9e635cb87",
       "path": ".github/instructions/commit-format.instructions.md",
+      "sha256": "2b5d774c4fb8fcdf640ddfc2f0e947c0672fc546fef8780ffbff1ef9e635cb87",
       "kind": "rendered"
     },
     {
-      "sha256": "217f57ceac71cfc5d6140c97f7e286c996d88abb62b9194b8f976694181aee33",
       "path": ".github/instructions/docs-style.instructions.md",
+      "sha256": "217f57ceac71cfc5d6140c97f7e286c996d88abb62b9194b8f976694181aee33",
       "kind": "rendered"
     },
     {
-      "sha256": "714802c2df6adc235056e70ca1e234aa27b774f783d143871702501d45516fab",
       "path": ".github/prompts/log-review.prompt.md",
+      "sha256": "714802c2df6adc235056e70ca1e234aa27b774f783d143871702501d45516fab",
       "kind": "rendered"
     },
     {
-      "sha256": "e9b79bb7b9148e9ea3f39260d94e9b76756f76a9280609b63698ffa81508d4c6",
       "path": ".github/prompts/new-task.prompt.md",
+      "sha256": "e9b79bb7b9148e9ea3f39260d94e9b76756f76a9280609b63698ffa81508d4c6",
       "kind": "rendered"
     },
     {
-      "sha256": "6ec8064448437fbf25b4a836ebe5a4fadab569e2831633e145b4fe5e0393d533",
       "path": ".github/prompts/run-gate.prompt.md",
+      "sha256": "6ec8064448437fbf25b4a836ebe5a4fadab569e2831633e145b4fe5e0393d533",
       "kind": "rendered"
     },
     {
-      "sha256": "83d3791d9d4ef614bf3650b6986ba859325e1af2f8722a37eec4a73ec129484e",
       "path": ".github/prompts/sync-board.prompt.md",
+      "sha256": "83d3791d9d4ef614bf3650b6986ba859325e1af2f8722a37eec4a73ec129484e",
       "kind": "rendered"
     },
     {
-      "sha256": "16ed9aac846a4dba42e6d554a5767554516068a25a496586d3ed299d57185099",
       "path": ".github/skills/ai-task-brief-writer/SKILL.md",
+      "sha256": "16ed9aac846a4dba42e6d554a5767554516068a25a496586d3ed299d57185099",
       "kind": "rendered"
     },
     {
-      "sha256": "d74b6e53902c189cd5a4feb07b4a79ca6864314e349ec422cf56cfbbf97ab9c0",
       "path": ".github/skills/commit-message-formatter/SKILL.md",
+      "sha256": "d74b6e53902c189cd5a4feb07b4a79ca6864314e349ec422cf56cfbbf97ab9c0",
       "kind": "rendered"
     },
     {
-      "sha256": "290837cb845b3ad899c3403777fb21594ba4ba036b1a873c893b1f896338dc47",
       "path": ".github/skills/phase-gate-runner/SKILL.md",
+      "sha256": "290837cb845b3ad899c3403777fb21594ba4ba036b1a873c893b1f896338dc47",
       "kind": "rendered"
     },
     {
-      "sha256": "33a7c10931e638d872db55a45476274c390d260872b6a8ef55b36cd898f85a6d",
       "path": ".github/skills/traceability-linker/SKILL.md",
+      "sha256": "33a7c10931e638d872db55a45476274c390d260872b6a8ef55b36cd898f85a6d",
       "kind": "rendered"
     },
     {
-      "sha256": "5710e29c06a9f3fc8b484601313b703a6e4ec40c644a19795b1452fdb6999dc9",
       "path": ".github/templates/ai-task-brief.md",
+      "sha256": "5710e29c06a9f3fc8b484601313b703a6e4ec40c644a19795b1452fdb6999dc9",
       "kind": "rendered"
     },
     {
-      "sha256": "4a44cfa9ff7c3a3377b23e0a82aca6c9038210378b0f333c7eb9fb239c677a24",
       "path": ".github/templates/dry-run-demo.md",
+      "sha256": "4a44cfa9ff7c3a3377b23e0a82aca6c9038210378b0f333c7eb9fb239c677a24",
       "kind": "rendered"
     },
     {
-      "sha256": "02a35245fa5995fe6cb86231a890d3562580aca6490353116d229f936577c3cf",
       "path": ".github/templates/open-questions.md",
+      "sha256": "02a35245fa5995fe6cb86231a890d3562580aca6490353116d229f936577c3cf",
       "kind": "rendered"
     },
     {
-      "sha256": "4d2a8b097607564a0e045147ae0fe749344bfe8c1f318f29eb8f33907fc06e81",
       "path": ".github/templates/phase-gate-checklist.md",
+      "sha256": "4d2a8b097607564a0e045147ae0fe749344bfe8c1f318f29eb8f33907fc06e81",
       "kind": "rendered"
     },
     {
-      "sha256": "b94ff77582f6c72babc2f6ace7e4afecfbf7b51bb3823673f31609ac37093a03",
       "path": ".github/templates/review-record.md",
+      "sha256": "b94ff77582f6c72babc2f6ace7e4afecfbf7b51bb3823673f31609ac37093a03",
       "kind": "rendered"
     },
     {
-      "sha256": "544a9f52410dd9179eff6f92f2bd3a2d84184d462ad323afbf2c9ecd9d781f52",
       "path": ".github/templates/task-board.md",
+      "sha256": "544a9f52410dd9179eff6f92f2bd3a2d84184d462ad323afbf2c9ecd9d781f52",
       "kind": "rendered"
     },
     {
-      "sha256": "29239302155730167e24dbbf1637edc2992b67924e17655bc5e927033dfdf6c2",
       "path": ".he/docs/repo-layout.md",
+      "sha256": "29239302155730167e24dbbf1637edc2992b67924e17655bc5e927033dfdf6c2",
       "kind": "rendered"
     },
     {
-      "sha256": "cacd9e0977ab0c23360ecb3d82b7943004bd51d26143b6214e6c82eb023f5cb4",
       "path": ".he/docs/stages.md",
+      "sha256": "cacd9e0977ab0c23360ecb3d82b7943004bd51d26143b6214e6c82eb023f5cb4",
       "kind": "rendered"
     },
     {
-      "sha256": "64cd575dc15802abf1d03cb68e49cc7a5a28ada95695467f992f0ef688815ca5",
       "path": ".he/docs/tech-debt-gc.md",
+      "sha256": "64cd575dc15802abf1d03cb68e49cc7a5a28ada95695467f992f0ef688815ca5",
       "kind": "rendered"
     },
     {
-      "sha256": "cfd12fe8235bd4ab11c2e512e703279e4428641cee298b2c1c9ceade6f61c754",
       "path": ".he/HANDBOOK.md",
+      "sha256": "cfd12fe8235bd4ab11c2e512e703279e4428641cee298b2c1c9ceade6f61c754",
       "kind": "rendered"
     },
     {
-      "sha256": "2d1bac342ee1ab8658faa9de8d2e8feab1c1c32b52471beda2973969d398b0b4",
       "path": ".he/README.md",
+      "sha256": "2d1bac342ee1ab8658faa9de8d2e8feab1c1c32b52471beda2973969d398b0b4",
       "kind": "rendered"
     },
     {
-      "sha256": "b5a72e28ac37355a0bb9bd3bb58389955d45e3fe18995be257f593f71ffe2916",
       "path": ".he/uninstall.ps1",
+      "sha256": "b5a72e28ac37355a0bb9bd3bb58389955d45e3fe18995be257f593f71ffe2916",
       "kind": "rendered"
     }
   ]

@@ -9,7 +9,7 @@
 - 所有变更必须能映射到一条 `REQ-NNN`（需求编号）。无对应需求的请求一律先反问，不直接写代码。
 - 提交信息必须满足 [`commit-format.instructions.md`](./instructions/commit-format.instructions.md) 的字段要求：`Design / Tests / Verify / Docs / Risk / Task` 六字段齐备。
 - 修改源码前先运行 `dotnet test`，确保起点干净；提交前再次运行，确认未引入回归。
-- 风格检查：`dotnet format`，警告视作错误处理。
+- 风格检查：`dotnet format --verify-no-changes`，警告视作错误处理。
 - `docs/` 是事实来源（source of truth）：先改文档再改代码，不要让代码先于设计落地。
 - 不在 `docs/04-detailed-design/` 之外的位置放设计内容；不在 `AGENTS.md` 里复述能用 Lint / Hooks / CI 强制的规则。
 

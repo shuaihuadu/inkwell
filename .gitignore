@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 编辑器 / IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# 构建产物（v1 占位，待 H5 真正引入再细化）
+bin/
+obj/
+out/
+dist/
+build/
+node_modules/
+
+# 凭据 / 本地配置（OQ-A006 closed §B：dev 走 .env，禁止入仓）
+.env
+.env.*
+!.env.example
+*.local
+
+# 日志
+*.log
+!.he/install.log
