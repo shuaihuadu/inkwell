@@ -1,0 +1,28 @@
+{
+  "name": "inkwell-agent-platform-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "H1 可交互原型 · 严格按 docs/01-requirements/ui-spec.md 翻译，仅供 PrototypeReviewer 评审使用",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "@ant-design/pro-components": "^2.8.2",
+    "@xyflow/react": "^12.3.5",
+    "antd": "^5.21.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.27.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
