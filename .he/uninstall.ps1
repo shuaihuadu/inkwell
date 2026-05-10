@@ -4,7 +4,7 @@
     Harness Engineering · 卸载脚本（基于 manifest）。
 
 .DESCRIPTION
-    根据 <TargetRepo>/.he/manifest.json 反向移除安装时落下的文件。
+    根据 <TargetRepo>/<vendor-dir>/manifest.json 反向移除安装时落下的文件。
 
     安全策略：
     - 优先用 manifest 精确卸载（按 sha256 比对）。
@@ -14,19 +14,28 @@
     - 自下而上清理只剩空的目录；非空目录绝不递归删。
     - 全程支持 -DryRun。
 
+    Vendor 目录探测顺序（默认 .he/，也可被安装时改为任意名）：
+    1. 显式 -VendorDir <name>。
+    2. 默认 .he/manifest.json。
+    3. 扫描顶层一级目录下的 manifest.json（schema==v1）。
+
     Manifest 缺失时的兜底（残留清理）：
-    - 例如 install 中途按 Ctrl+C，manifest 还没写入但 .he/
+    - 例如 install 中途按 Ctrl+C，manifest 还没写入但 vendor 目录
       或 .github/ 下已经有部分文件落地。
     - 此时脚本不报错退出，而是启动 best-effort 残留扫描：
-      * 整体清理 <TargetRepo>/.he/ 目录（纯属本工具产物）。
+      * 整体清理 <TargetRepo>/<vendor-dir>/ 目录（纯属本工具产物）。
       * 对 .github/copilot-instructions.md / .github/instructions/*.instructions.md /
         .github/agents/*.agent.md，仅当文件内含 "Harness Engineering" 标记时才删。
       * 交互模式下会列出候选并请求确认；非交互模式必须显式 -Force 才执行删除。
 
 .PARAMETER TargetRepo
     采用方仓库根目录的绝对路径。
-    省略时：若脚本位于 <TargetRepo>/.he/ 下（即装到目标的副本），自动取脚本所在目录的父目录；
+    省略时：若脚本位于 <TargetRepo>/<vendor-dir>/ 下（即装到目标的副本），自动取脚本所在目录的父目录；
     否则报错要求显式传入。
+
+.PARAMETER VendorDir
+    Vendor 目录名（安装时 --vendor-harness-to / -VendorHarnessTo 所用名字）。
+    省略时：依次探测 默认 .he/ → 顶层扫描。
 
 .PARAMETER Force
     对内容已被本地修改的文件也执行删除；在 manifest 缺失的兜底路径下，等价于
@@ -38,13 +47,14 @@
 .EXAMPLE
     # 源仓库直接卸载某采用方
     ./uninstall.ps1 -TargetRepo D:\Path\To\YourRepo
-    # 在采用方仓库内一键卸载（脚本已被装到 .he/ 下）
+    # 在采用方仓库内一键卸载（脚本已被装到 vendor 目录下）
     pwsh -File .\.he\uninstall.ps1
 #>
 
 [CmdletBinding()]
 param(
     [string]$TargetRepo,
+    [string]$VendorDir,
 
     [switch]$Force,
     [switch]$DryRun
@@ -53,14 +63,16 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# TargetRepo 智能默认：若脚本位于 .he/ 内，取上级目录
+# TargetRepo 智能默认：若脚本位于 vendor 目录内（含 manifest.json 或目录名为 .he / -VendorDir），取上级目录
 if (-not $TargetRepo) {
     $hereLeaf = Split-Path -Leaf $PSScriptRoot
-    if ($hereLeaf -eq '.he') {
+    $hasManifest = Test-Path (Join-Path $PSScriptRoot 'manifest.json') -PathType Leaf
+    if ($hereLeaf -and ($hereLeaf -eq '.he' -or ($VendorDir -and $hereLeaf -eq $VendorDir) -or $hasManifest)) {
         $TargetRepo = Split-Path -Parent $PSScriptRoot
+        if (-not $VendorDir) { $VendorDir = $hereLeaf }
     }
     else {
-        throw '请用 -TargetRepo <path> 指定采用方仓库根，或把脚本放到 <TargetRepo>/.he/ 下再运行'
+        throw '请用 -TargetRepo <path> 指定采用方仓库根，或把脚本放到 <TargetRepo>/<vendor-dir>/ 下再运行'
     }
 }
 
@@ -69,10 +81,47 @@ if (-not (Test-Path $TargetRepo -PathType Container)) {
 }
 $TargetRepo = (Resolve-Path $TargetRepo).Path
 
-$manifestDir = Join-Path $TargetRepo '.he'
-$manifestPath = Join-Path $manifestDir 'manifest.json'
+# 定位 vendor 目录：优先显式 -VendorDir，其次默认 .he/，最后扫描顶层一级目录
+$manifestDir = $null
+$manifestPath = $null
 
-# 如果脚本是在 .he\ 里被启动的，这个目录会被记录为进程的
+if ($VendorDir) {
+    $manifestDir = Join-Path $TargetRepo $VendorDir
+    $manifestPath = Join-Path $manifestDir 'manifest.json'
+}
+elseif (Test-Path (Join-Path (Join-Path $TargetRepo '.he') 'manifest.json') -PathType Leaf) {
+    $manifestDir = Join-Path $TargetRepo '.he'
+    $manifestPath = Join-Path $manifestDir 'manifest.json'
+}
+else {
+    $found = $null
+    Get-ChildItem -Path $TargetRepo -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($found) { return }
+        $candidate = Join-Path $_.FullName 'manifest.json'
+        if (Test-Path $candidate -PathType Leaf) {
+            try {
+                $obj = Get-Content -LiteralPath $candidate -Raw | ConvertFrom-Json -ErrorAction Stop
+                if ($obj -and $obj.PSObject.Properties.Name -contains 'schema' -and $obj.schema -eq 'v1') {
+                    $found = $candidate
+                }
+            }
+            catch { }
+        }
+    }
+    if ($found) {
+        $manifestPath = $found
+        $manifestDir = Split-Path -Parent $found
+    }
+    else {
+        # 未找到任何 manifest 时仍以 .he/ 为默认提示路径，交给 best-effort 兜底
+        $manifestDir = Join-Path $TargetRepo '.he'
+        $manifestPath = Join-Path $manifestDir 'manifest.json'
+    }
+}
+
+$vendorRel = $manifestDir.Substring($TargetRepo.Length).TrimStart('\','/')
+
+# 如果脚本是在 vendor 目录里被启动的，这个目录会被记录为进程的
 # 当前工作目录，最后一步删自身会被 Windows 拒以 "文件正在被使用"。
 # 提前切出去（同时同步进程级 cwd）。
 $startCwd = (Get-Location).ProviderPath
@@ -118,12 +167,13 @@ function Invoke-BestEffortCleanup {
 
     $candidates = New-Object System.Collections.Generic.List[object]
 
-    # 1) .he/ 目录：完全是本工具产物，整目录可删
+    # 1) vendor 目录：完全是本工具产物，整目录可删
     if (Test-Path $ManifestDir -PathType Container) {
+        $vendorRelLocal = $ManifestDir.Substring($TargetRepo.Length).TrimStart('\','/')
         $entry = New-Object PSObject -Property @{
             Kind   = 'dir'
             Path   = $ManifestDir
-            Rel    = '.he/'
+            Rel    = "$vendorRelLocal/"
             Reason = '整目录（本工具专属）'
             Safe   = $true
         }
@@ -327,23 +377,23 @@ else {
 
     if ($shouldRemoveManifest) {
         Remove-Item -LiteralPath $manifestPath -Force
-        Write-Host "   delete .he/manifest.json" -ForegroundColor Magenta
+        Write-Host "   delete $vendorRel/manifest.json" -ForegroundColor Magenta
         # install.log 是审计日志、不在 manifest 里；clean uninstall 时一并移除以让目录归零
         if (Test-Path $logPath -PathType Leaf) {
             Remove-Item -LiteralPath $logPath -Force
-            Write-Host "   delete .he/install.log" -ForegroundColor Magenta
+            Write-Host "   delete $vendorRel/install.log" -ForegroundColor Magenta
         }
         if ((Test-Path $manifestDir) -and -not @(Get-ChildItem -LiteralPath $manifestDir -Force)) {
             try {
                 Remove-Item -LiteralPath $manifestDir -Force -ErrorAction Stop
-                Write-Host "   rmdir  .he" -ForegroundColor DarkMagenta
+                Write-Host "   rmdir  $vendorRel" -ForegroundColor DarkMagenta
             }
             catch {
-                # 例如脚本是从 .he\ 内部被启动的，进程仍持有该 cwd 句柄，
+                # 例如脚本是从 vendor 目录内部被启动的，进程仍持有该 cwd 句柄，
                 # 内核会拒绝删除。此时不报错退出，只提示手动收尾。
-                Write-Host "   [!] .he/ 仍被本脚本进程占用，无法自动删除" -ForegroundColor Yellow
+                Write-Host "   [!] $vendorRel/ 仍被本脚本进程占用，无法自动删除" -ForegroundColor Yellow
                 Write-Host "       退出后手动执行：" -ForegroundColor Yellow
-                Write-Host "         cd '$TargetRepo'; Remove-Item .he -Force" -ForegroundColor Yellow
+                Write-Host "         cd '$TargetRepo'; Remove-Item $vendorRel -Force" -ForegroundColor Yellow
             }
         }
     }

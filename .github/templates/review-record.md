@@ -1,6 +1,17 @@
 # 评审记录模板
 
+> **Agent 起草指引**：本表 §1 / §3 的字段属于 [`io-contracts.md` §6.1](../agents/_shared/io-contracts.md#61-交互式输入约定pick-over-type) 的"封闭枚举 / 半结构化"类型，**必须**通过 `ask.user` 一次性收集，不要让用户自己打字填表。
+
 ## 1. 基本信息
+
+<!-- ask.user batch: 7 questions, options[] from detection where possible:
+     - 项目名称: 仓库名 (`basename $PWD`) / 当前 feature 名 / 自由输入
+     - 评审阶段: H1 / H2 / H3 / H4 / H5 / H6
+     - 评审对象: 当前阶段的事实源文件列表
+     - 评审时间: 今天 / 昨天 / 自由输入 (YYYY-MM-DD)
+     - 评审地点: 线上 / 现场 / 异步 / 自由输入
+     - 主持人 / 记录人: `git config user.name` + `git log --format=%an | sort -u | head -10` + 自由输入
+     - 参与人员: 多选 from same git log + 自由输入 -->
 
 - 项目名称：
 - 评审阶段：
@@ -23,6 +34,13 @@
 | 代码提交 |  |  |
 
 ## 3. 评审结论
+
+<!-- ask.user single picker, options[]:
+     - Approved
+     - Approved with Changes
+     - Rejected
+     - Pending
+     io-contracts.md §6.1 封闭枚举 → MUST picker, NOT freeform -->
 
 请选择一个结论：
 

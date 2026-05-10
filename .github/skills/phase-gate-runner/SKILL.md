@@ -38,7 +38,7 @@ H1–H6 的每一阶段都有一份**机械化清单**（[`templates/phase-gate-
 ### 3.1 加载清单与上下文
 
 1. 读 [`templates/phase-gate-checklist.md`](../../../templates/phase-gate-checklist.md) 对应阶段那一节，得到完整勾选项列表。
-2. 读 [`docs/stages.md`](../../../docs/stages.md) 对应阶段，了解该阶段的目录与产物路径约定。
+2. 读 [`docs/stages/`](../../../docs/stages/README.md) 对应阶段，了解该阶段的目录与产物路径约定。
 3. 读项目的 `repo-layout.md`（如有），定位实际产物落在哪。
 
 ### 3.2 逐条核对
@@ -97,8 +97,8 @@ H1–H6 的每一阶段都有一份**机械化清单**（[`templates/phase-gate-
 
 ## 4. 失败模式与回退
 
-- **找不到对应阶段的产物目录**：报"项目尚未按 stages.md 建立目录骨架"，建议先回到 H0 / 初始化阶段。不要猜路径。
-- **清单条目与项目实际工作流不匹配**（项目对清单做了裁剪）：以项目 `AGENTS.md` / `.he/templates/phase-gate-checklist.md` 的本地版本为准；如该文件未被裁剪，仍以源模板为真。**不要在本 Skill 里自行裁剪**。
+- **找不到对应阶段的产物目录**：报"项目尚未按 stages/ 建立目录骨架"，建议先回到 H0 / 初始化阶段。不要猜路径。
+- **清单条目与项目实际工作流不匹配**（项目对清单做了裁剪）：以项目 `AGENTS.md` / `.github/templates/phase-gate-checklist.md` 的本地版本为准；如该文件未被裁剪，仍以源模板为真。**不要在本 Skill 里自行裁剪**。
 - **跨阶段混跑**：用户同时让你核对 H3 和 H4，明确告知"门禁应一次一阶段"，建议按顺序核对。同时跑两阶段会让放行结论难以归档。
 
 ## 5. 示例

@@ -1,8 +1,8 @@
 {
   "schema": "v1",
   "harness_version": "0.0.1",
-  "harness_commit": "849ff27",
-  "installed_at": "2026-05-08T01:16:12Z",
+  "harness_commit": "476c411",
+  "installed_at": "2026-05-09T17:10:00Z",
   "targets": [
     "copilot"
   ],
@@ -14,68 +14,73 @@
   },
   "files": [
     {
+      "path": ".github/agents/h1-prototype-author.agent.md",
+      "sha256": "09d8ef3a5f01973a8a59fdf8c7939587dfcd1807da34dca103edb37ce88c957c",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/agents/h1-prototype-reviewer.agent.md",
-      "sha256": "5ba89030fa34bbed42561e1b8c238ed9e9dbd58b89db96dde7102b1a4778c09d",
+      "sha256": "e97b991c59d91f1296e231b64bd9bfbaa5201a470ad1f60d9f4d0318080e0911",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h1-repo-impact-mapper.agent.md",
-      "sha256": "d464a9b12d649ba4887f91b43a2ac8a04710663c4a65cf2be93e7cd3620a6bb6",
+      "sha256": "cdd99ced5f418d3c41c1d665ad05ab089fe44e258f3c1a2bcd9a915918af10ac",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h1-requirements-interviewer.agent.md",
-      "sha256": "7bc4d87304e7e5585124e9367701f8677ddf24a25efc9d6c42a8534811750e7d",
+      "sha256": "76ae6ad11ef1548a3dbc2fac027645123f1a4e08d414fc1d2d872f2d0c0137f7",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h1-ui-spec-author.agent.md",
-      "sha256": "5742e13619ea86efe8441aa38d2a0c37a79e6677552fd9e24839688838931d91",
+      "sha256": "5dd64cb7ca35e0b4f70885405aa60fc6a57225c0019577067c444dde476617dc",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h2-architect-advisor.agent.md",
-      "sha256": "6af96dfdf515bb3b0ed48af1d180a61eb2df65b89bc74346af392412b3fe3827",
+      "sha256": "5dcf20486810db051a4dbbee0a1ccc229a20d7a82be15964bf5dd5fe6c5338c1",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h3-design-reviewer.agent.md",
-      "sha256": "c2af6ecbbc2a5493a43e652d72ef693541cf83738ed36ed3fb5e1379314c2417",
+      "sha256": "84340ba53f6362b0bd8ef946f89abaf320baa819ec799beb89fb9f792d971880",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h4-test-case-author.agent.md",
-      "sha256": "3a6a39f0e583c3c40eb895bd85a918d48cb35ea450cc9584e6ec8150ffa989d6",
+      "sha256": "9601cff74af9c3d8dfdbaaf063c1339fd303dece59533b5e0b9c2642b57707cd",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h5-coding-executor.agent.md",
-      "sha256": "b07af02c8306cc6899da00cc0fe5af4f64bcfd1339971697495cbed0f57d16b0",
+      "sha256": "5fb83dc0af5bed569451d969c109ebebab4a1cd532e7847b27ed07ea65924e22",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h5-commit-auditor.agent.md",
-      "sha256": "5ef130a7af78163668f01266a9ef8f33f9c84613b33f67e6916ed8abd5bba912",
+      "sha256": "57512a2c7bd716977bd5a3f4fa5c67d3a30ae5ac9e3afddd8ccc5cfcf7056ffd",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/h6-release-note-writer.agent.md",
-      "sha256": "760fb5e9387f9fab547ae064db9cbfd0d047aeb50a1d8fc828abe2a43979aa6b",
+      "sha256": "9ed4dfdafeecc0b3367b5c493ac6adf12bad21f4f74eed02ef06b9f62c9c49f6",
       "kind": "rendered"
     },
     {
       "path": ".github/agents/hx-doc-gardener.agent.md",
-      "sha256": "bbd0c8494ed40ffcae986c8cae121169a159ef3d4e315bc6692e1b5cf15aa538",
+      "sha256": "e0631c033e710d0cc7bbc7a98971a4b2b848832b35d76d8028a00abc6ec85758",
       "kind": "rendered"
     },
     {
       "path": ".github/copilot-instructions.md",
-      "sha256": "b9b00c19ffec606aefcd12f23ef4abd73f3dfa6ed590142aff27283081e3009e",
+      "sha256": "edb773d6e3e15c2af91192c2274b2618e710c3ef5858792cca663a3866186bfc",
       "kind": "rendered"
     },
     {
-      "path": ".github/instructions/coding-style.instructions.md",
-      "sha256": "bda0308022f44de66aaa5b56a13ace8db9464d7be41c08a9724113f248c0ef0f",
+      "path": ".github/instructions/coding-discipline.instructions.md",
+      "sha256": "28544b0ed615c9e67a17e85a5a3ba46888c2c17b5d1239f693554185f2abddc7",
       "kind": "rendered"
     },
     {
@@ -85,7 +90,7 @@
     },
     {
       "path": ".github/instructions/docs-style.instructions.md",
-      "sha256": "217f57ceac71cfc5d6140c97f7e286c996d88abb62b9194b8f976694181aee33",
+      "sha256": "c7eb748a8ac8d6e6e9bff2e74b5270628492603c8af3645f115fb73e6654b439",
       "kind": "rendered"
     },
     {
@@ -114,13 +119,48 @@
       "kind": "rendered"
     },
     {
+      "path": ".github/skills/architecture-reviewer/SKILL.md",
+      "sha256": "77ad9a307821c8ac66c2d3b6df1738e2cac7a7430be179bb35d2e32367a0b2de",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/code-style-bootstrapper/SKILL.md",
+      "sha256": "e3b23e658175526d4098d238a73bb7c277e81f061b4c1d64aef710293626a2cf",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/skills/commit-message-formatter/SKILL.md",
       "sha256": "d74b6e53902c189cd5a4feb07b4a79ca6864314e349ec422cf56cfbbf97ab9c0",
       "kind": "rendered"
     },
     {
+      "path": ".github/skills/effort-estimator/SKILL.md",
+      "sha256": "9bc5b73be740c8e58cd7698f3b5b19678ff1621c62c8363399a9ed9f52b32020",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/interactive-form-builder/SKILL.md",
+      "sha256": "6c701e199dc9bbb083d10dbad3bae71fabf12bbba30f1adb1c477ec4b5a62e2c",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/skills/phase-gate-runner/SKILL.md",
-      "sha256": "290837cb845b3ad899c3403777fb21594ba4ba036b1a873c893b1f896338dc47",
+      "sha256": "fb50bbe895d18d8129cc11a9a649bbf29e5f4104389ea86cb33dbd03694d6ed9",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/prd-exporter/SKILL.md",
+      "sha256": "c29c4ce9ed4b1532254c6d322bda2dc8bb9b6a1c55d37fc46e677b52ce75fdcc",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/release-reviewer/SKILL.md",
+      "sha256": "ef0fa7c2be0cc3e0b9e114378a6ba90071a069a4562a4611124b9f75f39a4669",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/skills/test-plan-reviewer/SKILL.md",
+      "sha256": "b2d48b36abc52ca37d99cf56bcc6fc88da2bc9030e4eb9c29559b2c520c6ea02",
       "kind": "rendered"
     },
     {
@@ -129,8 +169,13 @@
       "kind": "rendered"
     },
     {
+      "path": ".github/templates/AGENTS.md",
+      "sha256": "105ec4059649319238120a67bf87ebaeb8fc0905ff1503574261dbcf04cd799a",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/templates/ai-task-brief.md",
-      "sha256": "5710e29c06a9f3fc8b484601313b703a6e4ec40c644a19795b1452fdb6999dc9",
+      "sha256": "b98d1530675866b9444e7d39119707c05af28c3a1c8b4158ac51e950f69ed1ae",
       "kind": "rendered"
     },
     {
@@ -139,8 +184,48 @@
       "kind": "rendered"
     },
     {
+      "path": ".github/templates/instructions-examples/csharp.instructions.example.md",
+      "sha256": "f21f9cfb21f832281dc99a0bfd718710f504792cdba5335f8cb037d174f654e6",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/go.instructions.example.md",
+      "sha256": "2afe155d03a30367bdd820bc24c74ec80b2234b718c8ccf2c11f5d1757050feb",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/java.instructions.example.md",
+      "sha256": "56ab92769bc871e50479ffdb6516e61bac93b6ba9ae8979752ee4abe564df2ac",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/javascript.instructions.example.md",
+      "sha256": "7ed4f555bf466e0ea929b017e6651ab8707844b9b5aaa7eb2368f9641791944d",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/python.instructions.example.md",
+      "sha256": "3aa4087cf951864879234871b0dd827f276aafa367327bc5298901240ca29f6f",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/rust.instructions.example.md",
+      "sha256": "b36cf9a18fd8c61e3d1062ee3472d0e722ef030fb6344cd3701b44baac6b25e7",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/shell.instructions.example.md",
+      "sha256": "d24eab28556bcd7ac5c9947e995d7d3e27d94914851e8eaa2278b6bd5f650fe8",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/templates/instructions-examples/typescript.instructions.example.md",
+      "sha256": "5af6848c295c3ba26e9d56978c012be7733c19c57b56efc05dd47b81510e5af6",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/templates/open-questions.md",
-      "sha256": "02a35245fa5995fe6cb86231a890d3562580aca6490353116d229f936577c3cf",
+      "sha256": "589d10c099159165c8be2d3b3d8bbcf34c0ab4cea4b5eb152fe439069683a533",
       "kind": "rendered"
     },
     {
@@ -149,18 +234,38 @@
       "kind": "rendered"
     },
     {
+      "path": ".github/templates/prototype-review.md",
+      "sha256": "6efceeb7ba2dce489fa46dd1daba527efd5d6a6d68991c6442b2679c8786936d",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/templates/review-record.md",
-      "sha256": "b94ff77582f6c72babc2f6ace7e4afecfbf7b51bb3823673f31609ac37093a03",
+      "sha256": "925eeb9923d7b21d12834605b86d1ca61837e260a45f09d17ca10b9bba7ac23b",
       "kind": "rendered"
     },
     {
       "path": ".github/templates/task-board.md",
-      "sha256": "544a9f52410dd9179eff6f92f2bd3a2d84184d462ad323afbf2c9ecd9d781f52",
+      "sha256": "a44045ff123c213535b1dbc53bf7ffc26794579efa355a03ebe91504c9dd0db0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/ai-usage.md",
+      "sha256": "a1ceec53186974ac8c3b03d6c432c1724323637796e9da831c53fade85066b60",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/concepts.md",
+      "sha256": "a17761ca2b5ea8dc498e5adc0233ffd26b9c9af5a92afafc2c07ea12af1fdf55",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/instructions-layout.md",
+      "sha256": "eff75e64b23a772040694ac7bbf31602efff07158a621639d3dc717ec0145014",
       "kind": "rendered"
     },
     {
       "path": ".he/docs/repo-layout.md",
-      "sha256": "29239302155730167e24dbbf1637edc2992b67924e17655bc5e927033dfdf6c2",
+      "sha256": "af7843e5f6f8ce31c3e73bb958797b2406772dbbb5df5835204a75b050139116",
       "kind": "rendered"
     },
     {
@@ -169,13 +274,48 @@
       "kind": "rendered"
     },
     {
+      "path": ".he/docs/stages/h1-requirements-and-prototype.md",
+      "sha256": "13ab8180d3a64e657fad1be76b9a8b8e9a4b821788e1e6b40bda633e982d58d3",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/h2-architecture.md",
+      "sha256": "8278a8a1669775b781c17f599f7a030b65c8a63f5da957a9199b14a5b6ce4c48",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/h3-detailed-design.md",
+      "sha256": "be3db3c2d3447e52df71ed4caa939b305ceb965c9a0a480bcefe074beea1e5b3",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/h4-test-design.md",
+      "sha256": "c07d818dd4a9c799c90b201a3081620002df4dbc505ee13ca7b4195840dcaaad",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/h5-coding.md",
+      "sha256": "1e235c227b36bed3f6d111b53f0c85705458ce5f22d3f75ffca0f67ed2361fb0",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/h6-release.md",
+      "sha256": "1504cc0dbeec35df4338895eb9437e917be579572b2df7b486e86b731b4f976d",
+      "kind": "rendered"
+    },
+    {
+      "path": ".he/docs/stages/README.md",
+      "sha256": "a4eff7488e351d854a7598784ed3efa9183b55dd7391185b32ab55ca6481bd45",
+      "kind": "rendered"
+    },
+    {
       "path": ".he/docs/tech-debt-gc.md",
-      "sha256": "64cd575dc15802abf1d03cb68e49cc7a5a28ada95695467f992f0ef688815ca5",
+      "sha256": "e9d6ddd9df54f20aaabddce9d61fbe62b32fb7942b2ff9686c7868e7f806eb47",
       "kind": "rendered"
     },
     {
       "path": ".he/HANDBOOK.md",
-      "sha256": "cfd12fe8235bd4ab11c2e512e703279e4428641cee298b2c1c9ceade6f61c754",
+      "sha256": "70b2c7a51ba9579d99db59a57f882bdf6501ef1e2303e6fb83133498994f97cf",
       "kind": "rendered"
     },
     {
@@ -185,7 +325,7 @@
     },
     {
       "path": ".he/uninstall.ps1",
-      "sha256": "b5a72e28ac37355a0bb9bd3bb58389955d45e3fe18995be257f593f71ffe2916",
+      "sha256": "3029a42cb8ebe7a583fd9bad1890f6fd271c11e7d0a549fece50398eee151a4d",
       "kind": "rendered"
     }
   ]

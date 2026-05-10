@@ -15,11 +15,14 @@
 
 ## 2. 何时切换到专用 Custom Agent
 
-当前项目已装的 Custom Agent（在 VS Code Copilot Chat 输入框下方的 Agent 下拉菜单中选择）。Agent 名以 `h<阶段号>-` 开头，对应 [Harness 阶段](../.he/docs/stages.md) H1–H6，横切阶段用 `hx-`：
+当前项目已装的 Custom Agent（在 VS Code Copilot Chat 输入框下方的 Agent 下拉菜单中选择）。Agent 名以 `h<阶段号>-` 开头，对应 [Harness 阶段](../.he/docs/stages/) H1–H6，横切阶段用 `hx-`：
 
 | 场景                             | 使用 Agent                    |
 | -------------------------------- | ----------------------------- |
 | H1 需求访谈 / 模糊描述变需求初稿 | `h1-requirements-interviewer` |
+| H1 UI 说明 / 用户流 / 验收标准   | `h1-ui-spec-author`           |
+| H1 按 ui-spec 生成可交互原型     | `h1-prototype-author`         |
+| H1 原型评审（PASS/FAIL/UNKNOWN） | `h1-prototype-reviewer`       |
 | H1↔H3 仓库影响面映射             | `h1-repo-impact-mapper`       |
 | H2 架构说明 / 技术选型 / ADR     | `h2-architect-advisor`        |
 | H3 评审详细设计                  | `h3-design-reviewer`          |
@@ -44,7 +47,7 @@
 ## 4. 关键文档入口
 
 - 操作手册（10 分钟上手）：[`HANDBOOK.md`](../.he/HANDBOOK.md)
-- 阶段细则：[`docs/stages.md`](../.he/docs/stages.md)（H1–H6）
+- 阶段细则：[`docs/stages/`](../../../docs/stages/README.md)（H1–H6）
 - 目录规范：[`docs/repo-layout.md`](../.he/docs/repo-layout.md)
 - 技术债务 GC：[`docs/tech-debt-gc.md`](../.he/docs/tech-debt-gc.md)
 - 项目 ADR：`docs/03-architecture/adr/`
@@ -53,4 +56,4 @@
 
 ## 5. 反模式（出现即拒绝）
 
-五条："杂烩会话 / 反复纠错 / 过量规则文件 / 先信后验缺口 / 无界探索"。当用户请求触发任一条时，先指出反模式，再给替代做法。详见 [Harness Engineering README 第 6.4 节](https://github.com/shuaihuadu/harness-engineering#64-五大反模式与替代做法)。
+五条："杂烩会话 / 反复纠错 / 过量规则文件 / 先信后验缺口 / 无界探索"。当用户请求触发任一条时，先指出反模式，再给替代做法。详见 [`.he/docs/ai-usage.md` §4](../.he/docs/ai-usage.md)。

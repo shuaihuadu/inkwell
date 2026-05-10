@@ -22,6 +22,8 @@ downstream: []
 >
 > 不会用 `<TBD>` 占位混过去；Agent 答不出来的全部进 OQ。
 
+> **OQ 关闭时的交互形式**：Agent 在 chat 里收集"回答 / 决策日期 / 决策人"三字段时，**必须**按 [`io-contracts.md` §6.1](../agents/_shared/io-contracts.md#61-交互式输入约定pick-over-type) 用一次 `ask.user` picker 同时问完三项：候选答从下方 A/B/C/D 直接生成 options[]，决策日期 options=[今天, 昨天, 自由输入]，决策人 options=[`git config user.name`, 历史 reviewer..., 自由输入]。**禁止**让用户在 chat 里手动打字填这三个字段。
+
 ## 字段说明
 
 - **问题**：一句话讲清楚要决策什么，配 1–2 句"为什么需要答"。
