@@ -323,16 +323,18 @@ public static class InMemoryCacheBuilderExtensions
       "MinTtlSeconds": 1,
       "MaxTtlSeconds": 86400,
       "DefaultLockTtlSeconds": 30,
-      "EnableSensitiveDataLogging": false
-    },
-    "Cache:Redis": {
-      "ConnectionString": "..."
+      "EnableSensitiveDataLogging": false,
+      "Redis": {
+        "ConnectionString": "..."
+      }
     }
   }
 }
 ```
 
-> Provider 特定子段（`Cache:Redis` / `Cache:InMemory`）由各 Provider HD 起草时锁定。
+> Provider 特定子段（`Cache:Redis` / `Cache:InMemory`，即 `Inkwell:Cache:Redis` / `Inkwell:Cache:InMemory` 嵌套段）由各 Provider HD 起草时锁定。
+>
+> **2026-07-05 errata（N14）**：本节 JSON 示例原写法 `"Cache:Redis": {...}` 是非法的顶层扁平键名，与 ASP.NET Core [配置嵌套段](https://learn.microsoft.com/aspnet/core/fundamentals/configuration/#json-configuration-provider)约定不符；已改为标准嵌套写法 `"Cache": { ..., "Redis": {...} }`。关联 [design-review-report.md §14.3 N14](../design-review-report.md#n14hd-004-9-appsettingsjson-示例-cacheredis-键名不符合-json-嵌套写法c47)。
 
 ## 10. CI 自检命令（grep 列表）
 
@@ -368,7 +370,7 @@ public static class InMemoryCacheBuilderExtensions
 
 | 字段                       | 选定值                                                                                             | picker 时间 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
-| Q-scope                    | A：6 方法（Get/Set/Remove/Exists/Increment/TryAcquireLock+ReleaseLock）                              | 2026-07-05  |
+| Q-scope                    | A：6 类能力 / 7 方法（Get/Set/Remove/Exists/Increment/TryAcquireLock+ReleaseLock）                    | 2026-07-05  |
 | Q-lock-shape               | A：`TryAcquireLockAsync` 返回 `string? lockToken`，配 `ReleaseLockAsync(key, lockToken)` 显式释放     | 2026-07-05  |
 | Q-ttl-policy                | A：强制要求通过 `CacheEntryOptions` 指定 TTL，不提供无限期选项                                        | 2026-07-05  |
 | Q-serialization             | A：统一 `System.Text.Json`（`JsonSerializer`）                                                       | 2026-07-05  |

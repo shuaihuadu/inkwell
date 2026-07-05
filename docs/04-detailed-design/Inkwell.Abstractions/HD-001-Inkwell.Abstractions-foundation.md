@@ -322,8 +322,8 @@ src/core/Inkwell.Abstractions/
 - 同步签名（仅 in-memory 操作）：`T Xxx(...)` / `void Xxx(...)`
 - **调用方语义约定**（命名前缀决定失败语义）：
   - `Find*Async` → `Task<T?>`：实体不存在 = `null`，不抛
-  - `Get*Async` → `Task<T>`：实体不存在抛 `InkwellException(EntityNotFound)`
-  - `Exists*Async` → `Task<bool>`：仅查询，网络故障抛 `InkwellException(ConnectionFailed)`
+  - `Get*Async` → `Task<T>`：实体不存在抛 `KeyNotFoundException`
+  - `Exists*Async` → `Task<bool>`：仅查询，网络故障抛 `IOException`
   - `Delete*Async` → `Task<bool>`：幂等（`true` = 实际删除 / `false` = 本不存在）
   - `List*Async` → `IAsyncEnumerable<T>` 或 `Task<PagedResult<T>>`
   - `Create*Async` / `Update*Async` / `Upload*Async` / ... → `Task<T>`，失败抛 `InkwellException`
@@ -495,6 +495,16 @@ var app = builder.Build();
 - **§14.1 csproj→namespace 表**：`Common/Result.cs` 示例行 → `Common/Pagination.cs` 示例行（表达同样的“§子目录不入 namespace”语义）
 
 **上游补齐落地**：[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 已由 `h2-architect-advisor` agent 在同会话切片落地（accepted by Inkwell 2026-05-11），本 HD §0 / §1.3 / §10 / §11 中 6 处“待 H2 起草”措辞已同步去除。下游待办：[HD-002](HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-003](HD-003-Inkwell.Abstractions-file-storage-port.md) 第二批 errata 在新会话切片处理；[HD-004 ~ HD-008](.) 直接用新规约起草。
+
+### 2026-07-05 errata——§5.2 调用方语义约定遗留字面量翻新（B11）
+
+**触发**：[design-review-report.md §14.3 B11](../design-review-report.md#b11hd-001-52-遗留-inkwellexceptionentitynotfound--inkwellexceptionconnectionfailed-字面量未随-adr-023-errata0102-同步c38)（HD-004 增量评审发现一致性冲突）——Owner picker 拍板修复路径为**选项 1**：§5.2 遗留的 `InkwellException(EntityNotFound)` / `InkwellException(ConnectionFailed)` 字面量是 [ADR-023 errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流)（废错误码机制、改走 BCL 异常类型分流）之前的旧写法，未随本文件 §5.3 BCL 异常对照表同步翻新，二者自相矛盾。
+
+**变更清单**：
+
+- **§5.2 调用方语义约定**：`Get*Async` 实体不存在场景 `InkwellException(EntityNotFound)` → `KeyNotFoundException`；`Exists*Async` 网络故障场景 `InkwellException(ConnectionFailed)` → `IOException`（与 §5.3 BCL 异常对照表一致：实体 / key 不存在走 `KeyNotFoundException`，I/O 故障走 `IOException`）
+
+本次为 errata 级修订，不改变 §5.3 既有决策，仅补齐 §5.2 遗漏的同步翻新；`status: reviewed` 不打回 `draft`。
 
 ## 14. 命名空间与代码风格约定（横切规约）
 

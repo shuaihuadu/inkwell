@@ -1507,6 +1507,7 @@ reviewer 在 chat 中列三路径 picker：
   - 选项 2：§5.2 两行改为直接指向 §5.3（"失败语义详见 §5.3 BCL 对照表"），不重复维护两处容易漂移的文字
 - **卡点等级**：**blocking**（建议 Owner picker 确认；修复目标是 HD-001，不改动 HD-004 本体）
 - **追溯**：C38
+- **✅ 已处理（2026-07-05）**：Owner picker 拍板选项 1；[HD-001 §5.2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#52-签名) 两行字面量已改为 `KeyNotFoundException` / `IOException`，并在 [HD-001 §13 2026-07-05 errata](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2026-07-05-errata52-调用方语义约定遗留字面量翻新b11) 追加记录；`status: reviewed` 未打回 `draft`
 
 #### Non-blocking
 
@@ -1533,6 +1534,7 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：改为 `"Cache": { "MinTtlSeconds": 1, ..., "Redis": { "ConnectionString": "..." } }` 嵌套写法
 - **卡点等级**：non-blocking
 - **追溯**：C47
+- **✅ 已处理（2026-07-05）**：[HD-004 §9](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#9-部署--配置) appsettings.json 示例已改为标准嵌套写法，`Redis` 段落入 `Cache` 内部
 
 ##### N15：HD-004 §13.1 决策表 `Q-scope` 行"6 方法"计数与 §1.1 / §1.3"7 方法"表述不一致（C48）
 
@@ -1541,15 +1543,16 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：§13.1 表格文字"A：6 方法"改为"A：6 类能力 / 7 方法"，与 §1.1 / §1.3 措辞对齐
 - **卡点等级**：non-blocking
 - **追溯**：C48
+- **✅ 已处理（2026-07-05）**：[HD-004 §13.1](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#131-起草期-picker-决策2026-07-05) `Q-scope` 行文字已改为"A：6 类能力 / 7 方法"，与 §1.1 / §1.3 对齐
 
 ### 14.4 评审结论与下一步
 
 - **整体评审决议**：**PASS-AS-ERRATA**——HD-004 本体设计（接口 / DTO / Options / OTel / CI 自检）完整且自洽，唯一 blocking 项（B11）的修复目标是已 reviewed 的 HD-001（一行字面量级 errata），不要求改动 HD-004 文件本身
 - **HD-004 翻 `reviewed` 前置条件**：
-  1. Owner 拍板 B11（picker 确认卡点等级 + 修复路径选项）
-  2. AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下落 HD-001 §5.2 errata（1 行级修复，同会话可顺带处理 N12 ~ N15 非阻塞项）
-  3. Owner 在 HD-004 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
-- **不阻塞的后续建议**：N12（ADR 配置 key 批量 errata）建议积攒到 HD-005 ~ HD-008 起草完毕后一次性处理，避免逐 HD 零散 errata
+  1. ✅ Owner 拍板 B11（picker 确认卡点等级 + 修复路径选项）——已选定选项 1（2026-07-05）
+  2. ✅ AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下落 HD-001 §5.2 errata（2026-07-05 已完成，同会话顺带处理 N14 / N15；N12 / N13 按建议留待 HD-005 ~ HD-008 起草完毕后批量处理，未处理）
+  3. ⬜ Owner 在 HD-004 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签，尚待 Owner 执行）
+- **不阻塞的后续建议**：N12（ADR 配置 key 批量 errata）与 N13（file-structure.md 建议段陈旧）仍建议积攒到 HD-005 ~ HD-008 起草完毕后一次性处理，避免逐 HD 零散 errata；N14 / N15 已随本轮处理完毕
 - **后续 HD 建议路径**：HD-004 reviewed 后继续 HD-005 `IQueueProvider` + `MessageEnvelope`（[ADR-018](../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) + [RISK-015](../03-architecture/risk-analysis.md) 跨服务 trace 字段）
 
 ### 14.5 自检
