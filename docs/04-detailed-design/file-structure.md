@@ -287,6 +287,40 @@ providers/Inkwell.Queue.Redis/
 
 > Provider 子 Options（连接字符串等）由各 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/Queue/QueueOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../03-architecture/risk-analysis.md) / [RISK-014 队列可靠性残余风险](../03-architecture/risk-analysis.md) / [RISK-015 双进程版本漂移与 OTel 双 source](../03-architecture/risk-analysis.md)）。
 
+## Inkwell.Abstractions.AgentRuntime
+
+> 由 [HD-006 §2 / §3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 锁定。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `AgentRuntime/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。**严禁**引入 `Microsoft.Agents.AI.*` 等任何 MAF 包（[ADR-017 §依赖规则第 3/4 条](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](../03-architecture/risk-analysis.md) MAF 接触面收敛约束）——`Inkwell.Core.AgentRuntime` 命名空间是**唯一**允许 `using Microsoft.Agents.AI.*` 的位置，本端口接口与 DTO 全部使用 Inkwell 自有类型，不泄漏 `AIAgent` / `AgentSession` / `ChatMessage` / `AgentResponse` / `AgentResponseUpdate` 等 MAF 类型。
+
+```text
+src/core/Inkwell.Abstractions/
+  AgentRuntime/                          # 新增子目录
+    IAgentRuntime.cs                     # 顶层 facade（3 方法：RunTurnAsync/RunTurnStreamingAsync/CancelRunAsync）
+    AgentRunRequest.cs                   # record，一次 Run 调用的全部已解析上下文
+    AgentTurnResult.cs                   # record，非流式最终结果（含 ToolCalls 回溯）
+    AgentChatMessage.cs                  # record，对话消息（Role + Content 封闭子类型族）
+    AgentMessageContentPart.cs           # abstract record + TextPart/ImagePart/DocumentPart
+    AgentModelParameters.cs              # record，temperature/top_p/max_tokens（REQ-006）
+    AgentToolDefinition.cs               # record，工具描述 + 同进程调用委托 + AgentToolCallRecord（REQ-007）
+    AgentRunEvent.cs                     # abstract record + 6 个 sealed 子类型（流式事件，对应 AG-UI 四大类）
+    AgentRuntimeOptions.cs               # DefaultTemperature/DefaultTopP/DefaultMaxTokens/RunTimeoutSeconds/EnableSensitiveDataLogging
+    AgentRuntimeOptionsValidator.cs      # IValidateOptions<AgentRuntimeOptions>
+```
+
+**文件计数**：HD-006 新增 9 个 `*.cs`（AgentRuntime/ 9）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 9（HD-006）= 43 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.AgentRuntime` 的契约**（无独立 Provider csproj，[ADR-017 §依赖规则](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 下 `Inkwell.AgentRuntime` 合并进 `Inkwell.Core.AgentRuntime` 命名空间）：
+
+```text
+src/core/Inkwell.Core/AgentRuntime/
+  AzureOpenAIAgentRuntime.cs                         # 唯一允许 using Microsoft.Agents.AI.* 的位置（独立 HD）
+  AzureOpenAIAgentRuntimeOptions.cs                  # Endpoint / ApiKey / DeploymentName
+  AzureOpenAIAgentRuntimeBuilderExtensions.cs        # UseAzureOpenAIAgentRuntime(...)
+```
+
+> Provider（模型云服务）特定凭证由 `Inkwell.Core.AgentRuntime` 独立锁定；**严禁**回填到 `Inkwell.Abstractions/AgentRuntime/AgentRuntimeOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001 MAF 接触面收敛约束](../03-architecture/risk-analysis.md)）。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
