@@ -252,6 +252,41 @@ providers/Inkwell.Cache.Redis/
 
 > Provider 子 Options（连接字符串等）由各 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/Cache/CacheOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../03-architecture/risk-analysis.md) / [RISK-012 Redis 单点与 invalidation 一致性](../03-architecture/risk-analysis.md)）。
 
+## Inkwell.Abstractions.Queue
+
+> 由 [HD-005 §2 / §3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md) 锁定。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Queue/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json` + `System.Diagnostics.Activity`）。
+>
+> [picker Q-queuename-convention=A](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md) 不锁队列名命名规约——`InkwellQueues` **不**出现在端口层；业务命名空间各自拼接队列名（如 `kb-ingest` / `trigger-fanout`）。`MessageEnvelope.TraceParent` 字段满足 [RISK-015](../03-architecture/risk-analysis.md) 跨进程 trace 不断链要求。
+
+```text
+src/core/Inkwell.Abstractions/
+  Queue/                                  # 新增子目录
+    IQueueProvider.cs                     # 顶层 facade（4 方法：Enqueue/Dequeue/Acknowledge/NegativeAcknowledge）
+    MessageEnvelope.cs                    # record<T>，MessageId + Payload + EnqueuedTime + DeliveryCount + TraceParent（RISK-015）
+    QueueOptions.cs                       # MaxDeliveryAttempts + VisibilityTimeoutSeconds + DlqRetentionHours + EnableSensitiveDataLogging
+    QueueOptionsValidator.cs              # IValidateOptions<QueueOptions>
+```
+
+**文件计数**：HD-005 新增 4 个 `*.cs`（Queue/ 4）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）= 34 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 Provider HD 的契约**：
+
+```text
+src/core/Inkwell.Core/Queue/
+  ChannelsQueueProvider.cs                           # 默认 dev / unit test，基于 System.Threading.Channels（独立 HD）
+  ChannelsQueueOptions.cs                            # 无额外必填字段（占位，进程内实现无需连接配置）
+  ChannelsQueueBuilderExtensions.cs                  # UseChannelsQueue()；未显式调用时 InkwellBuilder.Build() 默认自动注册（ADR-018）
+
+providers/Inkwell.Queue.Redis/
+  RedisStreamQueueProvider.cs                        # StackExchange.Redis Streams SDK 实现（独立 HD）
+  RedisQueueOptions.cs                               # ConnectionString
+  RedisQueueBuilderExtensions.cs                     # UseRedisQueue(string connectionString)
+```
+
+> Provider 子 Options（连接字符串等）由各 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/Queue/QueueOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../03-architecture/risk-analysis.md) / [RISK-014 队列可靠性残余风险](../03-architecture/risk-analysis.md) / [RISK-015 双进程版本漂移与 OTel 双 source](../03-architecture/risk-analysis.md)）。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
