@@ -217,6 +217,41 @@ providers/Inkwell.FileStorage.AzureBlob/
 
 > Provider 子 Options（连接字符串 / 凭证 / SAS 策略 / 桶自动创建等）由各 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/FileStorage/FileStorageOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../03-architecture/risk-analysis.md)）。
 
+## Inkwell.Abstractions.Cache
+
+> 由 [HD-004 §2 / §3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) 锁定。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Cache/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。
+>
+> [picker Q-key-convention=A](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) 不锁 Key 命名规范强制机制——`CacheKeyBuilder` **不**出现在端口层；业务命名空间各自按 [ADR-016 §Key 命名约定](../03-architecture/adr/ADR-016-cache-provider-redis.md) `{tenant}:{module}:{purpose}:{id}` 拼接字符串。
+
+```text
+src/core/Inkwell.Abstractions/
+  Cache/                                  # 新增子目录
+    ICacheProvider.cs                     # 顶层 facade（7 方法：Get/Set/Remove/Exists/Increment/TryAcquireLock/ReleaseLock）
+    CacheEntryOptions.cs                  # record，SetAsync 强制 TTL 载体（AbsoluteExpirationRelativeToNow）
+    CacheOptions.cs                       # MinTtlSeconds + MaxTtlSeconds + DefaultLockTtlSeconds + EnableSensitiveDataLogging
+    CacheOptionsValidator.cs              # IValidateOptions<CacheOptions>，跨字段校验 TTL 上下限
+```
+
+**文件计数**：HD-004 新增 4 个 `*.cs`（Cache/ 4）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）= 30 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 Provider HD 的契约**：
+
+```text
+src/core/Inkwell.Core/Cache/
+  InMemoryCacheProvider.cs                           # 默认 dev / unit test，进程内 dictionary（独立 HD）
+  InMemoryCacheOptions.cs                            # 无额外字段（占位，进程内实现无需连接配置）
+  InMemoryCacheBuilderExtensions.cs                  # UseInMemoryCache()
+
+providers/Inkwell.Cache.Redis/
+  RedisCacheProvider.cs                              # StackExchange.Redis SDK 实现（独立 HD）
+  RedisCacheOptions.cs                               # ConnectionString
+  RedisCacheBuilderExtensions.cs                     # UseRedisCache(string connectionString)
+```
+
+> Provider 子 Options（连接字符串等）由各 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/Cache/CacheOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../03-architecture/risk-analysis.md) / [RISK-012 Redis 单点与 invalidation 一致性](../03-architecture/risk-analysis.md)）。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
