@@ -1442,4 +1442,4 @@ reviewer 在 chat 中列三路径 picker：
 - 评审根因：[HD-002 §1.1 ↔ §3.1 内部不一致](#131-reviewer-复盘--11--31-内部不一致第五轮失职信号)，第五轮验收 §12.2 未 catch
 - 评审决议：PASS-AS-ERRATA（E1 ~ E8 errata 路线图详 [§13.3](#133-下游-errata-落地清单不立即落代码待-owner-切-author-模式)）
 - 评审人：[ ]（待 Owner 签）
-- errata 落地完成日期：**E1 ~ E6 = 2026-05-18**（author 模式落地：[HD-002 §1.3 Q1 / §3.1 / §13.5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-009 §3.2 / §11 note / §13.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，均 0 lint error）；**E7 ~ E8 = 待 Owner / 默认 Agent 落**（[AGENTS.md §3.1 / §3.2](../../AGENTS.md) 属 author 模式写禁区，见 §13.3 备注）
+- errata 落地完成日期：**E1 ~ E6 = 2026-05-18**（author 模式落地：[HD-002 §1.3 Q1 / §3.1 / §13.5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-009 §3.2 / §11 note / §13.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，均 0 lint error）；**E7 ~ E8 = 2026-05-18**（默认 Agent 落地：[AGENTS.md §3.1 / §3.2](../../AGENTS.md) + 顶部"2026-05-18 增量更新·第六轮"callout，0 lint error）
