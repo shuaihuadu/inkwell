@@ -296,7 +296,7 @@ providers/Inkwell.Queue.Redis/
 ```text
 src/core/Inkwell.Abstractions/
   AgentRuntime/                          # 新增子目录
-    IAgentRuntime.cs                     # 顶层 facade（3 方法：RunTurnAsync/RunTurnStreamingAsync/CancelRunAsync）
+    IAgentRuntime.cs                     # 顶层 facade（3 方法：RunAsync/RunStreamingAsync/CancelRunAsync）
     AgentRunRequest.cs                   # record，一次 Run 调用的全部已解析上下文
     AgentTurnResult.cs                   # record，非流式最终结果（含 ToolCalls 回溯）
     AgentChatMessage.cs                  # record，对话消息（Role + Content 封闭子类型族）
