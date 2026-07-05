@@ -94,7 +94,7 @@ src/core/Inkwell.Abstractions/
 | 内部函数或类 | 接口本身；实现由两 Provider HD 各自提供（`InMemoryCacheProvider` / `RedisCacheProvider`）                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | 输入数据     | `string key`（全部方法）/ `T value`（Set） / `CacheEntryOptions options`（Set） / `long delta` + `TimeSpan? ttl`（Increment） / `TimeSpan ttl`（AcquireLock） / `string lockToken`（ReleaseLock） / `CancellationToken ct`（全部方法）                                                                                                                                                                                                                                                                                    |
 | 输出数据     | `T?` / `bool` / `long` / `string?`（全部裸返回，不包 `Result<>`）                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 依赖模块     | `Cache/CacheEntryOptions.cs` / `System.Text.Json`（序列化，[picker Q-serialization=A](#13-决策记录)） / System（`TimeSpan`）                                                                                                                                                                                                                                                                                                                                                                                              |
+| 依赖模块     | `Cache/CacheEntryOptions.cs` / `System.Text.Json`（序列化，统一复用 BCL 内置静态实例 [`JsonSerializerOptions.Web`](https://learn.microsoft.com/dotnet/api/system.text.json.jsonserializeroptions.web)，[picker Q-serialization=A](#13-决策记录) + [§13.3 Q-json-defaults](#133-owner-2026-07-05-追加决策最简化--免配置优先) 锁定唯一实例、禁止 Provider 各自覆盖） / System（`TimeSpan`）                                                                                                                                                                                                                                                                                                                                                                                              |
 | 错误处理     | 全部上抛 BCL 异常（见 [§4.2 BCL 异常分类](#42-bcl-异常分类业务失败-vs-程序错误)）：`GetAsync` 反序列化失败 → [`JsonException`](https://learn.microsoft.com/dotnet/api/system.text.json.jsonexception)；`SetAsync` TTL 越界 → `ArgumentOutOfRangeException`；`IncrementAsync` key 持有非数字值 → `InvalidOperationException`；`TryAcquireLockAsync` / `ReleaseLockAsync` 竞争失败 / token 不匹配 → 幂等返回值不抛异常；全部方法网络故障 → `IOException`；超时 → `TimeoutException`；取消 → `OperationCanceledException` |
 | 日志要求     | 实现层（两 Provider HD）在每个方法入口 / 出口写 OTel span，命名 `cache.<verb>`（`get` / `set` / `remove` / `exists` / `increment` / `acquire_lock` / `release_lock`）；4 个 Inkwell 私有字段（`cache.provider` / `cache.key` / `cache.ttl_seconds` / `cache.operation_outcome`）+ 5 个 OTel 标准 `exception.*` 字段（详 §4.3）；`cache.key` 可能含 PII——实现层直接打，调用方在写额外业务日志前自行过滤（[HD-001 §7 安全](HD-001-Inkwell.Abstractions-foundation.md)）；`cache.operation_outcome` 值域见 §4.3                     |
 | 测试要求     | `tests/core/Inkwell.Abstractions.Tests/Cache/ICacheProviderContractTests.cs`：契约测试（接口形态 ABI 锁定 via [`PublicApiAnalyzers`](https://github.com/dotnet/roslyn-analyzers/blob/main/src/PublicApiAnalyzers/PublicApiAnalyzers.Help.md)）；7 个方法签名 / 参数顺序 / 默认值 / 返回类型逐一验证；行为测试在 `tests/core/Inkwell.Providers.Contract/Cache/`（统一跨 Provider 家族契约包，与 [HD-002 §8](HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-003 §8.3](HD-003-Inkwell.Abstractions-file-storage-port.md) / [file-structure.md 总体拓扑](../file-structure.md) 拓扑一致；[RISK-011](../../03-architecture/risk-analysis.md)），两 Provider 跑同一套用例                                     |
@@ -123,7 +123,7 @@ src/core/Inkwell.Abstractions/
 | 文件路径     | `src/core/Inkwell.Abstractions/Cache/CacheOptions.cs`                                                                                                                                                                                                                                                                                                                                                     |
 | 职责         | 缓存端口详细配置；从 `appsettings.json` `"Inkwell:Cache"` 段绑定                                                                                                                                                                                                                                                                                                                                          |
 | 对外接口     | `public sealed class CacheOptions { [Range(1, 86400)] public int MinTtlSeconds { get; init; } = 1; [Range(1, 86400)] public int MaxTtlSeconds { get; init; } = 86400; [Range(1, 86400)] public int DefaultLockTtlSeconds { get; init; } = 30; public bool EnableSensitiveDataLogging { get; init; } = false; }`                                                                                          |
-| 内部函数或类 | DataAnnotations 校验；TTL 单位统一为秒（与 [HD-003 §3.6](HD-003-Inkwell.Abstractions-file-storage-port.md) 分钟单位不同——缓存场景 TTL 粒度通常更细，秒级更贴近 Redis `EXPIRE` 原生单位）；`MaxTtlSeconds` 默认 86400 秒（24h，[picker Q-ttl-bounds=A](#13-决策记录)）；Provider 特定的连接字符串 / 端点由各 Provider HD 自己的子 Options 承载（如 `RedisCacheOptions`）                                     |
+| 内部函数或类 | DataAnnotations 校验；TTL 单位统一为秒（与 [HD-003 §3.6](HD-003-Inkwell.Abstractions-file-storage-port.md) 分钟单位不同——缓存场景 TTL 粒度通常更细，秒级更贴近 Redis `EXPIRE` 原生单位）；`MaxTtlSeconds` 默认 86400 秒（24h，[picker Q-ttl-bounds=A](#13-决策记录)）；Provider 特定的连接字符串 / 端点由各 Provider HD 自己的子 Options 承载（如 `RedisCacheOptions`）；**不**含 `JsonSerializerOptions` / `MaxKeyLength` 字段——序列化选项统一锁定为 BCL 内置静态实例 `JsonSerializerOptions.Web`，Key 长度直接依赖 Redis 原生 512MB 上限，二者均不可配置（[§13.3 Q-json-defaults / Q-max-key-length](#133-owner-2026-07-05-追加决策最简化--免配置优先)）                                     |
 | 输入数据     | 由 `IConfiguration` 绑定                                                                                                                                                                                                                                                                                                                                                                                  |
 | 输出数据     | `CacheOptions` 实例（DI 通过 `IOptions<CacheOptions>` 注入）                                                                                                                                                                                                                                                                                                                                              |
 | 依赖模块     | `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                                                                                                                                                                                    |
@@ -335,6 +335,8 @@ public static class InMemoryCacheBuilderExtensions
 > Provider 特定子段（`Cache:Redis` / `Cache:InMemory`，即 `Inkwell:Cache:Redis` / `Inkwell:Cache:InMemory` 嵌套段）由各 Provider HD 起草时锁定。
 >
 > **2026-07-05 errata（N14）**：本节 JSON 示例原写法 `"Cache:Redis": {...}` 是非法的顶层扁平键名，与 ASP.NET Core [配置嵌套段](https://learn.microsoft.com/aspnet/core/fundamentals/configuration/#json-configuration-provider)约定不符；已改为标准嵌套写法 `"Cache": { ..., "Redis": {...} }`。关联 [design-review-report.md §14.3 N14](../design-review-report.md#n14hd-004-9-appsettingsjson-示例-cacheredis-键名不符合-json-嵌套写法c47)。
+>
+> **2026-07-05 决策确认**：上方 JSON 示例故意不含 `JsonSerializerOptions` / `MaxKeyLength` 相关配置项——序列化选项统一锁定为 BCL 内置静态实例 `System.Text.Json.JsonSerializerOptions.Web`，Key 长度直接依赖 Redis 原生 512MB 单 key 上限，二者均不可通过 `appsettings.json` 覆盖（Owner"能不新增配置项就不新增"原则，详见 [§13.3](#133-owner-2026-07-05-追加决策最简化--免配置优先)）。
 
 ## 10. CI 自检命令（grep 列表）
 
@@ -349,11 +351,15 @@ public static class InMemoryCacheBuilderExtensions
 
 ## 11. 待补 / 待评审
 
-- **Key 长度上限**——本 HD 不锁 Key 最大长度；Redis 单 key 上限为 512MB（实践中远低于此），是否需要 Inkwell 层面额外限制留待 Provider HD 或后续 errata 决定
-- **`CacheEntryOptions` 序列化的 `JsonSerializerOptions` 细节**（命名策略 / 多态类型处理 / 循环引用检测开关）——本 HD 仅锁定"统一 `System.Text.Json`"，具体 `JsonSerializerOptions` 由 Provider 实现层决定，需在两 Provider（`InMemoryCacheProvider` / `RedisCacheProvider`）之间保持一致，避免跨 Provider 切换时历史缓存数据不可读；建议下一轮 picker 补齐
-- **Redis Key 命名空间隔离**（多租户前缀 / dev 与 prod 环境隔离）——留业务侧按 [ADR-016 §Key 命名约定](../../03-architecture/adr/ADR-016-cache-provider-redis.md) `{tenant}:{module}:{purpose}:{id}` 自行处理，本 HD 不提供强制机制（[picker Q-key-convention=A](#13-决策记录)）
-- **锁续约 / 心跳机制**——v1 明确不做（§1.2），业务侧需保证临界区耗时 < 锁 TTL；若后续场景需要长临界区，需走 v2 backlog 或新 ADR
-- **模型 response cache 的具体缓存键与 invalidation 触发点**——[ADR-016 §决策](../../03-architecture/adr/ADR-016-cache-provider-redis.md) 提及但默认关闭，由消费该能力的业务 HD（`Inkwell.Core.Agents` 或 `.Models`）起草时决定，呼应 [RISK-012](../../03-architecture/risk-analysis.md) H3 明确要求"为每个缓存键定义 invalidation 触发点"
+> **2026-07-05 Owner 决策原则**：本节此前挂起的 5 个开放问题，Owner 统一给出"优先选最简单且符合行业最佳实践的方案，能不新增配置项就不新增"的决策原则；据此逐条关闭，决策证据见 [§13.3](#133-owner-2026-07-05-追加决策最简化--免配置优先)。
+
+本轮无遗留开放问题。以下 5 条此前挂起事项均已关闭：
+
+- **Key 长度上限** → 已关闭：不新增 `MaxKeyLength` 配置项，直接依赖 Redis 原生 512MB 单 key 上限；v1 场景（rate limit 计数 / 会话状态 / 元数据缓存）不会触达该上限，额外限制属过度设计
+- **`JsonSerializerOptions` 序列化细节** → 已关闭：不新增可配置的 `JsonSerializerOptions` 字段，两 Provider（`InMemoryCacheProvider` / `RedisCacheProvider`）统一复用 BCL 内置静态实例 `JsonSerializerOptions.Web`，禁止各自覆盖，从根源消除跨 Provider 反序列化不一致风险
+- **Redis Key 命名空间隔离** → 已关闭：维持现状，不新增强制机制；[picker Q-key-convention=A](#13-决策记录) 已覆盖（业务侧按 [ADR-016 §Key 命名约定](../../03-architecture/adr/ADR-016-cache-provider-redis.md) 自行拼前缀），无需在 HD-004 重复决策
+- **锁续约 / 心跳机制** → 非开放问题：v1 明确不做已在 [§1.2](#12-范围) 锁定，本节不再重复挂起
+- **模型 response cache 的具体缓存键与 invalidation 触发点** → 移交声明：本项不属于 HD-004（端口层）职责范围，由消费方业务 HD（`Inkwell.Core.Agents` / `.Models`）在其详细设计中决定；HD-004 到此为止，不作为本 HD 的遗留问题追踪
 
 ## 12. 跨模块章节贡献
 
@@ -392,5 +398,25 @@ public static class InMemoryCacheBuilderExtensions
 - **Q-perf-budget**：备选 B（紧凑档 P50 < 10ms）未选——v1 未锁定 Redis 部署是否同 region，宽松档更稳妥，避免过早锁定不可达的 SLO
 - **Q-cache-entry-options**：备选 B（同时支持滑动过期）被否决——v1 使用场景（rate limit 计数窗口、元数据缓存、会话状态）均适合绝对过期；滑动过期的 `EXPIRE` 刷新会增加每次 `GetAsync` 的额外往返，与 §7.1 性能预算冲突
 - **Q-ttl-bounds**：备选 B（`MaxTtlSeconds=604800` 对齐 FileStorage 预签名 URL 7 天上限）未选——缓存层与预签名 URL 场景语义不同（缓存不应长期持有陈旧数据），24h 更贴近 rate limit / 会话状态 / 元数据缓存的典型时效
+
+### 13.3 Owner 2026-07-05 追加决策（最简化 + 免配置优先）
+
+> Owner 对 [§11](#11-待补--待评审) 遗留的 5 个开放问题给出统一决策原则："优先选最简单且符合行业最佳实践的方案，能不新增配置项就不新增"；本节记录逐条决策结果，5 项全部关闭，§11 不再遗留待评审事项。
+
+| 字段                       | 选定值                                                                                                     | picker 时间 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| Q-max-key-length            | 不新增 `MaxKeyLength` 配置项，直接依赖 Redis 原生 512MB 单 key 上限，不做 Inkwell 层额外限制                   | 2026-07-05  |
+| Q-json-defaults             | 不新增可配置 `JsonSerializerOptions`；两 Provider 统一复用 BCL 内置静态实例 `JsonSerializerOptions.Web`，禁止各自覆盖 | 2026-07-05  |
+| Q-key-namespace-isolation   | 维持现状，不新增强制机制；复用既有 [Q-key-convention=A](#131-起草期-picker-决策2026-07-05)                     | 2026-07-05  |
+| Q-lock-heartbeat            | 确认非开放问题——v1 明确不做已在 [§1.2](#12-范围) 锁定，从 §11 移除，不再作为待评审项挂着                        | 2026-07-05  |
+| Q-response-cache-handoff    | 移交声明——模型 response cache 键设计 / invalidation 触发点属消费方业务 HD（`Inkwell.Core.Agents` / `.Models`）职责，非 HD-004 遗留问题 | 2026-07-05  |
+
+放弃 / 未选理由：
+
+- **Q-max-key-length**：备选"新增 `MaxKeyLength` 配置项预防超大 key"被否决——Redis 原生 512MB 上限已远超 v1 rate limit / 会话状态 / 元数据缓存的实际 key 长度需求，新增配置属过度设计且无 v1 场景会触达该上限
+- **Q-json-defaults**：备选"各 Provider 自行选择 `JsonSerializerOptions`"被否决——已被 [§13.2 Q-serialization](#132-候选与放弃理由) 排除的跨 Provider 不一致风险同样适用；备选"新增可配置 `CacheJsonOptions`"被否决——新增配置面违反本轮"能不新增就不新增"原则；直接复用 BCL 内置 `JsonSerializerOptions.Web` 是零维护成本的标准实践
+- **Q-key-namespace-isolation**：无新增候选——[Q-key-convention=A](#131-起草期-picker-决策2026-07-05) 已是 v1 唯一决策，无需在本 HD 重复决策或叠加强制机制
+- **Q-lock-heartbeat**：无需候选——本项从未是真正的"待决策"事项，是 [§1.2](#12-范围) 范围声明的重申，之前误挂在 §11 属记录疏漏
+- **Q-response-cache-handoff**：无需候选——这是职责边界声明而非技术方案选择，由消费方业务 HD 承接
 
 > 全部候选与放弃理由源自 2026-07-05 picker 会话；无历史 errata（本 HD 从起草第一天直接采用 ADR-023 最终态规约）。
