@@ -1767,6 +1767,7 @@ reviewer 在 chat 中列三路径 picker：
   - 选项 2：若 Owner 判断 `AgentModelParameters` 应与 `AgentToolDefinition.cs` 同文件合并（如同 `AgentToolCallRecord` 的合并模式），则需回到 HD-006 §2 / §3.6 做相应精化并同步减少一个文件计数——但 HD-006 §3.6 已有独立完整 10 字段设计，合并会破坏该章节的独立性，reviewer 更倾向选项 1
 - **卡点等级**：**blocking**（建议 Owner picker 确认；修复目标是 file-structure.md 一处，不改动 HD-006 本体）
 - **追溯**：C60
+- **✅ 已处理（2026-07-05）**：file-structure.md `## Inkwell.Abstractions.AgentRuntime` 文件树补上 `AgentModelParameters.cs`（对齐 HD-006 §2 顺序，注释沿用 HD-006 §2 原文），文件计数“9 个”→“10 个”、累计“43”→“44”（全文 grep 确认仅此一处累计数字，无遗漏）。按建议方向选项 1 落地。
 
 #### Non-blocking
 
@@ -1777,14 +1778,15 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：§4.4 命令直接替换为与 §10 Q1 完全一致的字面量，或改为"（命令见 §10 Q1，此处不重复）"避免维护两份易漂移的副本
 - **卡点等级**：non-blocking
 - **追溯**：C75
+- **✅ 已处理（2026-07-05）**：HD-006 §4.4 命令替换为与 §10 Q1 完全一致的字面量（补 `\b` 单词边界 + `AgentResponseUpdate` / `AgentRunOptions` 两个模式），两处不再各自保留半套。
 
 ### 16.4 评审结论与下一步
 
 - **整体评审决议**：**PASS-AS-ERRATA**——HD-006 本体设计（接口 / DTO / Options / MAF 零泄漏边界 / OTel / CI 自检 / ADR-003+011+012 一致性）完整且自洽，唯一 blocking 项（B13）的修复目标是 file-structure.md 跨模块同步文件（HD-006 本体不用动），且是一行文件树 + 两处计数字面量的低成本修复
 - **HD-006 翻 `reviewed` 前置条件**：
-  1. ⬜ Owner picker 拍板 B13（确认修复方向，reviewer 建议选项 1）
-  2. ⬜ AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下落 file-structure.md 一处 errata（可同步处理 N20 非阻塞项）
-  3. ⬜ Owner 在 HD-006 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
+  1. ✅ Owner 确认 B13 修复方向——本次为机械性事实修正（file-structure.md 遗漏字面同步），不涉及设计决策，无需 picker，直接按 reviewer 建议选项 1 落地
+  2. ✅ AI 在 `h3-detailed-design-author` 模式下已落 file-structure.md 一处 errata（B13）+ HD-006 §4.4 errata（N20），详见 §16.3 各条"已处理（2026-07-05）"标记
+  3. ⬜ Owner 在 HD-006 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——前两项已完成，仅剩本项待 Owner 手工签字
 - **MAF 类型零泄漏边界专项结论**：HD-006 §3 全部接口方法签名 / DTO 字段逐一核对，**未发现任何 `Microsoft.Agents.AI.*` / `Microsoft.Agents.AI.AGUI.*` / `Microsoft.Agents.AI.Workflows.*` 类型泄漏**到 public 签名；`Inkwell.Core.AgentRuntime` 唯一 MAF 接触面边界在 §4/§10 均有对应机械化 grep 检查（§10 Q1 检查端口目录内 MAF 标识符 0 命中、Q2 检查业务命名空间禁 `using Microsoft.Agents.AI`），仅 §4.4 与 §10 两处命令字面不同步（N20，non-blocking）
 - **后续 HD 建议路径**：HD-006 reviewed 后继续 HD-007 `IAuditLogger`（[ADR-008](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)）或视 Owner 优先级安排 `Inkwell.Core.AgentRuntime` / `Inkwell.WebApi` 独立 HD 起草
 

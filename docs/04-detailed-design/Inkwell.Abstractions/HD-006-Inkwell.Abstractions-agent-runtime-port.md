@@ -337,7 +337,7 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
 }
 ```
 
-**CI 自检**（详 §10 Q1）：`rg -n -e 'Microsoft\.Agents\.AI' -e 'AIAgent' -e 'AgentSession' -e 'ChatMessage' -e 'AgentResponse' src/core/Inkwell.Abstractions/AgentRuntime/` 期望 0 行——本 HD 目录下任何文件都不得出现这些标识符。
+**CI 自检**（详 §10 Q1）：`rg -n -e 'Microsoft\.Agents\.AI' -e '\bAIAgent\b' -e '\bAgentSession\b' -e '\bChatMessage\b' -e '\bAgentResponse\b' -e '\bAgentResponseUpdate\b' -e '\bAgentRunOptions\b' src/core/Inkwell.Abstractions/AgentRuntime/` 期望 0 行——本 HD 目录下任何文件都不得出现这些标识符。
 
 ## 5. 公共约定继承（HD-001）
 

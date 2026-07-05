@@ -308,7 +308,7 @@ src/core/Inkwell.Abstractions/
     AgentRuntimeOptionsValidator.cs      # IValidateOptions<AgentRuntimeOptions>
 ```
 
-**文件计数**：HD-006 新增 9 个 `*.cs`（AgentRuntime/ 9）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 9（HD-006）= 43 个 `*.cs` + 1 个 `.csproj`。
+**文件计数**：HD-006 新增 10 个 `*.cs`（AgentRuntime/ 10）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）= 44 个 `*.cs` + 1 个 `.csproj`。
 
 **对接 `Inkwell.Core.AgentRuntime` 的契约**（无独立 Provider csproj，[ADR-017 §依赖规则](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 下 `Inkwell.AgentRuntime` 合并进 `Inkwell.Core.AgentRuntime` 命名空间）：
 
