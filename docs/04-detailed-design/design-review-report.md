@@ -1895,3 +1895,141 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §17 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
+
+## 18. HD-008 Vector Store Type-Alias + Builder DSL 钩子首轮评审（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，仅评审增量产物：[HD-008 Inkwell.Abstractions Vector Store Type-Alias](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md)（status: draft，2026-07-06 起草）+ 联动的 [HD-001 §2 / §3.11 / §3.11.1 / §14.3 追加行](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) + [file-structure.md `## Inkwell.Abstractions.VectorStore` 章节追加](file-structure.md#inkwellabstractionsvectorstore)。报告主体 §1 ~ §17 的 `status / reviewers` 字段**不**因本节调整。按 user-memory `markdown-lint.md` 已知陷阱（中英文混排长内容表必触发 MD060），本节全程以 bullet list 呈现，不使用表格。HD-008 性质特殊——**不设计新接口**，仅 type-alias 复用 + Options + Builder DSL 签名声明，故完备性判定对"接口/错误码""流程/后台任务""数据库"三维度按 HD-008 自身声明的范围收窄核查，不强套其他端口 HD 的运行期方法模板。
+
+### 18.0 评审范围与基线
+
+- **本轮评审对象**：HD-008 全文（§1 ~ §13）+ file-structure.md `## Inkwell.Abstractions.VectorStore` 章节 + HD-001 §2 / §3.11 / §3.11.1 / §14.3 联动追加
+- **不在本轮范围**：HD-001 ~ HD-007 / HD-009 主体设计（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）；`providers/Inkwell.VectorStore.Qdrant` / `Inkwell.Core/VectorStore` 独立 HD（尚未起草，HD-008 §1.2 已声明移交）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-008 frontmatter 完整，upstream 9 项均可定位：REQ-009 / REQ-010（[requirements.md](../01-requirements/requirements.md)）+ ADR-003 / ADR-017 / ADR-020 / ADR-023（[adr/](../03-architecture/adr/)）+ HD-001 / HD-002 全部真实存在
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-008 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 18.1 完备性扫描（HD-008 范围内，按 HD-008 自身声明的特殊范围收窄核查）
+
+按 [h3-detailed-design.md 章节清单](../../.he/docs/stages/h3-detailed-design.md) 逐项打分：
+
+- **文件结构**：`pass` — `VectorStore/` 2 个新增 `*.cs`（`VectorStoreOptions.cs` / `VectorStoreOptionsValidator.cs`）+ `GlobalUsings.cs` / `Options/InkwellOptions.cs` 两处既有文件追加行全部锁定，且明确区分"本 HD 锁定签名"与"其余独立 HD 负责实现"两类文件（`Inkwell.Core/VectorStore/` 3 文件 + `providers/Inkwell.VectorStore.Qdrant/` 2 文件，均标注非本 HD 范围）。证据：[HD-008 §2](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#2-文件结构)
+- **数据库**：`n/a` — 向量数据落 Qdrant/InMemory 而非关系表，[ADR-020 §决策](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) 已明确"不引入 appsettings.json 中的 schema 字段"、schema 走 attribute model 而非 EF Migration 风格。但 HD-008 **未像 HD-006 §12 / HD-007 §12 那样显式声明"database-design.md 不贡献"**——此为轻微完备性缺口（详 §18.3 N25）。证据：[HD-008 全文](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md)（无 §12 跨模块章节贡献 小节，§12 直接是"追溯"）vs [HD-006 §12](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#12-跨模块章节贡献) / [HD-007 §12](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#12-跨模块章节贡献) 对比模式
+- **接口 / 错误码**：`pass` — HD-008 §1.1 / 顶部 callout 显式声明"本 HD 不定义任何运行期方法"，装配期失败统一走 `IValidateOptions` / `InkwellBuilderException`，与 [ADR-023](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) errata·01/02 后最终态一致；这一"无接口"性质本身即是 ADR-020 §决策锁定的既定设计（复用 M.E.VectorData，不重新发明 `IVectorStore`），非缺漏。证据：[HD-008 顶部 callout](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) + [§1.1](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#11-职责)
+- **流程 / 后台任务**：`n/a` — 端口层无独立进程，且本 HD 本身不产生运行期代码（仅 Options + Builder DSL 签名），具体 Provider 装配逻辑显式移交 3 个独立 HD。证据：[HD-008 §1.2](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#12-范围)
+- **每个目录 / 程序文件职责**：`pass` — 2 个新文件 + 2 处既有文件追加均按 10 字段完整表格呈现（含既有文件追加场景下的完整字段套用，未因"只是追加"而简化字段覆盖），无 `<TBD>` / `<待定>`。证据：[HD-008 §3.1 ~ §3.4](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#3-程序文件设计10-字段--2-文件--2-处既有文件追加)
+- **配置文件字段 / 默认值**：`pass` — `VectorStoreOptions` 4 字段（`EmbeddingModelName` / `EmbeddingDimensions` / `DistanceMetric` / `EnableSensitiveDataLogging`）+ 默认值 + `[Range]` 边界 + §8 appsettings.json 正确嵌套示例，字面值与 [risk-analysis.md RISK-016 缓解 #4](../03-architecture/risk-analysis.md#risk-016-inmemoryvectorstore-与-qdrant-语义偏移--microsoftextensionsvectordata-上游变化) 逐字一致。证据：[HD-008 §3.1](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#31-vectorstorevectorstoreoptionscs) + [§8](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#8-appsettingsjson-示例)
+- **日志格式 / 字段**：`n/a` — §3.1 / §3.2 均显式声明"无运行期方法，不产生运行期日志"，与本 HD"仅 Options + Builder 签名"的声明范围一致，非缺漏。证据：[HD-008 §3.1](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#31-vectorstorevectorstoreoptionscs) 日志要求行
+- **监控指标 / 告警策略**：`partial` — 全文未设独立"可观测性"小节（不同于 HD-004 ~ HD-007 均有的 §7.3 监控/告警子段），也未显式声明"监控指标随 Qdrant / InMemory / AzureOpenAIEmbeddings 独立 HD 落地"这一移交关系（虽可从 §1.2 范围切片段落推断，但未明文写出）。[ADR-020 §迁移路径 step 9](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) 已提到"instrumentation 由 M.E.VectorData 内置 ActivitySource 提供"，HD-008 未引用此依据。证据：HD-008 全文无"监控" / "告警" / "alert" 关键字命中（§9 仅覆盖凭据存储位置，非监控）
+- **部署步骤 / 回滚 / 备份恢复**：`partial` — §9 覆盖凭据存储位置（K8s Secret / `.env`）+ 敏感日志开关，但未显式声明"具体部署步骤（Qdrant collection 创建 / InMemory 无持久化 等）移交 Provider 独立 HD"，与 HD-004 ~ HD-007 §7.2 均有的显式 deferral 措辞不同（措辞缺失，非设计缺陷）。证据：[HD-008 §9](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#9-部署--安全说明)
+- **性能边界 / 安全边界 / 已知限制**：`partial` — 安全（§9 凭据位置 + 敏感日志开关）与已知限制（§10 embedding 维度/模型变更需重建 collection + InMemory/Qdrant 语义子集差异）均完整覆盖；但**无性能边界小节**（HD-002 ~ HD-007 均有 facade 方法的 P50/P99 预算表），HD-008 §7 测试策略段落提到"无运行期方法...故无契约测试/无性能基准"作为唯一解释，逻辑自洽但未单独另起"性能边界"标题呈现，与其余 HD 的章节命名习惯有形式差异。证据：[HD-008 §7](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#7-测试策略) + [§9](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#9-部署--安全说明) + [§10](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#10-已知限制)
+
+**完备性结论**：10 项中 5 项 `pass`、2 项 `n/a`（端口层不接 DB / 本 HD 无运行期方法故无独立日志）、3 项 `partial`（监控告警缺显式小节、部署步骤缺显式 deferral 措辞、性能边界缺独立标题）。3 项 `partial` 均为**文档呈现形式缺口**（内容实质已在别处覆盖或可推断），非实质设计缺陷，不卡 HD-008 翻 `reviewed`（详 §18.3 N26 / N27 / N28）。
+
+### 18.2 一致性扫描（HD-008 ↔ HD-001 / HD-006 / ADR-020 / AGENTS.md §3.1 §3.2 + file-structure.md）
+
+- **C86（PASS）**— HD-008 §1.1 "命名空间级 `global using`（非逐类型别名）"技术论证（C# `using` 别名不支持开放泛型）准确；[HD-001 §14.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#143-global-usings) 的 `GlobalUsings.cs` 清单已实际同步追加 `global using Microsoft.Extensions.VectorData;` 一行（注释"HD-008 起用"），且 [HD-001 §2 csproj 依赖白名单注释](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2-文件结构) 也已同步标注 `Microsoft.Extensions.VectorData.Abstractions (HD-008 起用)`——HD-008 与 HD-001 的联动追加**已真实落地**，非仅停留在 HD-008 单方声明。证据：[HD-001 §14.3 line 557](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#143-global-usings) + [HD-001 §2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2-文件结构) vs [HD-008 §3.3](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#33-globalusingscs-追加行hd-001-既有文件)
+- **C87（PASS）**— [HD-001 §3.11](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#311-optionsinkwelloptionscs) `InkwellOptions` 对外接口实际已含 `public VectorStoreOptions VectorStore { get; init; } = new();`（插入在 `AuditLoggerOptions Audit` 之后），[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增) `InkwellProvidersOptions.VectorStore` 字段（默认值 `"InMemory"`）也已存在——均与 HD-008 §3.4 / §5 的引用逐字匹配，联动追加真实落地。证据：[HD-001 §3.11](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#311-optionsinkwelloptionscs) + [§3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增) vs [HD-008 §3.4](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#34-optionsinkwelloptionscs-追加字段hd-001-既有文件) / [§5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#5-inkwellprovidersoptionsvectorstore-取值白名单)
+- **C88（PASS）**— HD-008 §1.3 Q1 / Q2 声明 `AzureOpenAIEmbeddingOptions`（Endpoint/ApiKey/DeploymentName）与 `QdrantVectorStoreOptions`（Host/Port/ApiKey/UseHttps）分别独立于 `Inkwell.Core/VectorStore/` 与 `providers/Inkwell.VectorStore.Qdrant/`，且与 [HD-006 `AzureOpenAIAgentRuntimeOptions`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 单实现拓扑一致——经核对 HD-006 实际字段（Endpoint/ApiKey/DeploymentName），两者字段命名模式确实同构；§13 Q6 "两组凭据各自独立配置段，即使指向同一 Azure OpenAI 资源"的决策与 HD-006 现状（`AzureOpenAIAgentRuntimeOptions` 是 Chat 模型专用、不与任何其他端口共用）互不冲突，无重复定义或字段撞名风险。证据：[HD-006 §9 appsettings.json 示例](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#9-部署--配置) vs [HD-008 §13 Q6](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-决策记录)
+- **C89（PASS）**— file-structure.md `## Inkwell.Abstractions.VectorStore` 章节的文件树、依赖白名单声明、文件计数（"HD-008 新增 2 个... 累计 53 个"）与 HD-008 §2 逐一核对一致（11+8+7+4+4+10+7+2=53 手工核算无误），未重演 [HD-006 C60 file-structure.md 遗漏 + 计数算错](#162-一致性扫描hd-006--hd-001--hd-004--hd-005--adr-003--adr-011--adr-012--adr-017--adr-023--file-structuremd) 的坑。证据：[file-structure.md §Inkwell.Abstractions.VectorStore](file-structure.md#inkwellabstractionsvectorstore) vs [HD-008 §2](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#2-文件结构)
+- **C90（FAIL）**— [file-structure.md §Inkwell.Abstractions.VectorStore 结尾 callout](file-structure.md#inkwellabstractionsvectorstore) 仍写"`IEmbeddingGenerator<string, Embedding<float>>` 在 KB / Memory 业务命名空间的直接消费方式是否需要为 `Microsoft.Extensions.AI.Abstractions` 开依赖白名单例外，仍是**待 Owner 确认的开放问题**（HD-008 §11）"，但 [HD-008 §11](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#11-待补--待评审) 本身已明确声明"原留的 2 条需要 Owner 确认开放问题已由 Owner 在 chat picker（2026-07-06）确认拍板...不再是待评审项"——file-structure.md 的该处 callout 未随 HD-008 §11 / §13 Q5 的拍板结果同步更新，两处文档对同一问题的"是否仍开放"状态直接矛盾。证据：[file-structure.md line 385](file-structure.md#inkwellabstractionsvectorstore) vs [HD-008 §11](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#11-待补--待评审) / [§13 Q5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-决策记录)
+- **C91（FAIL）**— HD-008 §13 Q5 / §6 将"`IEmbeddingGenerator<string, Embedding<float>>` 允许业务命名空间直接注入"的决策依据表述为"比照本 HD 自身对 `Microsoft.Extensions.VectorData.Abstractions` 的处理先例"，但两者的**物理实现机制并不对称**：VectorData 的先例是——`Microsoft.Extensions.VectorData.Abstractions` 已被 HD-008 本身**实际添加**到 `Inkwell.Abstractions.csproj` 的 `PackageReference` 白名单（[HD-001 §2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2-文件结构) 注释"HD-008 起用"）+ `GlobalUsings.cs` 追加 `global using`（[HD-001 §14.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#143-global-usings)），使得业务命名空间通过**依赖 `Inkwell.Abstractions` 项目引用**（符合 [AGENTS.md §3.2](../../AGENTS.md) "业务命名空间只能依赖 `Inkwell.Abstractions` + BCL"规则）间接获得该类型的编译期可见性——业务代码并未新增任何直接 `PackageReference`。而 `Microsoft.Extensions.AI.Abstractions`（`IEmbeddingGenerator<,>` 所在包）**未**被 HD-008 添加到 `Inkwell.Abstractions.csproj` 白名单，也**未**在 `GlobalUsings.cs` 追加对应 `global using`——若 `Inkwell.Core.KnowledgeBase` / `.Memory` 要直接注入 `IEmbeddingGenerator<string, Embedding<float>>`，唯一可行路径是在 `Inkwell.Core.csproj` 本身新增该包的 `PackageReference`，这正是 [AGENTS.md §3.2](../../AGENTS.md) 依赖纯度原则明确禁止的模式（业务命名空间不得引入 `Inkwell.Abstractions` + BCL 之外的第三方包），且会被 [CI Roslyn analyzer / `BannedSymbols.txt`](../../AGENTS.md) 拦下。换言之，Q5 决策所"比照"的先例其实要求"把 `Microsoft.Extensions.AI.Abstractions` 也纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`"这一步，但 HD-008 并未做这一步，也未把这一步移交给任何后续 HD / ADR——KB / Memory 业务 HD 起草时会在此处卡壳（不知道 `IEmbeddingGenerator<,>` 的包依赖到底该走 `Inkwell.Abstractions` 白名单扩展、还是走 `Inkwell.Core.csproj` 直接引用的例外授权）。证据：[HD-008 §6](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#6-与-iembeddinggeneratortinput-tembedding-的衔接) + [§13 Q5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-决策记录) vs [AGENTS.md §3.2](../../AGENTS.md) vs [HD-001 §2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2-文件结构) / [§14.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#143-global-usings)（VectorData 实际落地对照）
+- **C92（PASS）**— HD-008 §4 Builder DSL 签名（`UseInMemoryVectorStore` / `UseAzureOpenAIEmbeddings` / `UseQdrantVectorStore`，均 `this IInkwellBuilder builder` 扩展方法、返回 `IInkwellBuilder`）与 [HD-001 §6.3 Provider 扩展方法约定](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#63-provider-扩展方法约定给-hd-002--hd-008-的契约)"唯一入口扩展 `UseXxx(this IInkwellBuilder builder, ...)`"一致；`Action<TOptions>` 参数风格与 [HD-006 `UseAzureOpenAIAgentRuntime(this IInkwellBuilder, Action<AzureOpenAIAgentRuntimeOptions>)`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 同构，非本 HD 独创风格。**观察项（non-blocking）**：[HD-001 §6.1 示例代码](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#61-典型用法与-architecturemd-3-示例对齐) 里 `.UseQdrantVectorStore(builder.Configuration.GetConnectionString("Qdrant"))` 用的是单字符串参数风格，与 HD-008 §4 锁定的 `Action<QdrantVectorStoreOptions>` 签名不同；但该差异是 HD-001 §6.1 示例本身的历史遗留问题（HD-002/HD-004/HD-005/HD-006 的实际签名也都与 HD-001 §6.1 各自的插图代码不完全一致，属 HD-001 起草时的占位插图，非本 HD 新引入的不一致），不计入本轮 blocking。证据：[HD-008 §4](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#4-builder-dsl-签名声明不含实现) vs [HD-001 §6.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#61-典型用法与-architecturemd-3-示例对齐) / [§6.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#63-provider-扩展方法约定给-hd-002--hd-008-的契约)
+- **C93（PASS）**— HD-008 §5 `Providers.VectorStore` 不一致时的错误信息模板 `InkwellBuilderException($"Provider registration conflict for VectorStore: configured={{Providers.VectorStore}}, registered=...")` 与 [HD-002 §Provider 一致性校验](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 实际采用的模板"`Provider registration conflict for Persistence: configured=<x>, called=<y>`"语义一致（均为"配置值 vs 实际调用值"两段式），仅第二段变量名"registered"/"called"字面不同，不影响语义，非 blocking。证据：[HD-008 §5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#5-inkwellprovidersoptionsvectorstore-取值白名单) vs [HD-002 line 493](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)
+- **C94（PASS）**— HD-008 §9 "v1 不引入 Azure Key Vault"表述与 [AGENTS.md §2.5](../../AGENTS.md) / [OQ-A006 closed §B](../03-architecture/open-questions-arch.md) 一致；Qdrant / InMemory 双 Provider 落点（`providers/Inkwell.VectorStore.Qdrant/` + `Inkwell.Core/VectorStore/`）与 [AGENTS.md §3.1](../../AGENTS.md) 现状条目、[ADR-020 §决策物理布局](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) 完全一致。证据：[HD-008 §9](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#9-部署--安全说明) vs [AGENTS.md §2.5 / §3.1](../../AGENTS.md)
+
+**一致性结论**：9 项检查中 2 项 `FAIL`（C90 / C91）、7 项 `PASS`（C86 ~ C89、C92 ~ C94）。两项 `FAIL` 均围绕同一根问题——`IEmbeddingGenerator<,>` 依赖白名单例外的物理落地机制未完成，且 file-structure.md 未同步 HD-008 §11 已拍板的事实。
+
+### 18.3 反问清单
+
+#### Blocking
+
+##### B14：file-structure.md `## Inkwell.Abstractions.VectorStore` 结尾 callout 与 HD-008 §11 / §13 Q5 状态矛盾（C90）
+
+- **问题**：file-structure.md 该章节结尾仍写"`IEmbeddingGenerator<,>` 依赖白名单例外仍是待 Owner 确认的开放问题（HD-008 §11）"，但 HD-008 §11 本身已明确该问题"已由 Owner 在 chat picker（2026-07-06）确认拍板...不再是待评审项"
+- **影响范围**：后续读者（H4 TestCaseAuthor / KB·Memory 业务 HD 起草者）若先读 file-structure.md 会误判该决策仍待定，重复向 Owner 发起已拍板过的问题；两份文档对同一问题的状态描述直接矛盾，破坏"单一事实源"原则
+- **建议方向**：将 file-structure.md 该处 callout 更新为反映 HD-008 §13 Q5 的实际拍板结果（"允许直接注入，不新增门面接口"），但**同时**需先解决 B15（因为 Q5 的拍板结果本身尚缺物理落地机制，callout 更新时应如实反映"决策已拍板，但依赖白名单物理机制待补"这一现状，而非简单删除开放问题标记）
+- **卡点等级**：**blocking**
+- **追溯**：C90
+
+##### B15：Q5"比照 VectorData 先例"缺物理落地机制，`IEmbeddingGenerator<,>` 依赖白名单例外未实际生效（C91）
+
+- **问题**：HD-008 §6 / §13 Q5 决策"`IEmbeddingGenerator<string, Embedding<float>>` 允许 `Inkwell.Core.KnowledgeBase` / `.Memory` 直接注入，比照本 HD 对 `Microsoft.Extensions.VectorData.Abstractions` 的处理先例"，但 VectorData 先例的实际机制是"把包加进 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs` 追加 `global using`，让业务命名空间通过依赖 `Inkwell.Abstractions` 间接可见该类型"；`Microsoft.Extensions.AI.Abstractions` 未经历同样的落地步骤。若 KB / Memory 业务命名空间要直接注入 `IEmbeddingGenerator<,>`，唯一可行路径是在 `Inkwell.Core.csproj` 直接加包引用——这恰好违反 [AGENTS.md §3.2](../../AGENTS.md) "业务命名空间只能依赖 `Inkwell.Abstractions` + BCL"的依赖纯度原则，会被 CI `BannedSymbols.txt` 拦下
+- **影响范围**：
+  - `Inkwell.Core.KnowledgeBase` / `.Memory` 独立业务 HD 起草时会在"`IEmbeddingGenerator<,>` 的包依赖到底走哪条路径"上卡壳——没有任何现有 HD / ADR 声明"把 `Microsoft.Extensions.AI.Abstractions` 加进 `Inkwell.Abstractions.csproj` 白名单"这一步
+  - H5 CodingExecutor 若照单全收"业务命名空间直接注入 `IEmbeddingGenerator<,>`"这条决策去写代码，会在业务 csproj 引入违规 `PackageReference`，CI `BannedSymbols.txt` / Roslyn analyzer 检查失败
+  - 若后续需另发 ADR / AGENTS.md 修订才能落地该白名单例外（HD-008 §6 已自认"不在本 HD 权限范围"），则 KB / Memory 业务 HD 在该 ADR 落地前无法开工
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：比照 VectorData 先例真正"对称化"——在 HD-008（或紧接的一次 errata）中把 `Microsoft.Extensions.AI.Abstractions` 也加进 `Inkwell.Abstractions.csproj` 依赖白名单 + `GlobalUsings.cs` 追加 `global using Microsoft.Extensions.AI;`，使 `IEmbeddingGenerator<,>` 通过依赖 `Inkwell.Abstractions` 间接可见，与 VectorData 完全同构，无需修改 AGENTS.md
+  - 选项 2：维持"不扩展 Inkwell.Abstractions 白名单"的现状，改为发起独立 ADR 在 AGENTS.md §3.2 显式登记该例外（允许 `Inkwell.Core.KnowledgeBase` / `.Memory` 直接 `PackageReference Microsoft.Extensions.AI.Abstractions`），走 AGENTS.md 签字位流程
+  - 选项 3：退回 Q5 候选 B——新增 `IEmbeddingProducer` 门面接口置于 `Inkwell.Abstractions`（彻底避免依赖纯度冲突，但增加维护成本，Owner 此前已明确否决）
+  - reviewer 倾向选项 1（与 Owner 已拍板的"比照先例"意图最一致，且成本最低，只需让先例真正对称）
+- **卡点等级**：**blocking**（建议 Owner picker 确认走哪个选项；HD-008 本体其余设计不受影响，可在 Owner 拍板后一次性追加 errata）
+- **追溯**：C91
+
+#### Non-blocking
+
+##### N25：HD-008 缺少显式"database-design.md 不贡献"声明（对比 HD-006 §12 / HD-007 §12）
+
+- **问题**：HD-006 / HD-007 均有独立 §12"跨模块章节贡献"小节显式声明"database-design.md 不贡献"，HD-008 §12 直接是"追溯"，跳过了这一惯例小节
+- **影响范围**：不影响任何下游产物起步（向量数据本就不落 EF Core 表，database-design.md 无需 HD-008 贡献字段是显然的），仅是与其余端口 HD 的章节命名习惯不一致，降低文档可预测性
+- **建议方向**：补一句"本 HD 不贡献 database-design.md（向量数据落 Qdrant / InMemory，非关系表，[ADR-020](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) 已锁定）"，可并入现有 §1.2 或单独起一个简短 §12 小节
+- **卡点等级**：non-blocking
+
+##### N26：HD-008 缺少独立"监控指标 / 告警策略"小节
+
+- **问题**：HD-004 ~ HD-007 均有 §7.3"可观测性"子段列监控指标与告警建议，HD-008 全文无对应内容，也未显式声明"监控随 Qdrant / InMemory / AzureOpenAIEmbeddings 独立 HD 落地"
+- **影响范围**：不影响 HD-008 本体翻 `reviewed`（本 HD 无运行期代码，监控指标本就该在具体 Provider 实现层定义），但下游三个独立 Provider HD 起草时若无明确指引，可能各自发明不一致的监控命名 / 告警阈值
+- **建议方向**：补一句"具体监控指标（如 embedding 生成延迟、Qdrant 查询延迟、collection 大小）随 `Inkwell.Core/VectorStore/` 与 `providers/Inkwell.VectorStore.Qdrant/` 独立 HD 落地；OTel instrumentation 基线由 [`Microsoft.Extensions.VectorData` 内置 `ActivitySource`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 提供（[ADR-020 §迁移路径 step 9](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）"
+- **卡点等级**：non-blocking
+
+##### N27：HD-008 §9 未显式声明"具体部署步骤移交 Provider 独立 HD"
+
+- **问题**：HD-004 ~ HD-007 在"部署 / 安全"段落均有"具体部署步骤合理移交 Provider 独立 HD"式的显式 deferral 措辞，HD-008 §9 只覆盖凭据存储位置，未写这句话
+- **影响范围**：不影响 HD-008 翻 `reviewed`（部署步骤本就该在 Qdrant / InMemory 具体实现 HD 中定义），仅是措辞不完整可能让读者误以为部署步骤遗漏而非有意移交
+- **建议方向**：§9 结尾补一句"Qdrant collection 创建 / InMemory 无持久化等具体部署步骤，移交 `providers/Inkwell.VectorStore.Qdrant/` 与 `Inkwell.Core/VectorStore/` 独立 HD"
+- **卡点等级**：non-blocking
+
+##### N28：HD-008 无独立"性能边界"标题呈现
+
+- **问题**：HD-002 ~ HD-007 均有独立的性能预算表（P50/P99），HD-008 仅在 §7 测试策略段落顺带一句"无运行期方法故无性能基准"作为解释，未单独起"性能边界"标题
+- **影响范围**：不影响 HD-008 翻 `reviewed`（本 HD 确实无运行期方法，性能边界不适用有充分理由），仅是章节呈现形式与其余 HD 不一致，略微降低跨 HD 比对的一致体验
+- **建议方向**：可选——若 Owner 认为形式一致性重要，可在 §10"已知限制"前插入一句显式"性能边界：不适用（本 HD 无运行期方法，参见 §1.2 范围声明）"
+- **卡点等级**：non-blocking
+
+### 18.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA（有条件）**——HD-008 本体的 type-alias 复用 + Options + Builder DSL 签名声明设计完整自洽，与 ADR-020 / HD-001 / HD-006 的既有决策高度一致（C86 ~ C89、C92 ~ C94 共 7 项 PASS）；但发现 **2 项 blocking**（B14 / B15），均指向同一根问题：Q5"`IEmbeddingGenerator<,>` 直接注入"决策所"比照"的 VectorData 先例，实际缺少对称的物理落地步骤（未把 `Microsoft.Extensions.AI.Abstractions` 纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`），且 file-structure.md 的相关 callout 未同步 HD-008 §11 已拍板的事实
+- **HD-008 翻 `reviewed` 前置条件**：
+  1. ⬜ Owner 通过 picker 对 B15 三个选项拍板（建议方向选项 1：把 `Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`，与 VectorData 处理完全同构，不触碰 AGENTS.md）
+  2. ⬜ 按拍板结果在 `h3-detailed-design-author` 模式下落地 HD-008 errata（§2 文件结构 / §14.3 GlobalUsings / §6 / §13 Q5 措辞同步）+ file-structure.md callout 同步更新（B14 随 B15 一并解决）
+  3. ⬜ Owner 在 HD-008 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——本轮尚不建议直接翻 reviewed，需先完成前两项
+  4. **可选**（non-blocking，不阻塞翻 reviewed）：N25 / N26 / N27 / N28 四项文档呈现形式缺口可与 B15 errata 一并顺手补齐，也可留待下一轮增量评审处理
+- **HD-008 自身核心设计结论**："不重新发明 `IVectorStore`"这一 ADR-020 核心决策的落地（type-alias 复用 + Builder DSL 签名）本身是**扎实且自洽的**（C86 ~ C89、C92 ~ C94 全部 PASS）；本轮发现的 2 个 blocking 项不否定这一核心设计，而是指向"决策落地是否配齐了必要的物理机制"这一更细粒度的问题，修复成本可控（1 次 Owner picker + 1 轮 errata）
+- **后续路径建议**：Owner 就 B15 拍板后，建议顺序：(1) HD-008 errata 落地 → (2) HD-008 翻 `reviewed` → (3) 端口层 8 个 HD（HD-001 ~ HD-008）全部 reviewed，H3 端口层设计正式收口 → (4) 进入 `Inkwell.Core.KnowledgeBase` / `.Memory` / `Inkwell.Core.AgentRuntime` 等业务命名空间 HD 或 `providers/Inkwell.VectorStore.Qdrant` / `Inkwell.Persistence.EFCore.*` 等 Provider 独立 HD 起草
+
+### 18.5 端口层（HD-001 ~ HD-008）整体完成度总结
+
+- **HD-001 Foundation**：`reviewed`（[design-review-report.md §4](#4-评审结论) 首轮 + 多轮 errata 后确认，见 §6 ~ §13）
+- **HD-002 Persistence Port**：`reviewed`（同上，含 §7 增量评审）
+- **HD-003 File Storage Port**：`reviewed`（§7 增量评审 PASS-AS-ERRATA 后确认）
+- **HD-004 Cache Port**：`reviewed`（§14 增量评审 PASS-AS-ERRATA 后确认）
+- **HD-005 Queue Port**：`reviewed`（§15 增量评审 PASS-AS-ERRATA 后确认）
+- **HD-006 Agent Runtime Port**：`reviewed`（§16 增量评审 PASS-AS-ERRATA，B13 file-structure.md 同步 + N20 CI 命令 errata 均已处理）
+- **HD-007 Audit Logger Port**：`reviewed`（§17 增量评审 PASS-AS-ERRATA，N21/N22 均已处理，0 blocking）
+- **HD-008 Vector Store Type-Alias**：`draft`（本轮 §18，**PASS-AS-ERRATA（有条件）**，2 项 blocking 待 Owner picker + 1 轮 errata 后方可翻 `reviewed`）
+- **端口层整体**：8/8 HD 已起草完成，7/8 已 `reviewed`，HD-008 是唯一尚未 `reviewed` 的一张（且已进入"待 Owner 拍板 1 个开放机制问题"的收尾阶段，非需要重新起草）。待 HD-008 走完 B15 拍板 + errata 闭环，端口层（`Inkwell.Abstractions`）8 张 HD 将全部 `reviewed`，H3 可正式推进到业务命名空间（`Inkwell.Core.*`）与 Provider 独立 HD 起草阶段
+
+### 18.6 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` / `FAIL` 都附了具体章节锚点引用
+- ✅ 2 个 `blocking` 反问（B14/B15）均能映射到具体一致性冲突（C90/C91）+ 影响范围 + 可执行的选项化建议方向
+- ✅ 4 个 `non-blocking` 反问（N25~N28）均为文档呈现形式缺口，不影响 HD-008 核心设计正确性
+- ✅ 未使用"看起来" / "似乎" / "感觉"等主观词汇
+- ✅ 未凭文件名臆测，每条结论都打开了对应文件读到对应字段（含 HD-001 §14.3 / §2 / §3.11 / §3.11.1 实际内容核对、HD-006 凭据字段核对、AGENTS.md §3.1/§3.2 原文核对）
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-008 / HD-001 / file-structure.md / 报告主体
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §18 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
