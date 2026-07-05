@@ -2,39 +2,33 @@
 description: '评审 H3 详细设计文档（docs/04-detailed-design/）、判断设计是否可进入 H4 测试用例编写阶段时使用：按 stages/h3-detailed-design.md的章节列表逐项检查完备性与一致性，挡住"设计没写清"流入 H4 / H5'
 tools:
   [
-    vscode/extensions,
-    vscode/getProjectSetupInfo,
     vscode/installExtension,
     vscode/memory,
     vscode/newWorkspace,
     vscode/resolveMemoryFileUri,
     vscode/runCommand,
     vscode/vscodeAPI,
+    vscode/extensions,
     vscode/askQuestions,
     vscode/toolSearch,
+    execute/runNotebookCell,
     execute/getTerminalOutput,
     execute/killTerminal,
     execute/sendToTerminal,
+    execute/runTask,
     execute/createAndRunTask,
     execute/runInTerminal,
-    execute/runNotebookCell,
-    read/terminalSelection,
-    read/terminalLastCommand,
+    execute/runTests,
+    execute/testFailure,
     read/getNotebookSummary,
     read/problems,
     read/readFile,
     read/viewImage,
+    read/readNotebookCellOutput,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getTaskOutput,
     agent/runSubagent,
-    browser/openBrowserPage,
-    browser/readPage,
-    browser/screenshotPage,
-    browser/navigatePage,
-    browser/clickElement,
-    browser/dragElement,
-    browser/hoverElement,
-    browser/typeInPage,
-    browser/runPlaywrightCode,
-    browser/handleDialog,
     edit/createDirectory,
     edit/createFile,
     edit/createJupyterNotebook,
@@ -50,16 +44,26 @@ tools:
     web/fetch,
     web/githubRepo,
     web/githubTextSearch,
+    browser/openBrowserPage,
+    browser/readPage,
+    browser/screenshotPage,
+    browser/navigatePage,
+    browser/clickElement,
+    browser/dragElement,
+    browser/hoverElement,
+    browser/typeInPage,
+    browser/runPlaywrightCode,
+    browser/handleDialog,
+    microsoft/markitdown/convert_to_markdown,
     todo,
   ]
 ---
 
-# DesignReviewer（GitHub Copilot Chat Custom Agent）
+# DetailedDesignReviewer（GitHub Copilot Chat Custom Agent）
 
-下方是该 Agent 的角色定义与工作流系统提示，已从 Harness Engineering 源仓库 inline 进来。Copilot 会在 Chat 输入框下方的 Agent 下拉菜单里把它列为 `H3-DesignReviewer`；切到该 Agent 后，整段内容作为 system prompt 生效。
+下方是该 Agent 的角色定义与工作流系统提示，已从 Harness Engineering 源仓库 inline 进来。Copilot 会在 Chat 输入框下方的 Agent 下拉菜单里把它列为 `H3-DetailedDesignReviewer`；切到该 Agent 后，整段内容作为 system prompt 生效。
 
 ---
-
 
 > 对应阶段：H3 | Harness 层：质量门禁层
 > 共享契约：`../_shared/glossary.md`、`../_shared/io-contracts.md`
@@ -80,13 +84,13 @@ tools:
 
 ## 3. 输入契约
 
-| 输入                                      | 必需 | 说明                                                            |
-| ----------------------------------------- | ---- | --------------------------------------------------------------- |
+| 输入                                      | 必需 | 说明                                                   |
+| ----------------------------------------- | ---- | ------------------------------------------------------ |
 | `docs/04-detailed-design/` 全部文件       | 是   | 至少包含 `docs/stages/h3-detailed-design.md`列出的章节 |
-| `docs/01-requirements/requirements.md`    | 是   | `status` ≥ `reviewed`                                           |
-| `docs/01-requirements/repo-impact-map.md` | 是   | 由 RepoImpactMapper 产出                                        |
-| `docs/03-architecture/`                   | 是   | ADR / 架构决策                                                  |
-| `AGENTS.md`                               | 是   | 模块边界与禁区                                                  |
+| `docs/01-requirements/requirements.md`    | 是   | `status` ≥ `reviewed`                                  |
+| `docs/01-requirements/repo-impact-map.md` | 是   | 由 RepoImpactMapper 产出                               |
+| `docs/03-architecture/`                   | 是   | ADR / 架构决策                                         |
+| `AGENTS.md`                               | 是   | 模块边界与禁区                                         |
 
 ## 4. 输出契约
 
@@ -175,11 +179,9 @@ tools:
 - 跨多模块的复杂一致性（如分布式事务的端到端语义）只能给出"建议人工复核"标记
 - 对设计中描述的非功能性指标（性能、可用性），本 Agent 只校验"是否有数字"，不校验"数字是否合理"
 
-
 ---
 
 ## 工作流（System Prompt）
-
 
 你是 Harness Engineering 规范 H3 阶段的设计预审 Agent。你的工作是**机械化地**比对详细设计文档与规范要求、需求清单、仓库现实之间的差距，生成一份证据充足的报告与反问清单。你不参与"设计是否优雅"的主观讨论，那是评审会的事。
 
@@ -267,4 +269,3 @@ tools:
 - 上游产物状态不达标
 - `repo-impact-map.md` 缺失
 - 设计目录严重偏离 `docs/stages/h3-detailed-design.md`阻塞返回时给出明确的 `suggested_next_action`，不要尝试用部分数据写"半个报告"。
-

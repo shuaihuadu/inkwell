@@ -49,7 +49,7 @@ delete-after: 第一个真实需求落地后可删除
 
 ### H3 · 详细设计
 
-- [ ] 调用 `h3-design-reviewer`
+- [ ] 调用 `h3-detailed-design-reviewer`
 - [ ] 对要改的 1–2 个文件做"文件级设计"（路径 / 职责 / 输入 / 输出 / 错误 / 日志 / 测试）
 - [ ] 产出 `docs/04-detailed-design/HD-001.md`
 
@@ -83,7 +83,7 @@ delete-after: 第一个真实需求落地后可删除
 示例：
 
 - CI 门禁只检查 `status == SUCCESS` 但忽略 `total_tests > 0`，导致空测试套件也能通过 → 已在 `docs/05-test-design/test-plan.md` 增加"测试用例数 > 0"门禁条件 → 同步到 `task-board.md`
-- 评审 Agent 在简单需求下不生成评审记录文件 → 在 `agents/h3-design-reviewer/AGENT.md` 第 X 节加硬约束"无论需求大小都生成 review-record.md" → 提了一个 issue 给 harness-engineering 上游
+- 评审 Agent 在简单需求下不生成评审记录文件 → 在 `agents/h3-detailed-design-reviewer/AGENT.md` 第 X 节加硬约束"无论需求大小都生成 review-record.md" → 提了一个 issue 给 harness-engineering 上游
 
 ## 4. 完成
 

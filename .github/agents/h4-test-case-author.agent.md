@@ -80,7 +80,7 @@ tools:
 | 输入                                              | 必需 | 说明                           |
 | ------------------------------------------------- | ---- | ------------------------------ |
 | `docs/01-requirements/requirements.md`            | 是   | `status` ≥ `reviewed`          |
-| `docs/04-detailed-design/`                        | 是   | 通过 `DesignReviewer` 审查     |
+| `docs/04-detailed-design/`                        | 是   | 通过 `DetailedDesignReviewer` 审查     |
 | `docs/04-detailed-design/design-review-report.md` | 是   | 阻塞项必须为空或全部接受为风险 |
 | 既有 `docs/05-test-design/`                       | 否   | 若存在，作为基线增量更新       |
 
@@ -153,7 +153,7 @@ tools:
 
 ## 8. 与其他 Agent 的协作
 
-- **上游**：`DesignReviewer`
+- **上游**：`DetailedDesignReviewer`
 - **下游**：
   - `CodingExecutor`：在 `ai-task-brief.md` 的"测试引用"字段引用本 Agent 产出的 `TC-NNN`
   - `CommitAuditor`：用矩阵验证提交的 `Tests:` 字段是否有效

@@ -75,6 +75,22 @@ tools:
 - 一份 `ai-task-brief.md` 经人工评审后被标记为可执行
 - 由人工通过 IDE 工具（Claude Code / Copilot / Codex 等）拉起；不接定时任务
 
+## 第 0 步：开工前的语言规范声明（强制前置）
+
+在第 3 节输入契约展开**之前**，Agent 必须先报家门：
+
+1. **列出本次将修改 / 新增的文件**：从 `ai-task-brief.md` 的"允许修改的文件"段抽路径
+2. **按文件后缀去重，得到本次涉及的语言集合**（如 `{ csharp, typescript }`）
+3. **对每种语言**：检测 `.github/instructions/<lang>.instructions.md` 是否存在
+   - **存在** → 在响应开头声明 "本次按 `<lang>.instructions.md` 写 `<lang>` 代码"，并把该文件作为 prompt 输入加载
+   - **不存在** → 用 `ask.user` picker（参考 io-contracts.md §6.1）问用户处置，**无 default、无 recommended**：
+     - **A**：调用 `code-style-bootstrapper` Skill 半自动落地（探栈、写草稿；完后用户手动回 §0 二次报家门）
+     - **B**：本次由 Agent 自行组织 `<lang>` 风格——commit message 的 `Risk` 字段**必须**记一句"未使用项目代码规范，按 Agent 自定 `<lang>` 风格"
+4. **同一对话内同语言只问一次**；新语言（用户后续追加文件涉及别的栈）再次走 §0
+5. **§0 未完成不能进 §3**：picker 选 A 时 Agent 暂停等待用户回流；选 B 时记一笔 Risk，继续 §3
+
+设计目的：避免 H5 编码与项目代码风格脱节，同时保证"无规范即默写"这条隐式路径**变可见、走得明**——commit message 里就能看到 Agent 是按规范写还是自由发挥。
+
 ## 3. 输入契约
 
 | 输入 | 必需 | 说明 |
@@ -188,6 +204,20 @@ tools:
 6. **能选就别让填**：阻塞返回时的下一步处置（"阻塞返回 / 接受降级 / 扩大允许范围"）、提交元数据收集（Design / Tests / Verify / Docs / Risk / Task 一次性问完），**必须**按 io-contracts.md §6.1 用 `ask.user` picker；多个相关字段合并到**一次** `ask.user` 调用，不要拆成 N 次。
 
 ## 工作流程
+
+### 第 0 步：开工前的语言规范声明（强制前置）
+
+在第一步"理解任务"展开**之前**，先报家门：
+
+1. 从 `ai-task-brief.md` 的"允许修改的文件"段列出本次涉及的所有路径
+2. 按文件后缀去重得到语言集合（`.cs` → csharp、`.ts/.tsx` → typescript、`.py` → python、`.sh/.bash` → shell、`.go` → go、`.rs` → rust、`.java` → java、`.js/.jsx/.mjs/.cjs` → javascript；其它后缀 → 用 picker 让用户填短名）
+3. **对每种语言**：检查 `.github/instructions/<lang>.instructions.md` 是否存在
+   - **存在** → 在响应开头声明一行："本次按 `<lang>.instructions.md` 写 `<lang>` 代码"，并把该文件加载进上下文
+   - **不存在** → 用 `ask.user` picker（参考 io-contracts.md §6.1）让用户选，**无 default、无 recommended**：
+     - **A**：调用 `code-style-bootstrapper` Skill 半自动落地规范（Skill 完成后用户手动回 §0 二次报家门）
+     - **B**：本次由你自行组织 `<lang>` 风格；commit message 的 `Risk` 字段**必须**包含一句"未使用项目代码规范，按 Agent 自定 `<lang>` 风格"
+4. 同一对话内同语言只问一次；用户后续追加涉及新语言的文件时再次走第 0 步
+5. **§0 未完成禁止进入第一步**：picker 选 A 时暂停等用户回流；选 B 时记一笔 Risk 后继续
 
 ### 第一步：理解任务
 

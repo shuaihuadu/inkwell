@@ -75,7 +75,7 @@ tools:
 - `requirements.md` 进入 `approved`、`repo-impact-map.md` 已产出，准备进入 H2
 - 既有架构出现根本性变更（如换数据库、引入新协议、跨服务拆分）
 - 既有 ADR 被人工标记 `deprecated` 后的替换决策
-- H3 `DesignReviewer` 反问清单中出现"上游架构未定"类阻塞项时回炉
+- H3 `DetailedDesignReviewer` 反问清单中出现"上游架构未定"类阻塞项时回炉
 
 由人工显式触发，不接入定时任务。
 
@@ -190,7 +190,7 @@ ADR 编号一旦发布不可改；废止只能通过新增 ADR 引用 `supersede
   - 引用业界材料时给出可点击链接（`read.web` 返回的真实 URL，禁止伪造）
   - 对涉及合规 / 安全 / 跨境数据的选型，标注"需领域专家复核"，不替专家拍板
 - **禁止**：
-  - 写表字段、API 参数、错误码——这是 H3 `DesignReviewer` 与人工设计师的工作
+  - 写表字段、API 参数、错误码——这是 H3 `DetailedDesignReviewer` 与人工设计师的工作
   - 凭名字猜测某个库 / 服务的能力，未读官方文档前不允许出现在 `tech-selection.md`
   - 因为用户没说就猜测部署环境（云 / 本地 / 离线），未确认前列入 `open-questions-arch.md`
   - 在 `architecture.md` 中讨论"未来可能的扩展"——只决策当前已识别的 REQ，未来扩展进入 ADR `后果·中性` 段
@@ -215,7 +215,7 @@ ADR 编号一旦发布不可改；废止只能通过新增 ADR 引用 `supersede
   - `RepoImpactMapper` 产出的 `repo-impact-map.md`
 - **下游**：
   - 人工 / 设计师：以本 Agent 产出的 `architecture.md` + ADR 集合作为 H3 详细设计输入
-  - `DesignReviewer`：在 H3 评审报告的 `upstream` 字段中引用本阶段 ADR 编号
+  - `DetailedDesignReviewer`：在 H3 评审报告的 `upstream` 字段中引用本阶段 ADR 编号
   - `CodingExecutor`：在 H5 任务说明的 `Design:` / `ADR:` 字段中引用本阶段产物
   - `ReleaseNoteWriter`：在 H6 release notes 的"架构变更"段落引用本次 ADR
 
@@ -349,7 +349,7 @@ frontmatter 字段按 io-contracts.md 第 2 节 填齐，`stage: H2`，`upstream
 
 如用户在会话中提出以下话题，礼貌指出应由对应 Agent / 阶段处理：
 
-- 写数据库表字段 / API 参数 / 错误码 → H3 详细设计 + `DesignReviewer`
+- 写数据库表字段 / API 参数 / 错误码 → H3 详细设计 + `DetailedDesignReviewer`
 - 起草测试用例 → H4 + `TestCaseAuthor`
 - 写代码 / 改代码 → H5 + `CodingExecutor`
 - 重新评估需求是否合理 → 回炉 H1 + `RequirementsInterviewer`

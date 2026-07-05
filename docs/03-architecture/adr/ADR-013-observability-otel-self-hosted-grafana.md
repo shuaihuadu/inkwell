@@ -16,6 +16,8 @@ upstream:
 downstream: []
 ---
 
+<!-- 2026-05-10 [ADR-019 进程拓扑](./ADR-019-process-topology-webapi-worker-split.md) 引入后：OTel `service.name` resource attribute 区分 `inkwell-webapi` / `inkwell-worker`；Prometheus scrape 双 source；Grafana Dashboard 加「队列吞吐 / Worker 健康」面板。 -->
+
 本地调试需要集成Aspire
 
 # ADR-013 可观测性：OpenTelemetry + 自托管 Grafana 栈
@@ -30,9 +32,9 @@ downstream: []
 
 **可观测性栈：OpenTelemetry .NET SDK 输出 → OTel Collector → 三个后端：[Tempo](https://grafana.com/oss/tempo/)（trace）/ [Loki](https://grafana.com/oss/loki/)（log）/ [Prometheus](https://prometheus.io/)（metric）；统一 UI 走 [Grafana](https://grafana.com/)。dev 用 Docker Compose 跑全栈；prod 用 Helm Chart 部署到 AKS。**
 
-- SDK 配置：`AddOpenTelemetry()` + `WithMetrics()` + `WithTracing()` + `WithLogs()`，全部走 OTLP gRPC 到 Collector。
-- Collector：单 Deployment，配置 receiver = OTLP，exporter = Tempo / Loki / Prometheus。
-- Grafana：默认 Dashboard 包含：(1) Run 数 / 平均延迟 / 错误率 / 工具调用数 / Skill 命中数；(2) PostgreSQL / Qdrant 健康；(3) AKS Pod 健康（节点 CPU / 内存 / 重启次数）。
+- SDK 配置：`AddOpenTelemetry()` + `WithMetrics()` + `WithTracing()` + `WithLogs()`，全部走 OTLP gRPC 到 Collector。`service.name` resource attribute 区分 `inkwell-webapi` / `inkwell-worker`（[ADR-019](./ADR-019-process-topology-webapi-worker-split.md)），dashboards 按 service 维度切分。
+- Collector：单 Deployment，配置 receiver = OTLP（双 source：webapi + worker），exporter = Tempo / Loki / Prometheus。
+- Grafana：默认 Dashboard 包含：(1) Run 数 / 平均延迟 / 错误率 / 工具调用数 / Skill 命中数；(2) PostgreSQL / Qdrant 健康；(3) AKS Pod 健康（节点 CPU / 内存 / 重启次数）；(4) **队列吞吐 / Worker 健康**（`queue_depth` / `inkwell-worker` Pod restart count / `BackgroundService` 自定义 metric）。
 - 数据保留：Loki / Tempo 保留 30 天（v1 默认）；Prometheus 保留 15 天 metric raw + 365 天 5 min downsample。
 - 业务 Dashboard：[REQ-014 trace 面板](../../01-requirements/requirements.md) 在 [UI-007 调试页](../../01-requirements/ui-spec.md) 是独立 UI（直接查 Tempo），不嵌入 Grafana iframe。
 - 告警：v1 仅 Grafana Alerting → SMTP（邮件）一种通道。

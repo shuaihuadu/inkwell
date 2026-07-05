@@ -42,7 +42,7 @@
 > **完成后下一步**：
 >
 > 1. `docs/03-architecture/architecture.md` / `tech-selection.md` / `risk-analysis.md` 三份文档的 `status` 改 `draft → reviewed`，`adr/` 下每条 ADR 也按同样规则升级。
-> 2. 把 H2 决策反写到根目录 `AGENTS.md` 第 4 节"模块边界 / 禁区"，把跨模块允许 / 禁止规则写清楚——这是 `H3-DesignReviewer` / `H5-CodingExecutor` 的边界依据。
+> 2. 把 H2 决策反写到根目录 `AGENTS.md` 第 4 节"模块边界 / 禁区"，把跨模块允许 / 禁止规则写清楚——这是 `H3-DetailedDesignReviewer` / `H5-CodingExecutor` 的边界依据。
 > 3. 找一个或多个最小 feature 切到 H3，人手起草 `docs/04-detailed-design/<feature>/HD-NNN.md`。
 
 ## H3：详细设计

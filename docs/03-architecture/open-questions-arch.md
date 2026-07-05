@@ -5,14 +5,16 @@ status: closed
 authors:
   - name: H2-ArchitectAdvisor
     role: agent
-reviewers: []
+reviewers: [ Inkwell Owner ]
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-10
 upstream:
   - REQ-inkwell-agent-platform
   - repo-impact-map-inkwell-agent-platform
 downstream: []
 ---
+
+<!-- 2026-05-10：随 ADR-017 / ADR-018 补录后追加 OQ-A008（RedisStreamQueueProvider v1 是否实现）；Owner 选 B（v1 同期实现）并提供三前置条件（环境对称论据 + DLQ 默认 + queue_depth），RISK-014 同步激活。OQ-A001 ~ OQ-A008 均 closed。 -->
 
 # Inkwell Agent 平台 · 架构待澄清清单（H2）
 
@@ -191,7 +193,7 @@ downstream: []
 - **为什么需要答**：决定 H4 测试用例编写时的命名 / 断言风格；影响 [.github/copilot-instructions.md](../../.github/copilot-instructions.md) 中 `dotnet test` 的实际执行链路。
 - **影响范围**：H4 全部测试用例；H5 编码任务的 Verify 命令格式；CI 流水线。
 - **候选答**：
-  - **A**（Agent 默认推进，Owner 修正后部分采纳）。后端 [MSTest v3](https://github.com/microsoft/testfx)（[`MSTest.Sdk`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-mstest-intro) 最新稳定版 + [`Microsoft.Testing.Platform`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro)） + Vitest + Playwright + GitHub Actions。后果：与 .NET 10 + C# 14 默认生态一致；`MSTest.Sdk` 提供零配置项目模板；Microsoft.Testing.Platform 带来冷启动提速；与 GitHub Actions matrix 原生兼容。
+  - **A**（Agent 默认推进，Owner 修正后部分采纳）。后端 [MSTest 微软系](https://github.com/microsoft/testfx)（[`MSTest.Sdk`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-mstest-sdk) 4.x 最新稳定 + [`Microsoft.Testing.Platform`](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro) / MTP runner） + Vitest + Playwright + GitHub Actions。后果：与 .NET 10 + C# 14 默认生态一致；`MSTest.Sdk` 提供零配置项目模板；Microsoft.Testing.Platform 带来冷启动提速；与 GitHub Actions matrix 原生兼容。
   - **B**. NUnit + Jest + Cypress + Azure DevOps。后果：脱离 GitHub 平台；Jest 与 Vite 集成需要 babel-jest；Cypress 不支持多 tab E2E。
   - **C**. 其他（请显式列出）。
 - **回答**：
@@ -209,10 +211,43 @@ downstream: []
 - **卡点等级**：closed
 - **回写**：→ [tech-selection.md §19 测试与 CI](./tech-selection.md)；[architecture.md §10 可观测性方案](./architecture.md)。
 
+> **2026-05-10 措辞勘误**：上文 Agent 作为背景考调及「MSTest v3」是测试框架本身的版本号（[`MSTest.TestFramework` 3.x](https://github.com/microsoft/testfx)），与本项目实际引入的 [MSBuild SDK 版本](https://learn.microsoft.com/dotnet/core/testing/unit-testing-mstest-sdk) `MSTest.Sdk` 4.x（最新稳定 4.2.2，默认使用 [Microsoft.Testing.Platform](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro) / MTP runner）是上游项目两个错位的发布通道。该 OQ 决议指向 MSTest 微软系本身仍锁定，措辞仅由“MSTest v3”精化为“[MSTest.Sdk 4.x](https://github.com/microsoft/testfx)”；Owner 回答字段保留原文。同步→ [tech-selection.md §18](./tech-selection.md) / [AGENTS.md §2.4](../../AGENTS.md) / [2026-05-10-h2-architecture-review §9](../07-reviews/2026-05-10-h2-architecture-review.md)。
+
+---
+
+## OQ-A008 RedisStreamQueueProvider v1 是否实现
+
+- **问题**：[ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) 已决议在 [Inkwell.Abstractions](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 预留 `IQueueProvider` 接口 + [Inkwell.Core](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 提供 `ChannelsQueueProvider` 默认实现。是否在 v1 同期实现独立的 `RedisStreamQueueProvider`（依赖 [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/)）还未决。
+- **为什么需要答**：Redis 可靠队列与 Channels in-process 队列在可靠性语义上差异明显（crash 后任务是否丢失 / 多副本 worker 能否各自拍任务）。是否 v1 出 csproj 决定了 [Inkwell.Queue.Redis](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 是否需创建、H4 测试是否需覆盖 crash recovery / fairness 用例、微服务多副本部署能否启用。Owner 在 ADR-018 取舍过程中未提供具体 v1 触发场景，由本 OQ 显式入账。
+- **影响范围**：[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) `src/core/providers/` 拓扑（是否多一个 `Inkwell.Queue.Redis/` csproj）；[ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) 「接受的代价」边界；[RISK-014](./risk-analysis.md) 是否激活；H4 需要补鱼类用例的范围；[Inkwell.Triggers](../01-requirements/repo-impact-map.md) / [Inkwell.Orchestrations](../01-requirements/repo-impact-map.md) 是否能依赖「多副本 不 抢 同一任务」语义。
+- **候选答**：
+  - **A**（Agent 默认推进）。**v1 不实现** `RedisStreamQueueProvider`，仅保留接口 + `ChannelsQueueProvider`。后果：ADR-018 不需重写；v1 运行时代价与当前等价；v1 范围不膊胀（[OQ-006 closed §A](../01-requirements/open-questions.md) 范围风险不加重）；HPA 开多副本时，需明确警告「同一任务可能被多副本重复拍」——该条限制进 [Inkwell.Triggers](../01-requirements/repo-impact-map.md) / [Inkwell.Orchestrations](../01-requirements/repo-impact-map.md) 的 H3 详细设计。
+  - **B**。**v1 同期实现** `RedisStreamQueueProvider`（新增 `src/core/providers/Inkwell.Queue.Redis/` csproj）。**前置条件（Owner 必须提供）**：(a) 明确 v1 触发场景（哪个 REQ / 哪个任务路径 / 哪项 SLA 在 in-process 队列下满足不了）；(b) dead-letter / retry / fairness 策略；(c) observability 指标清单。后果：RISK-014 激活；H4 补鱼 crash recovery / fairness / DLQ 用例；v1 范围膊胀。
+  - **C**。**现在不实现，但预起始化脚手架**（在 [Inkwell.Abstractions](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 内增补可靠性能力接口预留，如 `IDurableQueueProvider : IQueueProvider`）。后果：ADR-018 需微调 「接受的代价」；与选项 A 相比只多一个 marker 接口，运行时代价 ≈ 0。
+  - **D**。其他（请显式列出）。
+- **回答**：
+
+  > 2026-05-10。接受 **B**：v1 同期实现 `RedisStreamQueueProvider`（新增 `src/core/providers/Inkwell.Queue.Redis/` csproj）。三前置条件：
+  >
+  > - **(a) v1 触发场景**：环境对称论据——`ChannelsQueueProvider` = 开发态默认（InMemory / 单进程 / 零依赖）；`RedisStreamQueueProvider` = 集成测试 + prod 默认（与 [`IPersistenceProvider`](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) / [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) 的「InMemory dev · 真 Provider prod」拓扑对齐）。以此避免「开发期靠 Channels 跳过可靠性设计、上线才发现多副本抢同一任务」这类环境偏移 bug。
+  > - **(b) dead-letter / retry / fairness 策略**：DLQ 默认 N=3 + 24h 保留期。其余依赖 [Redis Streams 内置语义](https://redis.io/docs/latest/develop/data-types/streams/)：fairness 由 [`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) consumer group 多副本公平分发；crash recovery 由 PEL（pending entries list）+ [`XCLAIM`](https://redis.io/docs/latest/commands/xclaim/) visibility timeout = 5 min 重插；retry 策略 = 指数退避 + jitter（1s 起 / max 60s）。详细实现进 [Inkwell.Queue.Redis](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 的 H3 详细设计。
+  > - **(c) observability 指标清单**：v1 必发 `queue_depth`（活动 stream 长度）。其余 `queue_consume_latency_p95` / `queue_dlq_count` / `queue_consumer_lag` / `queue_redelivery_count` / `queue_consumer_active` 均进 [RISK-014](./risk-analysis.md) “prod 上线前补齐”残余风险，H4 验收门禁 = `queue_depth` + `queue_dlq_count` 两项（DLQ 计数 H4 必须能报警，否则无法验收选项 (b) DLQ 默认 N=3）。
+
+- **决策日期**：
+
+  > 2026-05-10
+
+- **决策人**：
+
+  > Inkwell Owner
+
+- **卡点等级**：closed
+- **回写**：→ [ADR-017 §决策 · csproj 表](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 新增 `Inkwell.Queue.Redis` 行；[ADR-018 §决议](./adr/ADR-018-queue-abstraction-channels-default.md) 「接受的代价」重写为「开发态 / 集成测试 + prod 双 Provider」；[RISK-014](./risk-analysis.md) 从「占位」激活。
+
 ---
 
 > **完成后下一步**：
 >
-> 1. 7 条 OQ-A 均已 closed（2026-05-08 初谈 + 2026-05-09 复议补齐）。详见各条 §回答 + §回写。
-> 2. 评审纪要走 `/log-review`（见 [.github/copilot-instructions.md §3](../../.github/copilot-instructions.md)），同时人工把本文件 `status: pending → closed`（本轮已随决策同步更新） + 各 ADR / tech-selection.md / risk-analysis.md / architecture.md `status: draft → reviewed`。
-> 3. H3 详细设计需接重点足迹：三 Provider 抽象接口 contract（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider`）、主进程长 SSE 在 macOS App Nap / Windows 节能模式下的保活策略、凭据轮换与 Pod 重启联动。
+> 1. OQ-A001 ~ OQ-A008 均已 closed（2026-05-08 初谈 + 2026-05-09 复议 + 2026-05-10 随 ADR-017 / ADR-018 补录）。
+> 2. 评审纪要走 `/log-review`（见 [.github/copilot-instructions.md §3](../../.github/copilot-instructions.md)），同时人工确认 [risk-analysis.md](./risk-analysis.md) / [tech-selection.md](./tech-selection.md) / [architecture.md](./architecture.md) `updated: 2026-05-10`（status 保持 reviewed）；ADR-017 / ADR-018 本轮已随 Owner 选 B + AGENTS.md 一次性授权一同翻转为 `accepted`。
+> 3. H3 详细设计需接重点足迹：四 Provider 抽象接口 contract（[`IPersistenceProvider`](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) / [`IQueueProvider`](./adr/ADR-018-queue-abstraction-channels-default.md)）、主进程长 SSE 在 macOS App Nap / Windows 节能模式下的保活策略、凭据轮换与 Pod 重启联动、[`Inkwell.Core.AgentRuntime` 命名空间 的 MAF 隔离 lint 规则](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)、[`RedisStreamQueueProvider` H3 详设](./adr/ADR-018-queue-abstraction-channels-default.md)（DLQ N=3 24h + Redis Streams 内置语义 + queue_depth metric）。

@@ -7,14 +7,22 @@ authors:
     role: agent
 reviewers: [ Inkwell ]
 created: 2026-05-08
-updated: 2026-05-08
+updated: 2026-05-10
 upstream:
   - REQ-inkwell-agent-platform
   - repo-impact-map-inkwell-agent-platform
   - tech-selection-inkwell-agent-platform
   - risk-analysis-inkwell-agent-platform
+  - ADR-017
+  - ADR-018
+  - ADR-019
+  - ADR-020
+  - ADR-021
 downstream: []
 ---
+
+<!-- 2026-05-10 ADR-017 + ADR-018 引入后端模块拓扑重构（capability-folder → Ports & Adapters）+ IQueueProvider 抽象；ADR-019 拆分 Inkwell.WebApi + Inkwell.Worker 双进程；ADR-020 向量存储抽象复用 Microsoft.Extensions.VectorData + Qdrant / InMemory 双 Provider；ADR-021 EFCore Persistence 共享层 + 3 final adapter。本文件 §1 / §3 / §6 / §9 / §14 / §15 已同步更新。
+     人工评审动作：确认 status 仍保持 reviewed（incremental update）或翻为 draft 重新过评审，由 Owner 决定。 -->
 
 # Inkwell Agent 平台 · 架构说明
 
@@ -30,38 +38,58 @@ downstream: []
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Electron 客户端  (ADR-001)                                            │
+│ Electron 客户端 src/app/  (ADR-001)                                   │
 │  ┌──────────────────────────────────┐  ┌─────────────────────────┐   │
-│  │ Renderer (React + Vite + TS)     │  │ Main (Node.js)          │   │
+│  │ src/app/web/  (React + Vite)     │  │ src/app/electron/       │   │
 │  │  · UI-001~010 (Pro Layout)       │  │  · idle / lock 调度     │   │
 │  │  · React Flow 画布 (ADR-006)     │  │  · powerMonitor / blur  │   │
-│  │  · AG-UI 客户端 SDK (ADR-012)    │  │  · cursor / run_id 持有 │   │
+│  │  · AG-UI 客户端 SDK (ADR-012)    │  │  · 主进程长 SSE 持有    │   │
 │  │  · MediaRecorder 麦克风录音      │  │  · 自动更新             │   │
 │  └──────────────┬───────────────────┘  └─────────┬───────────────┘   │
 └──────────────────┼──────────── IPC contextBridge ┼────────────────────┘
                    │ HTTPS REST + SSE              │
                    ▼                               │
 ┌──────────────────────────────────────────────────┴────────────────────┐
-│ ASP.NET Core 后端  (ADR-002, .NET 10)                                  │
-│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────┐   │
-│  │ Inkwell.Api        │  │ Inkwell.AGUI       │  │ Inkwell.Public │   │
-│  │ (REST CRUD)        │  │ (Hosting + Resume) │  │ (Token API)    │   │
-│  └─────────┬──────────┘  └─────────┬──────────┘  └────┬───────────┘   │
-│            │                       │                  │               │
-│  ┌─────────▼───────────────────────▼──────────────────▼───────────┐   │
-│  │ Inkwell.AgentRuntime (ADR-003 MAF 门面层)                       │   │
-│  │  · Microsoft.Agents.AI / AGUI / Workflows / DurableTask         │   │
-│  └────┬───────────┬───────────┬──────────┬─────────┬───────────────┘   │
-│       │           │           │          │         │                   │
-│  ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐ ┌──▼────┐ ┌──▼─────────────┐    │
-│  │Conver-  │ │Skills   │ │Knowledge │ │Multi- │ │Orchestrations  │    │
-│  │sations  │ │(static) │ │Base+RAG  │ │modal  │ │(WorkflowComp.) │    │
-│  └────┬────┘ └────┬────┘ └────┬─────┘ └──┬────┘ └──┬─────────────┘    │
-│       │           │           │          │         │                   │
-│  ┌────▼───────────▼───────────▼──────────▼─────────▼───────────────┐  │
-│  │ Inkwell.DataAccess (ADR-004)  · IAuditLogger · IVectorStore      │  │
-│  └────────────┬─────────────────────────┬──────────────────────────┘  │
-└───────────────┼─────────────────────────┼─────────────────────────────┘
+│ ASP.NET Core 后端 src/core/  (ADR-002 .NET 10 / ADR-017 P&A / ADR-019) │
+│                                                                       │
+│  ┌─────────────────────────────────┐  ┌─────────────────────────────┐ │
+│  │ Inkwell.WebApi  (REST + AGUI    │  │ Inkwell.Worker (.NET Generic│ │
+│  │ + Public 入口；enqueue 侧)      │  │ Host + BackgroundService；  │ │
+│  │ HPA: CPU 70% / min 2 / max 10   │  │ Channels/Redis consumer +   │ │
+│  │                                 │  │ DurableTask runner)         │ │
+│  │                                 │  │ HPA: queue_depth ≥ 100      │ │
+│  │                                 │  │ / min 1 / max 5             │ │
+│  └──────────────┬──────────────────┘  └──────────────┬──────────────┘ │
+│                 │  共享 DI 装配 AddInkwell()...      │                 │
+│                 ▼                                    ▼                │
+│  ┌──────────────────────▼───────────────────────────────────────┐    │
+│  │ Inkwell.Core  (业务实现 + 默认 Provider + AgentRuntime)       │    │
+│  │ ┌────────────┬────────────┬─────────────┬──────────────────┐ │    │
+│  │ │ .Auth      │ .Agents    │ .Skills     │ .KnowledgeBase   │ │    │
+│  │ │ .Memory    │ .Triggers  │ .Multimodal │ .Orchestrations  │ │    │
+│  │ │ .Traces    │ .Versioning│ .AuditLogs  │ .Conversations   │ │    │
+│  │ │ .Health    │ .AgentRuntime  ←唯一接 Microsoft.Agents.AI.* │ │    │
+│  │ │ ChannelsQueueProvider · InMemoryCacheProvider ·           │ │    │
+│  │ │ LocalFileSystemFileStorageProvider  (默认实现)            │ │    │
+│  │ └────────────────────────────────────────────────────────────┘ │    │
+│  └──────────────────────┬───────────────────────────────────────┘    │
+│                         │ 仅依赖接口                                  │
+│  ┌──────────────────────▼───────────────────────────────────────┐    │
+│  │ Inkwell.Abstractions  (接口 + Model + Options + Builder DSL) │    │
+│  │   IPersistenceProvider · IFileStorageProvider                │    │
+│  │   ICacheProvider · IQueueProvider · IAgentRuntime            │    │
+│  │   IAuditLogger · VectorStore (Microsoft.Extensions.VectorData)│    │
+│  └──────────────────────┬───────────────────────────────────────┘    │
+│                         │ 仅实现接口                                  │
+│  ┌──────────────────────▼───────────────────────────────────────┐    │
+│  │ src/core/providers/  (各 Provider 独立 csproj，按需引入)      │    │
+│  │   Inkwell.Persistence.EFCore (base, ADR-021)                 │    │
+│  │   Inkwell.Persistence.EFCore.{InMemory,SqlServer,Postgres}   │    │
+│  │   Inkwell.FileStorage.{MinIO,AzureBlob}                      │    │
+│  │   Inkwell.Cache.Redis · Inkwell.Queue.Redis                  │    │
+│  │   Inkwell.VectorStore.Qdrant                                 │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└───────────────┬─────────────────────────┬─────────────────────────────┘
                 │                         │
                 ▼                         ▼
         ┌──────────────┐          ┌────────────────┐
@@ -77,9 +105,15 @@ downstream: []
         └──────────────────────────────────────────────────┘
 
         ┌──────────────────────────────────────────────────┐
-        │ Azure 依赖：Speech (ADR-009) · Blob · Key Vault   │
+        │ Azure 依赖：Speech (ADR-009) · Blob (ADR-015)     │
+        │   凭据走 K8s Secret + .env (OQ-A006 §B)           │
         └──────────────────────────────────────────────────┘
 ```
+
+图说：
+
+- **Ports & Adapters 拓扑**（[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)）：业务代码（`Inkwell.Core` 各业务命名空间）→ 仅依赖 `Inkwell.Abstractions` 中的接口 → `providers/*` 实现接口；不允许业务代码直接 `using` 任何 Provider 包。
+- **MAF 隔离边界**：`Inkwell.Core.AgentRuntime` 命名空间是唯一允许 `using Microsoft.Agents.AI.*` 的位置；其他业务命名空间通过 `IAgentRuntime` 接口访问 MAF（[RISK-001](./risk-analysis.md) 缓解手段从 csproj 硬边界降级为 lint + 接口收敛软边界）。
 
 ## 2. 前端架构
 
@@ -93,21 +127,88 @@ downstream: []
 
 ## 3. 后端架构
 
-详见 [ADR-002](./adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md) + [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md)。
+详见 [ADR-002](./adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md) + [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md) + [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)（Ports & Adapters 拓扑）。
 
-- **应用层**：[Inkwell.Api](../01-requirements/repo-impact-map.md) (REST CRUD) + [Inkwell.AGUI.Hosting](../01-requirements/repo-impact-map.md) (流式) + [Inkwell.Public](../01-requirements/repo-impact-map.md) (Token API)。
-- **领域层**：`Inkwell.Agents` / `Inkwell.Skills` / `Inkwell.KnowledgeBase` / `Inkwell.Multimodal` / `Inkwell.Orchestrations` / `Inkwell.Conversations`（详见 [§3.1 repo-impact-map](../01-requirements/repo-impact-map.md)）。
-- 使用CodeFirst，EF Migration
-- 关于PersistenceProvider，先使用EFCore实现一个抽象层，然后再实现InMemory、SQL Server、PostgresSQL，说白了这三个就是不同类型的DbContext去兼容
-- **运行时门面**：[Inkwell.AgentRuntime](../01-requirements/repo-impact-map.md) 封装 MAF 公共 API（[Microsoft.Agents.AI](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI/) / [.AGUI](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.AGUI/) / [.Workflows](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.Workflows/) / [.DurableTask](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/)），其他模块只引用门面接口。
-- **数据访问层**：[Inkwell.DataAccess](../01-requirements/repo-impact-map.md) 提供 `InkwellDbContext` + `IVectorStore` + `IAuditLogger` 三个接口。
-- **横切**：`Inkwell.Common`（Result / Error 模型）/ `Inkwell.Common.Telemetry`（OTel 注册）/ `Inkwell.Common.Auth`（鉴权 middleware）。
+### 3.1 物理 csproj 拓扑（[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）
+
+```text
+src/core/
+├── Inkwell.Abstractions/        ← 接口 + Model + Options + DI Builder DSL
+├── Inkwell.Core/                ← 默认实现 + 业务编排域 + AgentRuntime
+├── providers/
+│   ├── Inkwell.Persistence.EFCore/                  ← [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 共享 base：Entity / OnModelCreating / EfCorePersistenceProvider / DataSeed
+│   ├── Inkwell.Persistence.EFCore.InMemory/
+│   ├── Inkwell.Persistence.EFCore.SqlServer/
+│   ├── Inkwell.Persistence.EFCore.Postgres/
+│   ├── Inkwell.FileStorage.MinIO/
+│   ├── Inkwell.FileStorage.AzureBlob/
+│   ├── Inkwell.Cache.Redis/
+│   ├── Inkwell.Queue.Redis/
+│   └── Inkwell.VectorStore.Qdrant/
+├── Inkwell.WebApi/              ← ASP.NET Core HTTP / REST / AGUI / Public API 入口（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 重命名自 Inkwell.Host）
+└── Inkwell.Worker/              ← 队列 consumer + DurableTask runner 入口（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增）
+```
+
+### 3.2 模块说明
+
+- **`Inkwell.Abstractions`**：零外部包依赖（除 `Microsoft.Extensions.*.Abstractions` 与 [`Microsoft.Extensions.VectorData.Abstractions`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)）；包含全部接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）+ 共享 Model（Result / Error）+ Options + DI Builder DSL（`IInkwellBuilder` 与 `AddInkwell()` 入口）。**向量存储抽象**直接 type-alias 复用 `Microsoft.Extensions.VectorData.VectorStore` / `VectorStoreCollection<TKey, TRecord>`（[ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）。
+- **`Inkwell.Core`**：业务实现（按 namespace 隔离 Auth / Agents / Skills / KnowledgeBase / Memory / Triggers / Orchestrations / Traces / Versioning / Multimodal / AuditLogs / Conversations / Health）+ 默认 Provider 实现（`ChannelsQueueProvider` / `InMemoryCacheProvider` / `LocalFileSystemFileStorageProvider` / `InMemoryVectorStore`）+ `Inkwell.Core.AgentRuntime` 命名空间（唯一允许 `using Microsoft.Agents.AI.*` 的位置，封装 [`Microsoft.Agents.AI`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI/) / [`.AGUI`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.AGUI/) / [`.Workflows`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.Workflows/) / [`.DurableTask`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) 公共 API，对外暴露 `IAgentRuntime`）。
+- **`providers/*`**：8 个 Provider 实现（含 1 个 EFCore family 共享 base + 3 EFCore final adapter + 5 其他 final adapter），每个独立 csproj；只依赖 `Inkwell.Abstractions`，**不依赖** `Inkwell.Core`（避免循环 + 让 Provider 可独立分发）。**EFCore family 例外**（[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：InMemory / SqlServer / Postgres 三 final adapter 允许引用同位 `providers/Inkwell.Persistence.EFCore` base csproj（shared adapter base + final adapter 分层）。每个 final adapter Provider 提供对应的 `IInkwellBuilder` extension method（`UseInMemoryDatabase()` / `UseSqlServer()` / `UsePostgres()` / `UseMinIO()` / `UseRedis()` / `UseQdrantVectorStore()` 等）。
+- **`Inkwell.WebApi`**（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）：ASP.NET Core HTTP / REST / AGUI SSE / Public API 入口。`Microsoft.NET.Sdk.Web`。`Program.cs` 调用 `AddInkwell()...Build()`，然后 `MapInkwellEndpoints()`。**仅注册 IQueueProvider enqueue 侧**，不跑 consumer。HPA：CPU 70%，min 2 / max 10。
+- **`Inkwell.Worker`**（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）：队列 consumer + [`Microsoft.Agents.AI.DurableTask`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) runner + 后台慢任务入口。`Microsoft.NET.Sdk.Worker`（[.NET Generic Host](https://learn.microsoft.com/aspnet/core/fundamentals/host/generic-host) + [`BackgroundService`](https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services)）。`Program.cs` 调用 `AddInkwell()...Build()` + `AddInkwellWorker()`。不开 HTTP 业务端口（仅开 `/healthz` probe + Prometheus scrape `/metrics`）。HPA：自定义 metric `queue_depth` ≥ 100，min 1 / max 5，fallback CPU 70%。
+
+### 3.3 数据访问
+
+- 使用 EF Core Code First + EF Migration（SqlServer / Postgres 各一份 `Migrations/` 位于各自 final adapter csproj，[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；CI 跑两套 — [RISK-002](./risk-analysis.md)）。InMemory 不支持 Migration，仅走 [`EnsureCreated`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)。
+- `IPersistenceProvider` 抽象位于 `Inkwell.Abstractions`；唯一实现 `EfCorePersistenceProvider` 位于 `providers/Inkwell.Persistence.EFCore/`（[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）；三 final adapter csproj 仅提供 `DbContextOptionsBuilder.UseXxx` 与 Builder DSL 扩展方法，**不重复实现** `IPersistenceProvider`。业务实体（`Agent` / `Conversation` / `Run` / `Trace` / `AuditLog` / `KnowledgeBase` / `MemoryItem` / `Skill` / `Tool` / `Trigger` / `Orchestration` / `Version` / `User` 等）集中在 `Inkwell.Persistence.EFCore/Entities/`。
+- **DataSeed** 通过 Builder DSL `.AutoSeedOnStartup(true|false)` 控制（default true），[`Inkwell.WebApi` 启动时](./adr/ADR-019-process-topology-webapi-worker-split.md) 由 `MigrationRunner` 在 Migration 完成后调 `InkwellSeeder.SeedAsync()`；Worker 不跑 Migration / Seed（避免双跡）。Seed 内容必须幂等（按业务唯一键判定而非 Id）。
+- `IAuditLogger` 接口位于 `Inkwell.Abstractions`；默认实现位于 `Inkwell.Core`（EF audit_logs 表）。
+- **向量存储**（[ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）：复用 [`Microsoft.Extensions.VectorData`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象（`VectorStore` / `VectorStoreCollection<TKey, TRecord>` + `[VectorStoreKey]` / `[VectorStoreData]` / `[VectorStoreVector]` attribute model）；prod 走 `providers/Inkwell.VectorStore.Qdrant/`，dev / unit test 走 `Inkwell.Core/VectorStore/InMemoryVectorStore`；KB / Memory 业务语义（chunking / retention）在各自 Service 层包，**不**进 `Inkwell.Abstractions`。embedding 生成通过 [`Microsoft.Extensions.AI.IEmbeddingGenerator`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.ai.iembeddinggenerator-2)（Builder DSL `UseAzureOpenAIEmbeddings(...)`）解耦。
+
+### 3.4 Builder DSL（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 双进程增量）
+
+```csharp
+// Inkwell.WebApi/Program.cs
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddInkwell()
+    .UseSqlServer(builder.Configuration.GetConnectionString("Inkwell"))
+    .UseAzureBlob(opts => builder.Configuration.GetSection("Inkwell:FileStorage:Azure").Bind(opts))
+    .UseRedis(builder.Configuration.GetConnectionString("Redis"))
+    .UseRedisQueue(builder.Configuration.GetConnectionString("RedisQueue")) // enqueue side
+    .Build();
+var app = builder.Build();
+app.MapInkwellEndpoints();
+app.Run();
+
+// Inkwell.Worker/Program.cs
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddInkwell()
+    .UseSqlServer(...)
+    .UseAzureBlob(...)
+    .UseRedis(...)
+    .UseRedisQueue(...)         // consume side
+    .Build();
+builder.Services.AddInkwellWorker(); // BackgroundService 注册集
+var host = builder.Build();
+host.Run();
+```
+
+未引用的 Provider csproj 对应的 `Use*()` extension method 不可见，天然裁剪。WebApi / Worker 必须使用同一 image tag、单 Helm release 同时滚（避免 [RISK-015](./risk-analysis.md) 版本漂移）。
 
 ## 4. 数据库选型
 
 详见 [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md)。
 
-- **关系数据**：EF Core 10（与 .NET 10 同步发布）+ Provider 切换（InMemory / SQL Server 2025 / PostgreSQL 17），通过 `appsettings.json` 的 `Inkwell:DataStore:Provider` 字段选择。
+> **2026-05-10 errata（F1 + F9）**——源 [`design-review-report.md` §6.4](../04-detailed-design/design-review-report.md)
+>
+> - 本节中 `appsettings.json` 配置键 `Inkwell:DataStore:Provider` 字面量已被精化：H3 [HD-002 §3.5](../04-detailed-design/Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 首先改名为 `Inkwell:Persistence:Provider`；
+> - 2026-05-10 InkwellOptions 形态 C 拍板（[`design-review-report.md` §6.4.1 F9](../04-detailed-design/design-review-report.md)）进一步把 Provider 选择器**集中**到顶层 `Inkwell:Providers` 段——最终配置键为 `Inkwell:Providers:Persistence`，由 [`InkwellProvidersOptions`](../04-detailed-design/Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 承载，与 `Queue` / `Cache` / `FileStorage` / `VectorStore` / `AgentRuntime` 同段集中；
+> - `Inkwell:Persistence:*` 仍承载 ConnectionString / 超时 / Seed / SensitiveLogging 等详细配置不变；
+> - Builder DSL `.UseSqlServer(...)` / `.UsePostgres(...)` / `.UseInMemoryDatabase(...)` 装配期会与 `Inkwell:Providers:Persistence` 取值交叉校验，不一致或重复注册抛 `INK-CORE-006 ProviderRegistrationConflict`（[HD-001 §3.13](../04-detailed-design/Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）。
+>
+> H2 主决策（EF Core 10 + 三 Provider 切换 + Code First + Migration）不变；本 errata 仅声明配置键命名精化，便于 H3 / H5 引用时不踩字面量陷阱。
+
+- **关系数据**：EF Core 10（与 .NET 10 同步发布）+ Provider 切换（InMemory / SQL Server 2025 / PostgreSQL 17），通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（精化历史见上方 errata）。
 - **向量数据**：[Qdrant 1.x](https://qdrant.tech/)，gRPC SDK，封装在 `Inkwell.DataAccess.VectorStore`。
 - **关键表**：
   - `agents` / `agent_versions`（[REQ-002](../01-requirements/requirements.md) + [REQ-012 §3 版本锁定](../01-requirements/requirements.md)）
@@ -139,9 +240,13 @@ downstream: []
 ## 6. 消息机制
 
 - **客户端↔后端**：REST + AG-UI Protocol over SSE（[ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md)）；不持久化 AG-UI 事件流，跨锁屏体验由客户端主进程长 SSE 保证（[ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)）。
-- **后端内异步**：[`System.Threading.Channels`](https://learn.microsoft.com/dotnet/core/extensions/channels) 用于流式 token 输出与后端内跨组件传递；不再用于 RunEventStore 批量写入（已在 [OQ-A002 closed §A](./open-questions-arch.md) 中取消）。
-- **后端持久工作流**：[Microsoft.Agents.AI.DurableTask](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/)（[ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)）；跨 Pod 重启续作。
-- **v1 不引入消息队列**（RabbitMQ / Service Bus）：避免新增组件，等 v2 性能瓶颈出现再评估。
+- **后端内队列抽象**：[`IQueueProvider`](./adr/ADR-018-queue-abstraction-channels-default.md) 接口位于 `Inkwell.Abstractions`。环境对称双 Provider（与 [`IPersistenceProvider`](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) / [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) 拓扑对齐）：
+  - **dev / unit test**：`ChannelsQueueProvider`（基于 [`System.Threading.Channels`](https://learn.microsoft.com/dotnet/core/extensions/channels)，in-process、不持久）位于 `Inkwell.Core`，`AddInkwell()` 默认注入。
+  - **integration test / prod**：`RedisStreamQueueProvider`（基于 [Redis 8 Streams](https://redis.io/docs/latest/develop/data-types/streams/) consumer group）位于 `providers/Inkwell.Queue.Redis`（[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) / [OQ-A008 closed §B](./open-questions-arch.md)）。**Consumer 跑在 `Inkwell.Worker` 进程**（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）：`Inkwell.WebApi` 仅注册 enqueue 侧，Worker Pod 独立扩缩（HPA 基于 `queue_depth`）。锁定设计：DLQ N=3 + 24h 保留；fairness / crash recovery / retry 依赖 Redis Streams 内置语义（[`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) consumer group + [`XCLAIM`](https://redis.io/docs/latest/commands/xclaim/) visibility timeout = 5 min + 指数退避 1s/max 60s）；observability v1 必发 `queue_depth`，其余五项进 [RISK-014](./risk-analysis.md) “prod 上线前补齐”残余风险。
+  - **DI 切换**：`AddInkwell().UseRedisQueue(connectionString)` 插入后覆盖 Channels。业务代码仅认 `IQueueProvider`，不直接依赖 `System.Threading.Channels` / `StackExchange.Redis`。
+- **分布式队列实现**：`providers/Inkwell.Queue.Redis/` v1 同期出 csproj（[OQ-A008 closed §B](./open-questions-arch.md) + [ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md)），环境对称原则：dev = `ChannelsQueueProvider`（in-process） / integration test + prod = `RedisStreamQueueProvider`（跨副本、DLQ N=3 + 24h、Redis Streams 内置 fairness / crash recovery / retry 语义）。与 [Inkwell.Cache.Redis](./adr/ADR-016-cache-provider-redis.md) Redis 实例是复用还是独立部署，由 H3 [Inkwell.Queue.Redis](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) HD 决（建议独立）。
+- **后端持久工作流**：[`Microsoft.Agents.AI.DurableTask`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/)（[ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)）；跨 Pod 重启续作。覆盖 KB ingest（[REQ-009](../01-requirements/requirements.md)） / Trigger fan-out（[REQ-011](../01-requirements/requirements.md)） / 后台慢任务三大主异步场景，**与 `IQueueProvider` 协同非互斥**。
+- **v1 不引入消息队列外部中间件**（RabbitMQ / Azure Service Bus）：`IQueueProvider` 接口 + `ChannelsQueueProvider`（dev） + `RedisStreamQueueProvider`（integration / prod）是与三 Provider 家族同构的环境对称 Provider，不被视为“外部中间件”（详见 [ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md)）。
 
 ## 7. 鉴权与权限模型
 
@@ -172,34 +277,38 @@ downstream: []
 
 ```text
 docker compose up -d
-  ├─ api            (Inkwell.Api + AGUI + Public)
-  ├─ postgres       (PostgreSQL 17, named volume)
-  ├─ qdrant         (Qdrant 1.x, named volume)
-  ├─ redis          (Redis 8, ICacheProvider 后端, ADR-016)
-  ├─ minio          (S3 兼容文件存储 dev 默认 Provider, ADR-015)
-  ├─ otel-collector (OTLP receiver)
+  ├─ webapi          (Inkwell.WebApi：REST + AGUI + Public)
+  ├─ worker          (Inkwell.Worker：RedisStream consumer + DurableTask runner; ADR-019)
+  ├─ postgres        (PostgreSQL 17, named volume)
+  ├─ qdrant          (Qdrant 1.x, named volume)
+  ├─ redis           (Redis 8，ICacheProvider + IQueueProvider 后端, ADR-016 + ADR-018)
+  ├─ minio           (S3 兼容文件存储 dev 默认 Provider, ADR-015)
+  ├─ otel-collector  (OTLP receiver 双 source: webapi + worker, ADR-013)
   ├─ tempo
   ├─ loki
   ├─ prometheus
-  └─ grafana        (默认 dashboard 已加载)
+  └─ grafana         (默认 dashboard 已加载)
 ```
 
 ### 9.2 prod 部署（AKS + Helm）
 
 ```text
 helm install inkwell ./charts/inkwell --namespace inkwell-prod
-  ├─ Deployment: api (HPA: CPU 70%, min 2, max 10)
+  ├─ Deployment: inkwell-webapi (HPA: CPU 70%, min 2, max 10)
+  ├─ Deployment: inkwell-worker (HPA: queue_depth≥100, min 1, max 5；ADR-019)
   ├─ StatefulSet: postgres (Azure Disk Premium, 100GiB)
   ├─ StatefulSet: qdrant (Azure Disk Premium, 50GiB)
   ├─ Cache: Azure Cache for Redis Standard (默认) 或 StatefulSet: redis (自建场景, ADR-016)
   ├─ FileStorage: AzureBlob (默认) 或 StatefulSet: minio (自建场景, ADR-015)
-  ├─ Deployment: otel-collector
+  ├─ Deployment: otel-collector (双 source: webapi + worker, ADR-013)
   ├─ Stack (Helm subchart): grafana / tempo / loki / prometheus
-  ├─ Ingress: NGINX + cert-manager (Let's Encrypt)
+  ├─ Ingress: NGINX + cert-manager (Let's Encrypt) — 仅 webapi
   └─ Secrets: Kubernetes Secret + RBAC + at-rest 加密（OQ-A006 §B，未引入 Key Vault，残余风险 RISK-013）
 ```
 
-- **CI/CD**：GitHub Actions（[OQ-A007 closed §A](./open-questions-arch.md)）→ build → ACR push → Helm deploy。后端仓库走 [MSTest v3](https://github.com/microsoft/testfx)（`MSTest.Sdk` + Microsoft.Testing.Platform）；前端 Vitest；E2E Playwright。
+> webapi 与 worker **必须使用同一 image tag**，单 Helm release 同时滚（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) / [RISK-015](./risk-analysis.md)）。`entrypoint`：image 内置两份，Helm 通过 `command:` / `args:` 区分（`dotnet Inkwell.WebApi.dll` vs `dotnet Inkwell.Worker.dll`）。
+
+- **CI/CD**：GitHub Actions（[OQ-A007 closed §A](./open-questions-arch.md)）→ build → ACR push → Helm deploy。后端仓库走 [MSTest.Sdk 4.x](https://github.com/microsoft/testfx)（最新稳定 4.2.2，默认使用 [Microsoft.Testing.Platform](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro) / MTP runner）；前端 Vitest；E2E Playwright。
 - **region**：v1 单 region；多 region 列入 v2（[RISK-004](./risk-analysis.md)）。
 
 ## 10. 可观测性方案
@@ -255,9 +364,9 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
 
 ## 14. 主要技术风险
 
-详见 [risk-analysis.md](./risk-analysis.md)。13 条 RISK-NNN 摘要：
+详见 [risk-analysis.md](./risk-analysis.md)。RISK-NNN 摘要：
 
-- [RISK-001](./risk-analysis.md#risk-001-microsoft-agent-framework-成熟度) Microsoft Agent Framework 成熟度
+- [RISK-001](./risk-analysis.md#risk-001-microsoft-agent-framework-成熟度) Microsoft Agent Framework 成熟度（[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 缓解手段从 csproj 硬边界降级为 lint + 接口收敛软边界）
 - [RISK-002](./risk-analysis.md#risk-002-ipersistenceprovider-切换抽象漏出) IPersistenceProvider 切换抽象漏出
 - [RISK-003](./risk-analysis.md#risk-003-nfr-003-字面与-oq-017-文字差异-w-003) NFR-003 字面与 OQ-017 文字差异（W-003）
 - [RISK-004](./risk-analysis.md#risk-004-aks-单-region-可用性) AKS 单 region 可用性
@@ -270,6 +379,8 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
 - [RISK-011](./risk-analysis.md#risk-011-文件存储三-provider-contract-漏出) 文件存储三 Provider contract 漏出
 - [RISK-012](./risk-analysis.md#risk-012-redis-单点与缓存-invalidation-一致性) Redis 单点与缓存 invalidation 一致性
 - [RISK-013](./risk-analysis.md#risk-013-v1-未引入-key-vault-的凭据轮换与隔离弱化) v1 未引入 Key Vault 的凭据轮换与隔离弱化
+- RISK-014（已激活，随 [OQ-A008 closed §B](./open-questions-arch.md) v1 同期交付 `RedisStreamQueueProvider`） `RedisStreamQueueProvider` 运维代价：observability 五项指标补齐 / Redis 实例双职能 / DLQ 人工处理 UI v2 backlog
+- RISK-015（随 [ADR-019 进程拓扑](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增） `Inkwell.WebApi` / `Inkwell.Worker` 双进程版本漂移与 OTel 双 source
 
 ## 15. 替代方案比较
 

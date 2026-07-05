@@ -19,7 +19,7 @@ when_not_to_use: |
 读本 Skill 之前必须接受以下三条硬约束。它们不是“推荐”而是**定义**本 Skill 存在价值的生命线。
 
 1. **PRD 只服务人类受众**。面向的是客户 / 老板 / 跨部门同事 / 评审会参与者——这些人不会、也不应该为了看需求去拼 4 份 markdown。如果你的项目没有这类受众，**不需要**调用本 Skill，直接让大家读四件源文件即可。
-2. **PRD 不进任何 Agent / Skill 的输入链**。`H2-ArchitectAdvisor` / `PrototypeAuthor` / `PrototypeReviewer` / `DesignReviewer` / `TestCaseAuthor` 等所有下游角色都读四件源文件，不读 PRD。全局设计依据见 [`io-contracts.md § 1.1 事实源 vs 导出物`](../../_shared/io-contracts.md)。
+2. **PRD 不进任何 Agent / Skill 的输入链**。`H2-ArchitectAdvisor` / `PrototypeAuthor` / `PrototypeReviewer` / `DetailedDesignReviewer` / `TestCaseAuthor` 等所有下游角色都读四件源文件，不读 PRD。全局设计依据见 [`io-contracts.md § 1.1 事实源 vs 导出物`](../../_shared/io-contracts.md)。
 3. **PRD 不可被独立编辑**。发现 PRD 与四件产物偏离——改源、重导。任何在 PRD 里刚出现、但源文件里不存在的文字，都是反向污染事实源的漏洞，需优先反转。
 
 为什么这样设：
@@ -246,7 +246,7 @@ PRD 模板（节序固定）：
 
 ## 6. 与其它 Skill / Agent 的边界
 
-- **下游 Agent / Skill 不读本 Skill 产物**。`PrototypeAuthor` / `H2-ArchitectAdvisor` / `DesignReviewer` / `TestCaseAuthor` 等所有下游角色的输入契约均只列出事实源四件文件，不列也不允许读 `PRD.md`。这是全局约定，全文见 [`io-contracts.md § 1.1`](../../_shared/io-contracts.md)。
+- **下游 Agent / Skill 不读本 Skill 产物**。`PrototypeAuthor` / `H2-ArchitectAdvisor` / `DetailedDesignReviewer` / `TestCaseAuthor` 等所有下游角色的输入契约均只列出事实源四件文件，不列也不允许读 `PRD.md`。这是全局约定，全文见 [`io-contracts.md § 1.1`](../../_shared/io-contracts.md)。
 - 想**写新需求**：用 `RequirementsInterviewer` Agent，不是本 Skill。
 - 想**评 PRD 内容好不好**：本 Skill 不评内容；评 H1 内容用 `PrototypeReviewer` Agent + `phase-gate-runner` Skill（两者都从四件源文件读，不读 PRD）。
 - 想**生成给开发看的合并文档**：不需要。开发者直接读四件源文件 + 详细设计 + 测试用例，不要从 PRD 读。**PRD 是对人类受众的视图，不是工程入口也不是 Agent 入口**。

@@ -16,9 +16,15 @@ upstream:
 downstream:
   - ADR-005
   - ADR-008
+  - ADR-020
+  - ADR-021
 ---
 
 # ADR-004 数据存储：EF Core Provider 可切换 + Qdrant 向量库
+
+> **2026-05-10 增量更新**：本 ADR §决策 line 43 “`Inkwell.VectorStore` 模块封装” 表述已被 [ADR-020 向量存储抽象](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 精化（refinement，不 supersede）为：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)；Qdrant 实现抽到 `providers/Inkwell.VectorStore.Qdrant/`；`Inkwell.Core/` 加 `InMemoryVectorStore` 默认实现（与 [ADR-018](./ADR-018-queue-abstraction-channels-default.md) 环境对称原则一致）。csproj 11 → 12。
+>
+> **2026-05-10 增量更新·第二轮**：本 ADR §决策 line 39 “三 Provider 实现” 表述已被 [ADR-021 EFCore Persistence 共享层](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 精化（refinement，不 supersede）为：EFCore family = 4 csproj（`Inkwell.Persistence.EFCore` base + InMemory / SqlServer / Postgres 三 final adapter）。Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在 base；Migration SQL 文本为 Provider-specific，在 SqlServer / Postgres final adapter 各自 `Migrations/`；InMemory 不支持 Migration 仅走 `EnsureCreated`。csproj 12 → 13。
 
 ## 上下文
 
@@ -36,11 +42,13 @@ downstream:
 
 **关系数据：EF Core 10（与 .NET 10 同步发布）+ `IPersistenceProvider` 抽象 + 三 Provider 实现（InMemory / SQL Server 2025 / PostgreSQL 17）；向量数据：[Qdrant 1.x](https://qdrant.tech/) 独立服务。**
 
+> 上述“三 Provider 实现”的 csproj 物理布局由 [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定：EFCore family = 4 csproj（`Inkwell.Persistence.EFCore` base + InMemory / SqlServer / Postgres 三 final adapter）。
+
 - **抽象名与命名**：后端代码仅依赖 [`IPersistenceProvider`](../../01-requirements/repo-impact-map.md)（同 [`IFileStorageProvider`](./ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./ADR-016-cache-provider-redis.md) 保持 `*Provider` 后缀一致），其下封装 `InkwellDbContext`（继承 `DbContext`）与 Migration 运行时。业务代码绝对不出现 Provider 特定 API。
 - **建模路径**：采用 [Code First](https://learn.microsoft.com/ef/core/managing-schemas/migrations/) + [EF Migration](https://learn.microsoft.com/ef/core/managing-schemas/migrations/?tabs=dotnet-core-cli)；表结构以 C# 实体为唯一源，不手写 SQL DDL。
 - **启动注入**：通过 `appsettings.json` 的 `Inkwell:Persistence:Provider` 字段（值域 `InMemory` / `SqlServer` / `PostgreSQL`）选择 Provider。
 - **Migration**：每种 Provider 一份 `Migrations/<Provider>/` 子目录；CI 跑三套迁移测试。
-- **向量库**：通过 `Inkwell.VectorStore` 模块封装 Qdrant gRPC SDK，与 EF 解耦；[Inkwell.KnowledgeBase / Inkwell.Memory](../../01-requirements/repo-impact-map.md) 的存储路径分两段（关系字段 → EF Core；embedding → Qdrant）。
+- **向量库**：通过 `Inkwell.VectorStore` 模块封装 Qdrant gRPC SDK，与 EF 解耦；[Inkwell.KnowledgeBase / Inkwell.Memory](../../01-requirements/repo-impact-map.md) 的存储路径分两段（关系字段 → EF Core；embedding → Qdrant）。具体抽象来源 / csproj 布局 / 多 Provider 矩阵由 [ADR-020](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 锁定。
 - **向量 ID 与关系 ID** 在应用层通过 `Guid` 关联，不在 DB 层做 FK。
 
 ## 备选项

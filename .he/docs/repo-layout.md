@@ -108,7 +108,7 @@ agents/                    # 配套 Agent 套件（与业务无关，详见第 1
 | UISpecAuthor            | H1     | 反馈层              |
 | PrototypeReviewer       | H1     | 质量门禁层          |
 | RepoImpactMapper        | H1↔H3  | 约束层              |
-| DesignReviewer          | H3     | 质量门禁层          |
+| DetailedDesignReviewer          | H3     | 质量门禁层          |
 | TestCaseAuthor          | H4     | 反馈层              |
 | CodingExecutor          | H5     | 反馈层              |
 | CommitAuditor           | H5/H6  | 质量门禁层          |
@@ -131,8 +131,24 @@ agents/                    # 配套 Agent 套件（与业务无关，详见第 1
 设计取向（与第 10.1 节"AGENTS.md 是目录而非百科全书"一脉相承）：
 
 - **索引优先，不堆百科**：本文件与 `AGENTS.md` 列结构、列职责、列入口路径，**不**复制 `docs/` 下的细节
-- **谁动地貌谁改地图**：模块结构变化、新模块加入、命名约定调整，由当次的 RepoImpactMapper / DesignReviewer / 编码者顺手改掉对应索引行；不允许"漂亮但没人维护"的孤岛文档
+- **谁动地貌谁改地图**：模块结构变化、新模块加入、命名约定调整，由当次的 RepoImpactMapper / DetailedDesignReviewer / 编码者顺手改掉对应索引行；不允许"漂亮但没人维护"的孤岛文档
 - **大仓拆薄册子**：当本文件超过两屏，应按子模块拆出 `src/<area>/AGENTS.md`，按路径层级拼接，避免单文件无限膨胀
 - **细节交给检索与跳转**：具体某个类、某条调用链，交给 IDE 跳转、`#codebase` / `grep` / 向量检索去办；索引层只保证"从哪几扇门进得去"
 
 判断口径：**新接手一个人，能不能在不读全部历史的前提下，靠这两个入口在 30 分钟内找到该改哪、对应需求和测试在哪？** 能 → 索引够用；不能 → 该补一行入口，而不是再写一段说明。
+
+### 10.4 instructions 分层与多语言代码风格
+
+Copilot Custom Instructions 的 frontmatter `applyTo` 字段支持 glob，按文件路径自动叠加加载。Harness 利用这个原生机制把指令切成两层：
+
+| 层级           | 维护者  | 内容                                                                              | 文件                                                                                  |
+| -------------- | ------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 流程纪律层     | Harness | 改动前找任务、跑 Verify、反模式守则、提交字段、文档风格                           | `.github/instructions/coding-discipline.instructions.md` / `commit-format` / `docs-style` |
+| 语言风格层     | 项目    | 命名 / 错误处理 / 异步 / 测试套路（Linter 不便强制的部分）                          | `.github/instructions/<lang>.instructions.md`（C# / TypeScript / Python / Go / Rust / Java / Shell / JavaScript） |
+| 强制层（外部） | 项目    | 缩进 / 引号 / 命名机械检查 / 类型检查 / 包版本 / 覆盖率                            | `.editorconfig` + Linter（Roslyn / ESLint / ruff / clippy / Checkstyle 等）+ CI       |
+
+Harness 在 `templates/instructions-examples/`（装到下游仓库的 `.github/templates/instructions-examples/`）下提供 8 份语言样例骨架（统一五段式：命名 / 错误处理 / 并发或异步 / 测试 / 不在此文件强制），由项目按需复制到 `.github/instructions/<lang>.instructions.md` 后裁剪。半自动落地可调用 `code-style-bootstrapper` Skill。
+
+详细方法论与边界判定（哪些写 instructions、哪些写 Linter、哪些写 `AGENTS.md`）见 [`docs/instructions-layout.md`](instructions-layout.md)。
+
+边界口径：**如果一条规则可以用 Lint / Hooks / CI 强制执行，就不要只在 markdown 文件里说它**——文档只能"建议"，工具才能"强制"。这一条与第 10.1 节 AGENTS.md 的克制原则同源。

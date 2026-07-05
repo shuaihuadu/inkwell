@@ -1,8 +1,8 @@
 {
   "schema": "v1",
   "harness_version": "0.0.1",
-  "harness_commit": "476c411",
-  "installed_at": "2026-05-09T17:10:00Z",
+  "harness_commit": "e804a84",
+  "installed_at": "2026-05-10T08:54:24Z",
   "targets": [
     "copilot"
   ],
@@ -40,7 +40,12 @@
     },
     {
       "path": ".github/agents/h2-architect-advisor.agent.md",
-      "sha256": "5dcf20486810db051a4dbbee0a1ccc229a20d7a82be15964bf5dd5fe6c5338c1",
+      "sha256": "cf0232ee6b41e298dccd8b5d6a0332635beb656786cf38964939ea2c8d369fc1",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h3-design-author.agent.md",
+      "sha256": "28d0703be08c818681dfc54a9ed02b37ffa4f8a6f13956652a47c859de9abae3",
       "kind": "rendered"
     },
     {
@@ -49,8 +54,18 @@
       "kind": "rendered"
     },
     {
+      "path": ".github/agents/h3-detailed-design-author.agent.md",
+      "sha256": "91f4b2efc405bf1b0565e57ec71625919234e3c4d26dcfaf12af8826ba8f82b4",
+      "kind": "rendered"
+    },
+    {
+      "path": ".github/agents/h3-detailed-design-reviewer.agent.md",
+      "sha256": "9833662b248d04e846f90abaa6f593523b15339ff1d7c75a15e60a3826231953",
+      "kind": "rendered"
+    },
+    {
       "path": ".github/agents/h4-test-case-author.agent.md",
-      "sha256": "9601cff74af9c3d8dfdbaaf063c1339fd303dece59533b5e0b9c2642b57707cd",
+      "sha256": "f2f36bcab45ece002a814da73af3a6b628c354c3042b105a2b5b26a6ded555a9",
       "kind": "rendered"
     },
     {
@@ -75,7 +90,7 @@
     },
     {
       "path": ".github/copilot-instructions.md",
-      "sha256": "edb773d6e3e15c2af91192c2274b2618e710c3ef5858792cca663a3866186bfc",
+      "sha256": "d675ce67fefb0b90e7503f201d727adef85c226edf97a755da96b70a6991ffcd",
       "kind": "rendered"
     },
     {
@@ -105,7 +120,7 @@
     },
     {
       "path": ".github/prompts/run-gate.prompt.md",
-      "sha256": "6ec8064448437fbf25b4a836ebe5a4fadab569e2831633e145b4fe5e0393d533",
+      "sha256": "d1a612bd08c9d07ade3390f61f672f92acc67234f4574cd56282dc12ab8344e2",
       "kind": "rendered"
     },
     {
@@ -120,7 +135,7 @@
     },
     {
       "path": ".github/skills/architecture-reviewer/SKILL.md",
-      "sha256": "77ad9a307821c8ac66c2d3b6df1738e2cac7a7430be179bb35d2e32367a0b2de",
+      "sha256": "721dad7c5947b1c3fb6573b5ea181a0269e9a02efa1c9faf9c61907862022e22",
       "kind": "rendered"
     },
     {
@@ -135,7 +150,7 @@
     },
     {
       "path": ".github/skills/effort-estimator/SKILL.md",
-      "sha256": "9bc5b73be740c8e58cd7698f3b5b19678ff1621c62c8363399a9ed9f52b32020",
+      "sha256": "791c675da3d95ec47801612f42422b6ec3479058ba365c9c5d3c64da1de37067",
       "kind": "rendered"
     },
     {
@@ -145,12 +160,12 @@
     },
     {
       "path": ".github/skills/phase-gate-runner/SKILL.md",
-      "sha256": "fb50bbe895d18d8129cc11a9a649bbf29e5f4104389ea86cb33dbd03694d6ed9",
+      "sha256": "460fbafb8afd12d800ddf60210db0cf18550c334177e96140a17ba07f73953ad",
       "kind": "rendered"
     },
     {
       "path": ".github/skills/prd-exporter/SKILL.md",
-      "sha256": "c29c4ce9ed4b1532254c6d322bda2dc8bb9b6a1c55d37fc46e677b52ce75fdcc",
+      "sha256": "9a1c53596e7e832b1ad24e82a64fbef96aaa968b9284f89dae0e76396910b0e5",
       "kind": "rendered"
     },
     {
@@ -165,7 +180,7 @@
     },
     {
       "path": ".github/skills/traceability-linker/SKILL.md",
-      "sha256": "33a7c10931e638d872db55a45476274c390d260872b6a8ef55b36cd898f85a6d",
+      "sha256": "3520985297f8a9ddb20b37a3c8b165278e6a1a632af1b03f9aaa14a3d78be5ba",
       "kind": "rendered"
     },
     {
@@ -180,7 +195,7 @@
     },
     {
       "path": ".github/templates/dry-run-demo.md",
-      "sha256": "4a44cfa9ff7c3a3377b23e0a82aca6c9038210378b0f333c7eb9fb239c677a24",
+      "sha256": "2ff8adcabc2e0cfcf880b284570eb1c4c7f444479613e9fd86d39565e68c6263",
       "kind": "rendered"
     },
     {
@@ -230,7 +245,7 @@
     },
     {
       "path": ".github/templates/phase-gate-checklist.md",
-      "sha256": "4d2a8b097607564a0e045147ae0fe749344bfe8c1f318f29eb8f33907fc06e81",
+      "sha256": "3a9ba7553d4204e56938c4a602ead3da5ac4a37e1cf2fbc13c10c0162113ed76",
       "kind": "rendered"
     },
     {
@@ -265,7 +280,7 @@
     },
     {
       "path": ".he/docs/repo-layout.md",
-      "sha256": "af7843e5f6f8ce31c3e73bb958797b2406772dbbb5df5835204a75b050139116",
+      "sha256": "40271ab92adcf5cb937ceb549766e42456c80d781577b9f25effb5eb636889f4",
       "kind": "rendered"
     },
     {
@@ -315,7 +330,7 @@
     },
     {
       "path": ".he/HANDBOOK.md",
-      "sha256": "70b2c7a51ba9579d99db59a57f882bdf6501ef1e2303e6fb83133498994f97cf",
+      "sha256": "75ef8bff8ee36007702aee8076c8b5aa807088f2e95d0ce3256d521e9d75c2bc",
       "kind": "rendered"
     },
     {

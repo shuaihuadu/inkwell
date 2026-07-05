@@ -6,7 +6,7 @@ when_to_use: |
   - 用户问"当前阶段还差什么才能放行"
   - 周期性地对项目做"健康度体检"
 when_not_to_use: |
-  - 用户在做内容评审（用 design-reviewer / test-case-author 等 Agent）
+  - 用户在做内容评审（用 detailed-design-reviewer / test-case-author 等 Agent）
   - 用户只是想看清单本身的内容（直接读 templates/phase-gate-checklist.md）
   - 用户在做追溯链补全（用 traceability-linker）
 ---

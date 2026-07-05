@@ -72,7 +72,7 @@ tools:
 2. 读 `.github/templates/phase-gate-checklist.md` 取本阶段清单
 3. 逐项核对，每项写证据
 4. 汇总结论
-5. 若有 `FAIL`，列出补救清单和应该切到哪个 Agent 处理（如 H3 设计 FAIL → 切 `H3-DesignReviewer`）
+5. 若有 `FAIL`，列出补救清单和应该切到哪个 Agent 处理（如 H3 设计 FAIL → 切 `H3-DetailedDesignReviewer`）
 
 ## 完成后下一步
 

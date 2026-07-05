@@ -18,7 +18,10 @@ downstream:
   - ADR-013
   - ADR-015
   - ADR-016
+  - ADR-019
 ---
+
+<!-- 2026-05-10 [ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 引入后后端拆为 `Inkwell.WebApi` + `Inkwell.Worker` 双进程：Compose 加 `worker` service；Helm 加 `Deployment: inkwell-worker` + HPA(`queue_depth`)。本文件 §决策 / §后果 已同步。 -->
 
 # ADR-005 部署形态：dev = Docker Compose / prod = AKS
 
@@ -38,9 +41,10 @@ downstream:
 
 **开发环境通过 Docker Compose 一键启动整个依赖栈；生产环境部署在 Azure Kubernetes Service (AKS)，通过 Helm Chart 管理。**
 
-- `docker-compose.yml`（dev）：包含 `api` / `postgres` / `qdrant` / `redis` / `minio` / `grafana` / `loki` / `tempo` / `prometheus` 九个 service，单 `docker compose up -d` 启动。[ADR-015](./ADR-015-object-storage-provider-switchable.md) 文件存储 dev 默认 MinIO；需对接 Azure Blob 的开发者可通过 [`docker-compose.azurite.override.yml`](../../../docker-compose.azurite.override.yml) 切换。[ADR-016](./ADR-016-cache-provider-redis.md) 缓存 dev 走本机 Redis 8 容器（[redis:8](https://hub.docker.com/_/redis)）。
+- `docker-compose.yml`（dev）：包含 `webapi` / `worker` / `postgres` / `qdrant` / `redis` / `minio` / `grafana` / `loki` / `tempo` / `prometheus` 十个 service（[ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 后拆 webapi + worker 双进程，共用同一 image tag、不同 entrypoint），单 `docker compose up -d` 启动。[ADR-015](./ADR-015-object-storage-provider-switchable.md) 文件存储 dev 默认 MinIO；需对接 Azure Blob 的开发者可通过 [`docker-compose.azurite.override.yml`](../../../docker-compose.azurite.override.yml) 切换。[ADR-016](./ADR-016-cache-provider-redis.md) 缓存 dev 走本机 Redis 8 容器（[redis:8](https://hub.docker.com/_/redis)）。
 - Helm Chart `charts/inkwell/`（prod）：
-  - API：Deployment + HPA（CPU 70% 触发）
+  - WebApi：`Deployment: inkwell-webapi` + HPA（CPU 70% 触发，min 2 / max 10）
+  - Worker：`Deployment: inkwell-worker` + HPA（自定义 metric `queue_depth` ≥ 100 触发，min 1 / max 5；fallback CPU 70%）——[ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 锁定同一 image tag 单 release 同时滚，避免版本漂移（[RISK-015](../risk-analysis.md)）
   - PostgreSQL：StatefulSet + PVC（[Azure Disk Premium](https://learn.microsoft.com/azure/aks/azure-csi-disk-storage-provision)）
   - Qdrant：StatefulSet + PVC
   - Redis：默认 [Azure Cache for Redis](https://learn.microsoft.com/azure/azure-cache-for-redis/cache-overview) 该项外部服务 + Private Endpoint 接入；自建场景可切换为 `redis` StatefulSet + PVC

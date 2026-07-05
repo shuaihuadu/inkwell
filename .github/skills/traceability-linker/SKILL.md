@@ -153,5 +153,5 @@ Task: TASK-2026-04-30-001
 ## 6. 与其它 Skill / Agent 的边界
 
 - 想**生成**新的提交信息：用 `commit-message-formatter`。
-- 想**评审**详细设计内容：用 `design-reviewer` Agent，本 Skill 不评内容质量。
+- 想**评审**详细设计内容：用 `detailed-design-reviewer` Agent，本 Skill 不评内容质量。
 - 想**核对阶段产物完整性**：用 `phase-gate-runner`。本 Skill 关注的是"编号链路"，不是"清单项是否齐全"。

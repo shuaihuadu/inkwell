@@ -159,7 +159,7 @@ when_not_to_use: |
 
 ## 6. 与其它 Skill / Agent 的边界
 
-- 想**评内容质量**（HD 写得对不对）：用 `design-reviewer` Agent，不是本 Skill。
+- 想**评内容质量**（HD 写得对不对）：用 `detailed-design-reviewer` Agent，不是本 Skill。
 - 想**核对清单**（是否所有 HD 都 reviewed 了）：用 `phase-gate-runner`。
 - 想**写任务卡**（把 HD 拆到 H5 任务）：用 `ai-task-brief-writer`，本 Skill 给输入。
 - 想**回写实际耗时**（H6 阶段对照估算）：直接读 `commit-records.md` + 本矩阵做对照，不需要新 Skill。
