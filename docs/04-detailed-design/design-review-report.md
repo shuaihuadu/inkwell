@@ -1801,3 +1801,95 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §16 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
+
+## 17. HD-007 Audit Logger Port 首轮评审（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，仅评审增量产物：[HD-007 Inkwell.Abstractions Audit Logger Port](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md)（status: draft，2026-07-05 起草）+ 联动的 [HD-001 §3.7 `AuditContext` 2026-07-05 errata·第五轮](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs) + [ADR-008 2026-07-05 保留期 errata](../03-architecture/adr/ADR-008-audit-log-store-and-query.md) + [file-structure.md `## Inkwell.Abstractions.Audit` 章节追加](file-structure.md#inkwellabstractionsaudit)。报告主体 §1 ~ §16 的 `status / reviewers` 字段**不**因本节调整。按 user-memory `markdown-lint.md` 已知陷阱（中英文混排长内容表必触发 MD060），本节全程以 bullet list 呈现，不使用表格。
+
+### 17.0 评审范围与基线
+
+- **本轮评审对象**：HD-007 全文（§1 ~ §13）+ file-structure.md `## Inkwell.Abstractions.Audit` 章节 + HD-001 §3.7 errata 联动 + ADR-008 保留期 errata 联动
+- **不在本轮范围**：HD-001 / HD-002 / HD-003 / HD-004 / HD-005 / HD-006 / HD-009 主体设计（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-007 frontmatter 完整，upstream 15 项均可定位：REQ-001 / REQ-002 / REQ-007 / REQ-008 / REQ-013 / REQ-014 / REQ-015 / REQ-017 / NFR-004（[requirements.md line 121-137 / 163 / 254-268](../01-requirements/requirements.md)）+ ADR-002 / ADR-008 / ADR-017 / ADR-023 + HD-001 / HD-002 全部真实存在
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-007 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 17.1 完备性扫描（HD-007 范围内）
+
+按 [h3-detailed-design.md 章节清单](../../.he/docs/stages/h3-detailed-design.md) 逐项打分：
+
+- **文件结构**：`pass` — `Audit/` 7 个 `*.cs` 全锁（`IAuditLogger.cs` / `AuditLogRequest.cs` / `AuditLogEntry.cs` / `AuditLogQuery.cs` / `AuditEnums.cs` / `AuditLoggerOptions.cs` / `AuditLoggerOptionsValidator.cs`）+ file-structure.md `## Inkwell.Abstractions.Audit` 章节文件树逐一核对与 HD-007 §2 完全一致（7 文件、顺序一致）；文件计数"HD-007 新增 7 个、累计 44（HD-001~006）+ 7 = 51 个"经手工核算无误（11+8+7+4+4+10+7=51）。证据：[HD-007 §2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#2-文件结构) + [file-structure.md §Inkwell.Abstractions.Audit](file-structure.md#inkwellabstractionsaudit)
+- **数据库**：`n/a` — 端口层不直接接 DB，HD-007 §12 显式声明 database-design.md "不贡献"，`audit_logs` 表行"锁定 HD"列保持 `TBD`，留 `Inkwell.Core.AuditLogs` 业务 HD 填写；经核对 [database-design.md line 86](database-design.md) 确认该行确为 `TBD`，与声明一致。证据：[HD-007 §12](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#12-跨模块章节贡献) vs [database-design.md line 86](database-design.md)
+- **接口 / 错误码**：`pass` — 2 方法签名齐全（`LogAsync` / `QueryAsync`）+ §4.1 显式声明"不分配 `INK-AUDIT-NNN` 错误码"，与 ADR-023 最终态一致，全文零 `Task<Result<` / 零 `Result.Success` / 零 `INK-` 字面量残留（§10 C2/C3 CI 自检覆盖）。证据：[HD-007 §3.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#31-auditiauditloggercs) + [§4.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#41-错误码)
+- **流程 / 后台任务**：`n/a` — 端口层无独立进程，内部重试队列 / 磁盘 fallback 文件格式 / 后台清理任务显式移交 `Inkwell.Core.AuditLogs` 独立 HD；§1.4 对"异步解耦"设计意图有专门说明段落。证据：[HD-007 §1.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#12-范围) + [§1.4](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#14-logasync-异步解耦声明呼应-adr-008业务事务不阻塞设计意图) + [§11](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#11-待补--待评审)
+- **每个目录 / 程序文件职责**：`pass` — 7 `*.cs` × 10 字段全填，无 `<TBD>` / `<待定>`。证据：[HD-007 §3.1 ~ §3.7](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#3-程序文件设计10-字段--7-文件)
+- **配置文件字段 / 默认值**：`pass` — `AuditLoggerOptions` 5 字段（`RetentionDays=180` / `MaxQueryTimeRangeDays=7` / `DefaultPageSize=50` / `MaxPageSize=200` / `EnableSensitiveDataLogging=false`）+ `[Range]` 边界 + §9 appsettings.json 正确嵌套示例（`"Inkwell:Audit"` 对齐 HD-001 `InkwellOptions.Audit` 属性名，未重演 HD-004 C47 扁平键坑）。证据：[HD-007 §3.6](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#36-auditauditloggeroptionscs) + [§9](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#9-部署--配置)
+- **日志格式 / 字段**：`pass` — 2 个 `audit.<verb>` span（`audit.log` / `audit.query`，`audit.log` 另有内部子 span `audit.log.retry` / `audit.log.fallback_write`）× 6 私有字段 + 5 个 OTel `exception.*` 标准字段（`exception.id` 用 `Guid.CreateVersion7()`，与 [HD-004](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#43-otel-span--字段) / [HD-005](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#43-otel-span--字段) / [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) 一致）+ 明确的 PII 边界（`AuditContext.Metadata` / `PayloadJson` 原始内容永不进 OTel）。证据：[HD-007 §4.3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#43-otel-span--字段)
+- **监控指标 / 告警策略**：`pass` — §7.3 三档告警建议（`fallback_file_written` 速率 > 0 → P1；磁盘 fallback 本身写入失败 → P1 最高优先级；`QueryAsync` 异常速率 > 5/min → P2），且显式与 [AGENTS.md §3.2](../../AGENTS.md) "不吞错"运维响应义务挂钩。证据：[HD-007 §7.3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#73-可观测性)
+- **部署步骤 / 回滚 / 备份恢复**：`partial` — `appsettings.json` 配置段完整，但磁盘 fallback 文件路径 / 权限 / 后台清理任务调度的具体部署步骤合理移交 `Inkwell.Core.AuditLogs` 独立 HD（与 [HD-004 / HD-005 / HD-006 §7.2 partial 先例](#161-完备性扫描hd-006-范围内) 同模式）。证据：[HD-007 §7.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#72-安全) + [§9](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#9-部署--配置)
+- **性能边界 / 安全边界 / 已知限制**：`pass` — §7.1 2 方法 P50/P99 预算表（`LogAsync` 仅覆盖入队耗时；`QueryAsync` 呼应 ADR-008"≤100 万条 < 200ms"目标）+ §7.2 安全（`EnableSensitiveDataLogging` 默认 false，payload 内容永不进 OTel）+ §11 4 条已知待补事项（含显式记录的 RetentionDays/ADR-008 数字冲突）。证据：[HD-007 §7](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#7-性能--安全--可观测性) + [§11](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#11-待补--待评审)
+
+**完备性结论**：10 项中 7 项 `pass`、2 项 `n/a`（端口层不接 DB / 不独立进程）、1 项 `partial`（部署细节合理 deferral 到 Provider HD）、0 项 `missing`。完备性维度不卡 HD-007 翻 reviewed。
+
+### 17.2 一致性扫描（HD-007 ↔ HD-001 / HD-002 / ADR-008 / ADR-023 / AGENTS.md §3.2 / ui-spec.md UI-009 + file-structure.md）
+
+- **C76（PASS）**— HD-007 §3.6 / §9 `AuditLoggerOptions.RetentionDays` 默认值 `180` 与 [ADR-008 §决策](../03-architecture/adr/ADR-008-audit-log-store-and-query.md#决策) 中 2026-07-05 errata 修订后的"180 天（约 6 个月）"完全一致，且与 [requirements.md line 207](../01-requirements/requirements.md) "审计日志：至少保留 6 个月（v1 默认值，可配置）"一致。证据：[HD-007 §3.6](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#36-auditauditloggeroptionscs) / [§9](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#9-部署--配置) vs [ADR-008 §决策](../03-architecture/adr/ADR-008-audit-log-store-and-query.md#决策) vs [requirements.md line 207](../01-requirements/requirements.md)
+- **C77（PASS）**— `AuditContext.ActorUserId` 的 `Guid` 类型迁移已在 HD-001 §3.7（含顶部 callout + 正文 + 测试要求三处同步更新）与 HD-007 全文（`AuditLogEntry.ActorUserId: Guid` / `AuditLogQuery.ActorUserId: Guid?`）完全对齐，全仓 grep `ActorUserId` 未发现任何 `string` 类型残留引用；与 [HD-002 §3.9](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) `IHasOwner.OwnerUserId: Guid` 强一致的目标已达成。证据：[HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs) + 全文 grep `ActorUserId`（4 文件 21 处命中，无 `string` 残留）
+- **C78（PASS）**— `QueryAsync` 返回类型 `Task<PagedResult<AuditLogEntry>>` 与 [HD-002 §3.4 `PagedResult<T>`](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#34-persistencepagedresultcs) 定义（`Items` / `TotalCount` / `Pagination` / `TotalPages` / `HasNextPage` / `HasPreviousPage` / `Empty(...)`）签名完全匹配，未重复定义分页返回形态。证据：[HD-007 §3.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#31-auditiauditloggercs) vs [HD-002 §3.4](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#34-persistencepagedresultcs)
+- **C79（PASS）**— `AuditActorType`（`enum { User, Token, System }`）/ `AuditResultCode`（`enum { Success, Failure }`）与 [ADR-008 §决策](../03-architecture/adr/ADR-008-audit-log-store-and-query.md) 表结构字段"`actor_type` (`user`/`token`/`system`)"+"`result_code`"字面语义闭集一致；`AuditLogEntry` 12 字段与 ADR-008 表结构关键字段（`id`/`event_type`/`actor_type`/`actor_id`/`agent_id`/`target_kind`/`target_id`/`payload`/`result_code`/`error_code`/`request_id`/`created_at`）逐一对应。证据：[HD-007 §3.3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#33-auditauditlogentrycs) + [§3.5](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#35-auditauditenumscs) vs [ADR-008 §决策](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)
+- **C80（PASS）**— OTel `exception.*` 五字段（`.type`/`.message`/`.stacktrace`/`.escaped`/`.id`）与 [HD-001 §5.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表) / [HD-004](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#43-otel-span--字段) / [HD-005](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#43-otel-span--字段) / [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) 锁定字段完全一致；`CancellationToken ct = default` 2 方法全填，与 [HD-001 §4.3 取消传播](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#43-取消传播) 一致。证据：[HD-007 §4.3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#43-otel-span--字段) + [§3.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#31-auditiauditloggercs)
+- **C81（PASS）**— `IAuditLogger` 未套用 `I<Capability>Provider` 命名模式，HD-007 §5.1 显式记录为既定命名例外（与 `IAgentRuntime` 同款），非静默违反；`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增) 实际 6 字段：Persistence/FileStorage/Cache/Queue/VectorStore/AgentRuntime）确未包含 `Audit` 字段，与 HD-007 §1.3 Q-implementation-topology + §10 C7 CI 自检声明一致。证据：[HD-007 §5.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#51-命名) + [HD-001 §3.11.1 line 253](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)
+- **C82（PASS）**— file-structure.md `## Inkwell.Abstractions.Audit` 章节的文件树、依赖白名单声明、文件计数（"HD-007 新增 7 个... 累计 51 个"）与 HD-007 §2 / §12 完全对齐，未重演 [HD-006 C60 file-structure.md 遗漏 + 计数算错](#162-一致性扫描hd-006--hd-001--hd-004--hd-005--adr-003--adr-011--adr-012--adr-017--adr-023--file-structuremd) 的坑。证据：[file-structure.md §Inkwell.Abstractions.Audit](file-structure.md#inkwellabstractionsaudit) vs [HD-007 §2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#2-文件结构)
+- **C83（PARTIAL）**— HD-007 §1.2"范围"段引用"UI-009 §9.4 检索表单"作为 `AuditLogQuery` / `AuditLogEntry` 字段映射的目标章节，但经核对 [ui-spec.md §9](../01-requirements/ui-spec.md) 实际结构，"用户 / Agent / 时间范围 / 事件类型"筛选条件定义在 **§9.3 表单字段**（`9.C 审计日志 tab` 行），**§9.4 操作按钮**实际列的是"解封 / 撤销共享 / 查看条目详情"三个按钮行为（`AuditLogEntry.PayloadJson` 弹层展示对应的是 §9.4"查看条目详情"行，而非筛选表单）。引用章节号指向有误——应为"§9.3（筛选字段）+ §9.4（查看条目详情展示 payload）"而非仅"§9.4"。字段设计本身（`AuditLogQuery` 的 `ActorUserId`/`EventType`/`AgentId`/`TimeRange` 四个可选过滤项 1:1 对应 §9.3 四个筛选条件）是正确、自洽的，此项仅是文档引用章节号的机械性错误。证据：[HD-007 §1.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#12-范围) vs [ui-spec.md §9.3 表单字段](../01-requirements/ui-spec.md) / [§9.4 操作按钮](../01-requirements/ui-spec.md)
+- **C84（PASS，附观察项）**— HD-007 §4.2 "Q-write-failure-strategy=A"（`LogAsync` 存储持续失败不向调用方抛异常）经核对 [AGENTS.md §3.2](../../AGENTS.md) "写入失败不得吞错，必须走 ADR-008 失败处理路径"原文，二者不矛盾——AGENTS.md 要求的是"走 ADR-008 失败处理路径"（重试 3 次 + 磁盘 fallback + 告警），而非要求异常必须透传给调用方；HD-007 §4.2/§4.3/§7.3 对该路径（重试 → fallback → OTel `exception.*` 记录 → P1 告警）三件套均有完整落地，满足"不吞错"（可观测 + 有持久化兜底 + 有告警升级），未构成静默丢弃。**观察项（non-blocking，供 Owner 判断）**：HD-007 §1.4 对 [ADR-008 后果](../03-architecture/adr/ADR-008-audit-log-store-and-query.md) 条款"写入路径与业务事务可同步（确保业务成功必有审计）"做了字面之外的重新解释（"同步"= 时序紧邻业务操作，非同一 DB 事务）；本 HD 采用的进程内内存队列 + 后台异步持久化设计，在"业务已提交 + 进程随即崩溃 + 审计尚未持久化"的极端窗口期理论上仍可能丢失单条审计记录，与 ADR-008 后果条款字面"确保业务成功必有审计"存在语义张力。HD-007 §4.2/§11 已就此风险做了透明记录（非隐瞒），且该问题属"设计权衡是否合理"范畴（需人工判断业务连续性优先级 vs 审计完整性優先级），超出本评审"机械一致性核查"的既定边界，故不计入 blocking，仅供 Owner 在 H4 测试用例覆盖该场景时留意。证据：[HD-007 §1.4](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#14-logasync-异步解耦声明呼应-adr-008业务事务不阻塞设计意图) + [§4.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#42-bcl-异常分类业务失败-vs-程序错误) vs [ADR-008 §后果](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)
+- **C85（PASS）**— HD-007 §11 显式记录 `RetentionDays` 默认值 180 与 ADR-008 未 errata 前的正文字面"90 天"（正文本身按 errata 惯例保留不改）仍存在数字差异，并正确声明"本 HD 不越权直接修改 `docs/03-architecture/` 文档"；经核对，该差异已由本会话另一 commit（`docs(arch): ADR-008 审计日志保留期 errata`）在 ADR-008 补充 errata 段落解决，HD-007 §11 的"待补"描述与当前 ADR-008 实际状态（errata 已落地）之间存在**时间差**——HD-007 §11 文字仍停留在"需要 Owner 补一条 errata"的措辞，未反映 errata 已完成的事实。此为文档时序滞后的良性问题（errata 先落地、HD-007 §11 措辞尚未回填更新），不影响设计正确性，建议列入 non-blocking 反问。证据：[HD-007 §11](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#11-待补--待评审) vs [ADR-008 2026-07-05 errata](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)（本会话已提交）
+
+**一致性结论**：10 项检查中 1 项 `PARTIAL`（C83）、9 项 `PASS`（C76 ~ C82、C84 附观察项、C85）。`PARTIAL` 是 HD-007 内部一处 UI 章节号引用错误，不影响字段设计本身的正确性。
+
+### 17.3 反问清单
+
+#### Blocking
+
+无。本轮完备性 / 一致性扫描未发现会阻塞 `TestCaseAuthor` 或 `CodingExecutor` 起步的缺口——数据库表字段 / 接口 / DTO / OTel / Options / Guid 类型迁移均完整可执行；C83（UI 章节号引用错误）与 C85（§11 措辞未回填 errata 已落地事实）均为文档精度问题，不影响任何下游产物能否起步。
+
+#### Non-blocking
+
+##### N21：HD-007 §1.2 引用"UI-009 §9.4 检索表单"章节号有误，应为 §9.3（C83）
+
+- **问题**：HD-007 §1.2"范围"段"本 HD 仅保证 `AuditLogQuery` / `AuditLogEntry` 字段可 1:1 映射到 UI-009 §9.4 检索表单"一句，实际筛选表单字段在 [ui-spec.md §9.3 表单字段](../01-requirements/ui-spec.md)（`9.C 审计日志 tab` 行："用户 / Agent / 时间范围 / 事件类型"），§9.4 是"操作按钮"（解封 / 撤销共享 / 查看条目详情）
+- **影响范围**：`Inkwell.WebApi` HD 起草时若直接按"§9.4"去核对检索表单字段会找错章节；不影响 `AuditLogQuery` / `AuditLogEntry` 字段设计本身（字段与 §9.3 筛选条件、§9.4"查看条目详情"展示需求均已正确覆盖）
+- **建议方向**：将引用改为"UI-009 §9.3 表单字段（筛选条件）+ §9.4 查看条目详情（`PayloadJson` 展示）"，或拆成两处引用分别对应筛选与展示两个不同的 UI 行为
+- **卡点等级**：non-blocking
+- **追溯**：C83
+
+##### N22：HD-007 §11 "待补"措辞未回填 ADR-008 errata 已落地的事实（C85）
+
+- **问题**：HD-007 §11 仍写"需要 Owner 在 H2 `h2-architect-advisor` 模式下对 ADR-008 补一条 errata（90 → 180）"，但 ADR-008 的该条 errata 已在本会话通过独立 commit（`docs(arch): ADR-008 审计日志保留期 errata`）落地，`tech-selection.md` 同步 errata 是否已完成需一并确认
+- **影响范围**：不影响任何下游产物起步（`RetentionDays=180` 默认值已经与落地后的 ADR-008 一致）；仅是 HD-007 §11 的措辞与当前文档状态出现短暂不同步，可能让后续读者误以为该 errata 仍待办
+- **建议方向**：HD-007 §11 该条目措辞由"待办"改为"已处理"或直接删除该条待办（因阻塞项已消除），同时确认 [tech-selection.md §8](../03-architecture/tech-selection.md) 的"保留 90 天"字面是否已同步改为 180 天
+- **卡点等级**：non-blocking
+- **追溯**：C85
+
+### 17.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-007 本体设计（`IAuditLogger` facade / DTO / Options / `ActorUserId` Guid 迁移 / OTel / CI 自检 / ADR-008+023 一致性）完整且自洽，"写审计失败不得吞错"约束（[AGENTS.md §3.2](../../AGENTS.md)）经核实确由"重试 3 次 + 磁盘 fallback + OTel + P1 告警"四件套满足、非变相吞错；仅 2 项 non-blocking 文档精度问题（N21 UI 章节号引用错误、N22 §11 措辞未回填 errata 已落地事实），均不阻塞下游 `TestCaseAuthor` / `CodingExecutor` 起步
+- **HD-007 翻 `reviewed` 前置条件**：
+  1. ⬜ Owner 确认 N21 / N22 是否需要在本轮一并修正（均为低成本文字修订，不涉及设计决策，无需 picker）
+  2. ⬜ 若 Owner 同意，AI 在 `h3-detailed-design-author` 模式下落 N21（§1.2 UI 章节号引用更正）+ N22（§11 待办措辞回填）两处 errata
+  3. ⬜ Owner 在 HD-007 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
+- **"不吞错"约束专项结论**：`LogAsync` 对调用方不抛存储异常这一设计决策，经核对 AGENTS.md §3.2 原文，满足的是"走 ADR-008 失败处理路径"（而非"异常必须透传"），HD-007 §4.2/§4.3/§7.3 的"重试→fallback→OTel exception.*→P1 告警"链路完整闭环，判定为**合规**；C84 观察项（极端崩溃窗口期的残余数据丢失风险）已被 HD-007 自身透明记录，属已知权衡而非隐瞒缺陷，不计入 blocking
+- **后续 HD 建议路径**：HD-007 reviewed 后可推进 `Inkwell.Core.AuditLogs`（`DefaultAuditLogger` 具体实现 + 磁盘 fallback 文件格式 + 后台清理任务）或 `Inkwell.VectorStore`（HD-008，[ADR-020](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）独立 HD 起草，视 Owner 优先级安排
+
+### 17.5 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` 都附了文件路径或具体引用
+- ✅ 无 `blocking` 反问；2 条 `non-blocking` 反问（N21/N22）均能映射到具体一致性发现（C83/C85）+ 影响范围
+- ✅ 未使用"看起来" / "似乎" / "感觉"等主观词汇
+- ✅ 未凭文件名臆测，每条结论都打开了对应文件读到对应字段（含 ui-spec.md §9.3/§9.4 逐段核对、requirements.md line 207 逐字核对）
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-007 / HD-001 / ADR-008 / file-structure.md / 报告主体
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §17 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
