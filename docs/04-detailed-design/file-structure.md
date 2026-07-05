@@ -351,6 +351,39 @@ src/core/Inkwell.Core/AuditLogs/
 
 > `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，按 [HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由 `Inkwell.Core.AuditLogs` 业务 HD 起草；磁盘 fallback 文件格式 / 后台清理任务由该 HD 独立锁定，**严禁**回填到 `Inkwell.Abstractions/Audit/AuditLoggerOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。
 
+## Inkwell.Abstractions.VectorStore
+
+> 由 [HD-008 §2 / §3](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) 锁定。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `VectorStore/` 子目录 + `GlobalUsings.cs` / `Options/InkwellOptions.cs` 两处既有文件追加行——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。本 HD **不设计新接口**——业务命名空间直接使用 `Microsoft.Extensions.VectorData.VectorStore` / `VectorStoreCollection<TKey, TRecord>`，不新增任何 `IVectorStore` 包装类型（[ADR-020](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [HD-008 §1.1](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#11-职责)）。
+
+```text
+src/core/Inkwell.Abstractions/
+  GlobalUsings.cs                        # （既有文件追加行）+= global using Microsoft.Extensions.VectorData;
+  VectorStore/                           # 新增子目录
+    VectorStoreOptions.cs                # Provider 无关：EmbeddingModelName/EmbeddingDimensions/DistanceMetric/EnableSensitiveDataLogging
+    VectorStoreOptionsValidator.cs       # IValidateOptions<VectorStoreOptions>
+  Options/
+    InkwellOptions.cs                    # （既有文件追加字段）+= public VectorStoreOptions VectorStore { get; init; } = new();
+```
+
+**文件计数**：HD-008 新增 2 个 `*.cs`（`VectorStore/` 2）；`GlobalUsings.cs` / `Options/InkwellOptions.cs` 为既有文件追加行，不计入新增文件数。Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）= **53** 个 `*.cs` + 1 个 `.csproj`。
+
+**Builder DSL 扩展方法签名声明（不含实现，[HD-008 §4](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#4-builder-dsl-签名声明不含实现) 锁定签名）**：
+
+```text
+src/core/Inkwell.Core/VectorStore/                          # 独立 HD（无独立 Provider csproj，[HD-008 §1.3 Q1-embedding-topology](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-关键决策摘要)）
+  InMemoryVectorStoreBuilderExtensions.cs                    # UseInMemoryVectorStore(...)
+  AzureOpenAIEmbeddingOptions.cs                             # Endpoint / ApiKey / DeploymentName
+  AzureOpenAIEmbeddingBuilderExtensions.cs                   # UseAzureOpenAIEmbeddings(...)
+
+providers/Inkwell.VectorStore.Qdrant/                        # 独立 HD（[HD-008 §1.3 Q2-qdrant-options-loc](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-关键决策摘要)）
+  QdrantVectorStoreOptions.cs                                # Host / Port / ApiKey / UseHttps
+  QdrantVectorStoreBuilderExtensions.cs                      # UseQdrantVectorStore(...)
+```
+
+> Provider 子 Options（Qdrant 连接参数 / Azure OpenAI 凭据）由各自 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/VectorStore/VectorStoreOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。`IEmbeddingGenerator<string, Embedding<float>>` 在 KB / Memory 业务命名空间的直接消费方式是否需要为 `Microsoft.Extensions.AI.Abstractions` 开依赖白名单例外，仍是待 Owner 确认的开放问题（[HD-008 §11](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#11-待补--待评审)）。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
