@@ -40,6 +40,8 @@ downstream: []
 - 写入失败处理：使用本地内存队列 + 重试 3 次；3 次失败后写入磁盘 fallback 文件，并触发告警。
 - 时间分区：v1 不分表，使用 `created_at` 索引 + 90 天保留期足矣；v2 数据量大可分月。
 
+> **2026-07-05 errata**（H3 [HD-007 IAuditLogger Port](../../04-detailed-design/Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 起草期发现 H1/H2 分歧）：上方"保留期：v1 默认保留 90 天"与 [requirements.md §8.3 数据生命周期](../../01-requirements/requirements.md) "审计日志：至少保留 6 个月（v1 默认值，可配置）"（该条经 §8.1 "审计数据：见 NFR-004" 关联到 [NFR-004 审计日志](../../01-requirements/requirements.md)）字面冲突。Owner picker 拍板：对齐 H1 requirements.md 的硬性合规要求，**保留期由 90 天修订为 180 天（约 6 个月）**。本 ADR 主决策正文与下方"状态"区块保留原文不改，实际生效值以本 errata 为准：后台清理任务（`BackgroundService`）的保留期配置默认值须为 **180 天**；[`docs/03-architecture/tech-selection.md` §8](./../tech-selection.md) 同步加 errata。
+
 ## 备选项
 
 ### 备选 A（OQ-020 §A 写入主 DB + 异步索引到 ELK）：双写到 Elasticsearch / OpenSearch

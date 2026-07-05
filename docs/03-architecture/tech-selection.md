@@ -127,6 +127,8 @@ downstream:
 - **团队维护影响**：与 [ADR-004 EF Core](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 同 Provider，无新依赖。
 - **成本/性能/安全/交付**：成本低；性能中（≤ 100 万条查询 < 200 ms）；安全中（PII 不脱敏，靠权限控制）；交付高。
 
+> **2026-07-05 errata**（同步 [ADR-008 2026-07-05 errata](./adr/ADR-008-audit-log-store-and-query.md)）：上方"保留 90 天"与 [requirements.md §8.3 数据生命周期](../01-requirements/requirements.md) "审计日志：至少保留 6 个月" 字面冲突，Owner picker 拍板对齐 H1，保留期修订为 **180 天（约 6 个月）**。上方"选择"一行文字保留原文不改，实际生效值以本 errata 为准。
+
 ## 9. 多模态（ADR-009）
 
 - **选择**：Azure Speech 后端 ASR + 模型 vision 处理图像 / PDF / Office。
