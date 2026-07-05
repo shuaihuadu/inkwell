@@ -321,6 +321,36 @@ src/core/Inkwell.Core/AgentRuntime/
 
 > Provider（模型云服务）特定凭证由 `Inkwell.Core.AgentRuntime` 独立锁定；**严禁**回填到 `Inkwell.Abstractions/AgentRuntime/AgentRuntimeOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001 MAF 接触面收敛约束](../03-architecture/risk-analysis.md)）。
 
+## Inkwell.Abstractions.Audit
+
+> 由 [HD-007 §2 / §3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 锁定。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Audit/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。本端口**无**可切换 Provider（[HD-007 §1.3 Q-implementation-topology](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要)）——`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增)）**不**新增 `Audit` 字段。
+
+```text
+src/core/Inkwell.Abstractions/
+  Audit/                                  # 新增子目录
+    IAuditLogger.cs                       # 顶层 facade（2 方法：LogAsync/QueryAsync）
+    AuditLogRequest.cs                    # record，写入请求（AuditContext + ActorType + AgentId? + ResultCode + ErrorCode?）
+    AuditLogEntry.cs                      # record，查询结果单条记录（对齐 ADR-008 表结构关键字段）
+    AuditLogQuery.cs                      # record，查询过滤条件（TimeRange + Pagination + 可选 ActorUserId/EventType/AgentId）
+    AuditEnums.cs                         # AuditActorType（3 值闭集）+ AuditResultCode（2 值闭集）
+    AuditLoggerOptions.cs                 # RetentionDays/MaxQueryTimeRangeDays/DefaultPageSize/MaxPageSize/EnableSensitiveDataLogging
+    AuditLoggerOptionsValidator.cs        # IValidateOptions<AuditLoggerOptions>
+```
+
+**文件计数**：HD-007 新增 7 个 `*.cs`（Audit/ 7）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）= 51 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.AuditLogs` 的契约**（无独立 Provider csproj，[HD-007 §1.3 Q-implementation-topology](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要) 下 `Inkwell.AuditLogs` 合并进 `Inkwell.Core.AuditLogs` 命名空间）：
+
+```text
+src/core/Inkwell.Core/AuditLogs/
+  DefaultAuditLogger.cs                              # 唯一 IAuditLogger 实现（独立 HD）
+  AuditLoggerBuilderExtensions.cs                     # AddDefaultAuditLogger()
+```
+
+> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，按 [HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由 `Inkwell.Core.AuditLogs` 业务 HD 起草；磁盘 fallback 文件格式 / 后台清理任务由该 HD 独立锁定，**严禁**回填到 `Inkwell.Abstractions/Audit/AuditLoggerOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。

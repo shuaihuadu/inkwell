@@ -24,6 +24,8 @@ upstream:
 > **范围切片**：本 HD 仅覆盖 `Inkwell.Abstractions` 的"地基"——`InkwellException` 两子类、`IInkwellBuilder + AddInkwell()`、`InkwellOptions` 根、共享 DTO、6 大端口的命名 / 签名 / 错误 / 日志公共约定。具体的 6 个端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）与向量存储接入 拆到 HD-002 ~ HD-008，每个端口独立一张 HD。
 >
 > **拓扑依据**：[ADR-017 §依赖规则](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) — `Inkwell.Abstractions` **零外部包依赖**（除 `Microsoft.Extensions.*.Abstractions` 与 `Microsoft.Extensions.VectorData.Abstractions`）。
+>
+> **2026-07-05 errata·第五轮**（[design-review-report §3.2 N2/C4](../design-review-report.md#n2auditcontextactoruserid-与-ihasownerowneruserid-类型分歧c4) + HD-007 起草期 Owner picker 拍板）：`Common/AuditContext.cs` 的 `ActorUserId` 字段类型由 `string` 改为 `Guid`，与 [HD-002 §3.9](HD-002-Inkwell.Abstractions-persistence-port.md) `IHasOwner.OwnerUserId: Guid` 强一致（均指向 `users.id`）；系统 actor（定时任务 / Trigger 触发）用 `Guid.Empty` 表示，构造期校验不再要求 `ActorUserId` 非空（`Guid.Empty` 是合法值）。受影响章节：§3.7。详见 [HD-007 §13 决策记录](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-决策记录)。
 
 ## 1. 模块概述
 
@@ -165,18 +167,20 @@ src/core/Inkwell.Abstractions/
 
 ### 3.7 `Common/AuditContext.cs`
 
+> **2026-07-05 errata·第五轮**：`ActorUserId` 由 `string` 改为 `Guid`（详见本文件顶部 callout + [HD-007 §13](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-决策记录)）；`Guid.Empty` 是系统 actor 的合法字面量，不再纳入必填非空校验。
+
 | 字段         | 内容                                                                                                                                                                                                                                                          |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Common/AuditContext.cs`                                                                                                                                                                                                        |
 | 职责         | 审计上下文 DTO，承载"谁在什么时间从什么入口做的什么"，由 `IAuditLogger`（HD-007）消费                                                                                                                                                                         |
-| 对外接口     | `public sealed record AuditContext(string ActorUserId, string ActionType, string ResourceType, string ResourceId, DateTimeOffset OccurredTime, string TraceId, string? ClientIp = null, IReadOnlyDictionary<string,object?>? Metadata = null)`                |
-| 内部函数或类 | 构造期校验 `ActorUserId` / `ActionType` / `ResourceType` / `ResourceId` / `TraceId` 必非空；`Metadata` 默认空字典                                                                                                                                             |
-| 输入数据     | 7 个必填字段 + 2 可选字段                                                                                                                                                                                                                                     |
+| 对外接口     | `public sealed record AuditContext(Guid ActorUserId, string ActionType, string ResourceType, string ResourceId, DateTimeOffset OccurredTime, string TraceId, string? ClientIp = null, IReadOnlyDictionary<string,object?>? Metadata = null)`                  |
+| 内部函数或类 | 构造期校验 `ActionType` / `ResourceType` / `ResourceId` / `TraceId` 必非空；`ActorUserId` **不**做非空校验（`Guid.Empty` 表示系统 actor，是合法值，[HD-007 §1.3](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要)）；`Metadata` 默认空字典   |
+| 输入数据     | `ActorUserId`（`Guid`，含 `Guid.Empty`） + 4 个必填字符串字段 + 2 可选字段                                                                                                                                                                                    |
 | 输出数据     | `AuditContext` 实例                                                                                                                                                                                                                                           |
 | 依赖模块     | System.*                                                                                                                                                                                                                                                      |
-| 错误处理     | 必填字段为 null/empty/whitespace → `ArgumentException`                                                                                                                                                                                                        |
+| 错误处理     | `ActionType` / `ResourceType` / `ResourceId` / `TraceId` 为 null/empty/whitespace → `ArgumentException`                                                                                                                                                       |
 | 日志要求     | 序列化映射：`audit.actor_user_id` / `audit.action_type` / `audit.resource_type` / `audit.resource_id` / `audit.occurred_time` / `trace.id`（与 OTel `trace_id` 桥接，[ADR-013](../../03-architecture/adr/ADR-013-observability-otel-self-hosted-grafana.md)） |
-| 测试要求     | `AuditContextTests.cs`：必填字段校验、`Metadata` 空字典默认、record equality（同字段相等）                                                                                                                                                                    |
+| 测试要求     | `AuditContextTests.cs`：必填字符串字段校验、`ActorUserId = Guid.Empty` 合法构造（不抛异常）、`Metadata` 空字典默认、record equality（同字段相等）                                                                                                             |
 
 ### 3.8 `Builder/IInkwellBuilder.cs`
 
