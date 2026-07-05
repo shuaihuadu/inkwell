@@ -2,8 +2,8 @@
 id: HD-003
 title: Inkwell.Abstractions 详细设计 — FileStorage Port（IFileStorageProvider facade + 4 DTO + Options）
 stage: H3
-status: draft
-reviewers: []
+status: reviewed
+reviewers: [Inkwell]
 upstream:
   - REQ-003
   - REQ-009
@@ -53,19 +53,19 @@ upstream:
 
 > 全部由 2026-05-11 picker 拍板，决策证据见本节"出处"列。
 
-| Q | 决议 | 出处 |
-| --- | --- | --- |
-| Q1 | 签名风格 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023) | picker 2026-05-11 superseded by ADR-023 |
-| Q2 | `DownloadAsync` 返回 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023) | picker 2026-05-11 superseded by ADR-023 errata·02 |
-| Q3 | **不锁容器名常量集**：业务命名空间各自传字符串（如 `kb-source` / `uploads` / `kb-extracted`）。[ADR-015 §容器命名](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) 已锁 4 容器名但**不**在 `Inkwell.Abstractions` 暴露 `InkwellContainers` 常量；业务 HD 起草时各自决定（`Inkwell.Core.KnowledgeBase` / `Inkwell.Core.Multimodal` / 等） | picker 2026-05-11；理由：端口层尽量薄 / 容器名是业务语义不是端口语义 |
-| Q4 | **预签名 URL TTL**：`Default` = 30 min，`Max` = 7 day（10080 min，Azure Blob / S3 双家共同上限），`Min` = 1 min | picker 2026-05-11；三 Provider 交集 + 多模态 / KB ingest 场景够用 |
-| Q5 | **`ListAsync` = `IAsyncEnumerable<FileObjectInfo>`**：流式迭代，实现层内部隐藏 continuation token；业务侧 `await foreach` 即可，不支持跳页 | picker 2026-05-11；与 ADR-015 §抽象接口 原型一致 |
-| Q6 | 错误码 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023) | picker 2026-05-11 superseded by ADR-023 errata·01 |
-| Q7 | **`FileMetadata` 字段**：`ContentType`（MIME）+ `CustomMetadata`（`IReadOnlyDictionary<string, string>?`）+ `ContentDisposition`（可选）；**不**锁 `CacheControl` / `ContentEncoding`（v2 backlog） | picker 2026-05-11 |
-| Q8 | **`FileUploadResult` 字段**：`Container` + `Key` + `SizeBytes` + `ETag` + `UploadedTime`；**不**锁 `VersionId` / `Checksum`（v1 不取版本控制；checksum 与 Q6 错误码同时撤） | picker 2026-05-11 |
-| Q9 | **`MaxObjectSizeBytes` = 100 MiB**（104857600 bytes）；超出抛 `InvalidOperationException`（message 前缀 `"Object size exceeds MaxObjectSizeBytes"`，errata·01 前为 `QuotaExceeded` 错误码）；REQ-016 多模态 / REQ-009 中小型 KB 文档够用，大文件 KB ingest 走 v2 分片上传 | picker 2026-05-11 + errata·01 修订 |
-| Q10 | **性能预算宽松档**：`Presign*` P50 < 100ms / P99 < 500ms；`Exists` / `Delete` P50 < 200ms / P99 < 1s；`Upload` / `Download` 主体不锁（依赖网络与文件大小），仅 SLO 化 facade overhead | picker 2026-05-11 |
-| Q11 | **OTel span**：`filestore.upload` / `filestore.download` / `filestore.delete` / `filestore.exists` / `filestore.presign_upload` / `filestore.presign_download` / `filestore.list`；5 + 5 字段 = `filestore.provider` / `.container` / `.key` / `.size_bytes` / `.operation_outcome` + OTel 标准 `exception.type` / `.message` / `.stacktrace` / `.escaped` / `.id`（[HD-001 §5.3](HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表)；errata·01 前最后字段为 `error.code`） | picker 2026-05-11 + errata·01 修订 |
+| Q   | 决议                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 出处                                                                 |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Q1  | 签名风格 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023)                                                                                                                                                                                                                                                                                                                                                                                                                  | picker 2026-05-11 superseded by ADR-023                              |
+| Q2  | `DownloadAsync` 返回 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023)                                                                                                                                                                                                                                                                                                                                                                                                      | picker 2026-05-11 superseded by ADR-023 errata·02                    |
+| Q3  | **不锁容器名常量集**：业务命名空间各自传字符串（如 `kb-source` / `uploads` / `kb-extracted`）。[ADR-015 §容器命名](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) 已锁 4 容器名但**不**在 `Inkwell.Abstractions` 暴露 `InkwellContainers` 常量；业务 HD 起草时各自决定（`Inkwell.Core.KnowledgeBase` / `Inkwell.Core.Multimodal` / 等）                                                                                                                         | picker 2026-05-11；理由：端口层尽量薄 / 容器名是业务语义不是端口语义 |
+| Q4  | **预签名 URL TTL**：`Default` = 30 min，`Max` = 7 day（10080 min，Azure Blob / S3 双家共同上限），`Min` = 1 min                                                                                                                                                                                                                                                                                                                                                                           | picker 2026-05-11；三 Provider 交集 + 多模态 / KB ingest 场景够用    |
+| Q5  | **`ListAsync` = `IAsyncEnumerable<FileObjectInfo>`**：流式迭代，实现层内部隐藏 continuation token；业务侧 `await foreach` 即可，不支持跳页                                                                                                                                                                                                                                                                                                                                                | picker 2026-05-11；与 ADR-015 §抽象接口 原型一致                     |
+| Q6  | 错误码 superseded → 见 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023)                                                                                                                                                                                                                                                                                                                                                                                                                    | picker 2026-05-11 superseded by ADR-023 errata·01                    |
+| Q7  | **`FileMetadata` 字段**：`ContentType`（MIME）+ `CustomMetadata`（`IReadOnlyDictionary<string, string>?`）+ `ContentDisposition`（可选）；**不**锁 `CacheControl` / `ContentEncoding`（v2 backlog）                                                                                                                                                                                                                                                                                       | picker 2026-05-11                                                    |
+| Q8  | **`FileUploadResult` 字段**：`Container` + `Key` + `SizeBytes` + `ETag` + `UploadedTime`；**不**锁 `VersionId` / `Checksum`（v1 不取版本控制；checksum 与 Q6 错误码同时撤）                                                                                                                                                                                                                                                                                                               | picker 2026-05-11                                                    |
+| Q9  | **`MaxObjectSizeBytes` = 100 MiB**（104857600 bytes）；超出抛 `InvalidOperationException`（message 前缀 `"Object size exceeds MaxObjectSizeBytes"`，errata·01 前为 `QuotaExceeded` 错误码）；REQ-016 多模态 / REQ-009 中小型 KB 文档够用，大文件 KB ingest 走 v2 分片上传                                                                                                                                                                                                                 | picker 2026-05-11 + errata·01 修订                                   |
+| Q10 | **性能预算宽松档**：`Presign*` P50 < 100ms / P99 < 500ms；`Exists` / `Delete` P50 < 200ms / P99 < 1s；`Upload` / `Download` 主体不锁（依赖网络与文件大小），仅 SLO 化 facade overhead                                                                                                                                                                                                                                                                                                     | picker 2026-05-11                                                    |
+| Q11 | **OTel span**：`filestore.upload` / `filestore.download` / `filestore.delete` / `filestore.exists` / `filestore.presign_upload` / `filestore.presign_download` / `filestore.list`；5 + 5 字段 = `filestore.provider` / `.container` / `.key` / `.size_bytes` / `.operation_outcome` + OTel 标准 `exception.type` / `.message` / `.stacktrace` / `.escaped` / `.id`（[HD-001 §5.3](HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表)；errata·01 前最后字段为 `error.code`） | picker 2026-05-11 + errata·01 修订                                   |
 
 #### 1.3.1 Q1 / Q2 / Q6 superseded by ADR-023
 
@@ -227,13 +227,13 @@ src/core/Inkwell.Abstractions/
 
 > **整段废止**（[ADR-023 errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) accepted by Inkwell 2026-05-11）：本端口**不再分配** `INK-FILESTORE-NNN` 错误码段；保留编号锁位 `INK-FILESTORE-001` ~ `INK-FILESTORE-099` **仅作历史证据**，编号不重用、不分配新含义。`ErrorCodes.FileStore.cs` 文件**不再创建**（与 HD-002 §3.10 同步执行）。
 
-| 字段 | 内容 |
-| --- | --- |
-| 文件路径 | ~~`src/core/Inkwell.Abstractions/ErrorCodes.FileStore.cs`~~（不再创建） |
-| 职责 | ~~9 条错误码常量~~ → 改走 BCL 异常类型 + OTel `exception.*` 五字段表达；具体 BCL 映射见 §4.2 |
-| 历史决策 | [picker Q6 = 9 错误码](#13-关键决策摘要) 已 superseded by ADR-023 errata·01；详 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023) |
-| 替代方案 | BCL 异常映射表 §4.2 + OTel 五字段 §4.3 |
-| 编号锁位 | `INK-FILESTORE-001` ~ `INK-FILESTORE-099` 保留为追溯证据，不重用、不分配新含义 |
+| 字段     | 内容                                                                                                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径 | ~~`src/core/Inkwell.Abstractions/ErrorCodes.FileStore.cs`~~（不再创建）                                                                                           |
+| 职责     | ~~9 条错误码常量~~ → 改走 BCL 异常类型 + OTel `exception.*` 五字段表达；具体 BCL 映射见 §4.2                                                                      |
+| 历史决策 | [picker Q6 = 9 错误码](#13-关键决策摘要) 已 superseded by ADR-023 errata·01；详 [§1.3.1](#131-q1--q2--q6-superseded-by-adr-023)                                   |
+| 替代方案 | BCL 异常映射表 §4.2 + OTel 五字段 §4.3                                                                                                                            |
+| 编号锁位 | `INK-FILESTORE-001` ~ `INK-FILESTORE-099` 保留为追溯证据，不重用、不分配新含义                                                                                    |
 | 测试要求 | 无（文件不创建）；CI 在 [§10 F3](#10-ci-自检命令grep-列表) 反向校验业务层 / 测试代码不再硬编码 `INK-FILESTORE-NNN` 字面量 / `ErrorCodes.FileStore.*` 命名空间引用 |
 
 ## 4. BCL 异常与日志（端口段补充 HD-001 §4）
