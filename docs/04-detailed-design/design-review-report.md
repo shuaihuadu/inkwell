@@ -1952,6 +1952,7 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：将 file-structure.md 该处 callout 更新为反映 HD-008 §13 Q5 的实际拍板结果（"允许直接注入，不新增门面接口"），但**同时**需先解决 B15（因为 Q5 的拍板结果本身尚缺物理落地机制，callout 更新时应如实反映"决策已拍板，但依赖白名单物理机制待补"这一现状，而非简单删除开放问题标记）
 - **卡点等级**：**blocking**
 - **追溯**：C90
+- **状态**：已处理（2026-07-06）——file-structure.md `## Inkwell.Abstractions.VectorStore` 结尾 callout 已更新为"已确认：`Microsoft.Extensions.AI.Abstractions` 对称纳入白名单，允许直接注入、不新增门面接口，不再是开放问题"，随 B15 一并解决。
 
 ##### B15：Q5"比照 VectorData 先例"缺物理落地机制，`IEmbeddingGenerator<,>` 依赖白名单例外未实际生效（C91）
 
@@ -1967,6 +1968,7 @@ reviewer 在 chat 中列三路径 picker：
   - reviewer 倾向选项 1（与 Owner 已拍板的"比照先例"意图最一致，且成本最低，只需让先例真正对称）
 - **卡点等级**：**blocking**（建议 Owner picker 确认走哪个选项；HD-008 本体其余设计不受影响，可在 Owner 拍板后一次性追加 errata）
 - **追溯**：C91
+- **状态**：已处理（2026-07-06）——Owner picker 拍板选项 1，[HD-001 §13 2026-07-06 errata·第六轮](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2026-07-06-errata第六轮b15-对称纳入-microsoftextensionsaiabstractions-白名单) 已把 `Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 依赖白名单 + `GlobalUsings.cs`（§2 / §14.3），[HD-008 §2 / §6 / §12 / §13 Q5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) 措辞同步精确化，未触碰 AGENTS.md。
 
 #### Non-blocking
 
@@ -1976,6 +1978,7 @@ reviewer 在 chat 中列三路径 picker：
 - **影响范围**：不影响任何下游产物起步（向量数据本就不落 EF Core 表，database-design.md 无需 HD-008 贡献字段是显然的），仅是与其余端口 HD 的章节命名习惯不一致，降低文档可预测性
 - **建议方向**：补一句"本 HD 不贡献 database-design.md（向量数据落 Qdrant / InMemory，非关系表，[ADR-020](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) 已锁定）"，可并入现有 §1.2 或单独起一个简短 §12 小节
 - **卡点等级**：non-blocking
+- **状态**：已处理（2026-07-06）——已并入 [HD-008 §1.2](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#12-范围) 末尾。
 
 ##### N26：HD-008 缺少独立"监控指标 / 告警策略"小节
 
@@ -1983,6 +1986,7 @@ reviewer 在 chat 中列三路径 picker：
 - **影响范围**：不影响 HD-008 本体翻 `reviewed`（本 HD 无运行期代码，监控指标本就该在具体 Provider 实现层定义），但下游三个独立 Provider HD 起草时若无明确指引，可能各自发明不一致的监控命名 / 告警阈值
 - **建议方向**：补一句"具体监控指标（如 embedding 生成延迟、Qdrant 查询延迟、collection 大小）随 `Inkwell.Core/VectorStore/` 与 `providers/Inkwell.VectorStore.Qdrant/` 独立 HD 落地；OTel instrumentation 基线由 [`Microsoft.Extensions.VectorData` 内置 `ActivitySource`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 提供（[ADR-020 §迁移路径 step 9](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）"
 - **卡点等级**：non-blocking
+- **状态**：已处理（2026-07-06）——已补入 [HD-008 §9](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#9-部署--安全说明) 末尾。
 
 ##### N27：HD-008 §9 未显式声明"具体部署步骤移交 Provider 独立 HD"
 
@@ -1990,6 +1994,7 @@ reviewer 在 chat 中列三路径 picker：
 - **影响范围**：不影响 HD-008 翻 `reviewed`（部署步骤本就该在 Qdrant / InMemory 具体实现 HD 中定义），仅是措辞不完整可能让读者误以为部署步骤遗漏而非有意移交
 - **建议方向**：§9 结尾补一句"Qdrant collection 创建 / InMemory 无持久化等具体部署步骤，移交 `providers/Inkwell.VectorStore.Qdrant/` 与 `Inkwell.Core/VectorStore/` 独立 HD"
 - **卡点等级**：non-blocking
+- **状态**：已处理（2026-07-06）——已补入 [HD-008 §9](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#9-部署--安全说明) 末尾（与 N26 同批追加）。
 
 ##### N28：HD-008 无独立"性能边界"标题呈现
 
@@ -1997,15 +2002,16 @@ reviewer 在 chat 中列三路径 picker：
 - **影响范围**：不影响 HD-008 翻 `reviewed`（本 HD 确实无运行期方法，性能边界不适用有充分理由），仅是章节呈现形式与其余 HD 不一致，略微降低跨 HD 比对的一致体验
 - **建议方向**：可选——若 Owner 认为形式一致性重要，可在 §10"已知限制"前插入一句显式"性能边界：不适用（本 HD 无运行期方法，参见 §1.2 范围声明）"
 - **卡点等级**：non-blocking
+- **状态**：已处理（2026-07-06）——已在 [HD-008 §10](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#10-已知限制) 前插入该句。
 
 ### 18.4 评审结论与下一步
 
 - **整体评审决议**：**PASS-AS-ERRATA（有条件）**——HD-008 本体的 type-alias 复用 + Options + Builder DSL 签名声明设计完整自洽，与 ADR-020 / HD-001 / HD-006 的既有决策高度一致（C86 ~ C89、C92 ~ C94 共 7 项 PASS）；但发现 **2 项 blocking**（B14 / B15），均指向同一根问题：Q5"`IEmbeddingGenerator<,>` 直接注入"决策所"比照"的 VectorData 先例，实际缺少对称的物理落地步骤（未把 `Microsoft.Extensions.AI.Abstractions` 纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`），且 file-structure.md 的相关 callout 未同步 HD-008 §11 已拍板的事实
 - **HD-008 翻 `reviewed` 前置条件**：
-  1. ⬜ Owner 通过 picker 对 B15 三个选项拍板（建议方向选项 1：把 `Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`，与 VectorData 处理完全同构，不触碰 AGENTS.md）
-  2. ⬜ 按拍板结果在 `h3-detailed-design-author` 模式下落地 HD-008 errata（§2 文件结构 / §14.3 GlobalUsings / §6 / §13 Q5 措辞同步）+ file-structure.md callout 同步更新（B14 随 B15 一并解决）
-  3. ⬜ Owner 在 HD-008 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——本轮尚不建议直接翻 reviewed，需先完成前两项
-  4. **可选**（non-blocking，不阻塞翻 reviewed）：N25 / N26 / N27 / N28 四项文档呈现形式缺口可与 B15 errata 一并顺手补齐，也可留待下一轮增量评审处理
+  1. ✅ Owner 通过 picker 对 B15 三个选项拍板（已选选项 1：把 `Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`，与 VectorData 处理完全同构，不触碰 AGENTS.md）——已处理（2026-07-06）
+  2. ✅ 按拍板结果在 `h3-detailed-design-author` 模式下落地 HD-008 errata（§2 文件结构 / §14.3 GlobalUsings / §6 / §13 Q5 措辞同步）+ file-structure.md callout 同步更新（B14 随 B15 一并解决）——已处理（2026-07-06）：[HD-001 §13 2026-07-06 errata·第六轮](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#2026-07-06-errata第六轮b15-对称纳入-microsoftextensionsaiabstractions-白名单) + [HD-008 §2 / §6 / §12 / §13 Q5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) + [file-structure.md `## Inkwell.Abstractions.VectorStore`](file-structure.md#inkwellabstractionsvectorstore)
+  3. ⬜ Owner 在 HD-008 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——前两项已完成，本项待人工签字
+  4. ✅（可选，non-blocking）N25 / N26 / N27 / N28 四项文档呈现形式缺口已随本轮一并补齐——已处理（2026-07-06）
 - **HD-008 自身核心设计结论**："不重新发明 `IVectorStore`"这一 ADR-020 核心决策的落地（type-alias 复用 + Builder DSL 签名）本身是**扎实且自洽的**（C86 ~ C89、C92 ~ C94 全部 PASS）；本轮发现的 2 个 blocking 项不否定这一核心设计，而是指向"决策落地是否配齐了必要的物理机制"这一更细粒度的问题，修复成本可控（1 次 Owner picker + 1 轮 errata）
 - **后续路径建议**：Owner 就 B15 拍板后，建议顺序：(1) HD-008 errata 落地 → (2) HD-008 翻 `reviewed` → (3) 端口层 8 个 HD（HD-001 ~ HD-008）全部 reviewed，H3 端口层设计正式收口 → (4) 进入 `Inkwell.Core.KnowledgeBase` / `.Memory` / `Inkwell.Core.AgentRuntime` 等业务命名空间 HD 或 `providers/Inkwell.VectorStore.Qdrant` / `Inkwell.Persistence.EFCore.*` 等 Provider 独立 HD 起草
 

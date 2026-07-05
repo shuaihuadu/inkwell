@@ -23,9 +23,11 @@ upstream:
 >
 > **范围切片**：本 HD 仅覆盖 `Inkwell.Abstractions` 的"地基"——`InkwellException` 两子类、`IInkwellBuilder + AddInkwell()`、`InkwellOptions` 根、共享 DTO、6 大端口的命名 / 签名 / 错误 / 日志公共约定。具体的 6 个端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）与向量存储接入 拆到 HD-002 ~ HD-008，每个端口独立一张 HD。
 >
-> **拓扑依据**：[ADR-017 §依赖规则](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) — `Inkwell.Abstractions` **零外部包依赖**（除 `Microsoft.Extensions.*.Abstractions` 与 `Microsoft.Extensions.VectorData.Abstractions`）。
+> **拓扑依据**：[ADR-017 §依赖规则](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) — `Inkwell.Abstractions` **零外部包依赖**（除 `Microsoft.Extensions.*.Abstractions`、`Microsoft.Extensions.VectorData.Abstractions` 与 `Microsoft.Extensions.AI.Abstractions`[2026-07-06 errata·第六轮，详 §13]）。
 >
 > **2026-07-05 errata·第五轮**（[design-review-report §3.2 N2/C4](../design-review-report.md#n2auditcontextactoruserid-与-ihasownerowneruserid-类型分歧c4) + HD-007 起草期 Owner picker 拍板）：`Common/AuditContext.cs` 的 `ActorUserId` 字段类型由 `string` 改为 `Guid`，与 [HD-002 §3.9](HD-002-Inkwell.Abstractions-persistence-port.md) `IHasOwner.OwnerUserId: Guid` 强一致（均指向 `users.id`）；系统 actor（定时任务 / Trigger 触发）用 `Guid.Empty` 表示，构造期校验不再要求 `ActorUserId` 非空（`Guid.Empty` 是合法值）。受影响章节：§3.7。详见 [HD-007 §13 决策记录](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-决策记录)。
+>
+> **2026-07-06 errata·第六轮**（[design-review-report.md §18.3 B15](../design-review-report.md#b15q5比照-vectordata-先例缺物理落地机制iembeddinggenerator-依赖白名单例外未实际生效c91) + Owner picker 拍板选项 1）：`Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 依赖白名单 + `GlobalUsings.cs` 追加 `global using Microsoft.Extensions.AI;`，使 [HD-008 §6](HD-008-Inkwell.Abstractions-vector-store-type-alias.md#6-与-iembeddinggeneratortinput-tembedding-的衔接) 锁定的 `IEmbeddingGenerator<string, Embedding<float>>` 通过依赖 `Inkwell.Abstractions` 间接可见，与 `Microsoft.Extensions.VectorData.Abstractions`（C86 既有落地）完全同构；不修改 [AGENTS.md §3.2](../../../AGENTS.md)。受影响章节：§2 / §14.3。详 §13 errata 记录。
 
 ## 1. 模块概述
 
@@ -83,6 +85,7 @@ upstream:
 src/core/Inkwell.Abstractions/
   Inkwell.Abstractions.csproj          # 仅引用 Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions
                                        #     + Microsoft.Extensions.VectorData.Abstractions (HD-008 起用)
+                                       #     + Microsoft.Extensions.AI.Abstractions (HD-008 起用，2026-07-06 errata·第六轮 B15)
   GlobalUsings.cs                      # 项目级 global using——详 §14.3 / [docs-style](../../../.github/instructions/coding-discipline.instructions.md)
   Common/
     InkwellException.cs                # 仅 InkwellConfigurationException + InkwellBuilderException 两个程序错误子类，直继 System.Exception
@@ -510,6 +513,18 @@ var app = builder.Build();
 
 本次为 errata 级修订，不改变 §5.3 既有决策，仅补齐 §5.2 遗漏的同步翻新；`status: reviewed` 不打回 `draft`。
 
+### 2026-07-06 errata·第六轮——B15 对称纳入 `Microsoft.Extensions.AI.Abstractions` 白名单
+
+**触发**：[design-review-report.md §18.3 B15](../design-review-report.md#b15q5比照-vectordata-先例缺物理落地机制iembeddinggenerator-依赖白名单例外未实际生效c91)（HD-008 增量评审发现一致性冲突 C91）——HD-008 §6 / §13 Q5 将 `IEmbeddingGenerator<string, Embedding<float>>` 允许业务命名空间直接注入的决策依据表述为“比照本 HD 自身对 `Microsoft.Extensions.VectorData.Abstractions` 的处理先例”，但 `Microsoft.Extensions.AI.Abstractions` 当时并未真正走过与 VectorData 相同的物理落地步骤（未纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`），若业务命名空间直接注入会被 CI `BannedSymbols.txt` 拦下。Owner 通过 chat picker 拍板修复方向为**选项 1**：把 `Microsoft.Extensions.AI.Abstractions` 也对称纳入 `Inkwell.Abstractions.csproj` 白名单 + `GlobalUsings.cs`，与 VectorData 处理完全同构，不触碰 `AGENTS.md`。
+
+**变更清单**：
+
+- **§1.1 拓扑依据 callout**：`Inkwell.Abstractions` 零外部包依赖例外清单追加 `Microsoft.Extensions.AI.Abstractions`
+- **§2 文件结构**：`Inkwell.Abstractions.csproj` 注释追加 `+ Microsoft.Extensions.AI.Abstractions (HD-008 起用，2026-07-06 errata·第六轮 B15)`
+- **§14.3 Global usings**：推荐例追加 `global using Microsoft.Extensions.AI;`
+
+本次为 errata 级修订，不改变 §10 既有决策，仅补齐 HD-008 Q5 决策所需的物理落地机制；`status: reviewed` 不打回 `draft`。下游联动：[HD-008 §2 / §6 / §13 Q5](HD-008-Inkwell.Abstractions-vector-store-type-alias.md) + [file-structure.md `## Inkwell.Abstractions.VectorStore`](../file-structure.md#inkwellabstractionsvectorstore) + [design-review-report.md §18](../design-review-report.md#18-hd-008-vector-store-type-alias--builder-dsl-钩子首轮评审2026-07-06) 同会话切片同步处理。
+
 ## 14. 命名空间与代码风格约定（横切规约）
 
 > **2026-05-11 新增**（Owner 拍板）：本节为跨 12 csproj 的代码风格横切规约，由 HD-001 作地基锁定；HD-002 ~ HD-008 及 providers/* 各自 HD 起草时**不重复本节内容**，仅引用 `[HD-001 §14](HD-001-Inkwell.Abstractions-foundation.md#14-命名空间与代码风格约定横切规约)`。下次会话补 ADR-024 作为根决策证据。
@@ -555,6 +570,7 @@ var app = builder.Build();
   global using Microsoft.Extensions.Logging;
   global using Microsoft.Extensions.Options;
   global using Microsoft.Extensions.VectorData; // HD-008 起用：VectorStore / VectorStoreCollection<TKey, TRecord> 等类型全项目可用
+  global using Microsoft.Extensions.AI; // HD-008 起用，2026-07-06 errata·第六轮（B15）：IEmbeddingGenerator<,> 等类型全项目可用，与 VectorData 同构
   ```
 
 - 本 csproj由于是抽象层，**禁止**在 `GlobalUsings.cs` 中 `global using Microsoft.Agents.AI.*` / `StackExchange.Redis` / `Azure.Storage.Blobs` / `Microsoft.EntityFrameworkCore.*` / `Npgsql.*` / `Minio.*`（[ADR-017 §依赖规则](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + Roslyn `BannedSymbols.txt` CI 强制）
