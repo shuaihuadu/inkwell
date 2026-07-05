@@ -1620,6 +1620,8 @@ reviewer 在 chat 中列三路径 picker：
 
 ##### B12：`JsonException` 告警分级在 HD-004（程序错误 / P1-P2）与 HD-005（业务失败 / 不触发 P1）之间矛盾（C50）
 
+> **已处理（2026-07-05）**：Owner picker 拍板方向为"HD-005 对齐 HD-004"——`JsonException` 统一划入"程序错误"档（P1-P2 告警）。修复落地于 [HD-005 §4.2](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#42-bcl-异常分类业务失败-vs-程序错误)（errata 说明 + 分类调整）与 [§5.3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#53-错误处理)（错误处理摘要同步）；HD-005 仍为 `status: draft`，未走 HD-001 §13 式的独立 errata 链式记录。
+
 - **问题**：两份共享同一序列化决策（`System.Text.Json` + `JsonSerializerOptions.Web`）的兄弟 HD，对完全相同的异常类型给出相反的运维告警语义——HD-004 把 `JsonException` 划入"运维介入修复"档，HD-005 把 `JsonException` 划入"调用方业务策略处理、不触发 P1"档。二者不可能同时成立：若"反序列化失败 = 通常因业务侧 payload/存储值 schema 变更未兼容处理"这一根因判断正确，则该判断在 Cache 与 Queue 两个端口应同样适用（不存在"Cache 场景的 schema 漂移是运维问题、Queue 场景的 schema 漂移是业务问题"的领域差异证据）。
 - **影响范围**：
   - H4 TestCaseAuthor 反推告警相关测试用例时，若信 HD-004 会为 `JsonException` 写"应触发 P1 告警"断言；若信 HD-005 会写"不应触发 P1"断言——同一异常类型在跨端口集成场景（如 KB ingest 同时经过 Cache 命中判断与 Queue 消费）下断言会自相矛盾
@@ -1636,6 +1638,8 @@ reviewer 在 chat 中列三路径 picker：
 
 ##### N16：HD-005 §2 csproj 依赖白名单声明遗漏 `System.Diagnostics.Activity`，与 file-structure.md 转述不一致（C55）
 
+> **已处理（2026-07-05）**：[HD-005 §2](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#2-文件结构) csproj 依赖白名单已补 `System.Diagnostics.Activity`，与 file-structure.md 转述对齐。
+
 - **问题**：HD-005 §2 自身文本未把 `System.Diagnostics.Activity` / `ActivitySource` 列入依赖白名单，但该命名空间是 `TraceParent` 自动捕获（[RISK-015](../03-architecture/risk-analysis.md) 硬约束）的直接依赖；file-structure.md 转述时补上了这一项，形成两处表述不同步
 - **影响范围**：不影响编译（BCL 内置命名空间无需 NuGet 引用），但作为"依赖白名单"权威声明存在文档间漂移，未来若有人只读 HD-005 §2 可能误以为需要额外确认该依赖是否被允许
 - **建议方向**：HD-005 §2 依赖白名单文本补一句"+ `System.Diagnostics.Activity`（BCL 内置，`TraceParent` 自动捕获所需）"，与 file-structure.md 转述对齐
@@ -1643,6 +1647,8 @@ reviewer 在 chat 中列三路径 picker：
 - **追溯**：C55
 
 ##### N17：RISK-015 缓解方案第 5 项"schema 兼容性 SOP"未在 HD-005 §11 待补事项中登记移交（C56）
+
+> **已处理（2026-07-05）**：[HD-005 §11](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#11-待补--待评审) 已补一条"`MessageEnvelope` schema 演进规则"移交声明，指向 `Inkwell.Queue.Redis` Provider HD。
 
 - **问题**：`MessageEnvelope<T>` 字段未来演进（新增字段是否强制可选、废弃字段最少保留几个 release）是 RISK-015 缓解方案明确列出的第 5 项，但 HD-005 §1.2 / §11 的"待移交事项"清单只覆盖了 Redis 实例复用策略、重试退避算法参数、跨服务集成测试用例三项，未提及 envelope schema 演进规则应移交给谁（`Inkwell.Queue.Redis` Provider HD，还是 HD-005 自身未来的 errata）
 - **影响范围**：不影响 v1 首次交付（HD-005 §3.2 已锁定 v1 的 5 字段最小集），但若后续（如 H5 编码期间）需要给 `MessageEnvelope<T>` 加字段，缺少明确的演进规则移交对象，容易出现"该改端口 HD 还是该改 Provider HD"的归属争议
@@ -1652,6 +1658,8 @@ reviewer 在 chat 中列三路径 picker：
 
 ##### N18：ADR-019"WebApi 仅注册 enqueue 侧"未在 HD-005 接口层固化为可机械检查的约束（C57）
 
+> **待后续 HD 处理**：不在本轮修复范围内，按评审建议留到 `Inkwell.WebApi` / `Inkwell.Worker` 各自 HD 起草时处理。
+
 - **问题**：ADR-019 明确 `Inkwell.WebApi` 不应消费队列，但 HD-005 的单一 `IQueueProvider` facade 让 Enqueue 与 Dequeue/Ack/Nack 共享同一接口类型，WebApi 侧的代码在类型系统层面完全可以调用 `DequeueAsync` / `AcknowledgeAsync` / `NegativeAcknowledgeAsync` 而不会被编译期或 CI 拦截
 - **影响范围**：若未来某位业务开发者在 `Inkwell.WebApi` 中意外调用了 Dequeue 系方法（如为了"调试方便"临时加一段消费逻辑），会破坏 ADR-019 的故障隔离 / 独立扩缩设计意图，且不会有任何自动化机制发现
 - **建议方向**：可选方向包括——(a) 接口拆分为 `IQueueProducer`（Enqueue）+ `IQueueConsumer`（Dequeue/Ack/Nack），`Inkwell.WebApi` 只注入前者；(b) 保持单一接口，但在 `Inkwell.WebApi` 起草独立 HD 时用 Roslyn analyzer / `BannedSymbols.txt` 风格的 CI 规则禁止该 csproj 内出现 `DequeueAsync` / `AcknowledgeAsync` / `NegativeAcknowledgeAsync` 调用；(c) 接受现状，仅在文档层面强调，不做机械强制。三个方向的成本 / 收益取舍留 Owner 判断，本 HD 不下结论
@@ -1659,6 +1667,8 @@ reviewer 在 chat 中列三路径 picker：
 - **追溯**：C57
 
 ##### N19：`TraceParent` 依赖 `Activity.DefaultIdFormat = W3C` 的隐含假设未显式声明（C58）
+
+> **已处理（2026-07-05）**：[HD-005 §4.3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#43-otel-span--字段) 已补显式声明该隐含依赖；[§8.3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#83-集成测试) 已补 H4 应断言 `TraceParent` 匹配 W3C 格式正则而非仅断言非空的测试要求。
 
 - **问题**：HD-005 假定 `Activity.Current?.Id` 返回的字符串就是合法 W3C `traceparent`，这一假设仅在 `Activity.DefaultIdFormat`（或调用方显式设置）为 `ActivityIdFormat.W3C` 时成立；HD-005 全文未显式声明这一前置条件，也未声明"若上游 `ActivitySource` 配置为 `Hierarchical` 格式会发生什么"
 - **影响范围**：若该假设在某个环境下不成立，RISK-015 要求的跨进程 trace 串联会**静默失效**（`TraceParent` 字段仍非 null，但内容不是合法 W3C 格式，Worker 侧 `ActivitySource.StartActivity(..., parentId: envelope.TraceParent)` 可能构造出无效的父子关系而不抛异常），比"直接报错"更难在 H4 集成测试中被发现
@@ -1671,10 +1681,10 @@ reviewer 在 chat 中列三路径 picker：
 - **整体评审决议**：**PASS-AS-ERRATA**——HD-005 本体设计（接口 / DTO / Options / OTel / CI 自检）完整且自洽，与 ADR-018 / ADR-019 / ADR-023 的核心决策无冲突；唯一 blocking 项（B12）是 HD-004 ↔ HD-005 之间的告警分级矛盾，修复动作是一处小范围的分类对齐（选一档并同步另一份 HD 的对应文字），不需要重新设计接口形态或推翻任何 picker 决策
 - **与 HD-004 §14.4 B11 的差异提醒**：B11 的修复目标是已 reviewed 的 HD-001（HD-004 本体不用动）；B12 的修复目标可以是仍处于 `status: draft` 的 HD-005 本身（成本更低的路径），也可以是已 reviewed 的 HD-004（需要新增 errata）——具体选哪个由 Owner picker 决定，reviewer 不代为拍板
 - **HD-005 翻 `reviewed` 前置条件**：
-  1. ⬜ Owner picker 拍板 B12（在"HD-004 对齐 HD-005" / "HD-005 对齐 HD-004" / "按根因拆分判断依据"三个方向中选一个）
-  2. ⬜ AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下按 picker 结果落地对应 HD 的 §4.2 errata
+  1. ✅ Owner picker 拍板 B12（2026-07-05，选定"HD-005 对齐 HD-004"方向）
+  2. ✅ AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下按 picker 结果落地 HD-005 §4.2 / §5.3 errata（同步处理 N16 / N17 / N19 非阻塞项，N18 按评审建议留待后续 HD）
   3. ⬜ Owner 在 HD-005 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
-- **不阻塞的后续建议**：N16（依赖白名单表述对齐）/ N17（schema 演进规则移交声明）/ N18（WebApi/Worker 接口隔离，建议留到 `Inkwell.WebApi` / `Inkwell.Worker` 各自 HD 起草时处理）/ N19（W3C DefaultIdFormat 假设显式声明 + H4 断言建议）均可与 B12 一并由 author 模式顺带落地，不需要单独会话
+- **不阻塞的后续建议**：N16（依赖白名单表述对齐，已处理）/ N17（schema 演进规则移交声明，已处理）/ N18（WebApi/Worker 接口隔离，建议留到 `Inkwell.WebApi` / `Inkwell.Worker` 各自 HD 起草时处理，本轮不处理）/ N19（W3C DefaultIdFormat 假设显式声明 + H4 断言建议，已处理）均已与 B12 一并由 author 模式在 2026-07-05 同一会话落地
 - **后续 HD 建议路径**：HD-005 reviewed 后继续 HD-006 `IAgentRuntime`（[REQ-003](../01-requirements/requirements.md) / [ADR-003](../03-architecture/adr/ADR-003-agent-engine-microsoft-agent-framework.md) MAF 唯一合法引用点）
 
 ### 15.5 自检

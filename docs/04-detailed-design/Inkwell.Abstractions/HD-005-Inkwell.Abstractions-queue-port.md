@@ -79,7 +79,7 @@ src/core/Inkwell.Abstractions/
     QueueOptionsValidator.cs              # IValidateOptions<QueueOptions>
 ```
 
-> **csproj 依赖白名单**：HD-005 不引入新依赖，仍仅 [HD-001 §2 锁定的](HD-001-Inkwell.Abstractions-foundation.md) `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions`（HD-008 起用）+ [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)（BCL 内置，无需额外包引用）。**严禁**因本 HD 引入 `StackExchange.Redis` 等任何具体 SDK（违反 [ADR-017 零外部包约束](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../../03-architecture/risk-analysis.md) 同构风险）。
+> **csproj 依赖白名单**：HD-005 不引入新依赖，仍仅 [HD-001 §2 锁定的](HD-001-Inkwell.Abstractions-foundation.md) `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions`（HD-008 起用）+ [`System.Text.Json`](https://learn.microsoft.com/dotnet/api/system.text.json)（BCL 内置，无需额外包引用）+ [`System.Diagnostics.Activity`](https://learn.microsoft.com/dotnet/api/system.diagnostics.activity)（BCL 内置，`TraceParent` 自动捕获所需，2026-07-05 [design-review-report.md §15.3 N16](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05) 评审发现后补齐，与 file-structure.md 转述对齐）。**严禁**因本 HD 引入 `StackExchange.Redis` 等任何具体 SDK（违反 [ADR-017 零外部包约束](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-011 三 Provider contract 漏出](../../03-architecture/risk-analysis.md) 同构风险）。
 
 ## 3. 程序文件设计（10 字段 × 4 文件）
 
@@ -155,6 +155,8 @@ src/core/Inkwell.Abstractions/
 
 ### 4.2 BCL 异常分类（业务失败 vs 程序错误）
 
+> **2026-07-05 errata（B12）**：`JsonException` 原划入下方"业务失败 / 预期错误"档（不触发 P1），经 [design-review-report.md §15.3 B12](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05) 评审发现与 [HD-004 §4.2](HD-004-Inkwell.Abstractions-cache-port.md#42-bcl-异常分类业务失败-vs-程序错误) 矛盾——两 HD 共享同一序列化决策却对同一异常类型给出相反告警语义。本行由该评审发现后同步翻新：`JsonException` 改判为"程序错误"档（P1-P2 告警），与 HD-004 §4.2 保持一致，理由：序列化 / 反序列化失败通常意味着代码缺陷或数据损坏，需要人工介入。
+
 按 [HD-001 §5.3 BCL 对照表](HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表) 的分类语义：
 
 - **预期返回值（不是异常，调用方按值判断）**：
@@ -162,8 +164,9 @@ src/core/Inkwell.Abstractions/
   - `NegativeAcknowledgeAsync` `messageId` 未知 / 已过期 → 返回 `false`（幂等）
   - `DequeueAsync` 空队列 → 枚举挂起等待新消息（长轮询语义，不是错误）
 - **业务失败 / 预期错误**（调用方应 try/catch 并按业务策略处理，**不**触发 P1 告警）：
-  - `JsonException`：`DequeueAsync` 枚举中遇到无法反序列化为 `T` 的消息（毒消息，通常因业务侧 payload schema 变更未做兼容处理）；`EnqueueAsync` 序列化 `T` 失败（含不支持的循环引用 / 非 JSON 友好类型）
+  - 本端口 v1 暂无归入此档的异常类型（`JsonException` 已按上方 2026-07-05 errata 改判为"程序错误"档，见下）
 - **程序错误 / 失血告警**（运维介入修复，P1 / P2 告警）：
+  - `JsonException`：`DequeueAsync` 枚举中遇到无法反序列化为 `T` 的消息（毒消息）；`EnqueueAsync` 序列化 `T` 失败（含不支持的循环引用 / 非 JSON 友好类型）——序列化 / 反序列化失败通常意味着代码缺陷（业务侧变更 payload schema 未做兼容处理）或数据损坏，需要人工介入排查，与 [HD-004 §4.2](HD-004-Inkwell.Abstractions-cache-port.md#42-bcl-异常分类业务失败-vs-程序错误) 分级一致
   - `IOException`：DNS / TLS / network 失败 / Redis 连接断开 / 中途传输中断；触发方法：全部 4 个；message 应含具体根因（如 `"Connection to Redis endpoint failed"`）
   - `TimeoutException`：单次远端调用超过 Provider 子 Options 的超时配置；触发方法：全部 4 个
 - **参数 / 取消错误**（调用方 bug，应在测试期暴露）：
@@ -202,6 +205,8 @@ src/core/Inkwell.Abstractions/
 
 > **跨进程 trace 恢复**（[RISK-015](../../03-architecture/risk-analysis.md)）：`DequeueAsync` 的实现层在产出每条 `MessageEnvelope<T>` 前，应以 `envelope.TraceParent` 为 `parentId` 启动一个 `ActivityKind.Consumer` 的新 `Activity`（[`ActivitySource.StartActivity(name, ActivityKind.Consumer, parentId: envelope.TraceParent)`](https://learn.microsoft.com/dotnet/api/system.diagnostics.activitysource.startactivity)），使 `Inkwell.Worker` 侧的 `queue.dequeue` span 与 `Inkwell.WebApi` 侧的 `queue.enqueue` span 在同一条 trace 内呈父子关系，满足 [REQ-014 trace 全链路](../../01-requirements/requirements.md) 跨服务不断链要求。若 `TraceParent` 为 `null`（生产方未启用 tracing），消费方新起一条独立 trace，不视为错误。
 >
+> **W3C DefaultIdFormat 隐含依赖**（2026-07-05 [design-review-report.md §15.3 N19](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05) 评审发现后补齐）：上述机制假设进程内 [`Activity.DefaultIdFormat`](https://learn.microsoft.com/dotnet/api/system.diagnostics.activity.defaultidformat) = `ActivityIdFormat.W3C`（.NET 5+ 默认值，Inkwell 未修改）。若某端因自定义 `ActivitySource` / 第三方 instrumentation 将其改为 `Hierarchical`，`Activity.Current?.Id` 将不再是合法 W3C `traceparent` 格式——`MessageEnvelope.TraceParent` 字段仍非 `null` 但内容非法，[RISK-015](../../03-architecture/risk-analysis.md) 的跨进程 trace 串联会**静默失效**而非报错。H4 集成测试应断言 `envelope.TraceParent` 匹配 W3C `traceparent` 正则（`^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$`），而非仅断言字段非空（详 §8.3）。
+>
 > **PII 提示**：`queue.name` / `queue.message_id` 可能含业务上下文；这些字段允许进 OTel（Inkwell 自托管 Grafana 栈在边界内），调用方在写**额外**业务日志时应自行过滤（同 [HD-004 §4.3](HD-004-Inkwell.Abstractions-cache-port.md#43-otel-span--字段) PII 处理方式一致）。消息**载荷本身**（`EnqueueAsync` / `MessageEnvelope.Payload` 的 `T`）**不得**进入任何 OTel 字段——需要观测载荷规模时仅追加 `queue.payload_size_bytes`（长度而非内容）。
 
 ## 5. 公共约定继承（HD-001）
@@ -222,8 +227,8 @@ src/core/Inkwell.Abstractions/
 
 ### 5.3 错误处理
 
-- 业务失败 / 预期错误 → BCL 业务异常（`JsonException`）；调用方 try/catch 按业务策略处理
-- 程序错误 / 失血告警 → BCL 程序异常（`IOException` / `TimeoutException`）；触发运维告警
+- 业务失败 / 预期错误 → 本端口 v1 暂无归入此档的异常类型（`JsonException` 已按 [§4.2 2026-07-05 errata（B12）](#42-bcl-异常分类业务失败-vs-程序错误) 改判为程序错误）
+- 程序错误 / 失血告警 → BCL 程序异常（`IOException` / `TimeoutException` / `JsonException`）；触发运维告警
 - 参数错误 → `ArgumentException` / `ArgumentNullException`
 - 幂等确认型返回 → `AcknowledgeAsync` / `NegativeAcknowledgeAsync` 返回值本身表达"已确认 / 未知消息"语义，不抛异常
 - 取消 → `OperationCanceledException`
@@ -304,7 +309,7 @@ public static class ChannelsQueueBuilderExtensions
   - crash recovery（worker SIGKILL 后未 ack 消息在 visibility timeout 后被重插）
   - fairness（多副本 worker 并发消费同一 queue，跨副本 ack 顺序不出现永久偏斜）
   - DLQ（连续 `MaxDeliveryAttempts` 次失败后消息进入死信）
-  - `MessageEnvelope.TraceParent` 跨进程 trace 串联（[RISK-015](../../03-architecture/risk-analysis.md)，[AGENTS.md §3.4](../../../AGENTS.md) 要求的 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例雏形，具体用例设计留 H4）
+  - `MessageEnvelope.TraceParent` 跨进程 trace 串联（[RISK-015](../../03-architecture/risk-analysis.md)，[AGENTS.md §3.4](../../../AGENTS.md) 要求的 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例雏形，具体用例设计留 H4）；**H4 应断言** `envelope.TraceParent` 匹配 W3C `traceparent` 格式正则（`^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$`），而非仅断言字段非空（2026-07-05 [design-review-report.md §15.3 N19](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05) 评审发现后补齐，详 §4.3）
 
 ### 8.4 BannedSymbols（CI 强制）
 
@@ -349,11 +354,12 @@ public static class ChannelsQueueBuilderExtensions
 
 ## 11. 待补 / 待评审
 
-以下 3 条为本轮起草后仍待后续 HD / H4 明确的开放事项，均已在 §1.2 范围声明为"不在本 HD 内"，此处仅作追踪索引：
+以下 4 条为本轮起草后仍待后续 HD / H4 明确的开放事项，均已在 §1.2 范围声明为"不在本 HD 内"，此处仅作追踪索引：
 
 - **Redis 实例复用策略**：`Inkwell.Queue.Redis` 与 `Inkwell.Cache.Redis` 是否复用同一 Redis 实例（不同 db number）vs 独立部署——留 `Inkwell.Queue.Redis` Provider HD 决定（[risk-analysis.md RISK-014](../../03-architecture/risk-analysis.md) 建议独立部署，非本 HD 强制）
 - **重试退避算法参数**：指数退避 1s ~ 60s + jitter 的具体实现（是否可配置、jitter 算法选型）——留 `Inkwell.Queue.Redis` Provider HD 决定，本 HD `QueueOptions` 不预留该字段（[picker Q-dlq-policy=A](#13-决策记录) 范围仅覆盖 `MaxDeliveryAttempts` / `VisibilityTimeoutSeconds` / `DlqRetentionHours` 三项）
 - **跨服务集成测试具体用例设计**：[AGENTS.md §3.4 RISK-015](../../../AGENTS.md) 要求的 enqueue (WebApi) → consume (Worker) → ack 全链路用例、`Inkwell.Triggers` [REQ-011](../../01-requirements/requirements.md) / KB ingest [REQ-009](../../01-requirements/requirements.md) 两类典型异步场景的具体测试步骤——留 H4 [TestCaseAuthor](../../../.github/agents/h4-test-case-author.agent.md) 反推详细用例，本 HD 仅锁定 `MessageEnvelope.TraceParent` 承载字段确保串联可行
+- **`MessageEnvelope` schema 演进规则**（[RISK-015 缓解方案 #5](../../03-architecture/risk-analysis.md#risk-015-webapi--worker-双进程版本漂移与-otel-双-source)"schema 兼容性 SOP"）：`MessageEnvelope<T>` 字段未来新增 / 废弃的向后兼容规则（新字段必须可选、废弃字段至少保留两个 release）——留 `Inkwell.Queue.Redis` Provider HD 起草时锁定（该规则本质是 Redis Streams 消费者端向后兼容性的实现细节），本 HD §3.2 仅锁定 v1 首次交付的 5 字段最小集，不预判未来演进路径（2026-07-05 [design-review-report.md §15.3 N17](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05) 评审发现后补齐）
 
 ## 12. 跨模块章节贡献
 
@@ -393,3 +399,11 @@ public static class ChannelsQueueBuilderExtensions
 - **Q-perf-budget**：备选 B（紧凑档 `Enqueue` P50 < 10ms）未选——理由同 [HD-004 Q-perf-budget](HD-004-Inkwell.Abstractions-cache-port.md#132-候选与放弃理由)：v1 未锁定 Redis 部署是否同 region，宽松档更稳妥
 - **Q-queuename-convention**：备选 B（锁 `InkwellQueues` 常量集）被否决——与 [HD-003 picker Q3](HD-003-Inkwell.Abstractions-file-storage-port.md#13-关键决策摘要) / [HD-004 picker Q-key-convention](HD-004-Inkwell.Abstractions-cache-port.md#13-决策记录) 风格保持一致，端口层保持薄，队列名语义留业务侧决定（如 `Inkwell.Core.KnowledgeBase` 决定 `kb-ingest`，`Inkwell.Core.Triggers` 决定 `trigger-fanout`）
 - **Q-otel**：不设对立候选——与 [HD-004 §4.3](HD-004-Inkwell.Abstractions-cache-port.md#43-otel-span--字段) `cache.<verb>` 风格保持族内一致，降低跨端口可观测性认知成本
+
+### 13.3 评审后修订记录（2026-07-05，[design-review-report.md §15](../design-review-report.md#15-hd-005-iqueueprovider-增量评审2026-07-05)）
+
+- **B12（blocking，已修复）**：Owner picker 拍板方向为"HD-005 对齐 HD-004"——`JsonException` 由"业务失败 / 预期错误"档改判为"程序错误 / 失血告警（P1-P2）"档，与 [HD-004 §4.2](HD-004-Inkwell.Abstractions-cache-port.md#42-bcl-异常分类业务失败-vs-程序错误) 保持一致。落地位置：§4.2（分类 + errata 说明）、§5.3（错误处理摘要同步）。因 HD-005 仍为 `status: draft`，直接修改正文，不走 HD-001 §13 式的 errata 链式记录
+- **N16（non-blocking，已修复）**：§2 csproj 依赖白名单补 `System.Diagnostics.Activity`，与 file-structure.md 转述对齐
+- **N17（non-blocking，已修复）**：§11 补一条 `MessageEnvelope` schema 演进规则的移交声明，指向 `Inkwell.Queue.Redis` Provider HD
+- **N19（non-blocking，已修复）**：§4.3 补 `Activity.DefaultIdFormat = W3C` 隐含依赖的显式声明；§8.3 补 H4 应断言 `TraceParent` 格式而非仅非空的测试要求
+- **N18（non-blocking，暂不处理）**：ADR-019"WebApi 仅注册 enqueue 侧"接口层固化，按评审建议留到 `Inkwell.WebApi` / `Inkwell.Worker` 各自 HD 起草时处理，本次不改动 HD-005 §3.1 接口形态
