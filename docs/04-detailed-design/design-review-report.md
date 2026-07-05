@@ -1698,3 +1698,104 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §15 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
+
+## 16. HD-006 Agent Runtime Port 首轮评审（2026-07-05）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，仅评审增量产物：[HD-006 Inkwell.Abstractions Agent Runtime Port](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)（status: draft，2026-07-05 起草）+ [file-structure.md `## Inkwell.Abstractions.AgentRuntime` 章节追加](file-structure.md#inkwellabstractionsagentruntime)。报告主体 §1 ~ §15 的 `status / reviewers` 字段**不**因本节调整。按 user-memory `markdown-lint.md` 已知陷阱（中英文混排长内容表必触发 MD060），本节全程以 bullet list 呈现，不使用表格。
+
+### 16.0 评审范围与基线
+
+- **本轮评审对象**：HD-006 全文（§1 ~ §13）+ file-structure.md `## Inkwell.Abstractions.AgentRuntime` 章节
+- **不在本轮范围**：HD-001 / HD-002 / HD-003 / HD-004 / HD-005 / HD-009 / database-design.md 主体（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-006 frontmatter 完整，upstream 15 项均可定位：REQ-003 / REQ-004 / REQ-005 / REQ-006 / REQ-007 / REQ-008 / REQ-010 / REQ-014 / REQ-016（[requirements.md line 123-136 / 256-269](../01-requirements/requirements.md)）+ ADR-003 / ADR-011 / ADR-012 / ADR-017 / ADR-023 + HD-001 / HD-004 / HD-005 全部真实存在
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-006 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 16.1 完备性扫描（HD-006 范围内）
+
+按 [h3-detailed-design.md 章节清单](../../.he/docs/stages/h3-detailed-design.md) 逐项打分：
+
+- **文件结构**：`pass` — `AgentRuntime/` 10 个 `*.cs` 全锁（`IAgentRuntime.cs` / `AgentRunRequest.cs` / `AgentTurnResult.cs` / `AgentChatMessage.cs` / `AgentMessageContentPart.cs` / `AgentModelParameters.cs` / `AgentToolDefinition.cs`（含 `AgentToolCallRecord`） / `AgentRunEvent.cs` / `AgentRuntimeOptions.cs` / `AgentRuntimeOptionsValidator.cs`）+ file-structure.md `## Inkwell.Abstractions.AgentRuntime` 章节同步落地（但清单存在遗漏，详 §16.2 C60）。证据：[HD-006 §2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#2-文件结构) + [file-structure.md §Inkwell.Abstractions.AgentRuntime](file-structure.md#inkwellabstractionsagentruntime)
+- **数据库**：`n/a` — 端口层不直接接 DB，HD-006 §12 显式声明 database-design.md "不贡献"（`AgentDefinition` 持久化已在 HD-002 覆盖）。证据：[HD-006 §12](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#12-跨模块章节贡献)
+- **接口 / 错误码**：`pass` — 3 方法签名齐全 + §4.1 显式声明"不分配 `INK-AGENTRUNTIME-NNN` 错误码"（与 ADR-023 errata 后最终态一致，全文零 `Task<Result<` / 零 `Result.Success` / 零 `INK-` 字面量残留）。证据：[HD-006 §3.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#31-agentruntimeiagentruntimecs) + [§4.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#41-错误码)
+- **流程 / 后台任务**：`n/a` — 端口层无独立进程，具体 Provider 实现（`AzureOpenAIAgentRuntime` / `AgentSession` 生命周期管理）显式移交 `Inkwell.Core.AgentRuntime` 独立 HD。证据：[HD-006 §1.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#12-范围) + [§9](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#9-部署--配置)
+- **每个目录 / 程序文件职责**：`pass` — 10 `*.cs` × 10 字段全填，无 `<TBD>` / `<待定>`。证据：[HD-006 §3.1 ~ §3.10](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#3-程序文件设计10-字段--10-文件)
+- **配置文件字段 / 默认值**：`pass` — `AgentRuntimeOptions` 5 字段 + 默认值 + `[Range]` 边界 + §9 appsettings.json 正确嵌套示例（`AgentRuntime` 对象内嵌套 `AzureOpenAI` 子段，未重演 [HD-004 C47 扁平键坑](#142-一致性扫描hd-004--hd-001--adr-016--adr-023)）。证据：[HD-006 §3.9](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#39-agentruntimeagentruntimeoptionscs) + [§9](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#9-部署--配置)
+- **日志格式 / 字段**：`pass` — 3 个 `agentruntime.<verb>` span × 6 私有字段 + 5 个 OTel `exception.*` 标准字段 + PII 提示（对话内容 / 工具参数不进 OTel）。证据：[HD-006 §4.3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段)
+- **监控指标 / 告警策略**：`pass` — §7.3 两档告警建议（P1 连接/超时失血 / P2 调用持续失败）+ 模型推理延迟指标移交实现层，处理方式与 [HD-005 §7.3 残余指标移交先例](#151-完备性扫描hd-005-范围内) 一致。证据：[HD-006 §7.3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#73-可观测性)
+- **部署步骤 / 回滚 / 备份恢复**：`partial` — 凭证位 + K8s Secret 引用明确，但 Azure OpenAI 凭证子 Options / 具体部署步骤合理移交 `Inkwell.Core.AgentRuntime` 独立 HD（与 [HD-004 / HD-005 §7.2 partial 先例](#141-完备性扫描hd-004-范围内) 同模式）。证据：[HD-006 §7.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#72-安全) + [§9](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#9-部署--配置)
+- **性能边界 / 安全边界 / 已知限制**：`pass` — §7.1 3 方法 P50/P99 预算表（facade overhead，不含模型推理延迟，理由与 HD-004/HD-005 一致）+ §7.2 安全（凭证位 / 对话内容不进 OTel）+ §11 5 条已知待补事项。证据：[HD-006 §7](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#7-性能--安全--可观测性) + [§11](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#11-待补--待评审)
+
+**完备性结论**：10 项中 7 项 `pass`、2 项 `n/a`（端口层不接 DB / 不独立进程）、1 项 `partial`（部署凭证合理 deferral 到 Provider HD）、0 项 `missing`。完备性维度不卡 HD-006 翻 reviewed。
+
+### 16.2 一致性扫描（HD-006 ↔ HD-001 / HD-004 / HD-005 / ADR-003 / ADR-011 / ADR-012 / ADR-017 / ADR-023 + file-structure.md）
+
+- **C60（FAIL）**— [file-structure.md `## Inkwell.Abstractions.AgentRuntime` 章节](file-structure.md#inkwellabstractionsagentruntime)的 `AgentRuntime/` 文件树遗漏 `AgentModelParameters.cs`：当前树仅列 9 个文件（`IAgentRuntime.cs` / `AgentRunRequest.cs` / `AgentTurnResult.cs` / `AgentChatMessage.cs` / `AgentMessageContentPart.cs` / `AgentToolDefinition.cs` / `AgentRunEvent.cs` / `AgentRuntimeOptions.cs` / `AgentRuntimeOptionsValidator.cs`），但 [HD-006 §2 文件结构](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#2-文件结构) + [§3.6](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#36-agentruntimeagentmodelparameterscs) 明确锁定 `AgentModelParameters.cs` 是独立第 10 个文件（`temperature`/`top_p`/`max_tokens` 字段 + `[Range]` 校验，完整 10 字段设计）。file-structure.md 文件计数文字"HD-006 新增 9 个 `*.cs`（AgentRuntime/ 9）；Abstractions csproj 累计 ... + 9（HD-006）= 43 个 `*.cs`"随之算错——应为新增 10 个、累计 44 个。证据：[file-structure.md §Inkwell.Abstractions.AgentRuntime 文件树 + 文件计数](file-structure.md#inkwellabstractionsagentruntime) vs [HD-006 §2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#2-文件结构) / [§3.6](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#36-agentruntimeagentmodelparameterscs)
+- **C61（PASS）**— HD-006 §4.4 防泄漏示例 + §10 CI 自检引用的 MAF 类型标识符（`AIAgent` / `AgentSession` / `ChatMessage` / `AgentResponse` / `AgentResponseUpdate` / `AgentRunOptions`）经核对 [microsoft/agent-framework 仓库](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.Abstractions/) 源码真实存在（`AIAgent.cs` / `AgentSession.cs` / `AgentResponse.cs` / `AgentResponseUpdate.cs` / `AgentRunOptions.cs`），非臆造类型名。证据：`agent-framework/dotnet/src/Microsoft.Agents.AI.Abstractions/AIAgent.cs` line 251/273/296（`RunAsync` 返回 `Task<AgentResponse>`）+ `AgentSession.cs` line 59 + `AgentResponse.cs` line 28
+- **C62（PASS）**— HD-006 全文（§3 / §4 / §10 CI 自检）零 `Task<Result<` / 零 `ErrorCodes.` / 零 `Result.Success`/`Result.Failure` 残留，从起草第一天直接采用 ADR-023 最终态，无历史包袱，与 [HD-004](#142-一致性扫描hd-004--hd-001--adr-016--adr-023) / [HD-005](#152-一致性扫描hd-005--hd-001--hd-004--adr-018--adr-019--adr-023) 同批次做法一致。证据：[HD-006 §10 Q4](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#10-ci-自检命令grep-列表) + 全文 grep 心算
+- **C63（PASS）**— OTel `exception.*` 五字段（`.type` / `.message` / `.stacktrace` / `.escaped` / `.id`）与 [HD-001 §4.2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#42-日志结构化字段) / [HD-004 §4.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#43-otel-span--字段) / [HD-005 §4.3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#43-otel-span--字段) 锁定字段完全一致。证据：[HD-006 §4.3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段)
+- **C64（PASS）**— 全 3 方法 `CancellationToken ct = default` 必填，`RunTurnStreamingAsync` 使用 `[EnumeratorCancellation]` 标注，与 [HD-001 §4.3 取消传播](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#43-取消传播) + [§5.2 流式签名约定](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#52-签名) 一致；被动 `ct` 取消与用户主动 `CancelRunAsync` 触发的取消统一走 `OperationCanceledException` 路径（§4.2 显式声明），与 [HD-005 `DequeueAsync` 取消惯例](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#42-bcl-异常分类业务失败-vs-程序错误) 一致。证据：HD-006 §3.1 接口签名 + §4.2
+- **C65（PASS）**— `IAgentRuntime` 未套用 `I<Capability>Provider` 命名模式，HD-006 §5.1 显式记录为既定命名例外，与 [HD-004 §1.4](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#14-与-hd-001-51--52-命名约定的一致性声明) / [HD-005 §1.4](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md#14-与-hd-001-51--52-命名约定的一致性声明) 同款"显式偏离声明 + reviewer 反查路径"质量门槛一致，非静默违反。证据：[HD-006 §5.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#51-命名)
+- **C66（PASS）**— HD-006 引用的 `InkwellProvidersOptions.AgentRuntime` 字段（默认值 `"AzureOpenAI"`）与 [HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增) 实际定义的 `[Required] public string AgentRuntime { get; init; } = "AzureOpenAI";` 字段完全一致；[HD-001 §3.11 `InkwellOptions`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 也已含 `AgentRuntimeOptions AgentRuntime` 属性锚点。证据：HD-001 §3.11 line 234 + §3.11.1 line 249 vs [HD-006 顶部 callout](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)
+- **C67（PASS）**— HD-006 多处引用"[ADR-017 §依赖规则第 3 条]"，经核对 [ADR-017 line 132](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 具体规则第 3 条原文确为"`Inkwell.Core.AgentRuntime` 命名空间 → 唯一允许 `using Microsoft.Agents.AI.*` 的位置"，引用准确无误。证据：[ADR-017 §依赖规则 line 132](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)
+- **C68（PASS）**— HD-006 §9 appsettings.json 示例采用标准 JSON 嵌套写法（`"AgentRuntime": { ..., "AzureOpenAI": { "Endpoint": ..., "ApiKey": ..., "DeploymentName": ... } }`），未重演 [HD-004 C47 扁平键名坑](#142-一致性扫描hd-004--hd-001--adr-016--adr-023)。证据：[HD-006 §9](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#9-部署--配置)
+- **C69（PASS）**— HD-006 §13.1 决策表 `Q-facade-scope` 行"3 方法（RunTurnAsync / RunTurnStreamingAsync / CancelRunAsync）"与 §1.1 / §3.1 实际接口方法数一致，未重演 [HD-004 C48 方法计数偏差](#142-一致性扫描hd-004--hd-001--adr-016--adr-023)。证据：[HD-006 §1.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#11-职责) / [§3.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#31-agentruntimeiagentruntimecs) / [§13.1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#131-起草期-picker-决策2026-07-05)
+- **C70（PASS）**— HD-006 §10 CI 自检命令全部使用多 `-e` flag 语法（`rg -n -e 'x' -e 'y' ...`），未重演 [HD-003 N8（`\|` markdown 表格 escape 在 shell 执行失效）](#n810-ci-命令-rg--shell-escape-失效c16) 的坑。证据：[HD-006 §10](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#10-ci-自检命令grep-列表) 全 6 条命令
+- **C71（PASS）**— 跨 Provider 契约测试包路径统一 `tests/core/Inkwell.Providers.Contract/AgentRuntime/`，与 [HD-002 §8](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-003 §8.3](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) / [HD-004 §8.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) / [HD-005 §8.3](Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md) 拓扑一致，未重演 [HD-003 B3 测试包路径分歧](#b3测试包路径分歧c13) 的坑。证据：[HD-006 §3.1 测试要求](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#31-agentruntimeiagentruntimecs) + [§8.3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#83-集成测试)
+- **C72（PASS）**— HD-006 §1.4 对 [ADR-011 自动锁屏保活](../03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md) 与 `CancelRunAsync`（用户主动中断）的边界声明逻辑自洽：ADR-011 锁屏保活作用于 Electron 主进程 SSE 订阅层，不触发 `CancelRunAsync`；二者路径独立、互不冲突。经对照 ADR-011 原文（"主进程不退出，也不主动断 SSE"）确认无矛盾。证据：[HD-006 §1.4](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#14-adr-011-自动锁屏保活-vs-本-hd-用户主动中断的边界声明) vs [ADR-011 §决策](../03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md)
+- **C73（PASS）**— HD-006 §3.8 `AgentRunEvent` 6 个子类型（`TextDelta` / `ToolCallRequested` / `ToolCallResult` / `StateDelta` / `RunCompleted` / `RunError`）1:1 对应 [ADR-012](../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) AG-UI 四大类事件（message / tool_call / state_delta / lifecycle）的映射关系经核对 ADR-012 原文（"定义了 message / tool_call / state_delta / lifecycle 等事件类型"）成立，且 HD-006 §1.2 显式声明"不锁定 AG-UI 事件到 `AgentRunEvent` 的具体映射代码（留 `Inkwell.WebApi` HD）"，边界清晰。证据：[HD-006 §3.8](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#38-agentruntimeagentruneventcs) vs [ADR-012 §上下文](../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md)
+- **C74（PASS）**— HD-006 upstream 引用的 REQ-003 / REQ-004 / REQ-005 / REQ-006 / REQ-007 / REQ-008 / REQ-010 / REQ-014 / REQ-016 全部在 [requirements.md](../01-requirements/requirements.md) 真实存在，且 HD-006 正文对各 REQ 验收标准的转述（如 REQ-006"这些参数最终在调试 trace 中可见"、REQ-007"调用与返回在调试 trace 中可见；工具失败按 EX-003 处理"）与 requirements.md 原文逐字对应。证据：[requirements.md line 123-136 / 256-269](../01-requirements/requirements.md) vs HD-006 §1.1 / §3.3 / §3.7
+- **C75（PARTIAL）**— HD-006 §4.4"CI 自检"引用的 grep 命令与 §10 Q1 实际列出的 grep 命令内容不一致：§4.4 写 `rg -n -e 'Microsoft\.Agents\.AI' -e 'AIAgent' -e 'AgentSession' -e 'ChatMessage' -e 'AgentResponse' src/core/Inkwell.Abstractions/AgentRuntime/`（无 `\b` 单词边界、缺 `AgentResponseUpdate` / `AgentRunOptions` 两个模式）；§10 Q1 写 `rg -n -e 'Microsoft\.Agents\.AI' -e '\bAIAgent\b' -e '\bAgentSession\b' -e '\bChatMessage\b' -e '\bAgentResponse\b' -e '\bAgentResponseUpdate\b' -e '\bAgentRunOptions\b' src/core/Inkwell.Abstractions/AgentRuntime/`（含 `\b` 边界 + 完整 7 模式）。§4.4 文字声称"详 §10 Q1"暗示两处应为同一条命令，但字面不同。证据：[HD-006 §4.4](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#44-maf-类型防泄漏机制本-hd-最核心约束的落地示例) vs [HD-006 §10 Q1](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#10-ci-自检命令grep-列表)
+
+**一致性结论**：16 项检查中 1 项 `FAIL`（C60）、1 项 `PARTIAL`（C75）、14 项 `PASS`（C61 ~ C74）。`FAIL` 是 file-structure.md 跨模块同步遗漏，非 HD-006 本体设计缺陷；`PARTIAL` 是同一 HD 内部两处 CI 命令字面不一致的文档精度问题。
+
+### 16.3 反问清单
+
+#### Blocking
+
+##### B13：file-structure.md `## Inkwell.Abstractions.AgentRuntime` 文件树遗漏 `AgentModelParameters.cs`，文件计数算错（C60）
+
+- **问题**：file-structure.md 新增的 `## Inkwell.Abstractions.AgentRuntime` 章节文件树只列 9 个文件，遗漏 [HD-006 §3.6](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#36-agentruntimeagentmodelparameterscs) 锁定的独立文件 `AgentModelParameters.cs`（`Temperature` / `TopP` / `MaxTokens` 三字段 + `[Range]` 校验，完整 10 字段设计）；文件计数文字"HD-006 新增 9 个 `*.cs`"及累计"43 个 `*.cs`"随之算错，应为"新增 10 个"、"累计 44 个"
+- **影响范围**：
+  - H5 [CodingExecutor](../../.he/agents/coding-executor/AGENT.md) 若以 file-structure.md 文件树作为"要创建哪些文件"的权威清单，会漏建 `AgentModelParameters.cs`，导致 `AgentRunRequest.ModelParameters` / `AgentTurnResult.ModelParametersUsed` 字段引用的类型不存在，直接编译失败
+  - H4 [TestCaseAuthor](../../.he/agents/test-case-author/AGENT.md) 反推 `AgentModelParametersTests.cs`（[HD-006 §3.6 测试要求](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#36-agentruntimeagentmodelparameterscs)已锁定）时若只看 file-structure.md 清单会遗漏该测试文件
+  - 后续 HD-007（`IAuditLogger`）起草时引用"当前 Abstractions csproj 累计文件数"会拿到错误基线（43 而非 44）
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：file-structure.md `## Inkwell.Abstractions.AgentRuntime` 文件树在 `AgentModelParameters.cs`（原第 6 行 `AgentToolDefinition.cs` 之前，对齐 HD-006 §2 顺序）补一行，注释沿用 HD-006 §2 原文"record，temperature/top_p/max_tokens（REQ-006）"；文件计数"9 个"→"10 个"、累计"43"→"44"
+  - 选项 2：若 Owner 判断 `AgentModelParameters` 应与 `AgentToolDefinition.cs` 同文件合并（如同 `AgentToolCallRecord` 的合并模式），则需回到 HD-006 §2 / §3.6 做相应精化并同步减少一个文件计数——但 HD-006 §3.6 已有独立完整 10 字段设计，合并会破坏该章节的独立性，reviewer 更倾向选项 1
+- **卡点等级**：**blocking**（建议 Owner picker 确认；修复目标是 file-structure.md 一处，不改动 HD-006 本体）
+- **追溯**：C60
+
+#### Non-blocking
+
+##### N20：HD-006 §4.4 与 §10 Q1 的 MAF 类型防泄漏 grep 命令字面不一致（C75）
+
+- **问题**：§4.4"CI 自检"标注"详 §10 Q1"暗示引用同一条命令，但 §4.4 命令缺 `\b` 单词边界、且比 §10 Q1 少两个匹配模式（`AgentResponseUpdate` / `AgentRunOptions`）
+- **影响范围**：不影响实际 CI 强制效果（§10 Q1 是 CI 实际引用的权威命令表，§4.4 仅为示例性重申），但若开发者直接复制 §4.4 命令当作最终 CI 脚本使用，会得到一条覆盖面较窄、且因缺 `\b` 边界可能误报（如变量名 `myAIAgentWrapper` 含子串 `AIAgent` 会被截获）的检查
+- **建议方向**：§4.4 命令直接替换为与 §10 Q1 完全一致的字面量，或改为"（命令见 §10 Q1，此处不重复）"避免维护两份易漂移的副本
+- **卡点等级**：non-blocking
+- **追溯**：C75
+
+### 16.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-006 本体设计（接口 / DTO / Options / MAF 零泄漏边界 / OTel / CI 自检 / ADR-003+011+012 一致性）完整且自洽，唯一 blocking 项（B13）的修复目标是 file-structure.md 跨模块同步文件（HD-006 本体不用动），且是一行文件树 + 两处计数字面量的低成本修复
+- **HD-006 翻 `reviewed` 前置条件**：
+  1. ⬜ Owner picker 拍板 B13（确认修复方向，reviewer 建议选项 1）
+  2. ⬜ AI 在 [`h3-detailed-design-author`](../../.github/agents/h3-detailed-design-author.agent.md) 模式下落 file-structure.md 一处 errata（可同步处理 N20 非阻塞项）
+  3. ⬜ Owner 在 HD-006 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
+- **MAF 类型零泄漏边界专项结论**：HD-006 §3 全部接口方法签名 / DTO 字段逐一核对，**未发现任何 `Microsoft.Agents.AI.*` / `Microsoft.Agents.AI.AGUI.*` / `Microsoft.Agents.AI.Workflows.*` 类型泄漏**到 public 签名；`Inkwell.Core.AgentRuntime` 唯一 MAF 接触面边界在 §4/§10 均有对应机械化 grep 检查（§10 Q1 检查端口目录内 MAF 标识符 0 命中、Q2 检查业务命名空间禁 `using Microsoft.Agents.AI`），仅 §4.4 与 §10 两处命令字面不同步（N20，non-blocking）
+- **后续 HD 建议路径**：HD-006 reviewed 后继续 HD-007 `IAuditLogger`（[ADR-008](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)）或视 Owner 优先级安排 `Inkwell.Core.AgentRuntime` / `Inkwell.WebApi` 独立 HD 起草
+
+### 16.5 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` / `FAIL` 都附了文件路径或具体引用
+- ✅ `blocking` 反问（B13）能映射到具体一致性冲突（file-structure.md 文件树遗漏 + 计数算错）+ 影响范围
+- ✅ 未使用"看起来" / "似乎" / "感觉"等主观词汇
+- ✅ 未凭文件名臆测，每条结论都打开了对应文件读到对应字段（含跨仓库核对 `microsoft/agent-framework` 源码验证 MAF 类型真实存在）
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-006 / file-structure.md / 报告主体
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §16 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
