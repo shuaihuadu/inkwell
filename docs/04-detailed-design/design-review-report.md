@@ -1863,6 +1863,7 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：将引用改为"UI-009 §9.3 表单字段（筛选条件）+ §9.4 查看条目详情（`PayloadJson` 展示）"，或拆成两处引用分别对应筛选与展示两个不同的 UI 行为
 - **卡点等级**：non-blocking
 - **追溯**：C83
+- **✅ 已处理（2026-07-06）**：HD-007 §1.2 引用已更正为"UI-009 §9.3 表单字段（筛选条件）+ §9.4 查看条目详情（`PayloadJson` 展示）"，详见 [HD-007 §1.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#12-范围)
 
 ##### N22：HD-007 §11 "待补"措辞未回填 ADR-008 errata 已落地的事实（C85）
 
@@ -1871,14 +1872,15 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：HD-007 §11 该条目措辞由"待办"改为"已处理"或直接删除该条待办（因阻塞项已消除），同时确认 [tech-selection.md §8](../03-architecture/tech-selection.md) 的"保留 90 天"字面是否已同步改为 180 天
 - **卡点等级**：non-blocking
 - **追溯**：C85
+- **✅ 已处理（2026-07-06）**：HD-007 §11 措辞已由"待办"改为"已通过 errata 解决"，并补充指向 [ADR-008 2026-07-05 errata](../03-architecture/adr/ADR-008-audit-log-store-and-query.md#决策) 的引用链接；经核对 [tech-selection.md §8](../03-architecture/tech-selection.md) 已同步 errata，无遗留字面不一致
 
 ### 17.4 评审结论与下一步
 
 - **整体评审决议**：**PASS-AS-ERRATA**——HD-007 本体设计（`IAuditLogger` facade / DTO / Options / `ActorUserId` Guid 迁移 / OTel / CI 自检 / ADR-008+023 一致性）完整且自洽，"写审计失败不得吞错"约束（[AGENTS.md §3.2](../../AGENTS.md)）经核实确由"重试 3 次 + 磁盘 fallback + OTel + P1 告警"四件套满足、非变相吞错；仅 2 项 non-blocking 文档精度问题（N21 UI 章节号引用错误、N22 §11 措辞未回填 errata 已落地事实），均不阻塞下游 `TestCaseAuthor` / `CodingExecutor` 起步
 - **HD-007 翻 `reviewed` 前置条件**：
-  1. ⬜ Owner 确认 N21 / N22 是否需要在本轮一并修正（均为低成本文字修订，不涉及设计决策，无需 picker）
-  2. ⬜ 若 Owner 同意，AI 在 `h3-detailed-design-author` 模式下落 N21（§1.2 UI 章节号引用更正）+ N22（§11 待办措辞回填）两处 errata
-  3. ⬜ Owner 在 HD-007 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）
+  1. ✅ Owner 确认 N21 / N22 需要在本轮一并修正（均为低成本文字修订，不涉及设计决策，无需 picker）
+  2. ✅ AI 在 `h3-detailed-design-author` 模式下已落 N21（§1.2 UI 章节号引用更正）+ N22（§11 待办措辞回填）两处 errata，详见 §17.3 各条"已处理（2026-07-06）"标记
+  3. ⬜ Owner 在 HD-007 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——前两项已完成，仅剩本项待 Owner 手工签字
 - **"不吞错"约束专项结论**：`LogAsync` 对调用方不抛存储异常这一设计决策，经核对 AGENTS.md §3.2 原文，满足的是"走 ADR-008 失败处理路径"（而非"异常必须透传"），HD-007 §4.2/§4.3/§7.3 的"重试→fallback→OTel exception.*→P1 告警"链路完整闭环，判定为**合规**；C84 观察项（极端崩溃窗口期的残余数据丢失风险）已被 HD-007 自身透明记录，属已知权衡而非隐瞒缺陷，不计入 blocking
 - **后续 HD 建议路径**：HD-007 reviewed 后可推进 `Inkwell.Core.AuditLogs`（`DefaultAuditLogger` 具体实现 + 磁盘 fallback 文件格式 + 后台清理任务）或 `Inkwell.VectorStore`（HD-008，[ADR-020](../03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）独立 HD 起草，视 Owner 优先级安排
 
