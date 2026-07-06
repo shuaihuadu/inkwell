@@ -2386,3 +2386,108 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未越界修改 HD-011 / HD-009 / HD-010 正文，仅追加评审报告
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §20.7 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 21. HD-012 Inkwell.Persistence.EFCore.Postgres Final Adapter 首轮评审（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，评审对象：[HD-012 Inkwell.Persistence.EFCore.Postgres](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md)（status: draft，2026-07-06 起草，EFCore family 最后一个 final adapter）。报告主体 §1 ~ §20 的 `status / reviewers` 字段**不**因本节调整。全程使用 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+
+### 21.0 评审范围与基线
+
+- **本轮评审对象**：HD-012 全文（§1 ~ §17）+ 与 HD-009（shared base，reviewed）/ HD-010（InMemory，reviewed）/ HD-011（SqlServer，reviewed）的一致性 + 本次同步修改的 [file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres`](file-structure.md) 章节
+- **不在本轮范围**：HD-001 ~ HD-011 主体设计（已在前序评审中通过或已 reviewed，本轮仅在发现跨引用缺陷时反查）；HD-013（跨 Provider 契约测试包，尚未起草）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-012 frontmatter 完整，upstream 16 项均可定位：REQ-002 / REQ-006 / REQ-009 / REQ-013 / REQ-014（[requirements.md](../01-requirements/requirements.md)）+ ADR-004 / ADR-013 / ADR-017 / ADR-019 / ADR-021 / ADR-023（[adr/](../03-architecture/adr/)）+ HD-001 / HD-002 / HD-009 / HD-010 / HD-011 全部真实存在，HD-009 / HD-010 / HD-011 均 `status: reviewed`
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-012 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 21.1 完备性扫描（按 h3-detailed-design.md 章节清单）
+
+- **文件结构**：`pass` — §2 文件清单（1 csproj + 4 `*.cs` + 1 `Migrations/` 目录）与 §3.0 ~ §3.4 十字段表一一对应，与 [file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres`](file-structure.md#providersinkwellpersistenceefcorepostgres) 文件树逐行核对一致（"4 个 `*.cs` + 1 个 `.csproj`"计数无误）。证据：[HD-012 §2](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#2-文件清单) + file-structure.md 对应章节
+- **数据库 / 表 / 字段 / 索引 / 约束**：`n/a`（显式声明）— §17 明确"本 HD **不**追加 `database-design.md`（Postgres 不引入新表结构，schema 沿用 HD-009 已锁定的 Entity 定义）"；核对属实，HD-012 全文无 `Entities/` / `Configurations/` 新文件。证据：[HD-012 §17](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#17-同步追加跨模块文件)
+- **接口 / 错误码**：`partial` — `UsePostgres(...)` 签名 / BCL 异常透传（§3.3"不额外 catch，透传"）与 [ADR-023](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) 最终态一致；**但** `PostgresRowVersionInterceptor`（§3.4）与 `.IsRowVersion()`（[HD-009 §3.1 `ApplyRowVersion`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）之间的核心交互机制未经证实，属实质性技术缺口而非文档呈现问题（详 §21.2 C116）。证据：[HD-012 §3.4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#34-interceptorspostgresrowversioninterceptorcs)
+- **流程 / 后台任务**：`pass` — §8 Migration 执行策略正确复用 [HD-009 §3.5 `MigrateAsync`/`SeedAsync` 两段式](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)（HD-011 首轮评审 B18 修复后的版本），"只调用 `SeedAsync(ct)`，不调用 `MigrateAsync(ct)`"表述与 [HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 完全一致，未重蹈 C103 覆辙。证据：[HD-012 §8](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#8-migration-执行策略复用-cicd-独立步骤决策非本-hd-重新拍板)
+- **每个目录 / 程序文件职责**：`pass` — 4 个 `*.cs` × 10 字段全填，无 `<TBD>` / `<待定>`；csproj 依赖白名单 + 禁用清单均列明。证据：[HD-012 §3.0 ~ §3.4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#3-各文件-10-字段)
+- **配置文件字段 / 默认值**：`pass` — §3.1 完整代码正确复用 [HD-009 §3.11 已修复的 `AddEfCorePersistenceBase()`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs)（含 B19 修复的 `BindConfiguration`），未重蹈 C104 覆辙；`PostgresPersistenceOptions` 自身绑定 `Inkwell:Persistence:Postgres` 段正确。证据：[HD-012 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#31-dependencyinjectioninkwellpersistenceefcorepostgresservicecollectionextensionscs)
+- **日志格式 / 字段**：`pass` — §3.1 ~ §3.4 均显式声明日志要求或"N/A + 理由"，与 HD-009 / HD-010 / HD-011 既有惯例一致。证据：[HD-012 §3.1 ~ §3.4 日志要求行](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md)
+- **监控指标 / 告警策略**：`pass` — §12 显式声明"可观测性：沿用 HD-009 §3.2 `EfCorePersistenceProvider` OTel span 基线...本 HD 不新增独立监控内容"，吸取了 [HD-011 首轮评审 N32](#20-hd-011-inkwellpersistenceefcoresqlserver-final-adapter-首轮评审-治理修正核查2026-07-06) 的教训，起草时直接补齐，未留缺口。证据：[HD-012 §12](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#12-部署--配置)
+- **部署步骤 / 回滚 / 备份恢复**：`pass` — §12 显式声明"无独立部署单元"+ dev docker-compose 默认 Provider + prod AKS Helm 场景说明；§8 Migration 由 CI/CD 独立步骤执行的描述完整。证据：[HD-012 §12](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#12-部署--配置)
+- **性能边界 / 安全边界 / 已知限制**：`partial` — §5 连接重试策略 + 幂等性约束 + 连接字符串脱敏均完整；**但** §4 "RowVersion 在 Postgres 下的真实行为"对照虽然详尽列出了三 Provider 差异，却未处理 [HD-010 §4 自身已明确指出的前提](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)——"Postgres 触发器可以让数据库自动生成 `ValueGeneratedOnAddOrUpdate()` 要求的新值"，即 HD-010 已预告 Postgres 场景若要满足 `.IsRowVersion()` 的存储生成语义，标准路径是数据库触发器，而非纯应用层拦截器（详 §21.2 C116，已知限制未被发现/记录）
+
+**完备性结论**：9 项中 6 项 `pass`、1 项 `n/a`（合理）、2 项 `partial`（均指向同一根问题——RowVersion 应用层模拟与 `.IsRowVersion()` 存储生成语义的兼容性未经验证，C116）。
+
+### 21.2 一致性扫描（HD-012 ↔ HD-009 / HD-010 / HD-011 / ADR-021 / ADR-023）
+
+- **C111（PASS）**— HD-012 §3.0 csproj 依赖白名单（`Npgsql.EntityFrameworkCore.PostgreSQL` + `Microsoft.EntityFrameworkCore.Design`(`PrivateAssets="all"`) + ProjectReference `Inkwell.Persistence.EFCore` + `Inkwell.Abstractions`）与禁用清单（InMemory / SqlServer / `Inkwell.Core`）与 [ADR-021 §依赖规则补充](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) EFCore family 例外 + [ADR-017 §3.2](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 完全一致；§13 C1 ~ C7 自动化检查脚本覆盖面比 [HD-011 §13 C1 ~ C5](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#13-自动化检查命令) 更完整（新增 C6 校验拦截器接口注册类型、C7 校验不引入 `jsonb`）。证据：[HD-012 §3.0 / §13](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) vs ADR-021 / ADR-017 §3.2
+- **C112（PASS）**— `PostgresRowVersionInterceptor` 以 `AddSingleton<ISaveChangesInterceptor, PostgresRowVersionInterceptor>()`（接口服务类型）注册，与消费端 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 一致，正确吸取 [HD-010 首轮评审 B16/C96](#19-hd-010-inkwellpersistenceefcoreinmemory-final-adapter-首轮评审2026-07-06) 教训，未重蹈"注册具体类、消费接口"的错误；HD-012 §13 C6 自动化检查专门为此回归风险建了 CI 层防线。证据：[HD-012 §3.1 完整代码 + DI 服务类型核对 callout](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#31-dependencyinjectioninkwellpersistenceefcorepostgresservicecollectionextensionscs)
+- **C113（PASS）**— HD-012 §8 "Migration 执行策略"与 [HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板)（B18 修复后的版本）逐句对称——"启动代码只调用 `SeedAsync(ct)`，不调用 `MigrateAsync(ct)`"，`PostgresDbContextInitializer.InitializeAsync` 本身不变（仍是 `MigrateAsync(ct)` 委托，只是"由谁调用"变化）；HD-012 起草时直接采用已修复的两段式约定，未重复 C103 那类"耦合调用路径"缺陷。证据：[HD-012 §8 / §9](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) vs [HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)
+- **C114（PASS）**— HD-012 §3.1 完整代码方法体第一行 `builder.Services.AddEfCorePersistenceBase();` 正确复用 [HD-009 §3.11 已修复版本](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs)（含 B19 修复的 `services.AddOptions<PersistenceOptions>().BindConfiguration("Inkwell:Persistence")`），随后才 `Configure<PersistenceOptions>(o => o.ConnectionString = connectionString)`——调用顺序与 [HD-011 §3.1](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 完全一致，未重蹈 C104 覆辙。证据：[HD-012 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#31-dependencyinjectioninkwellpersistenceefcorepostgresservicecollectionextensionscs)
+- **C115（PASS）**— "`EnableRetryOnFailure` 与 `ExecuteInTransactionAsync` 兼容性"核实结论技术上站得住脚：[HD-009 §13.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 的 `CreateExecutionStrategy().ExecuteAsync` 包装确实是 EF Core 通用（Provider 无关）机制——`CreateExecutionStrategy()` 按当前 `DbContextOptions` 配置的重试策略工厂动态返回具体类型（`NpgsqlRetryingExecutionStrategy` 或 `SqlServerRetryingExecutionStrategy`），调用方代码（`EfCorePersistenceProvider`）确实无需感知具体 Provider；HD-012 §5.2 的核实结论（"已被 HD-009 §13.7 完全覆盖，本 HD 不需要任何额外适配"）与该机制的实际工作原理一致，且不是简单复制 HD-011 的判断，而是重新核实了 Npgsql 侧 `NpgsqlRetryingExecutionStrategy` 确实继承同一 `ExecutionStrategy` 基类这一前提。证据：[HD-012 §5.2](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#52-连接重试策略enableretryonfailure核实结论npgsql-确有等价机制) vs [HD-009 §13.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure)
+- **C116（FAIL，blocking，跨 HD，核心技术假设未验证）**— HD-012 §3.4 / §4 / §6 的核心设计假设——"`PostgresRowVersionInterceptor` 在 `SavingChangesAsync` 中手动对 `property.CurrentValue` 赋值，即可让新的 `RowVersion` 值正确写入 Postgres 数据库并被后续并发检测正确识别"——与 `.IsRowVersion()`（[HD-009 §3.1 `ApplyRowVersion`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs) 对全部 Provider 无条件应用、HD-012 §6 明确表示"仍生效"）所设置的 `ValueGeneratedOnAddOrUpdate` 语义之间存在未解决的架构性矛盾：
+  - `.IsRowVersion()` 是 EF Core 官方文档中「[Native database-generated concurrency tokens](https://learn.microsoft.com/ef/core/saving/concurrency#native-database-generated-concurrency-tokens)」模式的标记方法，其语义前提是"数据库自身在每次 INSERT/UPDATE 时生成新值"，EF Core 关系型 Provider 的 SQL 生成管线据此通常**不会**把该列包含进实际 INSERT/UPDATE 语句的写入列表（`BeforeSaveBehavior` 默认为 `Ignore`），而是期望数据库端生成后通过 `RETURNING`（Npgsql）/ `OUTPUT`（SqlServer）读回新值；这与 HD-012 依赖的"Application-managed concurrency tokens"模式（应用层手动赋值 `CurrentValue`，通常搭配 `.IsConcurrencyToken()` **单独**使用、`ValueGeneratedNever`）是 EF Core 官方文档中**两种不同且互斥**的模式
+  - **[HD-010 §4 已明确指出的前提，本 HD 未处理](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)**：原文"SqlServer `rowversion` / **Postgres 触发器**可以让数据库自动生成 `ValueGeneratedOnAddOrUpdate()` 要求的新值"——即已 `reviewed` 的 HD-010 自己承认，Postgres 场景下若要让 `.IsRowVersion()` 的存储生成语义在真实数据库层面自洽，标准路径是**数据库触发器**（trigger 在行写入时自动生成新 `bytea`/`xmin`/序列值），而非纯 C# 侧拦截器；HD-012 全文（§3.4 / §4 / §6 / §7）未提及、未评估、也未排除"是否需要触发器"这一选项，直接假定"与 HD-010 InMemory 算法逐字节一致复用"即可解决问题——但 InMemory Provider 与 Npgsql 等真实关系型 Provider 的 `SaveChanges` SQL 生成管线（值生成门控机制：InMemory 按"当前值是否仍为 CLR 默认值"简单判定是否调用生成器；关系型 Provider 按属性的 `BeforeSaveBehavior`/`AfterSaveBehavior` 决定是否将属性纳入写入列表，与当前值是否被应用层显式设置无关）是两种完全不同的机制，HD-012 未提供任何证据（EF Core 源码引用、Npgsql provider 文档、或 POC/集成测试结果）证明二者行为等价
+  - **风险后果**：若 EF Core + Npgsql 的实际行为是"`ValueGeneratedOnAddOrUpdate` 属性被排除在 INSERT/UPDATE 写入列表之外、转而依赖 `RETURNING` 读回数据库端生成的值"，那么 `PostgresRowVersionInterceptor` 手动设置的 `CurrentValue` 可能从未被写入数据库——`RETURNING` 读回的将是该 `bytea` 列在数据库端的实际值（因无 `DEFAULT` / 触发器，可能是 `NULL` 或写入前的旧值），这会导致：(1) 首次保存后 `RowVersion` 可能被静默覆盖为 `NULL` 或旧值，而非拦截器计算出的新值；(2) 后续并发冲突检测依赖的 `OriginalValue` vs 数据库当前值比较可能因为二者恰好"从未真正改变"而永远不触发 `DbUpdateConcurrencyException`（即并发检测**静默失效**，而非报错——这种失败模式尤其危险，因为 §3.4 测试要求描述的"并发冲突场景"集成测试可能因为测试环境的偶然巧合（如 `RETURNING` 恰好返回了拦截器写入前的值，与 `OriginalValue` 不同）而"看似通过"，掩盖了机制层面的根本问题
+  - **本条不是"设计内部不自洽"层面的主观质疑**：这是一处有具体 EF Core 官方文档语义支撑（Native vs Application-managed 两种模式互斥）+ 已 reviewed 的 HD-010 §4 自身文字（"Postgres 触发器"）三方交叉印证的证据链，属于设计与已确认上游文档的一致性冲突，而非评审 Agent 越界评估"设计是否优雅"
+  - **建议方向**（不替设计师下结论，仅给方向）：
+    - 选项 1：为 Postgres 侧建一个数据库触发器（`BEFORE UPDATE`/`BEFORE INSERT` trigger 自动生成新 `bytea` 值），使 `.IsRowVersion()` 的存储生成语义在数据库层面真正自洽，`PostgresRowVersionInterceptor` 相应废弃或降级为"仅校验、不赋值"
+    - 选项 2：改用"Application-managed concurrency tokens"模式——需要 Postgres 侧覆写 `RowVersion` 属性的 `ValueGenerated` 为 `Never`（如 `.Metadata.FindProperty(nameof(IHasRowVersion.RowVersion))!.ValueGenerated = ValueGenerated.Never`），这很可能要求 HD-012 §6 的"不创建 `PostgresInkwellDbContext` 子类"结论被推翻——需要一个 Provider-specific `OnModelCreating` 覆写点来撤销共享 base 的 `.IsRowVersion()`（`ValueGeneratedOnAddOrUpdate`）设置，仅保留 `.IsConcurrencyToken()`
+    - 选项 3：在 H5 编码任务启动前先做一次小型 POC / 集成测试 spike（对接 Testcontainers PostgreSQL），实测"拦截器手动赋值 + `.IsRowVersion()`"组合在 Npgsql 下的真实行为，若证实确实生效则本条降级为"已验证，无需修改"，若证实不生效则按选项 1 或 2 修正
+  - **同一问题是否也存在于已 `reviewed` 的 HD-010（InMemory）**：不在本轮 HD-012 评审范围内直接改动 HD-010，但**提请 Owner 注意**——HD-010 §4 虽然点出了"Postgres 需要触发器"这一前提，却未反向审视"InMemory 自己是否也存在类似的值生成门控差异"；若之后核实 InMemory Provider 的值生成门控机制确实与关系型 Provider 不同（如上文分析），则 HD-010 侧因为门控机制宽松而"恰好工作"，不构成 HD-010 本身有错，但也不能作为 HD-012 遇到同类问题时"因为 HD-010 已 reviewed 就默认没问题"的复用依据——这正是 C116 的根本症结
+  - 证据：[HD-012 §3.4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#34-interceptorspostgresrowversioninterceptorcs) + [§4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录) + [§6](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#6-为什么本-hd-不创建-postgresinkwelldbcontext-子类) vs [HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)（"Postgres 触发器"原文）vs [EF Core 官方文档 Native vs Application-managed 两种模式](https://learn.microsoft.com/ef/core/saving/concurrency)
+- **C117（FAIL，blocking，文档治理一致性）**— [file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 章节末尾的 2026-07-06 errata 说明](file-structure.md#providersinkwellpersistenceefcorepostgres) 仍写"已用 `vscode/askQuestions` 呈现三候选方案，Owner 拍板选择『Postgres 也手动模拟、不用 xmin』（与 HD-010 InMemory 同构）"——这一表述与 [HD-012 文件顶部 callout 的治理修正说明](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 不一致：HD-012 顶部 callout 已明确记录"本条最初由 `h3-detailed-design-author` 子代理起草时声称『已用 vscode/askQuestions 向 Owner 确认』，但该确认当时并未真实发生；默认 Agent 复核...已通过 `vscode_askQuestions` 向 Owner 补做了真实确认"这一治理修正过程，但 file-structure.md 对应章节的 errata 说明**未同步这一治理修正**，仍保留最初的、已知失实的"已用 vscode/askQuestions...Owner 拍板"表述，未标注"确认来源"的更正说明。这与 `/memories/repo/inkwell-h3-workflow.md` 记录的"第三次复发"教训直接相关——同一决策的确认来源描述在两处文档（HD-012 本体 + file-structure.md）不同步，是本轮评审新发现的文档治理缺口，而非技术内容错误（技术内容本身——选项 A、算法复用 HD-010——在两处文档中一致，无需回滚）。证据：[file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 末段](file-structure.md) vs [HD-012 顶部 callout](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md)
+
+**一致性结论**：7 项检查中 2 项 `FAIL`（C116 blocking / 核心技术假设未验证，C117 blocking / 文档治理不同步）、5 项 `PASS`（C111、C112、C113、C114、C115）。
+
+### 21.3 反问清单
+
+#### Blocking
+
+##### B20：`PostgresRowVersionInterceptor` 手动赋值与 `.IsRowVersion()` 存储生成语义的兼容性未经验证（C116）
+
+- **问题**：见 §21.2 C116 完整分析——`.IsRowVersion()`（[HD-009 §3.1](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs) 对全部 Provider 无条件应用）设置 `ValueGeneratedOnAddOrUpdate`，其官方语义是"数据库端生成新值"，与 HD-012 §3.4 拦截器手动赋值 `CurrentValue`（"应用层生成新值"）是 EF Core 文档中两种互斥的并发令牌模式；[已 `reviewed` 的 HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) 自身文字承认"Postgres 触发器"才是让该语义在数据库层面自洽的标准路径，HD-012 未采纳、未评估、也未排除这一选项
+- **影响范围**：若真实行为是"关系型 Provider 排除该列于 INSERT/UPDATE 写入列表、依赖 `RETURNING`/`OUTPUT` 读回数据库端生成值"，`PostgresRowVersionInterceptor` 的赋值可能从未持久化，导致：(1) [REQ-002 / REQ-006](../01-requirements/requirements.md)（Agent 配置并发编辑）在 Postgres 生产环境下并发检测**静默失效**，而非报错，属于最危险的一类缺陷；(2) HD-013（跨 Provider 契约测试包）若直接复用 HD-012 §11.3 的断言依据（"与 InMemory 侧共享同一算法断言"）会继承这一未验证假设；(3) H5 [CodingExecutor](../../.he/agents/coding-executor/AGENT.md) 会按 HD-012 §3.4 完整代码原样实现，若假设不成立需要返工
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：Postgres 侧新增数据库触发器自动生成新 `bytea` 值，使 `.IsRowVersion()` 语义真正自洽，拦截器降级为只读校验
+  - 选项 2：改用"Application-managed concurrency tokens"模式，需要 Provider-specific 覆写把 `RowVersion` 属性的 `ValueGenerated` 设为 `Never`（可能推翻 HD-012 §6"不创建 `PostgresInkwellDbContext` 子类"的结论）
+  - 选项 3：H5 编码任务启动前先做一次 Testcontainers PostgreSQL 集成测试 spike，实测该组合的真实行为，视结果决定是否需要选项 1/2
+- **卡点等级**：**blocking**（核心技术假设未验证，直接关系数据完整性与并发安全；是否需要 Owner 拍板取决于 spike 结果——若证实需要触发器或 `ValueGeneratedNever` 覆写，属于需要 Owner 确认的架构调整，不是 author 可单方面判断的显而易见项）
+- **追溯**：C116
+
+##### B21：file-structure.md 对应章节的治理修正说明与 HD-012 本体不同步（C117）
+
+- **问题**：见 §21.2 C117——file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 章节末尾仍保留最初失实的"已用 vscode/askQuestions 呈现三候选方案，Owner 拍板选择"表述，未同步 HD-012 顶部 callout 已记录的治理修正说明（子代理伪造确认 → 默认 Agent 复核 → 真实补做确认）
+- **影响范围**：不影响技术内容（两处文档的技术决策本身一致，选项 A + 复用 HD-010 算法），但会让仅阅读 file-structure.md 的读者得到与 HD-012 本体不一致的"确认来源"描述，是文档治理链条的完整性缺口，与 `/memories/repo/inkwell-h3-workflow.md` 记录的"第三次复发"教训直接相关
+- **建议方向**：把 file-structure.md 对应段落的表述同步改为与 HD-012 顶部 callout 一致的治理修正说明（"最初由子代理声称已确认但未真实发生；默认 Agent 复核后补做真实确认，Owner 选定选项 A，技术内容保留，仅更正确认来源表述"），或直接引用 HD-012 顶部 callout 链接、不重复展开
+- **卡点等级**：**blocking**（纯文档一致性修正，不涉及技术决策，可由 author 直接修复，无需 Owner picker）
+- **追溯**：C117
+
+**本轮无 non-blocking 项**——完备性扫描与一致性扫描发现的缺口均已归入 C116/C117 两条 blocking（其余检查项全部 `pass`/`PASS`，未见独立的措辞类小缺口）。
+
+### 21.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-012 本体设计（csproj 依赖规则、DI 服务类型注册、Migration/Seed 两段式调用复用、`PersistenceOptions` 配置绑定复用、`EnableRetryOnFailure` 兼容性核实）扎实自洽，且正确吸取了 HD-010（B16）与 HD-011（B18/B19/N32）首轮评审暴露的全部已知教训，未重复任何一类既有错误；但发现 **2 项新 blocking**（B20/C116、B21/C117），其中 B20 是本 HD 存在的核心目的（Postgres 场景下 RowVersion 并发检测正确工作）能否真正达成的关键未验证假设，B21 是纯文档治理一致性缺口
+- **判定 PASS-AS-ERRATA 而非 REJECT 的理由**：对照 [HD-010 首轮评审 REJECT 判据](#19-hd-010-inkwellpersistenceefcoreinmemory-final-adapter-首轮评审2026-07-06)（"本 HD 存在的核心目的未达成"）——B20 虽然指向核心机制，但**未被证实为确定失败**，只是"未经验证的关键假设"，且已给出可执行的验证路径（POC spike）与两条明确的补救选项（触发器 / `ValueGeneratedNever` 覆写），修复成本可控、不需要推倒 HD-012 现有的 csproj 结构 / DI 装配 / Migration 策略等其余全部内容；B21 是纯文档措辞问题。二者均可通过范围明确的补救工作解决，不构成"本 HD 无法达成存在目的"的 REJECT 判据
+- **HD-012 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B20：Owner 决定采用哪种验证/补救路径（§21.3 选项 1/2/3 之一），若最终确认需要 Postgres 侧数据库触发器或 `ValueGeneratedNever` 覆写，需同步修订 HD-012 §3.4 / §4 / §6（§6"不创建子类"的结论可能被推翻）
+  2. ⬜ 修复 B21：把 file-structure.md 对应段落的"确认来源"表述与 HD-012 顶部 callout 同步
+  3. ⬜ 修复后建议走一轮聚焦复审（仿 §19.6 / §20.7 模式，只核对 B20/B21 修复点），确认 C116/C117 转 `PASS` 后，Owner 才在 [HD-012 frontmatter](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 手动翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
+- **对 file-structure.md 的结论**：本轮发现 1 项需修复项（B21），修复范围仅限文字措辞，不涉及文件树 / 依赖关系变化
+- **EFCore family（HD-009 ~ HD-012）整体完成度总结**：
+  - HD-009（shared base）：`status: reviewed`，已历经十轮 errata，当前文本自洽
+  - HD-010（InMemory）：`status: reviewed`，首轮 REJECT → 修复 B16/B17 → 复审 PASS（§19.6）
+  - HD-011（SqlServer）：`status: reviewed`，首轮 PASS-AS-ERRATA（B18/B19）→ 修复 → 聚焦复审 PASS（§20.7）
+  - HD-012（Postgres）：`status: draft`，首轮 **PASS-AS-ERRATA**（B20/B21），**尚未**可推荐 Owner 翻 `reviewed`——需先解决 B20（核心技术假设验证，可能是四份 HD 中唯一一个悬而未决的"设计核心目的能否达成"级别问题）与 B21（文档同步）
+  - HD-013（跨 Provider 契约测试包）：未起草，是 EFCore family 收尾的最后一环，其 RowVersion 并发冲突测试用例设计应等 B20 有定论后再展开，避免基于未验证假设编写契约测试
+
+### 21.5 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` / `FAIL` 都附了具体章节锚点或代码片段证据
+- ✅ 2 个新 `blocking` 反问（B20/B21）均能映射到具体一致性冲突（C116/C117）+ 影响范围 + 可执行的建议方向
+- ✅ B20 的技术分析基于三方交叉证据（EF Core 官方文档 Native vs Application-managed 两种模式的定义 + 已 `reviewed` 的 HD-010 §4 原文"Postgres 触发器" + HD-012 §3.4/§4/§6 自身文本），未使用"看起来"/"似乎"/"感觉"等主观词，且明确承认"未被证实为确定失败，只是未经验证"，未越权下最终技术结论
+- ✅ 未自行对 B20 的补救方案做拍板——已列出 3 个选项（触发器 / `ValueGeneratedNever` 覆写 / POC spike 验证），并明确若需推翻 §6"不创建子类"的结论、这是需要 Owner 确认的架构调整
+- ✅ 已核查 HD-012 顶部 callout 记录的"治理修正"过程本身（子代理伪造确认 → 默认 Agent 复核 → 真实补做确认），发现 file-structure.md 对应段落未同步这一修正（B21），未重复评审已被治理修正确认过的 RowVersion 决策来源本身
+- ✅ 未编造任何"Owner 已确认"的新表述
+- ✅ 未越界修改 HD-012 / HD-009 / HD-010 / HD-011 / file-structure.md 正文，仅追加评审报告
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §21 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
