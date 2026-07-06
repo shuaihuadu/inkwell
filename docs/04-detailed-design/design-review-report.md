@@ -2330,3 +2330,59 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §20 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+### 20.7 聚焦复审（2026-07-06，回应 B18/B19 修复核查请求）
+
+> 本节仅复核 B18/C103、B19/C104 两项 blocking 的修复点，以及 N31/C107、N32 两项 non-blocking 的处理结果，**不重跑** §20.1 ~ §20.3 全部检查项。检查对象：[HD-009 §3.5 / §13.9](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)、[HD-009 §3.11 / §13.10](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs)、[HD-011 §3.0 / §3.1 / §3.3 / §8 / §9 / §12](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)。
+
+#### 20.7.1 B18 修复核查（对应请求项 1：`MigrateAsync`/`SeedAsync` 拆分是否让 InMemory 与 SqlServer/Postgres 两种场景均自洽）
+
+- **InMemory 场景**：[HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 职责段明确"`Inkwell.WebApi` / `Inkwell.Worker` 启动时依次调用本类 `MigrateAsync(ct)`（包装 `EnsureCreatedAsync()`）+ `SeedAsync(ct)`"；`MigrateAsync(ct)` 内部委托 `initializer.InitializeAsync(db, ct)`（[HD-010 §3.2 `InMemoryDbContextInitializer`](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#32-inmemorydbcontextinitializercs) → `EnsureCreatedAsync`）+ `MigrationTimeoutSeconds` 超时包装；`SeedAsync(ct)` 独立判断 `AutoSeedOnStartup` 开关。二者作为两个独立方法被依次显式调用，无耦合冲突，`PASS`
+- **SqlServer / Postgres 场景**：[HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 明确"启动代码**只调用** `SeedAsync(ct)`——不再调用 `MigrateAsync(ct)`"；[HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 同步措辞"`Inkwell.WebApi` / `Inkwell.Worker` 启动代码对 SqlServer 场景只调用 `MigrationRunner.SeedAsync(ct)`，不调用 `MigrationRunner.MigrateAsync(ct)`"——两处表述完全一致，不再有"Seed 仍无条件运行"与"不再自动 Migrate"的矛盾；`SeedAsync(ct)` 的前提从"随 Migrate 完成后触发"改为"确认 CI/CD 已将 schema 迁移到位"（[HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 末句），`MigrateAsync(ct)` 对 SqlServer/Postgres 而言仅由集成测试通过 mock `IDbContextInitializer` 覆盖（[HD-009 §3.5 测试要求](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)），生产路径确认不经过它，`PASS`
+- **`MigrationRunner` 构造函数未变**：`(InkwellDbContext db, IDbContextInitializer initializer, IOptions<PersistenceOptions> options, InkwellSeeder seeder, ILogger<MigrationRunner> logger)`——`initializer` 参数对 SqlServer/Postgres 场景虽不再被 `SeedAsync(ct)` 使用，但仍是合法依赖注入（构造期即解析，不因方法调用与否而失败），不构成设计缺陷
+- **HD-011 §9 Builder DSL 示例**：`.AutoSeedOnStartup(false)` 仅是 prod 场景选择关闭自动 seed 的**示例**，不代表"`AutoSeedOnStartup(true)` + SqlServer"组合无法工作——按 §8 修订后的调用路径，若某环境显式 `.AutoSeedOnStartup(true)`，启动代码仍只调 `SeedAsync(ct)`（该方法内部按开关判断是否真正执行 seed），不会触发 `MigrateAsync(ct)`，两种开关取值下调用路径均自洽，此前 B18 指出的"设计空白"已被两方法拆分彻底消除
+- **结论**：`PASS` — B18/C103 修复后，InMemory（依次调二者）与 SqlServer/Postgres（只调 `SeedAsync`）两种场景均有明确、自洽、无矛盾的调用路径
+
+#### 20.7.2 B19 修复核查（对应请求项 2：`BindConfiguration` 修复 + 注册顺序核实结论是否正确）
+
+- **`BindConfiguration` 落地位置**：[HD-009 §3.11 完整代码](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) `AddEfCorePersistenceBase()` 方法体第一行为 `services.AddOptions<PersistenceOptions>().BindConfiguration("Inkwell:Persistence");`——配置键路径与 [HD-002 §3.5 `PersistenceOptions`](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#35-persistenceoptionscs) 锁定的 `Inkwell:Persistence` 段一致，`PASS`
+- **调用顺序核实**：[HD-011 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 方法体第一行即 `builder.Services.AddEfCorePersistenceBase();`，随后才是 `builder.Services.Configure<PersistenceOptions>(o => o.ConnectionString = connectionString);`——`BindConfiguration` 确实先于 `Configure<PersistenceOptions>(...)` 被调用，与 [HD-009 §13.10](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1310-2026-07-06-errata第十轮design-review-reportmd-20-b19c104--n31c107hd-011-首轮评审发现owner-picker-选项-1addoptionspersistenceoptionsbindconfiguration--补-internalsvisibleto-声明) 记录的顺序一致
+- **.NET Options 行为核实**：核对 [.NET Options 模式官方文档](https://learn.microsoft.com/dotnet/core/extensions/options) —— `IOptionsFactory<TOptions>.Create` 按**注册顺序**依次对同一 `TOptions` 实例执行全部 `IConfigureOptions<TOptions>`（含 `BindConfiguration` 内部注册的 `NamedConfigureFromConfigurationOptions` 与显式 `Configure<T>(Action<T>)` 注册的 `ConfigureNamedOptions`），每个委托只修改它显式触碰的属性，不清空/重置其余属性；`IPostConfigureOptions<TOptions>` 恒定在全部 `Configure` 之后执行，与其注册顺序无关。据此：① `BindConfiguration` 先写入 `CommandTimeoutSeconds`（及配置文件提供的其余字段，含可能提供的 `ConnectionString`）；② 显式 `Configure<PersistenceOptions>(o => o.ConnectionString = connectionString)` 仅覆盖 `ConnectionString` 一个字段，`CommandTimeoutSeconds` 不受影响；③ 若调用方传入可选 `configure` 委托，经 `PostConfigure` 在最后执行（可覆盖任意字段，符合"调用方显式传参最高优先级"的直觉预期）。三步互不冲突，核实结论技术上准确，`PASS`
+- **测试要求闭环**：[HD-011 §3.1 测试要求](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 新增"appsettings.json 设置 `CommandTimeoutSeconds = 60` 后 `IOptions<PersistenceOptions>.Value.CommandTimeoutSeconds == 60` 生效"用例，可在 H5 编码阶段直接验证本节核实结论，不依赖"文档声称"，`PASS`
+- **结论**：`PASS` — B19/C104 修复后，配置绑定链路补齐且不与 `ConnectionString` 显式赋值冲突，注册顺序核实结论技术上站得住脚
+
+#### 20.7.3 N31 / N32 处理核查（对应请求项 3）
+
+- **N31（`InternalsVisibleTo` 声明）**：[HD-009 §3.0](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#30-inkwellpersistenceefcorecsproj) 已补 `<ItemGroup><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.InMemory" /><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.SqlServer" /><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.Postgres" /></ItemGroup>`——三个 final adapter 一次性覆盖，`PASS`
+- **N32（可观测性 deferral 措辞）**：[HD-011 §12](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#12-部署--配置) 已补"沿用 HD-009 §3.2 `EfCorePersistenceProvider` OTel span 基线；`EnableRetryOnFailure` 重试次数可通过 EF Core 内置 `Microsoft.EntityFrameworkCore.Database.Command` 诊断事件观测，本 HD 不新增独立监控内容"，措辞与 [HD-010 §9 N29 先例](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) 风格一致，`PASS`
+- **结论**：两项 non-blocking 均已处理到位
+
+#### 20.7.4 新增不一致排查（对应请求项 4）
+
+> 检查方法：`grep` HD-009 / HD-010 / HD-011 全文 `MigrationRunner.RunAsync` / `RunAsync()` 残留，核实 §13.9 拆分是否已同步到全部引用点（而非仅 HD-011 自身）。
+
+- **C109（发现，non-blocking）**——[HD-009 §7 配置项汇总表](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#7-配置项) `MigrationTimeoutSeconds` 行仍写"`MigrationRunner.RunAsync` 内部 `CancellationTokenSource` 超时"——§13.9 已把超时逻辑归属改到 `MigrateAsync(ct)`（§3.5 + §4.3 BCL 对照表两处均已同步改名），但 §7 配置表这一行在 §13.9 errata 时被遗漏，未同步更新方法名，属**新引入的文本级不一致**（根因：§13.9 修改范围未覆盖 §7）
+- **C110（发现，non-blocking）**——[HD-010 §3.2 `InMemoryDbContextInitializer`](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#32-inmemorydbcontextinitializercs) 错误处理行"透传给调用方 `MigrationRunner.RunAsync`"与日志要求行"`MigrationRunner.RunAsync` 已记 `Migration begin...`"共 2 处仍引用已废弃的 `RunAsync`——HD-010 依赖 HD-009 `MigrationRunner` 的方法名，§13.9 拆分后应同步改为 `MigrateAsync`（InMemory 场景两方法都被调用，此处描述的"记录 Migration begin/ok 日志"职责确实仍由 `MigrateAsync(ct)` 承担，只是方法名未同步更新），属**跨 HD 引入的新文本级不一致**（根因：HD-011 §13.9/§13.10 同步范围只覆盖了 HD-011 自身，未覆盖同样依赖 `MigrationRunner` 命名的 HD-010）
+- **影响评估**：两处均为纯方法名引用的文本陈旧（未影响任何签名、返回类型、错误处理策略、测试要求的实质内容），不影响 H5 编码阶段的可执行性（`MigrateAsync` 的真实签名与行为在 §3.5 完整代码块中已经正确），也不影响 HD-011 自身翻 `reviewed` 的判定；但会造成"读者只看 §7 / HD-010 §3.2 就得到过时方法名"的误导，建议随下一次小 errata 一并修正（HD-009 §7 一行 + HD-010 §3.2 两行，共 3 处文本替换，`RunAsync` → `MigrateAsync`）
+- **结论**：发现 **2 项新的文本级不一致（C109/C110）**，均判定 `non-blocking`——不影响 HD-011 本轮翻 `reviewed`，但建议在后续 errata 中一并清理，避免遗留到 H5 阶段造成误读
+
+#### 20.7.5 复审结论
+
+- **B18/C103**：`FAIL` → `PASS`（20.7.1）
+- **B19/C104**：`FAIL` → `PASS`（20.7.2）
+- **N31/C107**：已处理 → `PASS`（20.7.3）
+- **N32**：已处理 → `PASS`（20.7.3）
+- **新发现**：C109（HD-009 §7 遗留 `RunAsync` 引用）、C110（HD-010 §3.2 遗留 `RunAsync` 引用 ×2）——均 `non-blocking`，不阻塞 HD-011 翻 `reviewed`（20.7.4）
+- **整体复审结论**：**PASS** — HD-011 首轮评审的 2 项 blocking（B18/B19）均已消除且经本轮核实技术方案站得住脚；发现的 2 项新 non-blocking 文本不一致不影响 HD-011 本体判定
+- **HD-011 是否可以推荐 Owner 翻 `reviewed`**：**是**——[HD-011 frontmatter](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 可由 Owner 手动将 `status: draft` 翻为 `status: reviewed` 并填写 `reviewers: [Inkwell]`（人工签字位，AI 不代签）；建议 Owner 在签字前后一并安排一次小范围 errata 清理 C109/C110（HD-009 §7 一处 + HD-010 §3.2 两处 `RunAsync` → `MigrateAsync` 文本替换），但这不构成签字的前置阻塞条件
+
+#### 20.7.6 复审自检
+
+- ✅ 仅复核 B18/B19/N31/N32 修复相关章节（HD-009 §3.5/§3.11/§7/§13.9/§13.10、HD-011 §3.0/§3.1/§3.3/§8/§9/§12），未重跑 §20.1~§20.3 全部检查项
+- ✅ 每条 `PASS` 结论均附具体章节锚点或代码片段证据，未使用"看起来"/"似乎"等主观词
+- ✅ 已扩大检查面到 HD-011 自身之外（HD-009 §7 配置表、HD-010 §3.2），而非只看 HD-011 修改点本身，据此发现 2 项新增不一致（C109/C110）
+- ✅ 未自行对 C109/C110 的处理时机做拍板——已在结论中明确"不阻塞签字，建议后续 errata 清理"，不越权替 Owner 决定是否现在就修
+- ✅ 未编造任何"Owner 已确认"的新表述
+- ✅ 未越界修改 HD-011 / HD-009 / HD-010 正文，仅追加评审报告
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §20.7 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
