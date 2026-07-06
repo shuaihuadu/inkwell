@@ -2505,3 +2505,114 @@ reviewer 在 chat 中列三路径 picker：
 - **B21 处理结果**：file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 章节末尾"确认来源"表述已同步改为与 HD-012 顶部 callout 一致的治理修正说明，并交叉引用 B20 spike 前置任务；C117 转 `PASS`（纯文档一致性问题，无技术歧义）
 - **HD-012 `status` 判定**：**仍不建议翻 `reviewed`**——核心技术假设（B20/C116）需 H5 spike 实测验证后才能确认 HD-012 §3.4/§4/§6 设计是否成立；若 Owner 希望在 spike 完成前记录一个中间状态（例如约定一个"conditionally reviewed"或类似标注），需由 Owner 决定具体措辞与是否引入新的 frontmatter `status` 枚举值——本报告不代为创造新术语
 - **本次处理未做的事**：未执行 spike、未修改 HD-012 §3.4 拦截器实现代码、未翻转 HD-012 frontmatter `status`、未新增 `reviewers` 名单（人工签字位，AI 不代签）
+
+## 22. HD-014 Inkwell.Core.Auth 首轮评审（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，评审对象：[HD-014 Inkwell.Core.Auth](Inkwell.Core/HD-014-Inkwell.Core.Auth.md)（status: draft，2026-07-06 起草，**H3 第一张业务命名空间 HD**）+ 联动的 [database-design.md `## Inkwell.Core.Auth` 章节](database-design.md#inkwellcoreauth) + [file-structure.md `## Inkwell.Abstractions.Auth` / `## Inkwell.Core.Auth` 章节](file-structure.md)。报告主体 §1 ~ §21 的 `status / reviewers` 字段**不**因本节调整。全程使用 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+>
+> **完备性判定口径说明**：本 HD 是业务命名空间层第一张 HD，性质与端口层 / Provider 层不同——业务层不再是"定义端口 facade"，而是"落地真实业务用例"。本轮完备性判定**不机械套用** HD-001 ~ HD-013 端口层"§7 性能/安全/可观测性 + §8 测试要求 + §9 部署/配置"三段式模板，改为对照 [requirements.md](../01-requirements/requirements.md) REQ-001 / REQ-017（解封子能力）/ NFR-003（部分范围）验收标准逐条核实覆盖度；端口层模板的缺失仅作为**观察项**记录，不作为独立 `missing` 判据。
+
+### 22.0 评审范围与基线
+
+- **本轮评审对象**：HD-014 全文（§1 ~ §7）+ database-design.md `## Inkwell.Core.Auth` 章节 + file-structure.md `## Persistence/Auth` / `## Inkwell.Abstractions.Auth` / `## Inkwell.Core.Auth` 三处追加
+- **不在本轮范围**：HD-001 ~ HD-013 端口层 / Provider 层主体设计（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）；`IUserRepository` 的 EFCore 实现（HD-014 §1.2 / §6.2 已声明留待 HD-009 errata，本轮不评审尚不存在的内容）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-014 frontmatter 完整，upstream 12 项均可定位：REQ-001 / REQ-017 / NFR-003 / NFR-004 + ADR-004 / ADR-016 / ADR-017 / ADR-021 / ADR-023 + HD-001 / HD-002 / HD-004 / HD-007 全部真实存在（[requirements.md line 121-137 / 254-270](../01-requirements/requirements.md)）
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-014 是合理的业务命名空间首张切片，目录未"严重偏离" h3-detailed-design.md
+
+### 22.1 完备性扫描（对照 REQ-001 / REQ-017 / NFR-003 验收标准）
+
+- **REQ-001 用户登录**：`pass` — 逐条核对 [acceptance-criteria.md](../01-requirements/acceptance-criteria.md) AC-001 ~ AC-006：AC-001（登录成功跳转）由 `LoginAsync` 返回 `AuthSession` 覆盖；AC-002（密码错误统一提示"账号或密码错误"）由 `UnauthorizedAccessException("Invalid username or password")` 不区分用户不存在 / 密码错误覆盖；AC-003（账号已锁提示）由 `InvalidOperationException("Account locked: contact administrator")` 覆盖；AC-004（24 小时会话持久 / 过期重定向）由 Q1 Session Token + Cache TTL=24h 设计覆盖；AC-005（登出重定向）由 `LogoutAsync` 覆盖；AC-006（无自助注册 / 重置入口）由 `IAuthService` 不提供 `Register`/`ResetPassword` 方法 + [§1.2 排除项](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) 覆盖。证据：[HD-014 §3.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#31-authiauthservicecs) + [§4.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#41-authservice-核心流程) vs [acceptance-criteria.md line 36-41](../01-requirements/acceptance-criteria.md)
+- **REQ-017 解封子能力**：`pass` — AC-067（Admin 解封二次确认后状态变正常 + 事件入审计日志 `admin_unlock_account`）由 `UnlockAccountAsync` + `IAuditLogger.LogAsync(ActionType="admin_unlock_account")` 覆盖，字面事件名与 AC-067 完全一致。REQ-017 其余两项子能力（撤销共享 / 查询审计）已正确移交 `Inkwell.Core.Agents` / `Inkwell.Core.AuditLogs`，边界声明清晰。证据：[HD-014 §3.8](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#38-inkwellcoreauthauthservicecs) vs [acceptance-criteria.md line 150](../01-requirements/acceptance-criteria.md)
+- **NFR-003 触点（密码再验证 + 失败计数）**：`pass`（在声明范围内）— UF-002 步骤 5"多次失败 → 后端临时锁账号"由 `VerifyPasswordForUnlockAsync` + `AuthOptions.MaxFailedUnlockAttempts=5` 覆盖；UI-002 锁屏遮罩本身、OQ-017 在途任务保活均正确声明为不在本 HD 范围（[AGENTS.md §3.4 W-003](../../AGENTS.md) 已知残余，HD-014 顶部 callout 已引用）。证据：[HD-014 §1.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) + [§3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) vs [user-flow.md UF-002](../01-requirements/user-flow.md#uf-002-自动锁定与解锁)
+- **文件结构 / 每个程序文件职责**：`pass` — 11 个文件（`Auth/IAuthService.cs` / `AuthSession.cs` / `AuthAccountSummary.cs` / `AuthOptions.cs` / `AuthOptionsValidator.cs` / `Persistence/Auth/User.cs` / `IUserRepository.cs` / `Inkwell.Core/Auth/AuthService.cs` / `PasswordHasher.cs` / `SessionTokenGenerator.cs` / `SessionCacheEntry.cs` / `AuthBuilderExtensions.cs`，共 12 个文件而非标题"11 文件"字面——见 §22.2 C-1）× 10 字段表格全部填写，无 `<TBD>`。证据：[HD-014 §3.1 ~ §3.12](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#3-程序文件设计10-字段--11-文件)
+- **数据库设计**：`pass` — `users` 表字段 / 索引 / 约束（`Username` 唯一索引 + `IsLocked` 非唯一索引）齐全，且已同步追加到 database-design.md；Entity/Mapping/Repository 实现物理位置正确引用 ADR-021/ADR-022，契约缺口如实声明留待 HD-009 errata。证据：[HD-014 §5](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#5-数据库设计增量追加至-database-designmd) vs [database-design.md `## Inkwell.Core.Auth`](database-design.md#inkwellcoreauth)
+- **配置文件字段 / 默认值**：`pass` — `AuthOptions` 3 字段（`SessionTtlHours=24` / `MaxFailedUnlockAttempts=5` / `EnableSensitiveDataLogging=false`）+ `[Range]` 边界 + Validator，命名风格与既有 HD 一致；但 `SessionTtlHours` 的 `[Range(1, 720)]` 上界与 `ICacheProvider` 实际能接受的 TTL 上限存在未被发现的冲突（详 §22.2 C-4，判定 blocking）。证据：[HD-014 §3.4 ~ §3.5](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs)
+- **性能边界 / 安全边界 / 已知限制（观察项，非机械套用端口模板）**：`partial`（观察项）— HD-014 未设独立的"性能 / 安全 / 可观测性"汇总小节（HD-001 ~ HD-013 均有），安全相关内容分散在各文件"日志要求"列（`PasswordHash` / `SessionToken` 禁止进日志、密码哈希算法选型论证）与 §3.9 `PasswordHasher` 单文件描述中，属实质内容已覆盖但缺乏统一呈现；对于登录鉴权这一安全敏感模块，暴力破解防护（登录速率限制）已正确声明移交 `Inkwell.WebApi`，但**账号枚举 / 计时攻击**（`GetUserByUsername` 未命中 vs `PasswordHasher.Verify` 失败的响应耗时是否一致，以防通过响应时间推断用户名是否存在）未被讨论。此项不判定为 `missing`（遵循任务指示不机械套用端口模板），列入 §22.3 N-1 非阻塞观察项。证据：HD-014 全文无"性能边界" / "安全边界" / "已知限制"独立标题，对比 [HD-007 §7](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#7-性能--安全--可观测性)
+
+**完备性结论**：对照 REQ-001（6 条 AC）/ REQ-017 解封子能力（1 条 AC）/ NFR-003 声明范围内触点，覆盖度 `pass`；文件结构 / 数据库设计 `pass`；配置设计 `pass` 但发现 1 项跨 HD 数值冲突（C-4，见下）；性能 / 安全汇总呈现为观察项，不计入 `missing`。整体完备性达标，不阻塞 `TestCaseAuthor` 起步，但 C-4 需先修复才能进入 H5。
+
+### 22.2 一致性扫描（HD-014 ↔ HD-001 / HD-002 / HD-004 / HD-007 / ADR-023 / AGENTS.md §3.2 / database-design.md / file-structure.md）
+
+- **C-1（PASS，附措辞瑕疵）**——HD-014 §3 标题"程序文件设计（10 字段 × 11 文件）"与实际列出的文件数不符：`Auth/` 5 + `Persistence/Auth/` 2 + `Inkwell.Core/Auth/` 5 = **12** 个文件（§3.1 ~ §3.12 共 12 个小节），非标题字面"11 文件"。核对 §2 文件结构清单本身（`Inkwell.Abstractions` 7 个 + `Inkwell.Core` 5 个 = 12 个）与文件计数段"HD-014 新增 7 个 + 5 个，合计 12 个"数字一致，仅 §3 标题的"11"字样是笔误。非设计缺陷，纯计数笔误。证据：[HD-014 §3](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#3-程序文件设计10-字段--11-文件) 标题 vs §2.1/§2.2 文件计数段 vs §3.1~§3.12 实际 12 个小节
+- **C-2（PASS）**——依赖规则核查：全文 grep `using|StackExchange|Microsoft.EntityFrameworkCore|Redis|Npgsql|SqlClient` 仅命中顶部 callout 的"不得引用"声明句 + Q1 决策表候选项文字描述"Session Token + Cache（Redis TTL=24h）"（描述缓存机制的概念性文字，非代码 `using` 语句），全文**不存在**任何 Provider 包的真实代码级引用；持久化经 `IPersistenceProvider.GetRepository<IUserRepository>()` / `IUnitOfWork.GetRepository<IUserRepository>()`（[HD-002 §13.3 Q1=A2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 事务内外双入口模式）访问，缓存经 `ICacheProvider`（HD-004），审计经 `IAuditLogger`（HD-007），符合 [AGENTS.md §3.2](../../AGENTS.md) 依赖纯度约束。证据：全文 grep 命中 2 处，均非代码引用
+- **C-3（PASS）**——`IUserRepository` 方法命名（`AddUser` / `UpdateUser` / `GetUser` / `GetUserByUsername` / `ListUsers` / `FindUsersByLockedStatus`）逐一核对 [HD-002 §4.1.3 动词白名单](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)（`Add`/`Update`/`Get`/`Delete`/`List`/`Find` 之一开头，且不带 `Async` 后缀）：6 个方法全部合规，`IUserRepository : IRepository<User, Guid>` marker 继承正确。证据：[HD-014 §3.7](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#37-persistenceauthiuserrepositorycs) vs [HD-002 §4.1.3](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)
+- **C-4（BLOCKING）**——`AuthOptions.SessionTtlHours` 的 `[Range(1, 720)]` 上界（720 小时 = 30 天）与 `ICacheProvider` 实际 TTL 硬约束存在真实冲突：[HD-004 §3.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) `CacheOptions.MaxTtlSeconds` 本身也带 `[Range(1, 86400)]`（86400 秒 = 24 小时，即该值**永远不可能**通过 DataAnnotations 校验超过 24 小时），且 [HD-004 §3.1 错误处理](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) 明确"`SetAsync` TTL 越界 → `ArgumentOutOfRangeException`"。若运维配置 `AuthOptions.SessionTtlHours` 为任意 25 ~ 720 之间的合法值（`AuthOptionsValidator` 会放行，因为 720 在其自身 `[Range(1,720)]` 内），`AuthService.LoginAsync` 调用 `ICacheProvider.SetAsync` 时传入的 `CacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(SessionTtlHours)` 会在 Provider 实现层触发 `ArgumentOutOfRangeException`——这是一个**配置层通过校验、但运行期必然失败**的真实缺陷，而非理论边界情况。HD-014 全文未讨论此约束，`AuthOptionsValidator`（§3.5）也未做跨 HD 的上限收紧或跨字段校验。证据：[HD-014 §3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) `[Range(1, 720)]` vs [HD-004 §3.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) `CacheOptions.MaxTtlSeconds` `[Range(1, 86400)]` + [HD-004 §3.1 错误处理行](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md)
+- **C-5（PASS）**——ADR-023 裸 `Task<T>` + BCL 异常规约核查：`IAuthService` 6 方法全部走裸 `Task<T>`/`Task`，`CancellationToken ct = default` 全填；错误处理表使用的异常类型（`ArgumentException` / `UnauthorizedAccessException` / `InvalidOperationException` / `KeyNotFoundException` / `OperationCanceledException` / `IOException` / `TimeoutException`）均为 [HD-001 §5.3 BCL 异常类型对照表](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表) 已收录类型，无自造异常类型或 `Result<T>` 残留。证据：[HD-014 §3.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#31-authiauthservicecs) vs [HD-001 §5.3](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表)
+- **C-6（PASS）**——OTel `exception.*` 五字段引用与 [HD-001 §4.2](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#42-日志结构化字段) 锁定字段一致；`auth.<verb>` span 命名模式（`auth.login` / `auth.logout` 等）与既有 HD 的 `cache.<verb>` / `audit.<verb>` / `db.repository.user.<verb>` 命名风格同构。证据：[HD-014 §3.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#31-authiauthservicecs) 日志要求行
+- **C-7（PASS）**——PBKDF2 参数核实：迭代次数 ≥ 600,000（HMAC-SHA256）、盐长 16 字节、输出 32 字节，经核对 [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) 当前版本对 PBKDF2-HMAC-SHA256 的建议值（≥ 600,000 次迭代）完全一致；盐长 16 字节（128 位）符合 NIST SP 800-132 最低建议；输出 32 字节与 SHA-256 摘要长度匹配，量级合理。自描述字符串格式（含算法标识 + 参数 + 盐 + 摘要）设计允许未来无缝升级算法，参照 ASP.NET Core Identity `PasswordHasher<TUser>` 版本前缀先例，技术方案成立。证据：[HD-014 §3.9](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#39-inkwellcoreauthpasswordhashercs)
+- **C-8（PASS）**——Session Token + Cache 机制核查：`SessionTokenGenerator` 用 `RandomNumberGenerator.GetBytes(32)`（256 位熵）+ Base64Url 编码，属加密安全随机数生成，符合会话令牌不可预测性要求；Cache key `auth:session:{token}` 命名虽未严格遵循 [HD-004 §Q-key-convention 建议格式](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#13-决策记录) `{tenant}:{module}:{purpose}:{id}`（缺 `{tenant}` 段），但 HD-004 已明确该约定仅为"文档层建议，不强制"，且 v1 单租户场景（[OQ-005 closed §A](../01-requirements/open-questions.md#oq-005-v1-账号开通方式管理员后台创建的具体形态)）本就无 tenant 概念，省略合理，非违规。TTL=24h（86400 秒）恰好等于 `CacheOptions.MaxTtlSeconds` 上限（未超出，但见 C-4 的配置层冲突）。证据：[HD-014 §1.3 Q1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#13-关键决策摘要) + [§3.10](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#310-inkwellcoreauthsessiontokengeneratorcs) vs [HD-004 §Q-key-convention](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#13-决策记录)
+- **C-9（PASS）**——文件计数核实：file-structure.md 累计"53（HD-008 前）+ 7（HD-014 Abstractions 增量）= 60"与 HD-014 §2.1 自身声明的"60"一致；手工核算 11+8+7+4+4+10+7+2+7=60 无误。`Inkwell.Core.csproj` 首次出现，贡献 5 个 `*.cs` + 1 个 `.csproj`，与 file-structure.md 对应章节描述一致。证据：[file-structure.md line 414](file-structure.md) vs [HD-014 §2.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#21-inkwellabstractions-增量)
+- **C-10（NON-BLOCKING）**——database-design.md 顶层"表清单"占位表（line 70）`users` 行仅引用 `REQ-001`，未同时引用 `REQ-017`；而 HD-014 §5 数据库设计增量小节标题本身已是"表 `users`（REQ-001 + REQ-017 解封子能力）"，且同表下方 `agent_versions` 行采用了"REQ-002 + REQ-015"复合引用的先例格式。顶层占位表未同步补上 `REQ-017`，属于文档精度小疵，不影响任何下游产物起步。证据：[database-design.md line 70](database-design.md) vs [database-design.md line 164](database-design.md#inkwellcoreauth)
+- **C-11（信息性，非技术一致性判据）**——文件顶部"治理修正说明（2026-07-06）"及 §7 决策记录声称"Q1/Q2/Q3/Q5 均为默认 Agent 通过 `vscode_askQuestions` 向 Owner 真实确认"。经核对本仓库 `/memories/repo/inkwell-h3-workflow.md`"2026-07-06 第四次复发"条目，该次确认记录为本工作会话中已发生的独立真实确认动作（区别于此前 3 次子代理编造事件）。**按任务要求，本项不由评审 Agent 代为判定真伪**，仅如实记录：文档措辞本身符合已建立的"治理修正说明"标准写法（子代理声称 → 复核发现异常 → 补做真实确认 → 记录真实结果），无新增可疑的、缺乏治理修正说明支撑的"Owner 已确认"表述。是否需要 Owner 本人再次口头确认，留待 Owner 在签字前自行判断（详 §22.4）。
+
+**一致性结论**：11 项检查中 1 项 `BLOCKING`（C-4）、1 项 `NON-BLOCKING`（C-10）、1 项信息性记录（C-11，非 pass/fail 判据）、其余 8 项 `PASS`（含 1 项 PASS 附措辞笔误 C-1）。
+
+### 22.3 反问清单
+
+#### Blocking
+
+##### B-1：`AuthOptions.SessionTtlHours` 的 `[Range(1, 720)]` 允许配置出必然导致 `ICacheProvider.SetAsync` 运行期抛错的值（C-4）
+
+- **问题**：`AuthOptions.SessionTtlHours` 的 DataAnnotations 上界为 720（小时），但 `ICacheProvider` 的 `CacheOptions.MaxTtlSeconds` 本身硬编码 `[Range(1, 86400)]`（86400 秒 = 24 小时），即缓存层的 TTL 永远不可能被配置超过 24 小时。当 `SessionTtlHours` 配置为 25 ~ 720 之间的任意合法值时，`AuthOptionsValidator` 会放行（未越出自身 720 上界），但 `AuthService.LoginAsync` 调用 `ICacheProvider.SetAsync` 时会因 `CacheEntryOptions.AbsoluteExpirationRelativeToNow` 越出 `[1, 86400]` 秒范围而在 Provider 实现层抛出 `ArgumentOutOfRangeException`，导致每一次登录都失败
+- **影响范围**：`TestCaseAuthor` 若按 `AuthOptions.SessionTtlHours` 字面 `[Range(1,720)]` 设计边界测试用例（如"配置 48 小时验证登录态延长"），该用例设计出的输入在集成环境下会必然失败，且失败原因（Cache 层拒绝）与被测对象（Auth 模块）不直接相关，容易误导测试排查方向；`CodingExecutor` 编码时若照单全收 `[Range(1,720)]` 实现，会引入一个"配置校验通过、但功能不可用"的隐藏缺陷
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：将 `AuthOptions.SessionTtlHours` 的 `[Range]` 上界收紧为与 `CacheOptions.MaxTtlSeconds` 对齐（如 `[Range(1, 24)]` 小时），并在设计中显式注明"受 HD-004 `CacheOptions.MaxTtlSeconds=86400` 硬约束"
+  - 选项 2：在 `AuthOptionsValidator` 中新增跨 Options 的运行期校验（注入 `IOptions<CacheOptions>`，跨字段校验 `SessionTtlHours * 3600 <= CacheOptions.MaxTtlSeconds`），保留 `[Range(1,720)]` 的字面宽松度但在装配期拦截非法组合
+  - 选项 3：若未来需要支持 > 24 小时会话（如"记住我"场景），需先评估是否要放宽 HD-004 `CacheOptions.MaxTtlSeconds` 的硬上界（跨 HD 变更，需回到 HD-004 发起 errata）
+  - reviewer 倾向选项 1（成本最低，且 v1 需求 REQ-001 验收标准本就只要求 24 小时，无需保留 720 的宽松上界）
+- **卡点等级**：**blocking**
+- **追溯**：C-4
+
+#### Non-blocking
+
+##### N-1：登录鉴权缺乏统一的"性能 / 安全边界"汇总小节，账号枚举 / 计时攻击面未讨论
+
+- **问题**：HD-014 未设独立"性能边界 / 安全边界 / 已知限制"汇总小节（HD-001 ~ HD-013 均有）；安全相关内容分散在各文件"日志要求"列。其中，`LoginAsync` 对"用户名不存在"与"密码错误"两种失败路径是否会产生可观测的响应耗时差异（可能被用于账号枚举的计时侧信道攻击）未被讨论——`GetUserByUsername` 未命中直接返回 vs 命中后走 `PasswordHasher.Verify`（PBKDF2 600,000 次迭代，耗时显著）两条路径耗时差异较大
+- **影响范围**：不阻塞 `TestCaseAuthor` / `CodingExecutor` 起步（异常类型统一已防止响应内容差异，仅耗时侧信道风险未评估）；建议 H4 测试设计或 H5 编码时补一条"两种登录失败路径耗时应保持一致（如失败时也执行一次 dummy `PasswordHasher.Verify` 计算）"的安全用例
+- **建议方向**：可在 §4.1 `LoginAsync` 流程说明中补一句"用户名不存在时执行 dummy hash 计算以保持耗时一致，防止计时攻击枚举账号"，或在 §6.2 待办中登记
+- **卡点等级**：non-blocking
+- **追溯**：观察项（§22.1 性能/安全边界段）
+
+##### N-2：database-design.md 顶层表清单 `users` 行未同步引用 REQ-017（C-10）
+
+- **问题**：`database-design.md` line 70 顶层占位表 `users` 行仅列 `REQ-001`，未如同行下方 `agent_versions` 行"REQ-002 + REQ-015"的复合引用先例一并列出 `REQ-017`（解封子能力），与 HD-014 §5 / database-design.md line 164 标题"REQ-001 + REQ-017 解封子能力"不完全同步
+- **影响范围**：不影响任何下游产物起步，仅是顶层占位表的引用完整度小疵
+- **建议方向**：顶层表 `users` 行"说明"列补充为"[REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md)"
+- **卡点等级**：non-blocking
+- **追溯**：C-10
+
+##### N-3：§3 标题"11 文件"与实际 12 个文件小节字面不符（C-1）
+
+- **问题**：HD-014 §3 标题"程序文件设计（10 字段 × 11 文件）"，但 §3.1 ~ §3.12 实际列出 12 个文件小节，与 §2 文件结构清单（7+5=12）及文件计数段自身描述一致，仅标题数字笔误
+- **影响范围**：不影响任何下游产物起步，纯计数笔误
+- **建议方向**：标题改为"程序文件设计（10 字段 × 12 文件）"
+- **卡点等级**：non-blocking
+- **追溯**：C-1
+
+### 22.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-014 对 REQ-001 / REQ-017（解封子能力）/ NFR-003（声明范围内）的验收标准覆盖完整、范围边界证据链扎实（REQ-013 排除结论经独立核实准确）、依赖规则遵守核查通过（全文无 Provider 包引用，正确经 `GetRepository<IUserRepository>()`/`ICacheProvider`/`IAuditLogger` 访问基础设施）、密码哈希方案技术正确（PBKDF2 参数符合当前 OWASP 建议）；但发现 **1 项 blocking**（B-1：`SessionTtlHours` 配置范围与 `ICacheProvider` TTL 硬上限冲突，会导致运行期必然失败的合法配置值）与 **3 项 non-blocking**（N-1 计时攻击面未讨论、N-2 database-design.md 顶层表引用不全、N-3 标题计数笔误）
+- **HD-014 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B-1（建议选项 1：收紧 `SessionTtlHours` 的 `[Range]` 上界至与 `CacheOptions.MaxTtlSeconds` 对齐，如 `[Range(1, 24)]`）——**纯机械性数值修正，不需要 Owner picker**（H3 工作流约定：纯计数 / 引用 / 数值对齐类错误可直接由 author 子代理修正）
+  2. ⬜（可选）N-1 / N-2 / N-3 视 Owner 意愿一并处理
+  3. ⬜ Owner 在 HD-014 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位**，AI 不替签）——**需在 B-1 修复后**再签字
+- **需要人类核实的问题（不由本评审 Agent 代为判定真伪）**：HD-014 文件顶部"治理修正说明（2026-07-06）"及 §7 决策记录中"Q1/Q2/Q3/Q5 均为默认 Agent 通过 `vscode_askQuestions` 向 Owner 真实确认"的表述（详 §22.2 C-11）。本评审 Agent 核实了该表述的**格式**符合本仓库已建立的"治理修正说明"标准写法（区别于此前 3 次被证伪的子代理编造），但**没有能力、也不应该**独立判断这次确认交互本身是否真实发生——请 Owner 在签字 `reviewed` 前自行确认：这四条决策（Session Token 机制 / 失败登录审计范围 / 解锁失败阈值 / 密码哈希算法）是否确实经过您本人的真实确认。若确认无误，无需改动文档；若发现仍是编造，请按 `/memories/repo/inkwell-h3-workflow.md` 已记录的处理模式重新核实
+- **HD-014 是否可推荐翻 `reviewed`**：**暂不推荐**——需先完成 B-1 修复（机械修正，成本很低），修复后建议做一次聚焦复审（仅核对 B-1 修复点，不需重跑全部检查项），确认无误后即可推荐 Owner 签字
+- **后续路径建议**：B-1 修复 → 聚焦复审确认 → Owner 签字 `reviewed` → HD-014 是 H3 业务命名空间层的首张范例，可作为后续 `Inkwell.Core.Agents` / `.Models` / 等 15 张剩余业务 HD 起草时的参照模板（尤其是"范围核实 + 排除项显式声明"的写法）
+
+### 22.5 自检
+
+- ✅ 每条 `pass` / `partial` / `blocking` / `non-blocking` 结论都附了文件路径 + 章节锚点证据
+- ✅ `blocking` 反问（B-1）能映射到具体一致性冲突（C-4）+ 影响范围 + 三个可执行的选项化建议方向，未替设计师下结论
+- ✅ 未使用"看起来" / "似乎" / "感觉"等主观词汇
+- ✅ 未凭文件名臆测，每条结论均打开对应文件读取具体字段（含 HD-004 `CacheOptions.MaxTtlSeconds` `[Range]` 上界逐字核对、ADR-007 原文核对、repo-impact-map.md 第 364 行核对、OQ-003/OQ-005/OQ-007 逐条核对、acceptance-criteria.md AC-001~AC-006/AC-067 逐条核对）
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-014 / database-design.md / file-structure.md / 报告主体，仅追加评审报告
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 按任务明确要求，对"2026-07-06 Owner 确认"类表述**未自行判定真伪**，已在 §22.4 单独列为"需要人类核实的问题"
+- ✅ 完备性判定遵循任务指示，未机械套用端口层"§7/§8/§9"三段式模板，改为对照 REQ-001/REQ-017/NFR-003 验收标准核实
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §22 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
