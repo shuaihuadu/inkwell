@@ -2620,3 +2620,48 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 完备性判定遵循任务指示，未机械套用端口层"§7/§8/§9"三段式模板，改为对照 REQ-001/REQ-017/NFR-003 验收标准核实
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §22 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+### 22.6 聚焦复审（2026-07-06，仅核对 B-1/N-1/N-2/N-3 四处修复点）
+
+> 本节范围严格限定为 §22.3 反问清单四条"处理结果"是否真的消除了对应问题、是否引入新的边界/不一致问题，不重跑 §22.1/§22.2 全部检查项。
+
+#### 22.6.1 B-1 复核（`SessionTtlHours [Range(1, 720)]` → `[Range(1, 24)]`）
+
+- **数值范围核实**：`AuthOptions.SessionTtlHours` 新上界 `[Range(1, 24)]`，换算秒数区间为 `[3600, 86400]`；`ICacheProvider.CacheOptions.MaxTtlSeconds` 硬约束 `[Range(1, 86400)]`。`[3600, 86400] ⊆ [1, 86400]`，且上界 86400 与 86400 相等（[Range] 两端均为闭区间，[HD-004 §3.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) 未声明排他），不构成越界。默认值 24 小时（86400 秒）与 `CacheOptions.MaxTtlSeconds` 默认值 86400 秒（[HD-004 §Q-ttl-bounds](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#13-决策记录)）恰好相等，属合法边界值而非越界值。**结论：C-4 描述的"配置层通过校验、运行期必然抛错"的组合在默认配置下已被消除**。证据：[HD-014 §3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) `[Range(1, 24)]` + 修正 callout vs [HD-004 §3.3](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) `[Range(1, 86400)]`
+- **新发现的残留边界问题（non-blocking，记为 N-4）**：`CacheOptions` 是应用级单一实例，从 `"Inkwell:Cache"` 顶层配置段绑定（[HD-004 §3.4](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) 职责行），被**全应用所有缓存消费方共用**，并非 Auth 模块专属子段。`AuthOptions.SessionTtlHours` 的 `[Range(1, 24)]` 静态修正只保证与 `CacheOptions.MaxTtlSeconds` **默认值** 86400 秒兼容，但 `MaxTtlSeconds` 本身可被运维在其自身合法范围 `[1, 86400]` 内下调（例如运维出于限制其他缓存场景陈旧数据的目的，把全局 `MaxTtlSeconds` 调低至 3600 秒）。一旦 `MaxTtlSeconds` 被配置为小于 86400 的任意值，`AuthOptions.SessionTtlHours=24`（或 `AuthOptionsValidator` 放行的任何 1~24 之间的值换算超过该值）仍会在 `AuthService.LoginAsync` 调用 `ICacheProvider.SetAsync` 时重新触发 `ArgumentOutOfRangeException`——即 B-1 原本建议的"选项 2：跨 Options 运行期校验"未被采纳，只采纳了"选项 1：静态收紧字面上界"，两者防御强度不同：选项 1 只防住了"字面越界"，未防住"两个字段各自合法但组合非法"的跨配置耦合问题。**卡点等级：non-blocking**——v1 默认配置下不触发，且这一残留耦合在原始 C-4 发现之前就已存在（`CacheOptions.MaxTtlSeconds` 一直是全局可配置项），不属于 B-1 修复本身新引入的问题，而是修复选项 1 相对选项 2 的已知代价。建议方向：留待 H5 编码或后续 errata 视 Owner 意愿决定是否补做跨 Options 运行期校验（原 B-1 选项 2），或在部署手册中显式约束"运维不得将 `Inkwell:Cache:MaxTtlSeconds` 调低于 `Inkwell:Auth:SessionTtlHours` 换算的秒数"。证据：[HD-004 §3.4](Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) `"Inkwell:Cache"` 顶层段职责描述 vs [HD-014 §3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) 修正 callout（未提及跨 Options 校验）
+- **测试要求措辞精度观察（non-blocking，附属 N-4）**：[HD-014 §3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) 测试要求行写"`[Range]` 边界（含 26 小时以上必被拒绝的用例）"，但真正的首个非法边界值是 **25** 小时（`[Range(1, 24)]` 的紧邻越界值），"26 小时以上"的表述会让 `TestCaseAuthor` 误以为 25 小时是合法值而漏测真正的边界点。不判定为新 blocking（这是测试用例设计精度问题，不影响 HD-014 本身的正确性，且 H4 测试设计阶段仍有机会自行核对 `[Range]` 字面值补全边界用例），仅作为观察项记录。证据：[HD-014 §3.4](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#34-authauthoptionscs) 测试要求列
+- **B-1 复核结论**：`PASS`——核心冲突（C-4 描述的默认配置下必然失败问题）已消除，未发现新的字面越界或逻辑错误；发现 1 项非本次修复引入、但修复方式（选项 1 而非选项 2）未覆盖的残留耦合（N-4，non-blocking），以及 1 项测试用例措辞精度观察（non-blocking）
+
+#### 22.6.2 N-1 复核（登录鉴权计时攻击防护说明）
+
+- [HD-014 §4.1 `LoginAsync`](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#41-authservice-核心流程) 新增说明逐句核对：明确"账号不存在时仍须执行一次 `PasswordHasher.Verify` 的假验证（对固定的哑哈希值计算）"，覆盖了 N-1 原始问题指出的"`GetUserByUsername` 未命中直接返回 vs 命中后走 PBKDF2 验证"两条路径耗时差异；并明确"两种失败路径最终必须统一抛出同一种异常 `UnauthorizedAccessException`"，与既有错误处理表（[HD-014 §3.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#31-authiauthservicecs)）"不区分二者，防信息泄露"的既有设计一致，未产生冲突
+- **可执行性判定**：`pass`——说明包含明确的实现约束（"对固定的哑哈希值计算"），`CodingExecutor` 可据此实现（如硬编码一个哑 `PasswordHash` 常量供未命中路径调用 `PasswordHasher.Verify`），无需额外反问
+- **遗留观察（non-blocking，不新增编号，沿用原 N-1 精神）**：说明未指明"哑哈希值"的来源（是否需要与真实 PBKDF2 参数——迭代次数 600,000+——完全一致，否则耗时仍可能因迭代次数不同而产生可测量差异）。建议 H5 编码或 H4 测试设计时明确"哑哈希值必须用与真实账号相同的 PBKDF2 迭代参数生成"，但这是实现细节而非设计缺陷，不阻塞
+- **N-1 复核结论**：`PASS`——防护说明清晰可执行，未发现新的不一致
+
+#### 22.6.3 N-2 复核（database-design.md 顶层表 `users` 行补 REQ-017）
+
+- 核对 [database-design.md 第 70 行](database-design.md)：`users` 行"说明"列已更新为 `REQ-001 + REQ-017`，格式与 `agent_versions` 行"REQ-002 + REQ-015"复合引用先例完全一致；与 [HD-014 §5](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#5-数据库设计增量追加至-database-designmd) / [database-design.md 第 164 行](database-design.md) 标题"REQ-001 + REQ-017 解封子能力"三处引用现已同步
+- **N-2 复核结论**：`PASS`——修复完全符合建议方向，未发现新的不一致
+
+#### 22.6.4 N-3 复核（HD-014 §3 标题"11 文件"→"12 文件"）
+
+- 核对 [HD-014 §3 标题](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#3-程序文件设计10-字段--12-文件)：已改为"程序文件设计（10 字段 × 12 文件）"，与 §3.1 ~ §3.12 实际 12 个小节、§2 文件结构清单 7+5=12 三处一致；本报告 §22.1 / §22.2 内引用该标题的锚点链接（`#3-程序文件设计10-字段--12-文件`）逐一点验均可正确定位到修正后的标题，未发现死链
+- **N-3 复核结论**：`PASS`——修复完全符合建议方向，未发现新的不一致
+
+#### 22.6.5 聚焦复审结论
+
+- **四项修复点判定**：B-1 `PASS`（附 1 项 non-blocking 残留耦合 N-4 + 1 项 non-blocking 测试措辞观察）、N-1 `PASS`、N-2 `PASS`、N-3 `PASS`
+- **是否引入新的不一致**：未发现字面错误或逻辑冲突；仅发现 N-4（`CacheOptions.MaxTtlSeconds` 作为全局共享配置项被运维下调时的残留耦合风险，non-blocking，性质是"修复选项 1 相对选项 2 的已知代价"而非本次修复引入的新缺陷）
+- **本轮复审决议**：**PASS**——HD-014 前次评审（§22）的 1 项 blocking（B-1）与 3 项 non-blocking（N-1/N-2/N-3）均已妥善修复，聚焦复审未发现新的 blocking 项
+- **HD-014 是否可推荐 Owner 翻 `status: reviewed`**：**可以推荐**，前提仍是 §22.4 已记录的"需要人类核实的问题"——即 HD-014 文件顶部"治理修正说明"及 §7 决策记录中 4 条"Owner 已通过 `vscode_askQuestions` 真实确认"的表述，其真实性**不由本评审 Agent 代为判定**，请 Owner 在签字前自行确认。N-4（`CacheOptions.MaxTtlSeconds` 全局下调残留耦合）不阻塞签字，建议登记为后续 errata 候选项（是否补做跨 Options 运行期校验，留 Owner 意愿决定）
+
+#### 22.6.6 自检（本节）
+
+- ✅ 复审范围严格限定为 B-1/N-1/N-2/N-3 四项修复点，未重跑 §22.1/§22.2 全部检查项
+- ✅ 每条结论均附文件路径 + 章节锚点证据，逐字核对了 `[Range]` 数值区间与秒数换算
+- ✅ 未使用"看起来" / "似乎"等主观词汇
+- ✅ 新发现的 N-4 已明确"卡点等级：non-blocking"及理由，未替设计师下结论，只给建议方向
+- ✅ 未对"Owner 已确认"类表述代为判定真伪，延续 §22.4 已记录的立场
+- ✅ 未越界修改 HD-014 / database-design.md / 报告主体，仅追加本节
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
