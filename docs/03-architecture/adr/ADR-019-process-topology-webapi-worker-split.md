@@ -61,10 +61,10 @@ src/core/
 
 ### 进程职责划分
 
-| 进程 | csproj | SDK | 主要职责 | 不做什么 |
-| --- | --- | --- | --- | --- |
-| `Inkwell.WebApi` | `Microsoft.NET.Sdk.Web` | ASP.NET Core minimal-host | REST CRUD（[REQ-002 ~ REQ-017](../../01-requirements/requirements.md)） / AG-UI SSE（[ADR-012](./ADR-012-client-server-protocol-rest-agui.md)） / Public API（[ADR-007](./ADR-007-public-api-token-auth.md)） / 鉴权 / Rate limit | 不消费 `IQueueProvider` 队列；不跑 [DurableTask](../../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) actor |
-| `Inkwell.Worker` | `Microsoft.NET.Sdk.Worker` | [.NET Generic Host](https://learn.microsoft.com/aspnet/core/fundamentals/host/generic-host) + [`BackgroundService`](https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services) | 消费 [`IQueueProvider`](./ADR-018-queue-abstraction-channels-default.md)（dev `ChannelsQueueProvider` / prod `RedisStreamQueueProvider`）队列；DurableTask runner；后台慢任务（KB ingest [REQ-009](../../01-requirements/requirements.md) / Trigger fan-out [REQ-011](../../01-requirements/requirements.md)） | 不开 HTTP 监听端口（除了 OTel `/healthz` 探针 + Prometheus scrape `/metrics` 端口） |
+| 进程             | csproj                     | SDK                                                                                                                                                                                            | 主要职责                                                                                                                                                                                                                                                                                                       | 不做什么                                                                                                                                  |
+| ---------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Inkwell.WebApi` | `Microsoft.NET.Sdk.Web`    | ASP.NET Core minimal-host                                                                                                                                                                      | REST CRUD（[REQ-002 ~ REQ-017](../../01-requirements/requirements.md)） / AG-UI SSE（[ADR-012](./ADR-012-client-server-protocol-rest-agui.md)） / Public API（[ADR-007](./ADR-007-public-api-token-auth.md)） / 鉴权 / Rate limit                                                                              | 不消费 `IQueueProvider` 队列；不跑 [DurableTask](../../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) actor |
+| `Inkwell.Worker` | `Microsoft.NET.Sdk.Worker` | [.NET Generic Host](https://learn.microsoft.com/aspnet/core/fundamentals/host/generic-host) + [`BackgroundService`](https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services) | 消费 [`IQueueProvider`](./ADR-018-queue-abstraction-channels-default.md)（dev `ChannelsQueueProvider` / prod `RedisStreamQueueProvider`）队列；DurableTask runner；后台慢任务（KB ingest [REQ-009](../../01-requirements/requirements.md) / Trigger fan-out [REQ-011](../../01-requirements/requirements.md)） | 不开 HTTP 监听端口（除了 OTel `/healthz` 探针 + Prometheus scrape `/metrics` 端口）                                                       |
 
 ### 部署形态（[ADR-005](./ADR-005-deployment-docker-compose-aks.md) 增量）
 
@@ -105,6 +105,8 @@ host.Run();
 ```
 
 具体的 hosted service 注册扩展方法 `AddInkwellWorker()` 由 [Inkwell.Core](./ADR-017-backend-module-topology-ports-and-adapters.md) 提供（属业务编排域，不属端口层）。
+
+> **2026-07-06 errata（关联 [ADR-021 2026-07-06 errata](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）**：本 ADR 仅锁定进程拓扑（`Inkwell.WebApi` 承载 HTTP 入口，`Inkwell.Worker` 承载队列 consumer + DurableTask runner），**不**对 Migration 执行时机作决策。[ADR-021 §「Migration / DataSeed 启动行为」](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 曾把「仅 `Inkwell.WebApi` 启动时跑 Migration」表述为本 ADR「锁定」的推论——该表述已随 ADR-021 2026-07-06 errata 一并修订：**应用启动不再自动执行 Migration**，Migration 改由 CI/CD pipeline 独立步骤执行；本 ADR 的 WebApi / Worker 双进程拓扑本身不变。触发原因：H3 HD-011 起草期发现的生产安全考量，Owner 拍板。
 
 ### 可观测性（[ADR-013](./ADR-013-observability-otel-self-hosted-grafana.md) 增量）
 
@@ -176,17 +178,17 @@ host.Run();
 
 **breaking change 标记**：是。本 ADR 落地后，下列文档需更新（按依赖顺序）：
 
-| 步骤 | 文件 | 改动 | 是否需翻 status |
-| --- | --- | --- | --- |
-| 1 | [`ADR-017` §3.1 csproj 树 + §模块映射](./ADR-017-backend-module-topology-ports-and-adapters.md) | `Inkwell.Host` → `Inkwell.WebApi`；新增 `Inkwell.Worker`；csproj 数 10 → 11 | 内部增量，仍 accepted |
-| 2 | [`ADR-018` §决策 §`Inkwell.Queue.Redis` 部署](./ADR-018-queue-abstraction-channels-default.md) | 「consumer 跑在 `Inkwell.Worker`」一句话补充；`UseRedisQueue()` 在 WebApi 仅注册 enqueue 侧、Worker 注册 consume 侧 | 内部增量，仍 accepted |
-| 3 | [`ADR-005` §决策 §dev / §prod](./ADR-005-deployment-docker-compose-aks.md) | Compose 加 `worker` service；Helm 加 `Deployment: inkwell-worker` + HPA(`queue_depth`) | reviewed → 增量 reviewed（updated 2026-05-10） |
-| 4 | [`ADR-013` §决策](./ADR-013-observability-otel-self-hosted-grafana.md) | OTel `service.name` 区分 webapi / worker；Prometheus scrape 双 source；Dashboard 加 worker 面板 | reviewed → 增量 reviewed |
-| 5 | [`architecture.md` §1 总体图 / §3 后端架构 / §6 队列 consumer / §9 部署](../architecture.md) | 拓扑图 / csproj 树 / Builder DSL / 部署清单同步 | reviewed → 增量 reviewed |
-| 6 | [`tech-selection.md` §0 摘要表 / §21 备选项打分表](../tech-selection.md) | 新增「后端进程拓扑」条目六字段；§21.11 进程拓扑对比表；§22 自检统计更新 | reviewed → 增量 reviewed |
-| 7 | [`risk-analysis.md`](../risk-analysis.md) | 新增 [RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source](../risk-analysis.md) | reviewed → 增量 reviewed |
-| 8 | [`adr/README.md`](./README.md) | 新增 ADR-019 行 + 依赖树 | draft 不变 |
-| 9 | [`AGENTS.md` §3.1 / §3.2](../../../AGENTS.md) | `Inkwell.Host` → `Inkwell.WebApi` + `Inkwell.Worker`；§3.2 「Inkwell.Host → 全部」改为「Inkwell.WebApi / Inkwell.Worker → 全部」 | 签字位 ⚠️（需人工授权） |
+| 步骤 | 文件                                                                                            | 改动                                                                                                                             | 是否需翻 status                                |
+| ---- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1    | [`ADR-017` §3.1 csproj 树 + §模块映射](./ADR-017-backend-module-topology-ports-and-adapters.md) | `Inkwell.Host` → `Inkwell.WebApi`；新增 `Inkwell.Worker`；csproj 数 10 → 11                                                      | 内部增量，仍 accepted                          |
+| 2    | [`ADR-018` §决策 §`Inkwell.Queue.Redis` 部署](./ADR-018-queue-abstraction-channels-default.md)  | 「consumer 跑在 `Inkwell.Worker`」一句话补充；`UseRedisQueue()` 在 WebApi 仅注册 enqueue 侧、Worker 注册 consume 侧              | 内部增量，仍 accepted                          |
+| 3    | [`ADR-005` §决策 §dev / §prod](./ADR-005-deployment-docker-compose-aks.md)                      | Compose 加 `worker` service；Helm 加 `Deployment: inkwell-worker` + HPA(`queue_depth`)                                           | reviewed → 增量 reviewed（updated 2026-05-10） |
+| 4    | [`ADR-013` §决策](./ADR-013-observability-otel-self-hosted-grafana.md)                          | OTel `service.name` 区分 webapi / worker；Prometheus scrape 双 source；Dashboard 加 worker 面板                                  | reviewed → 增量 reviewed                       |
+| 5    | [`architecture.md` §1 总体图 / §3 后端架构 / §6 队列 consumer / §9 部署](../architecture.md)    | 拓扑图 / csproj 树 / Builder DSL / 部署清单同步                                                                                  | reviewed → 增量 reviewed                       |
+| 6    | [`tech-selection.md` §0 摘要表 / §21 备选项打分表](../tech-selection.md)                        | 新增「后端进程拓扑」条目六字段；§21.11 进程拓扑对比表；§22 自检统计更新                                                          | reviewed → 增量 reviewed                       |
+| 7    | [`risk-analysis.md`](../risk-analysis.md)                                                       | 新增 [RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source](../risk-analysis.md)                                             | reviewed → 增量 reviewed                       |
+| 8    | [`adr/README.md`](./README.md)                                                                  | 新增 ADR-019 行 + 依赖树                                                                                                         | draft 不变                                     |
+| 9    | [`AGENTS.md` §3.1 / §3.2](../../../AGENTS.md)                                                   | `Inkwell.Host` → `Inkwell.WebApi` + `Inkwell.Worker`；§3.2 「Inkwell.Host → 全部」改为「Inkwell.WebApi / Inkwell.Worker → 全部」 | 签字位（需人工授权）                           |
 
 **自动化检查命令**（落地后用以确认旧名已清理）：
 
