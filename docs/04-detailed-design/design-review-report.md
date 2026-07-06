@@ -2094,6 +2094,7 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：将该行改为 `builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, InMemoryRowVersionInterceptor>();`——这是纯机械修正，不涉及任何新的技术决策，不需要 Owner picker
 - **卡点等级**：**blocking**
 - **追溯**：C96
+- **已处理（2026-07-06）**：[HD-010 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) 注册行已按建议方向修正为 `AddSingleton<ISaveChangesInterceptor, InMemoryRowVersionInterceptor>()`；§3.1 注解与 §12 待办同步更新，去除"假设待验证"措辞
 
 ##### B17：HD-009 `AddEfCorePersistenceBase()` 是否把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型——现有文本无法确认，且 HD-010 已证实同类错误确实会发生（C97）
 
@@ -2104,6 +2105,7 @@ reviewer 在 chat 中列三路径 picker：
   - 若实际实现另有机制（例如不通过 DI 的 `GetServices<ISaveChangesInterceptor>()` 汇总模式，而是 `InkwellDbContext` 自身在 `OnConfiguring` 或构造函数中直接持有并附加拦截器实例），HD-009 需要显式声明该替代机制，HD-010 §3.1 的 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 消费方式需要同步调整以匹配
 - **卡点等级**：**blocking**（HD-009 虽已 `reviewed`，但本条是可执行验证发现的具体代码级缺陷，非重新评估已定决策；建议走小 errata 而非重新评审全文）
 - **追溯**：C97
+- **已处理（2026-07-06）**：核实结论——**HD-009 §3.11 此前无完整代码块，不构成已确认的书面 bug，而是文档空白**；已通过 [HD-009 §13.6 errata·第六轮](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#136-2026-07-06-errata第六轮hd-010-首轮评审-design-review-reportmd-19-b17c97-补齐-addefcorepersistencebase-完整代码) 补齐该方法完整代码，确认 `AuditingSaveChangesInterceptor` 按 `AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>()`（接口服务类型）注册，与消费端一致，不受 B16 同类问题影响；`EfCorePersistenceProvider`（`AddScoped<IPersistenceProvider, ...>`）/ `InkwellSeeder` / `MigrationRunner`（具体类型注册，消费端亦按具体类型注入，无接口不匹配风险）/ 具名 Repository 一并补全。HD-009 `status: reviewed` 未回退，本次是补齐既有承诺的实现细节，非重新评估已定决策
 
 #### Non-blocking
 
@@ -2126,11 +2128,11 @@ reviewer 在 chat 中列三路径 picker：
 - **整体评审决议**：**REJECT（需修复后重新提交，非结构性问题）**——HD-010 的整体设计思路（不建子类、复用 base DbContext、InMemory 专属 `EnsureCreatedAsync` + `RowVersion` 拦截器）扎实自洽，csproj 依赖规则、Migration 策略、file-structure.md 同步均 100% 通过（C95、C98、C99、C101 全 PASS）；但发现 **2 项 blocking**（B16 / B17），且 B16 是**可复现、可确认的代码级 bug**（不是"设计不够清楚"，而是"设计给出的示例代码本身不会按预期工作"）——本 HD 存在的目的就是解决 RowVersion 手动模拟这一具体问题，而当前代码样本恰好让这个机制失效，这是评审报告口径下的"核心交付物未达成"，故判定为 REJECT 而非 PASS-AS-ERRATA
 - **判定 REJECT 而非 PASS-AS-ERRATA 的理由**：B16 / B17 均可通过纯机械修正解决（改一行 DI 注册代码 + 补一段 HD-009 完整代码），不需要 Owner 拍板任何新的技术方向；但由于两处缺陷都直接命中"本 HD 存在的核心目的能否达成"这一验收标准（而非外围文档措辞问题），按 HD-008 §18.4 先例的"文档呈现缺口 PASS-AS-ERRATA" vs 本轮"机制性代码缺陷 REJECT"两类问题应区别对待——避免把"HD-010 已通过评审"的信号过早释放给 H5 CodingExecutor
 - **HD-010 修复路径**：
-  1. ⬜ 修复 B16：HD-010 §3.1 完整代码 `InMemoryRowVersionInterceptor` 注册行改为按 `ISaveChangesInterceptor` 服务类型注册（纯机械修正，`h3-detailed-design-author` 子代理可直接修，不需要 picker）
-  2. ⬜ 修复 B17：HD-009 §3.11 补一段"完整代码"展示 `AddEfCorePersistenceBase()` 内部注册语句，明确 `AuditingSaveChangesInterceptor` 的服务类型注册方式；若发现 HD-009 实际也犯了同 B16 一样的错误，一并修正（此项修复会触碰已 `reviewed` 的 HD-009，需按小 errata 流程处理，不需要整份 HD-009 重新评审）
-  3. ⬜ 修复后重新核对 §3.3 单测断言仍然成立（RowVersion 递增、并发冲突抛 `DbUpdateConcurrencyException`）
+  1. ✅ **已处理（2026-07-06）** 修复 B16：[HD-010 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) `InMemoryRowVersionInterceptor` 注册行已改为 `AddSingleton<ISaveChangesInterceptor, InMemoryRowVersionInterceptor>()`（纯机械修正，未涉及 Owner picker）
+  2. ✅ **已处理（2026-07-06）** 修复 B17：核实结论——**HD-009 §3.11 此前无"完整代码"块，属文档空白，不构成已确认的书面 bug**；已通过 [HD-009 §13.6 errata·第六轮](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#136-2026-07-06-errata第六轮hd-010-首轮评审-design-review-reportmd-19-b17c97-补齐-addefcorepersistencebase-完整代码) 补齐 `AddEfCorePersistenceBase()` 完整代码，确认 `AuditingSaveChangesInterceptor` 按 `AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>()`（接口服务类型）注册，与消费端一致，不受 B16 同类风险影响；HD-009 `status: reviewed` 未回退（小 errata 流程，非重新评审全文）
+  3. ⬜ 修复后重新核对 §3.3 单测断言仍然成立（RowVersion 递增、并发冲突抛 `DbUpdateConcurrencyException`）——留待 H5 编码阶段验证，非本轮文档修复范围
   4. ⬜ 可选处理 N29 / N30（non-blocking，不阻塞下一轮评审通过）
-  5. ⬜ 修复完成后建议再走一轮增量评审（确认 C96 / C97 转 PASS）后，Owner 再在 HD-010 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
+  5. ⬜ **B16 / B17 已修复，满足重新提交条件**——建议再走一轮增量评审（确认 C96 / C97 转 PASS）后，Owner 再在 HD-010 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
 - **对 file-structure.md 的结论**：本轮追加章节（`## providers/Inkwell.Persistence.EFCore.InMemory`）本身准确（C101 PASS），**不需要**因 B16/B17 而改动——问题在 HD-010/HD-009 的代码样本，不在文件树描述
 
 ### 19.5 自检

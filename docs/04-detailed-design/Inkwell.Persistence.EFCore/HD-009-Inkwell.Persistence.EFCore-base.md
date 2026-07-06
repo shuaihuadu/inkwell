@@ -35,6 +35,8 @@ downstream: []
 > **2026-05-12 errata·第三轮（[ADR-023 errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流)）**：废 `INK-PERSIST-NNN` 错误码机制；本 HD §3.1 / §3.2 / §3.3 / §3.4 / §3.5 / §3.10 / §4.2 / §4.3 / §7 错误处理统一走 [.NET BCL 异常类型](https://learn.microsoft.com/dotnet/standard/exceptions/) + OTel [`exception.*` 五字段](https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/)；§4.3 重写为 BCL 对照表；§7 `EnableSensitiveDataLogging` prod fail-fast 改抛 `InkwellConfigurationException`；详 §13.3。
 >
 > **2026-05-12 errata·第四轮（[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常)）**：删 `Common/Result.cs` + `Common/Error.cs` 抽象；本 HD §3.2 / §3.10 依赖模块删 `Inkwell.Abstractions/Common/Result.cs`；§3.10 AgentRepository 完整代码 6 方法签名 + catch 块同步翻；§10 自动化检查命令补 C9 ~ C12 grep；§11 决策记录补 4 行；详 §13.4。
+>
+> **2026-07-06 errata·第六轮（HD-010 首轮评审 B17/C97）**：§3.11 此前只有职责描述与方法签名，无"完整代码"块，无法确认 `AuditingSaveChangesInterceptor` 的 DI 服务类型注册方式；本轮补齐该方法完整代码，明确按 `ISaveChangesInterceptor` 接口服务类型注册（与消费端 HD-010/HD-011/HD-012 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 一致），同时一并注册 `EfCorePersistenceProvider` / `InkwellSeeder` / `MigrationRunner` / 具名 Repository；详 §13.6。
 
 ## 1. 模块职责
 
@@ -550,6 +552,40 @@ internal sealed class AgentRepository(InkwellDbContext db, ILogger<AgentReposito
 - **日志要求**：N/A（注册期）
 - **测试要求**：单测在测试 host 中调 `AddEfCorePersistenceBase()` + 至少一个 `UseXxxDatabase`（来自 final adapter），断言可 `BuildServiceProvider().GetRequiredService<IPersistenceProvider>()` 解到 `EfCorePersistenceProvider`；覆盖率门槛 ≥ 95%
 
+**完整代码**（2026-07-06 errata·第六轮补齐，详 §13.6）：
+
+```csharp
+// src/core/providers/Inkwell.Persistence.EFCore/DependencyInjection/InkwellPersistenceEfCoreServiceCollectionExtensions.cs
+namespace Inkwell.Persistence.EFCore.DependencyInjection;
+
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Inkwell.Abstractions.Persistence;
+using Inkwell.Abstractions.Persistence.Agents;
+using Inkwell.Persistence.EFCore;
+using Inkwell.Persistence.EFCore.Interceptors;
+using Inkwell.Persistence.EFCore.Repositories;
+
+internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
+{
+    internal static IServiceCollection AddEfCorePersistenceBase(this IServiceCollection services)
+    {
+        services.AddScoped<IPersistenceProvider, EfCorePersistenceProvider>();
+        services.AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>();
+        services.AddScoped<InkwellSeeder>();
+        services.AddScoped<MigrationRunner>();
+
+        // 18 个业务实体的具名 Repository（§3.13 表）：以 AgentRepository 为例，其余 17 个同构注册
+        services.AddScoped<IAgentRepository, AgentRepository>();
+        // ... 其余 17 个 Repositories/<TypeName>Repository 按同一模式注册（省略，模板见 §3.10）
+
+        return services;
+    }
+}
+```
+
+> **关键点**：`AuditingSaveChangesInterceptor` 必须以 `ISaveChangesInterceptor`（接口）为服务类型注册——`AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>()`，而非 `AddSingleton<AuditingSaveChangesInterceptor>()`（服务类型=具体类）。final adapter（HD-010 / HD-011 / HD-012）的 `AddDbContext<InkwellDbContext>` 配置里用 `.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 按接口服务类型汇总全部拦截器；若注册成具体类，`GetServices<ISaveChangesInterceptor>()` 不会返回它，拦截器永不执行（[HD-010 首轮评审 B16/C96](../design-review-report.md#b16inmemoryrowversioninterceptor-以错误的-di-服务类型注册导致rowversion-拦截器永不执行c96) 已实证此类错误的后果）。
+
 ### 3.12 BannedSymbols.txt
 
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore/BannedSymbols.txt`
@@ -895,3 +931,18 @@ echo "HD-009 automation checks passed."
 **未变项**：具名 `IXxxRepository` 实现（§3.10 AgentRepository 样本）方法签名与数量不变；csproj 数不变；DI 注册列表不变（`AddEfCorePersistenceBase()` 本就把全部 `Repositories/<TypeName>Repository` 注入 DI，工厂直接解）。
 
 **下游联动**：[AGENTS.md §3.1 / §3.2](../../../AGENTS.md) 拓扑描述与注入风格约束同步——**由 Owner / 默认 Agent 落，author 模式不写 AGENTS.md**。
+
+### 13.6 2026-07-06 errata·第六轮（HD-010 首轮评审 [design-review-report.md §19 B17/C97](../design-review-report.md#b17hd-009-addefcorepersistencebase-是否把-auditingsavechangesinterceptor-注册为-isavechangesinterceptor-服务类型现有文本无法确认且-hd-010-已证实同类错误确实会发生c97) 补齐 `AddEfCorePersistenceBase()` 完整代码）
+
+**背景**：HD-010 首轮评审发现 §3.1 `InMemoryRowVersionInterceptor` 的 DI 注册用了错误的服务类型（具体类而非 `ISaveChangesInterceptor` 接口），导致拦截器永不执行（B16/C96，纯代码级 bug，已在 HD-010 §3.1 修正）。评审同时指出：本 HD §3.11 `AddEfCorePersistenceBase()` 此前**只有职责描述与方法签名，没有任何"完整代码"块**，因此无法从文本确认 `AuditingSaveChangesInterceptor` 是否也犯了同一类错误（B17/C97）——这是文档空白，不是已确认的书面 bug。
+
+**核实结论**：经补写完整代码（见 §3.11），本 HD 从未有其他章节暗示或依赖"具体类注册"这一错误模式；§3.11 现按 `AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>()`（接口服务类型）注册，与消费端 HD-010/HD-011/HD-012 final adapter 的 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 一致——**该 bug 在 HD-009 中不成立，是本轮补齐文档时一并确认、按正确方式落笔，而非"发现书面错误后修正"**。
+
+**改动范围**：
+
+- **§3.11 完整代码**：新增（此前该章节缺失代码块）——`AddEfCorePersistenceBase()` 方法体：`EfCorePersistenceProvider` 注册为 `IPersistenceProvider`（`AddScoped`，因依赖 Scoped 的 `InkwellDbContext`）；`AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor`（`AddSingleton`，与 HD-010 §3.1 `InMemoryRowVersionInterceptor` 同款注册方式）；`InkwellSeeder` / `MigrationRunner` 按具体类型注册（`AddScoped`，消费端按具体类型直接注入，无接口层，不受本类 bug 影响）；具名 Repository 以 `AgentRepository` 为样本，其余 17 个同构注册
+- **HD-010 §3.1 注 + §12**：同步更新，去除"假设待验证"措辞，标注假设已成立（详 HD-010 本次改动）
+
+**未变项**：本轮不改变任何签名、返回类型、错误处理策略；不触及 §1 ~ §12 已有章节的除 §3.11 外内容；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是补齐既有承诺的实现细节，不是重新评估已定决策）。
+
+**下游联动**：HD-011 / HD-012（SqlServer / Postgres final adapter）起草时直接引用本节 `AddEfCorePersistenceBase()` 完整代码，其自身的 `Use*` 扩展方法与 HD-010 §3.1 同款调用 `.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 即可正确汇总 `AuditingSaveChangesInterceptor`；无需重复验证。

@@ -111,7 +111,7 @@ public static class InkwellPersistenceEfCoreInMemoryServiceCollectionExtensions
         var root = new InMemoryDatabaseRoot();
 
         builder.Services.AddEfCorePersistenceBase();
-        builder.Services.AddSingleton<InMemoryRowVersionInterceptor>();
+        builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, InMemoryRowVersionInterceptor>();
         builder.Services.AddDbContext<InkwellDbContext>((sp, options) => options
             .UseInMemoryDatabase(databaseName, root)
             .AddInterceptors(sp.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor>()));
@@ -122,7 +122,7 @@ public static class InkwellPersistenceEfCoreInMemoryServiceCollectionExtensions
 }
 ```
 
-> **注**：`AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 要求 [HD-009 §3.11 `AddEfCorePersistenceBase()`](HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型（而非仅注册具体类）；本 HD 依赖此假设成立，未在 HD-009 文本中找到逐字确认——已列入本次总结的"需要 Owner 确认的问题"，不在本 HD 内代为拍板。
+> **注·2026-07-06 修正**：`builder.Services.AddSingleton<InMemoryRowVersionInterceptor>()`（服务类型=具体类）此前与消费端 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())`（按接口服务类型查询）不匹配，导致该拦截器永不执行（design-review-report.md §19 B16/C96）；已修正为 `AddSingleton<ISaveChangesInterceptor, InMemoryRowVersionInterceptor>()`（上方代码已同步）。`AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 同时要求 [HD-009 §3.11 `AddEfCorePersistenceBase()`](HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 把 `AuditingSaveChangesInterceptor` 同样注册为 `ISaveChangesInterceptor` 服务类型——[HD-009 §13.6 errata·第六轮](HD-009-Inkwell.Persistence.EFCore-base.md#136-2026-07-06-errata第六轮hd-010-首轮评审-design-review-reportmd-19-b17c97-补齐-addefcorepersistencebase-完整代码) 已补齐该方法的完整代码并确认采用同一注册方式，该假设现已成立。
 
 ### 3.2 InMemoryDbContextInitializer.cs
 
@@ -342,7 +342,7 @@ echo "HD-010 automation checks passed."
 - **HD-011 / HD-012**：SqlServer / Postgres final adapter，需各自 `Migrations/` 子目录 + `UseSqlServer` / `UsePostgres` Builder DSL + 各自 `IDbContextInitializer` 实现（走 `MigrateAsync`，非 `EnsureCreatedAsync`）
 - **HD-013 跨 Provider 契约测试包**：直接复用本 HD §3.3 并发冲突用例作为 InMemory 侧断言依据；InMemory 侧"Migration 启动"用例替换为本 HD §3.2 `EnsureCreatedAsync` 断言（[HD-009 §8.3 / N4](HD-009-Inkwell.Persistence.EFCore-base.md#83-跨-provider-行为契约测试前置-hd-010--hd-011--hd-012-起草后启动)）
 - **`scripts/ci/hd-010-checks.sh`**：§10 自动化检查脚本物化（H5 编码任务）
-- **跨 HD 假设待验证**：§3.1 注解中提到的"`AddEfCorePersistenceBase()` 是否把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型"——需要在 H5 编码或 HD-009 补一次 errata 时确认，本 HD 不代为拍板（详见会话总结"需要 Owner 确认的问题"）
+- **跨 HD 假设已验证（2026-07-06）**：§3.1 注解中提到的"`AddEfCorePersistenceBase()` 是否把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型"——[HD-009 §13.6 errata·第六轮](HD-009-Inkwell.Persistence.EFCore-base.md#136-2026-07-06-errata第六轮hd-010-首轮评审-design-review-reportmd-19-b17c97-补齐-addefcorepersistencebase-完整代码) 已补齐 `AddEfCorePersistenceBase()` 完整代码，确认按 `ISaveChangesInterceptor` 服务类型注册，假设成立，无需下游再核实
 
 ## 13. 同步追加跨模块文件
 
