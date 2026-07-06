@@ -39,6 +39,8 @@ downstream: []
 > **2026-07-06 errata·第六轮（HD-010 首轮评审 B17/C97）**：§3.11 此前只有职责描述与方法签名，无"完整代码"块，无法确认 `AuditingSaveChangesInterceptor` 的 DI 服务类型注册方式；本轮补齐该方法完整代码，明确按 `ISaveChangesInterceptor` 接口服务类型注册（与消费端 HD-010/HD-011/HD-012 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 一致），同时一并注册 `EfCorePersistenceProvider` / `InkwellSeeder` / `MigrationRunner` / 具名 Repository；详 §13.6。
 >
 > **2026-07-06 errata·第七轮（HD-011 起草期发现，Owner picker 授权同步修改）**：`EfCorePersistenceProvider.ExecuteInTransactionAsync`（§3.2）此前手动调 `IDbContextTransaction`（`BeginTransactionAsync` / `CommitAsync` / `RollbackAsync`），与 [EF Core 连接重试策略约束](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#execution-strategies-and-transactions) 不兼容——一旦 HD-011 SqlServer 适配器启用 `EnableRetryOnFailure`，任何手动 `BeginTransactionAsync` 调用会在运行时 100% 抛 `InvalidOperationException`（"The configured execution strategy ... does not support user-initiated transactions"）。本轮修正：`ExecuteInTransactionAsync` 内部改用 [`db.Database.CreateExecutionStrategy().ExecuteAsync(...)`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.infrastructure.dbcontextoptionsbuilder) 包装 Begin/Commit/Rollback 全过程；InMemory（HD-010，无 retry 策略）下 `CreateExecutionStrategy()` 返回默认 no-op 策略，包装不改变现有行为，兼容既有测试。详 §13.7。
+>
+> **2026-07-06 errata·第八轮（ADR-021 / ADR-019 2026-07-06 errata：Migration 执行策略改为 CI/CD 独立步骤）**：[ADR-021 §「Migration/DataSeed 启动行为」2026-07-06 errata](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 修订 Migration 执行时机——`Inkwell.WebApi` / `Inkwell.Worker` 启动代码不再调用本 HD §3.5 `MigrationRunner` 对 SqlServer / Postgres 执行 `MigrateAsync()`；Migration 改由 CI/CD pipeline 独立步骤（`dotnet ef database update` 或等价工具）在部署前执行。**InMemory 场景不受影响**：`EnsureCreatedAsync()` + `InkwellSeeder.SeedAsync()` 仍在两进程启动期自动运行（ADR-021 errata 原文明确 InMemory 属 dev / unit test 场景，不涉及生产发布风险）。§3.5 同步修订，详 §13.8。
 
 ## 1. 模块职责
 
@@ -197,12 +199,14 @@ downstream: []
 ### 3.5 MigrationRunner.cs
 
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore/MigrationRunner.cs`
-- **职责**：启动期包装 `dbContext.Database.MigrateAsync()`（SqlServer / Postgres）或 `EnsureCreatedAsync()`（InMemory），完成后选择性调 `InkwellSeeder.SeedAsync()`
-- **对外接口**：
+- **职责**（2026-07-06 errata·第八轮修订，详 §13.8）：
+  - **InMemory 场景**（dev / unit test，不受本轮修订影响）：`Inkwell.WebApi` / `Inkwell.Worker` 启动时仍自动调用本类，包装 `EnsureCreatedAsync()`，完成后选择性调 `InkwellSeeder.SeedAsync()`
+  - **SqlServer / Postgres 场景**（integration test / prod）：`Inkwell.WebApi` / `Inkwell.Worker` 启动代码**不再调用**本类执行 `MigrateAsync()` 做 schema 变更——Migration 改由 CI/CD pipeline 独立步骤（既可以是引用本类的独立命令行工具，也可以直接用标准 [`dotnet ef database update`](https://learn.microsoft.com/ef/core/managing-schemas/migrations/#apply-migrations-at-runtime)）在新版本部署前执行；`InkwellSeeder.SeedAsync()` 仍可能在应用启动时运行，但前提从「随本类完成 Migration 后触发」改为「确认 CI/CD 已将 schema 迁移到位」
+- **对外接口**（不变）：
   - `internal sealed class MigrationRunner(InkwellDbContext db, IDbContextInitializer initializer, IOptions<PersistenceOptions> options, InkwellSeeder seeder, ILogger<MigrationRunner> logger)`
   - `public async Task RunAsync(CancellationToken ct = default)`
 - **内部函数或类**：
-  - 调 `initializer.InitializeAsync(db, ct)`（final adapter 决定走 Migrate 还是 EnsureCreated，详 §3.6）
+  - 调 `initializer.InitializeAsync(db, ct)`（final adapter 决定走 Migrate 还是 EnsureCreated，详 §3.6）——该调用路径本身不变；变化在于「谁在什么时机调用 `RunAsync`」：InMemory 场景仍由 `Inkwell.WebApi` / `Inkwell.Worker` 启动代码调用；SqlServer / Postgres 场景改由 CI/CD 独立步骤（或其调用的命令行工具）调用，两进程启动代码不再调用
   - 若 `PersistenceOptions.AutoSeedOnStartup` = true → 调 `seeder.SeedAsync(ct)`
   - 全过程加 `MigrationTimeoutSeconds` 超时（默认 300s，[HD-002 §3.5 PersistenceOptions](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）
 - **输入数据**：`PersistenceOptions`
@@ -217,7 +221,7 @@ downstream: []
   - 开始：`LogInformation("Migration begin provider={ProviderName}")`
   - 完成：`LogInformation("Migration ok appliedCount={Applied} elapsed={Ms}ms")`
 - **测试要求**：
-  - InMemory 走 EnsureCreated 路径、SqlServer / Postgres 走 Migrate 路径（用 mock `IDbContextInitializer`）、超时抛 007、Seeder 失败透传 006、`AutoSeedOnStartup=false` 跳过 Seeder
+  - InMemory 走 EnsureCreated 路径（由 `Inkwell.WebApi` / `Inkwell.Worker` 启动集成测试覆盖）；SqlServer / Postgres 走 Migrate 路径（用 mock `IDbContextInitializer` 做单测，真实 Migrate 行为改由 CI/CD 侧调用方 / 独立命令行工具的测试覆盖，不再属于 WebApi/Worker 启动集成测试范围）；超时抛 007；Seeder 失败透传 006；`AutoSeedOnStartup=false` 跳过 Seeder
   - 覆盖率门槛 ≥ 95%
 
 ### 3.6 IDbContextInitializer.cs
@@ -963,3 +967,17 @@ echo "HD-009 automation checks passed."
 **未变项**：本轮不改变 `ExecuteInTransactionAsync` 的公共签名、返回类型、异常包装的类型与 message 格式（§4.3 BCL 对照表不变）；不改变 §1 ~ §12 除 §3.2 外的任何章节；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是为兼容下游 HD-011 的功能修正，非重新评估已定决策，改动范围小且有明确技术证据支撑，参照 §13.6 先例处理方式）。
 
 **下游联动**：[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 直接引用本节结论，`UseSqlServer(...)` 中启用的 `EnableRetryOnFailure` 与本节修正后的 `ExecuteInTransactionAsync` 兼容，无需在 HD-011 中重复解释包装机制。
+
+### 13.8 2026-07-06 errata·第八轮（ADR-021 / ADR-019 2026-07-06 errata：Migration 执行策略改为 CI/CD 独立步骤）
+
+**背景**：H3 [HD-011 SqlServer final adapter](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 起草期间发现「`Inkwell.WebApi` 启动时自动跑 `MigrateAsync()`」存在生产安全风险（未经独立人工审阅即对生产数据库执行 schema 变更）。该风险已提请 Owner 确认，Owner 于 2026-07-06 拍板：**应用启动不再自动执行 Migration**，Migration 改由 CI/CD pipeline（[GitHub Actions](https://github.com/features/actions)，[OQ-A007 closed §A](../../03-architecture/open-questions-arch.md) 已锁定）独立步骤执行 `dotnet ef database update`（或等价的预生成脚本 apply），在新版本 `Inkwell.WebApi` / `Inkwell.Worker` 部署之前完成；两进程启动代码均不再调用 `Database.MigrateAsync()` / `MigrationRunner` 的 Migration 分支。详见 ADR-021 2026-07-06 errata / ADR-019 2026-07-06 errata。
+
+**改动范围**：
+
+- **§3.5 `MigrationRunner.cs`**：职责描述拆分为 InMemory（不受影响，仍由 `Inkwell.WebApi` / `Inkwell.Worker` 启动代码自动调用 `EnsureCreatedAsync` + Seed）与 SqlServer / Postgres（两进程启动代码不再调用本类执行 `MigrateAsync()`，改由 CI/CD 独立步骤 / 其调用的命令行工具调用）两种场景；对外接口 / 输入输出 / 错误处理 / 日志要求均不变，仅「谁在什么时机调用」改变
+- **§3.6 `IDbContextInitializer`**：接口签名与实现方式不变（`InitializeAsync` 仍是 Migrate 或 EnsureCreated 的统一入口），本轮不改动
+- **下游 HD 同步**：[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) §8「Migration 执行策略」、§9 Builder DSL 示例说明、§14 决策记录、§16 开放问题（由「待确认」改为「已解决」）均同步修订
+
+**未变项**：`InkwellSeeder.SeedAsync()` 仍在 `Inkwell.WebApi` 启动时运行（`.AutoSeedOnStartup` 开关不变），前提从「随 `MigrationRunner` 完成 Migration 后触发」改为「确认 CI/CD 已将 schema 迁移到位」；InMemory Provider `EnsureCreatedAsync()`（dev / unit test）不受影响，不涉及生产发布流程；本轮不改变 `MigrationRunner` 的公共签名、异常类型与 message 格式（§4.3 BCL 对照表不变）；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是 ADR 层级已拍板决策向 H3 文档的同步修订，非重新评估已定架构决策，参照 §13.6 / §13.7 先例处理方式）。
+
+**下游联动**：[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 直接引用本节结论；HD-012（Postgres final adapter，待起草）起草时应直接采用本轮已修订的策略描述，不再沿用「WebApi 启动自动 Migrate」的旧表述。

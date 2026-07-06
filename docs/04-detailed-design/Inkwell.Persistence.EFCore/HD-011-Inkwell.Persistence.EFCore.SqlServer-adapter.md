@@ -31,7 +31,7 @@ downstream: []
 >
 > **跨 HD 前置修正（2026-07-06，Owner picker 授权）**：起草本 HD 期间发现 §5 `EnableRetryOnFailure` 与 [HD-009 §3.2](HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) `ExecuteInTransactionAsync` 手动事务管理运行时不兼容（[EF Core 官方约束](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#execution-strategies-and-transactions)）；已在 [HD-009 §13.7 errata·第七轮](HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 同步修正（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装），本 HD 直接消费修正后的行为，不重复解释机制。
 >
-> **待 Owner 确认（非本 HD 拍板，详见文末"开放问题"）**：应用启动时自动 `MigrateAsync()` 的生产风险——本 HD 按 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) + [HD-009 §3.5](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 已锁定策略原样实现，Owner 会话中确认维持现状；本 HD §11 仍列出该残余风险供后续 ProdReady checklist 引用。
+> **2026-07-06 errata（Migration 执行策略改为 CI/CD 独立步骤）**：本 HD 起草期发现"应用启动时自动 `MigrateAsync()`"存在生产安全风险，已提请 Owner 确认；Owner 于 2026-07-06 拍板改为 CI/CD 独立步骤执行，[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 已同步 errata；[HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) §13.8 已同步修订。本 HD §3.3 `SqlServerDbContextInitializer.MigrateAsync` 实现本身不变，变化在于"由谁在何时调用"——详见 §8。
 
 ## 1. 模块职责
 
@@ -166,7 +166,7 @@ public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
 ### 3.2 SqlServerPersistenceOptions.cs
 
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/SqlServerPersistenceOptions.cs`
-- **职责**：SqlServer 专属配置——连接重试参数；从 `appsettings.json` `"Inkwell:Persistence:SqlServer"` 段绑定（Owner picker：新增专属 Options 类，与 [HD-008 `QdrantVectorStoreOptions` / `AzureOpenAIEmbeddingOptions`](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例一致，不回填到共享 `PersistenceOptions`——避免跨三 Provider 共享一个只有 SqlServer / Postgres 关系型 Provider 用得到的字段）
+- **职责**：SqlServer 专属配置——连接重试参数；从 `appsettings.json` `"Inkwell:Persistence:SqlServer"` 段绑定（author 判断的显而易见项，非 Owner 拍板：新增专属 Options 类，比照 [HD-008 `QdrantVectorStoreOptions` / `AzureOpenAIEmbeddingOptions`](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例，不回填到共享 `PersistenceOptions`——避免跨三 Provider 共享一个只有 SqlServer / Postgres 关系型 Provider 用得到的字段）
 - **对外接口**：`public sealed class SqlServerPersistenceOptions { [Range(0, 20)] public int MaxRetryCount { get; init; } = 6; [Range(1, 300)] public int MaxRetryDelaySeconds { get; init; } = 30; }`
 - **内部函数或类**：无（纯 DTO + DataAnnotations）
 - **输入数据**：由 `IConfiguration` 绑定
@@ -246,7 +246,7 @@ internal sealed class SqlServerDbContextInitializer : IDbContextInitializer
 
 ## 6. 为什么本 HD 不创建 `SqlServerInkwellDbContext` 子类
 
-沿用 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 已确立的判断路径（Owner picker 复核确认）：
+沿用 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 已确立的判断路径（author 判断的显而易见项，与 HD-010 §5 判断依据对称，非 Owner 拍板）：
 
 - **`IHasTimestamps` 列类型无需覆写**：EF Core SqlServer provider 对 `DateTimeOffset` CLR 类型的默认列类型即为 [`datetimeoffset`](https://learn.microsoft.com/sql/t-sql/data-types/datetimeoffset-transact-sql)——与 [HD-009 §3.1 `ApplyTimestamps`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs) 描述的目标列类型天然一致，不需要 `HasColumnType("datetimeoffset")` 显式覆写，更不需要子类承载该覆写
 - **`IHasRowVersion` 无需覆写**：见 §4——`.IsRowVersion()` 在 SqlServer provider 下已是完整实现
@@ -261,13 +261,14 @@ internal sealed class SqlServerDbContextInitializer : IDbContextInitializer
 - **`MigrationsAssembly`**：显式设为 `"Inkwell.Persistence.EFCore.SqlServer"`（§3.1 完整代码），确保 Migration 编译产物落在本 csproj 而非 shared base（[ADR-021 §`IPersistenceProvider` 实现唯一性](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 已给出示例代码）
 - **`__EFMigrationsHistory` 表名**：使用 EF Core 默认表名，不自定义（无 NFR / ADR 要求自定义，避免无依据的配置面）
 
-## 8. Migration 启动执行策略（继承 ADR-021 / ADR-019 / HD-009，非本 HD 新决策）
+## 8. Migration 执行策略（2026-07-06 errata：由“WebApi 启动自动执行”改为 CI/CD 独立步骤，非本 HD 拍板）
 
-> **本节仅记录继承的上游决策 + 明确标注为 Owner 已确认维持现状的残余风险，不代表本 HD 重新拍板。**
+> **本节记录 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) / [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) §13.8 已锁定的上游决策，不代表本 HD 重新拍板。**
 
-- **已锁定行为**：[ADR-021 §Migration/DataSeed 启动行为](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) + [HD-009 §3.5 `MigrationRunner`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 明确：`Inkwell.WebApi` 启动时（**仅 WebApi**，`Inkwell.Worker` 跳过）由 `MigrationRunner` 自动调 `dbContext.Database.MigrateAsync()`；`SqlServerDbContextInitializer`（本 HD §3.3）是该自动调用链路在 SqlServer 侧的具体实现
-- **生产风险（Owner 会话中已确认维持现状）**：应用启动时自动跑 `MigrateAsync()` 存在"未经独立人工审阅即对生产库结构做变更"的风险；业界常见更保守的实践是让 CI/CD pipeline 用独立步骤跑 Migration，应用启动不自动执行 schema 变更。本 HD 起草期就此单独向 Owner 求证，Owner 选择**维持 ADR-021 + ADR-019 已锁定的现状**（自动执行），本 HD 按此原样实现，不引入任何"手动 CI 步骤"的替代路径
-- **残余风险记录**：若后续需要收紧该策略（改为 CI/CD 独立步骤），需另开 ADR-021 / ADR-019 errata 会话——不在本 HD 范围内变更，也不通过本 HD 的 picker 机制间接决定
+- **原设计（H2/H3 起草初期）**：[ADR-021 §Migration/DataSeed 启动行为](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 原锁定 `Inkwell.WebApi` 启动时（仅 WebApi，`Inkwell.Worker` 跳过）由 `MigrationRunner` 自动调 `dbContext.Database.MigrateAsync()`
+- **生产风险与真实决策过程**：本 HD 起草期发现该行为存在“未经独立人工审阅即对生产库结构做变更”的风险，已提请 Owner 确认。Owner 于 2026-07-06 拍板：**应用启动不再自动执行 Migration**，Migration 改由 CI/CD pipeline（[GitHub Actions](https://github.com/features/actions)）独立步骤执行 `dotnet ef database update`（或等价的预生成脚本 apply），在新版本 `Inkwell.WebApi` / `Inkwell.Worker` 部署之前完成；两进程启动代码均不再调用 `Database.MigrateAsync()` / `MigrationRunner` 的 Migration 分支。详见 ADR-021 2026-07-06 errata / ADR-019 2026-07-06 errata / [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) §13.8
+- **本 HD §3.3 `SqlServerDbContextInitializer` 不变**：`InitializeAsync` 仍是 `db.Database.MigrateAsync(ct)` 的直接委托——变化的是“由谁在何时调用”，不是本类自身的实现；CI/CD 独立步骤 / 命令行工具通过同一 `IDbContextInitializer` 契约（或直接用标准 `dotnet ef database update` 工具）触发 Migration，两进程启动代码不再持有该调用路径
+- **`InkwellSeeder.SeedAsync()` 不受影响**：仍在 `Inkwell.WebApi` 启动时运行（`.AutoSeedOnStartup` 开关不变），前提从“随 `MigrationRunner` 完成 Migration 后触发”改为“确认 CI/CD 已将 schema 迁移到位”（详 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) §13.8）
 
 ## 9. Builder DSL 衔接与使用示例
 
@@ -285,7 +286,7 @@ builder.Services
 ```
 
 - `UseSqlServer(...)` 与 `UseInMemoryDatabase()` / `UsePostgres(...)`（[HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) / HD-012 待起草）互斥——同一个 `IServiceCollection` 上只应调用其中一个（[HD-001 §6.3](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#63-provider-扩展方法约定给-hd-002--hd-008-的契约)"后调用者覆盖前调用者"）
-- `Inkwell.Worker/Program.cs` 同样调用 `.UseSqlServer(...)`（与 WebApi 共享 `AddInkwell()...` 套装，[AGENTS.md §3.1](../../../AGENTS.md) Worker DI 装配约定），但因 `MigrationRunner` 仅由 WebApi 触发（§8），Worker 侧不会重复跑 Migration
+- `Inkwell.Worker/Program.cs` 同样调用 `.UseSqlServer(...)`（与 WebApi 共享 `AddInkwell()...` 套装，[AGENTS.md §3.1](../../../AGENTS.md) Worker DI 装配约定）；`Inkwell.WebApi` / `Inkwell.Worker` 两进程启动代码均不再调用 `MigrationRunner` 触发 Migration（2026-07-06 errata，详 §8）——Migration 由 CI/CD 独立步骤在部署前完成
 
 ## 10. 配置项汇总
 
@@ -363,10 +364,10 @@ echo "HD-011 automation checks passed."
 
 - **`UseSqlServer` 签名**：`UseSqlServer(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——来源 [HD-002 §6](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#6-builder-dsl-衔接hd-001-63) + [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；证据：两处均已预先锁定该签名，非本 HD 新拍板
 - **`EnableRetryOnFailure` 与 `ExecuteInTransactionAsync` 兼容性**：Owner picker（2026-07-06）= 启用重试 + 同步修正 HD-009——已在 [HD-009 §13.7](HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 落地（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装）
-- **重试参数配置方式**：Owner picker（2026-07-06）= 新增 `SqlServerPersistenceOptions`（绑定 `Inkwell:Persistence:SqlServer` 配置段）——与 [HD-008](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例一致
+- **重试参数配置方式**：author 判断的显而易见项，非 Owner 拍板 = 新增 `SqlServerPersistenceOptions`（绑定 `Inkwell:Persistence:SqlServer` 配置段）——比照 [HD-008](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例
 - **重试参数默认值**：`MaxRetryCount=6` / `MaxRetryDelaySeconds=30`——来源 [`EnableRetryOnFailure()`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.sqlserverdbcontextoptionsextensions.enableretryonfailure) 无参重载的框架内置默认值，非本 HD 臆造数字
-- **DbContext 子类化**：Owner picker（2026-07-06）= 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 判断依据对称
-- **Migration 启动执行策略**：Owner picker（2026-07-06）= 维持 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 已锁定的 WebApi 启动自动 `MigrateAsync()` 现状，不改动——详 §8
+- **DbContext 子类化**：author 判断的显而易见项，非 Owner 拍板 = 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 判断依据对称
+- **Migration 执行策略**：Owner 拍板（2026-07-06）= 由“WebApi 启动自动 `MigrateAsync()`”改为 CI/CD pipeline 独立步骤执行——详 §8 / ADR-021 errata / ADR-019 errata
 - **RowVersion 值生成机制**：SqlServer 原生 `rowversion` 类型自动生成，不引入拦截器——来源 [EF Core 官方「Native database-generated concurrency tokens」](https://learn.microsoft.com/ef/core/saving/concurrency#native-database-generated-concurrency-tokens)；证据：`.IsRowVersion()` 单独已是完整实现（§4）
 
 ## 15. 待补 / 后续 HD 衔接
@@ -378,7 +379,11 @@ echo "HD-011 automation checks passed."
 
 ## 16. 开放问题（需要 Owner 后续确认，非本 HD 拍板）
 
-- **Migration 启动执行策略残余风险**（详 §8）：本 HD 起草期已单独求证 Owner，Owner 选择维持 ADR-021 + ADR-019 已锁定的"WebApi 启动自动 `MigrateAsync()`"现状。**此处仍显式列出**，供后续 ProdReady checklist / release 评审阶段（H6）再次核对——若上线后出现"未经审阅的 schema 变更导致生产事故"的实际案例，应触发 ADR-021 / ADR-019 errata 重新评估，而非在 H5 编码阶段私自改动执行策略。
+### 16.1 已解决
+
+- **Migration 执行策略**（详 §8）：本 HD 起草期发现的生产风险，已提请 Owner 确认，Owner 拍板改为 CI/CD 独立步骤执行（2026-07-06，详 [ADR-021 errata](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [ADR-019 errata](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）。不再是开放问题，保留在此仅作历史记录。
+
+### 16.2 当前无其他开放问题
 
 ## 17. 同步追加跨模块文件
 
