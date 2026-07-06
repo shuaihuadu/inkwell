@@ -457,6 +457,24 @@ providers/Inkwell.Persistence.EFCore/
 >
 > **2026-05-11 errata（HD-009 起草）**：本节由 HD-009 从「未起草」→「已起草」翻面；`Interceptors/AuditingSaveChangesInterceptor.cs` + `IDbContextInitializer.cs` + `DependencyInjection/InkwellPersistenceEfCoreServiceCollectionExtensions.cs` + `BannedSymbols.txt` 四项为 HD-009 落地新增。
 
+## providers/Inkwell.Persistence.EFCore.InMemory
+
+> 由 [HD-010](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) 锁定。InMemory final adapter——dev / unit test 默认 Provider，不支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`EnsureCreatedAsync`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)。
+
+```text
+providers/Inkwell.Persistence.EFCore.InMemory/
+  Inkwell.Persistence.EFCore.InMemory.csproj   # 依赖 Microsoft.EntityFrameworkCore.InMemory + Inkwell.Persistence.EFCore（base） + Inkwell.Abstractions
+  DependencyInjection/
+    InkwellPersistenceEfCoreInMemoryServiceCollectionExtensions.cs  # Builder DSL：UseInMemoryDatabase(this IInkwellBuilder builder, string databaseName = "inkwell")
+  InMemoryDbContextInitializer.cs               # 实现 IDbContextInitializer，走 EnsureCreatedAsync（HD-010 §3.2）
+  Interceptors/
+    InMemoryRowVersionInterceptor.cs            # 手动模拟 RowVersion 递增（回应 design-review-report N5/C7，HD-010 §3.3）
+```
+
+> **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-010 锁定）；不创建 `InMemoryInkwellDbContext` 子类 / 不创建独立 `BannedSymbols.txt`（理由详 [HD-010 §5](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / §10），与 base 8 个 `*.cs`（HD-009）各自独立计数，不做跨 csproj 累加。
+>
+> **2026-07-06 errata（HD-010 起草）**：本节由 HD-010 从「未起草」→「已起草」翻面；三个文件均为 HD-010 落地新增。
+
 ## Errata 记录（2026-05-12：ADR-023 三轮 errata 跨 HD 同步）
 
 本文件 `status: draft` 期间，根据 [ADR-023 主决策](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) + [errata·01](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) + [errata·02](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 三轮 accepted by Inkwell 2026-05-11，同步落以下变更（已嵌入 §Inkwell.Abstractions / §Inkwell.Abstractions.FileStorage 两节，本节是变更摘要）：
