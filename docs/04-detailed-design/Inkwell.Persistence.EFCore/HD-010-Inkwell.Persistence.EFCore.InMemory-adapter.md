@@ -133,8 +133,8 @@ public static class InkwellPersistenceEfCoreInMemoryServiceCollectionExtensions
 - **输入数据**：`InkwellDbContext`
 - **输出数据**：成功无返回值；`EnsureCreatedAsync` 内部返回的 `bool`（是否新建）不对外暴露——[HD-009 §3.5 `MigrationRunner`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 不关心该值
 - **依赖模块**：`Microsoft.EntityFrameworkCore` / `Inkwell.Persistence.EFCore.IDbContextInitializer`
-- **错误处理**：不额外 catch——`EnsureCreatedAsync` 抛出的任何异常透传给调用方 [`MigrationRunner.RunAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)，由其统一包成 `InvalidOperationException("Migration failed", inner)`（[HD-009 §4.3](HD-009-Inkwell.Persistence.EFCore-base.md#43-错误处理统一细化-hd-002-43-bcl-对照表--efcore-provider-补充)）；`OperationCanceledException` 透传
-- **日志要求**：N/A——[`MigrationRunner.RunAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 已记 `"Migration begin provider={ProviderName}"` / `"Migration ok..."`，本类不重复记录，避免同一次启动出现两条语义重叠日志
+- **错误处理**：不额外 catch——`EnsureCreatedAsync` 抛出的任何异常透传给调用方 [`MigrationRunner.MigrateAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)（2026-07-06 errata：原 `MigrationRunner.RunAsync` 已拆分为 `MigrateAsync` / `SeedAsync`，详 [HD-009 §13.9](HD-009-Inkwell.Persistence.EFCore-base.md)），由其统一包成 `InvalidOperationException("Migration failed", inner)`（[HD-009 §4.3](HD-009-Inkwell.Persistence.EFCore-base.md#43-错误处理统一细化-hd-002-43-bcl-对照表--efcore-provider-补充)）；`OperationCanceledException` 透传
+- **日志要求**：N/A——[`MigrationRunner.MigrateAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 已记 `"Migration begin provider={ProviderName}"` / `"Migration ok..."`，本类不重复记录，避免同一次启动出现两条语义重叠日志
 - **测试要求**：
   - 首次调 `InitializeAsync` 后 `db.Database.CanConnectAsync()` 返回 `true`（[`DatabaseFacade.CanConnectAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.infrastructure.databasefacade.canconnectasync)）
   - 二次调用幂等（`EnsureCreatedAsync` 官方语义：已存在则返回 `false`，不抛异常）
