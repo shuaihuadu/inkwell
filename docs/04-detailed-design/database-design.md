@@ -68,7 +68,7 @@ downstream: []
 | 表名                 | 业务模块               | 锁定 HD | 说明                                                                                                                                                               |
 | -------------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md)                                                                      |
-| `agents`             | Inkwell.Agents         | TBD     | [REQ-002](../01-requirements/requirements.md)                                                                                                                      |
+| `agents`             | Inkwell.Core.Agents    | HD-015  | [REQ-002](../01-requirements/requirements.md) ~ [REQ-008](../01-requirements/requirements.md)                                                                      |
 | `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
 | `skills`             | Inkwell.Skills         | TBD     | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
 | `tools`              | Inkwell.Tools          | TBD     | [REQ-007](../01-requirements/requirements.md)                                                                                                                      |
@@ -174,5 +174,33 @@ downstream: []
 - `RowVersion`：`IHasRowVersion`（乐观并发，防"失败计数递增"与"Admin 解封"并发写互相覆盖）
 
 **索引**：`Username` 唯一索引；`IsLocked` 非唯一索引（[UF-012](../01-requirements/user-flow.md#uf-012-admin-解封账号) 账号 tab 默认过滤已锁账号）。
+
+**Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
+
+## Inkwell.Core.Agents
+
+> 由 [HD-015 §6](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#6-数据库设计增量追加至-database-designmd) 锁定。本节是 H3 第二张业务命名空间贡献的表结构（此前"表清单"占位表中 `agents` 行为 `TBD`，现更新为 `HD-015`）。
+
+### 表 `agents`（[REQ-002](../01-requirements/requirements.md) ~ [REQ-008](../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `OwnerUserId`：`Guid`（`IHasOwner`），非唯一索引
+- `Name`：`string`，长度上限 50（[requirements.md §5.1](../01-requirements/requirements.md)），不加唯一约束（多用户可同名）
+- `AvatarUri`：`string?`（`Uri` 序列化存储，指向 [HD-003 `IFileStorageProvider`](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 已上传对象）
+- `Description`：`string?`，长度上限 500
+- `Instructions`：`string?`，无长度上限
+- `ModelId`：`string?`
+- `ModelParametersJson`：`string?`（[HD-006 `AgentModelParameters`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 序列化存储，JSON 列 + `JsonSerializer` value converter）
+- `ToolBindingsJson`：`string`，默认 `"[]"`（`AgentToolBinding` 集合序列化存储）
+- `SkillBindingsJson`：`string`，默认 `"[]"`（`AgentSkillBinding` 集合序列化存储）
+- `IsShared`：`bool`，默认 `false`
+- `SharedRevokedByAdminTime`：`DateTimeOffset?`，可空（[AC-068](../01-requirements/acceptance-criteria.md) Admin 撤销共享状态条触点）
+- `CurrentVersion`：`int`，默认 `1`（[REQ-015](../01-requirements/requirements.md) 版本号递增触点，快照存储归 `Inkwell.Core.Versioning`，未起草）
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+- `RowVersion`：`IHasRowVersion`（乐观并发）
+
+**索引**：`OwnerUserId` 非唯一索引（"我的" tab 查询路径）；`IsShared` 非唯一索引（"团队共享" tab 过滤路径）。
+
+**⚠️ 未决冲突（需 Owner 确认，详见 [HD-015 §8](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)）**：本表**不**包含软删除字段，遵循已 reviewed 的 [HD-002 §1.3 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)"v1 不提供软删"——但这与 [requirements.md §8.3](../01-requirements/requirements.md) / [ui-spec.md §3.5](../01-requirements/ui-spec.md)"30 天回收期可恢复"的字面承诺冲突，本节未自行裁决，具体候选方案见 HD-015 §8。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。

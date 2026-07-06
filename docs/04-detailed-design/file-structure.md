@@ -77,9 +77,9 @@ src/core/Inkwell.Abstractions/
       IHasTimestamps.cs                # CreatedTime + UpdatedTime（F2：DateTimeOffset UTC，不再名 AtUtc）
       IHasRowVersion.cs                # byte[] RowVersion（乐观并发）
       IHasOwner.cs                     # Guid OwnerUserId
-    Agents/                            # 业务 Model + 具名 Repository 接口共置（需业务 HD 起草后追加）
+    Agents/                            # 业务 Model + 具名 Repository 接口共置（已由 HD-015 落地为真实文件，见下方 §Persistence/Agents 小节）
       AgentDefinition.cs               # 业务 Model，撞名降级 Definition（与 Microsoft.Agents.AI.AIAgent 区分，详 HD-002 §4.1.2）
-      IAgentRepository.cs              # 继承 IRepository<AgentDefinition, Guid> + 6 个具名动词方法（§4.1.3）
+      IAgentRepository.cs              # 继承 IRepository<AgentDefinition, Guid> + 7 个具名动词方法（§4.1.3）
 ```
 
 **文件计数**：11（HD-001）+ 8（HD-002 本体）= 19 个 `*.cs` + 1 个 `.csproj`；**业务命名空间在 `Persistence/<Module>/` 下追加的 `<TypeName>.cs` + `IXxxRepository.cs` 双件套**由各业务 HD 独立计数，不计入 HD-002 本身。
@@ -120,8 +120,8 @@ src/core/Inkwell.Abstractions/
 > ```text
 > src/core/Inkwell.Abstractions/Persistence/
 >   Agents/
->     AgentDefinition.cs               # 撞 MAF Microsoft.Agents.AI.AIAgent 降级
->     IAgentRepository.cs              # 6 个具名动词方法
+>     AgentDefinition.cs               # 撞 MAF Microsoft.Agents.AI.AIAgent 降级（已由 HD-015 落地为真实文件，见下方 §Persistence/Agents 小节）
+>     IAgentRepository.cs              # 7 个具名动词方法（已由 HD-015 落地）
 >   Tools/
 >     ToolDefinition.cs                # 撞 "运行时 Tool" 语义降级
 >     IToolRepository.cs
@@ -181,6 +181,17 @@ src/core/Inkwell.Abstractions/Persistence/
   Auth/                                # 新增子目录（HD-014）
     User.cs                            # 业务 Model，无后缀（不撞外部类型）
     IUserRepository.cs                 # 具名 Repository（6 方法：AddUser/UpdateUser/GetUser/GetUserByUsername/ListUsers/FindUsersByLockedStatus）
+```
+
+### Persistence/Agents（HD-015 落地，2026-07-06）
+
+> 由 [HD-015 §2 / §3.1 / §3.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 锁定。上方示例中的 `Agents/` 条目现已是真实文件，非仅占位。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Agents/                              # 新增子目录（HD-015）
+    AgentDefinition.cs                 # 业务 Model + AgentToolBinding/AgentSkillBinding 同文件小 DTO
+    IAgentRepository.cs                # 具名 Repository（7 方法：AddAgent/UpdateAgent/GetAgent/DeleteAgent/ListAgents/FindAgentsByOwner/FindSharedAgents）
 ```
 
 ## Inkwell.Abstractions.FileStorage
@@ -427,6 +438,39 @@ src/core/Inkwell.Core/
 ```
 
 > `Persistence/Auth/User.cs` + `IUserRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Auth 小节](#persistenceauthhd-014-落地2026-07-06)）；`UserEntity` / `UserMappingExtensions` / `EfCoreUserRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
+
+## Inkwell.Abstractions.Agents
+
+> 由 [HD-015 §2 / §3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 锁定。**本 HD 是 H3 第二张业务命名空间 HD**——`IAgentService` / `IAgentInvocationService` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Agents/` 子目录（与 `Persistence/Agents/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Agents` / `Inkwell.Abstractions.Persistence.Agents`）。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Agents/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）。
+
+```text
+src/core/Inkwell.Abstractions/
+  Agents/                                 # 新增子目录（HD-015）
+    IAgentService.cs                      # 顶层业务门面（10 方法：CRUD + 共享 + 克隆）
+    IAgentInvocationService.cs            # AgentDefinition → AgentRunRequest 翻译 + 调用 IAgentRuntime
+    AgentUpsertRequest.cs                 # 创建 / 更新请求 DTO
+    AgentSummary.cs                       # 列表卡片投影 DTO
+    AgentOptions.cs                       # MaxAgentsPerOwner / InstructionsWarningThresholdChars
+    AgentOptionsValidator.cs              # IValidateOptions<AgentOptions>
+```
+
+**文件计数**：HD-015 在 `Agents/` 新增 6 个 `*.cs` + 在 `Persistence/Agents/`（见 [§Inkwell.Abstractions 追加小节](#persistenceagentshd-015-落地2026-07-06)）新增 2 个 `*.cs`，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）= **68** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Agents` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）：
+
+```text
+src/core/Inkwell.Core/
+  Agents/
+    AgentService.cs                       # 唯一 IAgentService 实现
+    AgentInvocationService.cs             # 唯一 IAgentInvocationService 实现
+    AgentBuilderExtensions.cs             # UseDefaultAgentService()
+```
+
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）= 8 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+
+> `Persistence/Agents/AgentDefinition.cs` + `IAgentRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Agents 小节](#persistenceagentshd-015-落地2026-07-06)）；`AgentEntity` / `AgentMappingExtensions` / `EfCoreAgentRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
 
 ## providers/Inkwell.Persistence.EFCore
 
