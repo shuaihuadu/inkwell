@@ -2,8 +2,8 @@
 id: HD-014
 title: Inkwell.Core.Auth 详细设计 — 登录鉴权 / 会话 / 账号锁定与解封
 stage: H3
-status: draft
-reviewers: []
+status: reviewed
+reviewers: [Inkwell]
 upstream:
   - REQ-001
   - REQ-017
