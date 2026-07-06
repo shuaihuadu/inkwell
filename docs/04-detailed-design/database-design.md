@@ -67,7 +67,7 @@ downstream: []
 
 | 表名                 | 业务模块               | 锁定 HD | 说明                                                                                                                                                               |
 | -------------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md)                                                                                                                      |
+| `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md)                                                                      |
 | `agents`             | Inkwell.Agents         | TBD     | [REQ-002](../01-requirements/requirements.md)                                                                                                                      |
 | `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
 | `skills`             | Inkwell.Skills         | TBD     | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |

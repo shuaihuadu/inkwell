@@ -155,7 +155,7 @@ src/core/Inkwell.Core/
 
 **文件计数**：`Inkwell.Core.csproj` 首次出现，本 HD 贡献 5 个 `*.cs` + 1 个 `.csproj`（`Inkwell.Core` 项目累计文件数以本 HD 为基线起算，此前为 0）。
 
-## 3. 程序文件设计（10 字段 × 11 文件）
+## 3. 程序文件设计（10 字段 × 12 文件）
 
 ### 3.1 `Auth/IAuthService.cs`
 
@@ -208,14 +208,16 @@ src/core/Inkwell.Core/
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Auth/AuthOptions.cs`                                                                                                                                                                                           |
 | 职责         | Auth 模块详细配置；从 `appsettings.json` `"Inkwell:Auth"` 段绑定                                                                                                                                                                              |
-| 对外接口     | `public sealed class AuthOptions { [Range(1, 720)] public int SessionTtlHours { get; init; } = 24; [Range(1, 20)] public int MaxFailedUnlockAttempts { get; init; } = 5; public bool EnableSensitiveDataLogging { get; init; } = false; }`    |
+| 对外接口     | `public sealed class AuthOptions { [Range(1, 24)] public int SessionTtlHours { get; init; } = 24; [Range(1, 20)] public int MaxFailedUnlockAttempts { get; init; } = 5; public bool EnableSensitiveDataLogging { get; init; } = false; }`     |
 | 内部函数或类 | DataAnnotations 校验；`SessionTtlHours` 默认 24（[requirements.md §11](../../01-requirements/requirements.md) REQ-001 验收字面值，[§1.3 Q1](#13-关键决策摘要)）；`MaxFailedUnlockAttempts` 默认 5（[§1.3 Q3](#13-关键决策摘要) 本次会话拍板） |
 | 输入数据     | 由 `IConfiguration` 绑定                                                                                                                                                                                                                      |
 | 输出数据     | `AuthOptions` 实例（DI 通过 `IOptions<AuthOptions>` 注入）                                                                                                                                                                                    |
 | 依赖模块     | `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                       |
 | 错误处理     | DataAnnotations 校验失败 → `OptionsValidationException`，host 兜底                                                                                                                                                                            |
 | 日志要求     | DI 启动期 `IValidateOptions` 失败时输出 OTel `exception.type=Microsoft.Extensions.Options.OptionsValidationException`                                                                                                                         |
-| 测试要求     | `AuthOptionsTests.cs`：默认值（24/5/false）、`appsettings.json` 绑定、`[Range]` 边界                                                                                                                                                          |
+| 测试要求     | `AuthOptionsTests.cs`：默认值（24/5/false）、`appsettings.json` 绑定、`[Range]` 边界（含 26 小时以上必被拒绝的用例）                                                                                                                          |
+
+> **2026-07-06 评审修正（B-1，design-review-report.md §22.3）**：`SessionTtlHours` 上界原为 `[Range(1, 720)]`，与 [HD-004 §3.3](../Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md) `CacheOptions.MaxTtlSeconds` 的硬约束 `[Range(1, 86400)]`（= 24 小时）冲突——配置 25 ~ 720 小时之间的值会通过 `AuthOptionsValidator` 校验，但 `AuthService.LoginAsync` 调用 `ICacheProvider.SetAsync` 时必然因 TTL 越出 `[1, 86400]` 秒而抛 `ArgumentOutOfRangeException`，导致登录必然失败。已按评审建议选项 1 收紧为 `[Range(1, 24)]`，使配置层校验与运行期 `ICacheProvider` 实际可用范围完全一致，不再需要额外的跨字段运行期校验。纯机械性数值修正，不改变 [§1.3 Q1](#13-关键决策摘要) 已拍板的"24 小时"默认值本身。
 
 ### 3.5 `Auth/AuthOptionsValidator.cs`
 
@@ -343,7 +345,7 @@ src/core/Inkwell.Core/
 
 ### 4.1 `AuthService` 核心流程
 
-- **`LoginAsync`**：`GetUserByUsername` 命中失败或 `PasswordHasher.Verify` 失败 → 统一 `UnauthorizedAccessException`（不透露是否账号存在，[AC-002](../../01-requirements/acceptance-criteria.md) 前端文案"账号或密码错误"与此一致）；`User.IsLocked` → `InvalidOperationException`（[AC-003](../../01-requirements/acceptance-criteria.md) 前端文案"账号已被锁定"）；成功后 `SessionTokenGenerator.Generate()` → `ICacheProvider.SetAsync` → `ExecuteInTransactionAsync` 更新 `LastLoginTime` → `IAuditLogger.LogAsync`（`ActionType="login"`）。
+- **`LoginAsync`**：`GetUserByUsername` 命中失败或 `PasswordHasher.Verify` 失败 → 统一 `UnauthorizedAccessException`（不透露是否账号存在，[AC-002](../../01-requirements/acceptance-criteria.md) 前端文案"账号或密码错误"与此一致）；`User.IsLocked` → `InvalidOperationException`（[AC-003](../../01-requirements/acceptance-criteria.md) 前端文案"账号已被锁定"）；成功后 `SessionTokenGenerator.Generate()` → `ICacheProvider.SetAsync` → `ExecuteInTransactionAsync` 更新 `LastLoginTime` → `IAuditLogger.LogAsync`（`ActionType="login"`）。**（2026-07-06 评审 N-1 补充）** 无论 `GetUserByUsername` 未命中（账号不存在）还是命中后 `PasswordHasher.Verify` 失败（密码错误），均须走同样耗时的计算路径——账号不存在时仍须执行一次 `PasswordHasher.Verify` 的假验证（对固定的哑哈希值计算，不影响真实结果判定），避免两种失败路径因是否执行 PBKDF2 迭代而产生可观测的响应耗时差异，被用于账号枚举的计时侧信道攻击；两种失败路径最终必须统一抛出同一种异常 `UnauthorizedAccessException`（不新增区分账号是否存在的异常类型或消息）。
 - **`LogoutAsync`**：`GetAsync<SessionCacheEntry>` 取出 `UserId` 用于审计 → `RemoveAsync` → 命中则 `IAuditLogger.LogAsync`（`ActionType="logout"`）后返回 `true`；未命中直接返回 `false`（幂等，不审计）。
 - **`ValidateSessionAsync`**：纯 Cache 读路径，不触达 `IPersistenceProvider`（性能优先，[HD-004 §1.3](../Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#13-关键决策摘要) TTL 到期自动失效，无需业务侧二次校验 `IsLocked`——[§1.2](#12-范围) 已声明"已激活会话在锁定瞬间不主动失效"为已知边界）。
 - **`VerifyPasswordForUnlockAsync`**（[UF-002](../../01-requirements/user-flow.md#uf-002-自动锁定与解锁)）：密码正确 → `FailedUnlockAttempts` 重置为 0；密码错误 → 计数 +1，达 `AuthOptions.MaxFailedUnlockAttempts` 则同时置 `IsLocked=true`，两种错误路径均通过同一次 `ExecuteInTransactionAsync` 写回，避免竞态窗口。
