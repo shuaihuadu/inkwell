@@ -2,8 +2,8 @@
 id: HD-011
 title: Inkwell.Persistence.EFCore.SqlServer 详细设计 - final adapter（integration test / prod 候选 Provider 之一）
 stage: H3
-status: draft
-reviewers: []
+status: reviewed
+reviewers: [Inkwell]
 upstream:
   - REQ-002
   - REQ-006

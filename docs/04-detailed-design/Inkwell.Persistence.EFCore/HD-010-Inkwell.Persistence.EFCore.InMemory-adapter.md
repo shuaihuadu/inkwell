@@ -2,8 +2,8 @@
 id: HD-010
 title: Inkwell.Persistence.EFCore.InMemory 详细设计 - final adapter（dev / unit test 默认 Provider）
 stage: H3
-status: draft
-reviewers: []
+status: reviewed
+reviewers: [Inkwell]
 upstream:
   - REQ-002
   - REQ-006
