@@ -475,6 +475,24 @@ providers/Inkwell.Persistence.EFCore.InMemory/
 >
 > **2026-07-06 errata（HD-010 起草）**：本节由 HD-010 从「未起草」→「已起草」翻面；三个文件均为 HD-010 落地新增。
 
+## providers/Inkwell.Persistence.EFCore.SqlServer
+
+> 由 [HD-011](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 锁定。SqlServer final adapter——integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 SqlServer 原生 `rowversion` 类型自动生成，不需要拦截器（对照 [HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)）。
+
+```text
+providers/Inkwell.Persistence.EFCore.SqlServer/
+  Inkwell.Persistence.EFCore.SqlServer.csproj   # 依赖 Microsoft.EntityFrameworkCore.SqlServer + Microsoft.EntityFrameworkCore.Design（工具期）+ Inkwell.Persistence.EFCore（base）+ Inkwell.Abstractions
+  DependencyInjection/
+    InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs  # Builder DSL：UseSqlServer(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)
+  SqlServerPersistenceOptions.cs                # MaxRetryCount(默认6) / MaxRetryDelaySeconds(默认30)，绑定 Inkwell:Persistence:SqlServer
+  SqlServerDbContextInitializer.cs              # 实现 IDbContextInitializer，走 MigrateAsync（HD-011 §3.3）
+  Migrations/                                    # dotnet ef migrations add 生成，H3 阶段不预写内容（HD-011 §7）
+```
+
+> **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-011 锁定）；`Migrations/` 目录本身不计入文件数（内容由 H5 编码任务用 `dotnet ef migrations add` 生成）。不创建 `SqlServerInkwellDbContext` 子类（理由详 [HD-011 §6](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）/ InMemory 3 个 `*.cs`（HD-010）各自独立计数，不做跨 csproj 累加。
+>
+> **2026-07-06 errata（HD-011 起草，同步修 HD-009）**：本节由 HD-011 从「未起草」→「已起草」翻面；三个文件均为 HD-011 落地新增。HD-011 起草期发现 SqlServer `EnableRetryOnFailure` 与 [HD-009 §3.2 `ExecuteInTransactionAsync`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) 手动事务运行时不兼容，已同步在 [HD-009 §13.7 errata·第七轮](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 修正（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装），HD-009 `providers/Inkwell.Persistence.EFCore` 一节文件数与代码结构不变，仅内部实现细节调整，本节不重复列出。
+
 ## Errata 记录（2026-05-12：ADR-023 三轮 errata 跨 HD 同步）
 
 本文件 `status: draft` 期间，根据 [ADR-023 主决策](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) + [errata·01](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) + [errata·02](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 三轮 accepted by Inkwell 2026-05-11，同步落以下变更（已嵌入 §Inkwell.Abstractions / §Inkwell.Abstractions.FileStorage 两节，本节是变更摘要）：

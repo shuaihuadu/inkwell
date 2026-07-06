@@ -37,6 +37,8 @@ downstream: []
 > **2026-05-12 errata·第四轮（[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常)）**：删 `Common/Result.cs` + `Common/Error.cs` 抽象；本 HD §3.2 / §3.10 依赖模块删 `Inkwell.Abstractions/Common/Result.cs`；§3.10 AgentRepository 完整代码 6 方法签名 + catch 块同步翻；§10 自动化检查命令补 C9 ~ C12 grep；§11 决策记录补 4 行；详 §13.4。
 >
 > **2026-07-06 errata·第六轮（HD-010 首轮评审 B17/C97）**：§3.11 此前只有职责描述与方法签名，无"完整代码"块，无法确认 `AuditingSaveChangesInterceptor` 的 DI 服务类型注册方式；本轮补齐该方法完整代码，明确按 `ISaveChangesInterceptor` 接口服务类型注册（与消费端 HD-010/HD-011/HD-012 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 一致），同时一并注册 `EfCorePersistenceProvider` / `InkwellSeeder` / `MigrationRunner` / 具名 Repository；详 §13.6。
+>
+> **2026-07-06 errata·第七轮（HD-011 起草期发现，Owner picker 授权同步修改）**：`EfCorePersistenceProvider.ExecuteInTransactionAsync`（§3.2）此前手动调 `IDbContextTransaction`（`BeginTransactionAsync` / `CommitAsync` / `RollbackAsync`），与 [EF Core 连接重试策略约束](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#execution-strategies-and-transactions) 不兼容——一旦 HD-011 SqlServer 适配器启用 `EnableRetryOnFailure`，任何手动 `BeginTransactionAsync` 调用会在运行时 100% 抛 `InvalidOperationException`（"The configured execution strategy ... does not support user-initiated transactions"）。本轮修正：`ExecuteInTransactionAsync` 内部改用 [`db.Database.CreateExecutionStrategy().ExecuteAsync(...)`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.infrastructure.dbcontextoptionsbuilder) 包装 Begin/Commit/Rollback 全过程；InMemory（HD-010，无 retry 策略）下 `CreateExecutionStrategy()` 返回默认 no-op 策略，包装不改变现有行为，兼容既有测试。详 §13.7。
 
 ## 1. 模块职责
 
@@ -125,6 +127,7 @@ downstream: []
   - `GetRepository<TRepository>()` 委托 [`IServiceProvider.GetRequiredService<TRepository>()`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.serviceproviderserviceextensions.getrequiredservice)；未注册时 `GetRequiredService` 自身抛 `InvalidOperationException`（message 含未注册类型名），实现无需额外 catch（与 [HD-002 §3.1 错误处理](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 约定一致）
   - `private sealed class EfCoreUnitOfWork(IDbContextTransaction tx) : IUnitOfWork` —— 仅在 `ExecuteInTransactionAsync` lambda 内有效
   - `EfCoreUnitOfWork` 持有 `IDbContextTransaction`，`Dispose` 后 `IsDisposed = true`；外部业务在 lambda 外调用任何成员 → 抛 `new InvalidOperationException("UnitOfWork accessed outside ExecuteInTransactionAsync scope")`（[HD-002 §4.3](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）
+  - **（2026-07-06 errata·第七轮）** `ExecuteInTransactionAsync` 的 Begin/Commit/Rollback 三步全部包在 `db.Database.CreateExecutionStrategy().ExecuteAsync(async () => { ... })` 回调内——SqlServer 场景下（[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) `EnableRetryOnFailure`）该回调可能因瞬时故障重新整体执行；业务 `work` 委托必须保持对再次调用安全（幂等于数据库写操作层面，不产生数据库外部副作用），这是本 HD 对 `IPersistenceProvider.ExecuteInTransactionAsync` 调用方的既有隐含约定（纯 Repository 操作天然满足，业务 HD 起草时若在 `work` 内混入外部 I/O 需显式说明）
 - **输入数据**：业务 lambda + `CancellationToken`
 - **输出数据**：业务 lambda 的返回值（`T`）/ 受影响行数（`int`）；失败统一走 BCL 异常
 - **依赖模块**：`Microsoft.EntityFrameworkCore` / `Microsoft.EntityFrameworkCore.Storage` / [`Microsoft.Extensions.DependencyInjection.Abstractions`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.serviceproviderserviceextensions.getrequiredservice)（`GetRepository<T>` 委托用；该包已由 `AddEfCorePersistenceBase()` 注册扩展引入，非新增依赖，[ADR-017 零外部包约束](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 范围内） / `Inkwell.Abstractions/Persistence/*`（[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 删 `Common/Result.cs` 依赖）
@@ -946,3 +949,17 @@ echo "HD-009 automation checks passed."
 **未变项**：本轮不改变任何签名、返回类型、错误处理策略；不触及 §1 ~ §12 已有章节的除 §3.11 外内容；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是补齐既有承诺的实现细节，不是重新评估已定决策）。
 
 **下游联动**：HD-011 / HD-012（SqlServer / Postgres final adapter）起草时直接引用本节 `AddEfCorePersistenceBase()` 完整代码，其自身的 `Use*` 扩展方法与 HD-010 §3.1 同款调用 `.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 即可正确汇总 `AuditingSaveChangesInterceptor`；无需重复验证。
+
+### 13.7 2026-07-06 errata·第七轮（HD-011 起草期发现，`ExecuteInTransactionAsync` 包 `CreateExecutionStrategy` 以兼容 SqlServer `EnableRetryOnFailure`）
+
+**背景**：HD-011（SqlServer final adapter）起草期间，用户要求覆盖"连接重试策略"（[`EnableRetryOnFailure`](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency)）。核实 [EF Core 官方「Execution strategies and transactions」约束](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency#execution-strategies-and-transactions) 后发现：一旦 `DbContextOptionsBuilder` 配置了具备自动重试能力的 execution strategy（如 `SqlServerRetryingExecutionStrategy`），任何手动 `Database.BeginTransactionAsync()` 调用都必须包裹在 `Database.CreateExecutionStrategy().ExecuteAsync(...)` 回调内，否则运行时**必定**抛 `InvalidOperationException`（"The configured execution strategy ... does not support user-initiated transactions"）。§3.2 `EfCorePersistenceProvider.ExecuteInTransactionAsync` 此前的实现手动调 `BeginTransactionAsync` / `CommitAsync` / `RollbackAsync`，与 SqlServer 侧启用重试直接冲突——这是一个真实的跨 HD 技术冲突，经 Owner picker 确认后（选项：启用重试 + 同步修 HD-009，[design-review-report.md](../design-review-report.md) 尚未记录本轮，由 HD-011 起草会话直接授权）在本 HD 落地修正。
+
+**改动范围**：
+
+- **§3.2 内部函数或类**：新增一条——`ExecuteInTransactionAsync` 的 Begin/Commit/Rollback 三步全部包在 `db.Database.CreateExecutionStrategy().ExecuteAsync(async () => { ... })` 回调内；InMemory（HD-010，未配置 retry 策略）下 `CreateExecutionStrategy()` 返回框架默认的 no-op 策略（[`ExecutionStrategy`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.storage.executionstrategy) 基类，回调只跑一次），包装本身不引入额外行为，`§8` 既有事务测试用例断言不变
+- **幂等性约束（新增文档要求）**：由于 execution strategy 在检测到瞬时故障时会**重新整体执行**回调（含业务 `work` 委托），`work` 委托必须对"整体重跑"安全——本 HD 范围内 `work` 委托只允许包含 Repository / `SaveChangesAsync` 等数据库写操作（本身具备幂等性质：失败的事务已回滚，重跑等价于该事务从未发生过），**禁止**在 `work` 内混入外部 I/O（发消息 / 调用外部 API / 写文件等无法被事务回滚的副作用）——该约束此前隐含成立（业务层调用惯例），本轮把它写成显式文档要求，供 HD-011 / HD-012 / 后续业务 HD 引用
+- **§8 测试要求补充**：新增用例——`ExecuteInTransactionAsync` 在 InMemory Provider（无 retry 策略）下行为与包装前完全一致（回归测试，防止本轮改动破坏 HD-010 既有事务用例）；SqlServer 侧的"瞬时故障触发重试后仍提交成功"用例由 [HD-011 §8](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 起草时补齐（需要 SqlServer 集成测试环境，非 InMemory 单测可覆盖）
+
+**未变项**：本轮不改变 `ExecuteInTransactionAsync` 的公共签名、返回类型、异常包装的类型与 message 格式（§4.3 BCL 对照表不变）；不改变 §1 ~ §12 除 §3.2 外的任何章节；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是为兼容下游 HD-011 的功能修正，非重新评估已定决策，改动范围小且有明确技术证据支撑，参照 §13.6 先例处理方式）。
+
+**下游联动**：[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 直接引用本节结论，`UseSqlServer(...)` 中启用的 `EnableRetryOnFailure` 与本节修正后的 `ExecuteInTransactionAsync` 兼容，无需在 HD-011 中重复解释包装机制。
