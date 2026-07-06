@@ -2148,3 +2148,61 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §19 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+### 19.6 复审（2026-07-06，聚焦 B16/B17 修复核实）
+
+> 本次不重跑 §19.1 ~ §19.3 全部检查项，仅针对 author 已提交的 B16/B17 修复做聚焦复审，核实范围与用户请求四项一一对应。
+
+#### 19.6.1 HD-010 §3.1 DI 注册代码复核（对应请求项 1）
+
+- **检查内容**：逐行核对 [HD-010 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs)
+- **发现**：注册行现为 `builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, InMemoryRowVersionInterceptor>();`；消费行为 `options.AddInterceptors(sp.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor>())`——服务类型（`ISaveChangesInterceptor`）与查询类型完全一致，`GetServices<T>()` 会返回该拦截器实例
+- **结论**：`PASS` — 注册与消费类型匹配，B16 根因已消除，`InMemoryRowVersionInterceptor` 会被正常执行
+
+#### 19.6.2 HD-010 全文同类 DI 注册扫描（对应请求项 2）
+
+- **检查方法**：逐节核对 §2 文件清单列出的全部 4 个文件（csproj / DI 扩展 / `InMemoryDbContextInitializer` / `InMemoryRowVersionInterceptor`），确认是否存在其他"注册一个服务 + 用 `GetServices<TInterface>()` 消费"的组合
+- **发现**：
+  - §3.1 内另有一处注册 `builder.Services.AddSingleton<IDbContextInitializer, InMemoryDbContextInitializer>()`——消费方是 [HD-009 §3.5 `MigrationRunner`](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 构造函数参数 `IDbContextInitializer initializer`（单例构造函数注入，非 `GetServices<T>()` 多实例聚合），服务类型与构造函数参数类型均为 `IDbContextInitializer`，两者一致；此模式与 B16 不同类（构造函数注入下服务类型与消费类型不一致会直接导致解析失败 / 编译期可发现，不存在"静默失效"风险）
+  - §3.2 / §3.3 本身不含 DI 注册代码（仅定义类型，由 §3.1 统一注册）
+  - 未发现 HD-010 全文还有第二处 `AddXxx<TImpl>()`（服务类型=具体类）与 `GetServices<TInterface>()`（按接口查询）不匹配的组合
+- **结论**：`PASS` — HD-010 全文范围内无遗漏的同类 DI 注册类型不匹配问题
+
+#### 19.6.3 HD-009 §3.11 补全代码复核（对应请求项 3）
+
+- **检查内容**：核对 [HD-009 §3.11 完整代码](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) + [§13.6 errata 说明](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#136-2026-07-06-errata第六轮hd-010-首轮评审-design-review-reportmd-19-b17c97-补齐-addefcorepersistencebase-完整代码)
+- **`AuditingSaveChangesInterceptor` 注册**：`services.AddSingleton<ISaveChangesInterceptor, AuditingSaveChangesInterceptor>();`——与 HD-010 §3.1 消费行 `sp.GetServices<ISaveChangesInterceptor>()` 类型一致，`PASS`
+- **自洽性核查（Singleton 捕获依赖风险）**：`AuditingSaveChangesInterceptor(TimeProvider clock)`（[HD-009 §3.3](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#33-interceptorsauditingsavechangesinterceptorcs)）唯一依赖 `TimeProvider`——BCL 类型，`TimeProvider.System` 语义上是进程级单例，以 `AddSingleton` 注册不构成"Singleton 捕获 Scoped 依赖"的经典 DI 生命周期缺陷；未发现自洽性问题
+- **其余注册逐一核对**：`EfCorePersistenceProvider` → `AddScoped<IPersistenceProvider, EfCorePersistenceProvider>()`（依赖 Scoped 的 `InkwellDbContext`，生命周期匹配）；`InkwellSeeder` / `MigrationRunner` → 均 `AddScoped<TConcrete>()` 按具体类型注册，消费端（[HD-009 §3.5](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) `MigrationRunner` 构造函数）按同一具体类型 / 接口注入，无 `GetServices<T>()` 聚合场景，不受 B16 同类风险影响；具名 `IAgentRepository` → `AddScoped<IAgentRepository, AgentRepository>()`，与 [HD-009 §3.2](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) `GetRepository<TRepository>()` 工厂的 `GetRequiredService<TRepository>()` 消费方式一致
+- **与 HD-010 调用方式兼容性**：HD-010 §3.1 先调 `builder.Services.AddEfCorePersistenceBase()` 再追加 `AddSingleton<ISaveChangesInterceptor, InMemoryRowVersionInterceptor>()`——两次 `AddSingleton<ISaveChangesInterceptor, TImpl>()` 分别注册 `AuditingSaveChangesInterceptor` 与 `InMemoryRowVersionInterceptor`，.NET DI 容器对同一服务类型的多次 `Add*` 调用会全部保留（而非后者覆盖前者），`GetServices<ISaveChangesInterceptor>()` 会同时返回两个实例——与 HD-010 §3.1 消费方"汇总全部拦截器"的设计意图一致
+- **结论**：`PASS` — HD-009 §3.11 补全代码正确、自洽，且与 HD-010 调用方式兼容
+
+#### 19.6.4 是否引入新的不一致（对应请求项 4）
+
+- **检查方法**：对比 HD-010 本次修改前后的 §3.1 / §12、HD-009 本次新增的 §3.11 代码块 / §13.6，核对是否与报告 §19.1/§19.2 已 `PASS` 的其余检查项（C95、C98、C99、C101）、及 §1~§18 已 reviewed 内容存在新冲突
+- **发现**：
+  - HD-010 §12"跨 HD 假设已验证"段落措辞与 HD-009 §13.6 结论完全对应，无矛盾表述
+  - HD-009 frontmatter `status: reviewed` 未被回退，§13.6 明确"未变项"边界（不改签名/返回类型/错误处理策略），与既有 §1~§12 内容无冲突
+  - HD-010 §3.1 新增的 errata 注解未修改任何测试要求 / 覆盖率门槛 / 错误处理条款，与 §19.1 完备性扫描已认定 `pass` 的其余章节无冲突
+  - 未发现 HD-011 / HD-012（尚未起草）或 HD-013（尚未起草）与本次修改产生的新引用断链
+- **结论**：`PASS` — 未引入新的不一致
+
+#### 19.6.5 复审结论
+
+- **HD-010 §3.1 DI 注册**：`PASS`（19.6.1）
+- **HD-010 全文同类问题扫描**：`PASS`，无遗漏（19.6.2）
+- **HD-009 §3.11 补全代码正确性与兼容性**：`PASS`（19.6.3）
+- **新增不一致排查**：`PASS`，未发现（19.6.4）
+- **B16 / B17 状态**：均已修复并核实，`design-review-report.md §19.2` 的 C96 / C97 判定由 `FAIL` 转 `PASS`
+- **整体复审结论**：**PASS** — HD-010 首轮评审的 2 项 blocking（B16/B17）均已消除，未发现新增缺陷；non-blocking 项 N29/N30 仍待处理但不阻塞（详 §19.3，处置方向不变：N29 可选补一句 deferral 措辞，N30 已转化为 H5 编码阶段的显式验收标准）
+- **是否可推荐 Owner 翻 `reviewed`**：**是**——建议 Owner 在 [HD-010 frontmatter](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) 手动将 `status: draft` 翻为 `status: reviewed` 并填写 `reviewers: [Inkwell]`（人工签字位，AI 不代签）
+
+#### 19.6.6 复审自检
+
+- ✅ 仅复核 B16/B17 修复相关章节（HD-010 §3.1/§12、HD-009 §3.11/§13.6），未重跑 §19.1~§19.3 全部检查项
+- ✅ 每条 `PASS` 结论均附具体代码片段 / 章节锚点证据，未使用"看起来"/"似乎"等主观词
+- ✅ 已扩大检查面到 HD-010 全文其余 DI 注册点（§3.2 `IDbContextInitializer`），而非只看 §3.1 单点
+- ✅ 已验证 `AuditingSaveChangesInterceptor` 的 Singleton 生命周期自洽性（依赖 `TimeProvider`，无 Scoped 捕获风险），非仅比对服务类型字符串
+- ✅ 未越界修改 HD-010 / HD-009 正文，仅追加评审报告子节
+- ✅ 报告路径仍为 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §19.6，未另开顶层章节）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
