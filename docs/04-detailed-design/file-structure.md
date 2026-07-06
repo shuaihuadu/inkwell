@@ -160,8 +160,8 @@ src/core/Inkwell.Abstractions/
 >     AuditLog.cs
 >     IAuditLogRepository.cs
 >   Auth/
->     User.cs
->     IUserRepository.cs
+>     User.cs                          # 已由 HD-014 落地为真实文件，见下方 §Inkwell.Abstractions.Auth
+>     IUserRepository.cs               # 已由 HD-014 落地为真实文件，见下方 §Inkwell.Abstractions.Auth
 >   PublicApi/
 >     PublicApiToken.cs
 >     IPublicApiTokenRepository.cs
@@ -171,6 +171,17 @@ src/core/Inkwell.Abstractions/
 > ```
 >
 > 业务 HD 在 `Persistence/<Module>/` 下遵循「filename = classname.cs」与「Model + 具名 Repo 同模块共置」原则（详 [HD-002 §4.1.4](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）。
+
+### Persistence/Auth（HD-014 落地，2026-07-06）
+
+> 由 [HD-014 §2.1 / §3.6 / §3.7](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 锁定。上方示例中的 `Auth/` 条目现已是真实文件，非仅占位。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Auth/                                # 新增子目录（HD-014）
+    User.cs                            # 业务 Model，无后缀（不撞外部类型）
+    IUserRepository.cs                 # 具名 Repository（6 方法：AddUser/UpdateUser/GetUser/GetUserByUsername/ListUsers/FindUsersByLockedStatus）
+```
 
 ## Inkwell.Abstractions.FileStorage
 
@@ -383,6 +394,39 @@ providers/Inkwell.VectorStore.Qdrant/                        # 独立 HD（[HD-0
 ```
 
 > Provider 子 Options（Qdrant 连接参数 / Azure OpenAI 凭据）由各自 Provider HD 独立锁定；**严禁**回填到 `Inkwell.Abstractions/VectorStore/VectorStoreOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。`IEmbeddingGenerator<string, Embedding<float>>` 在 KB / Memory 业务命名空间的直接消费方式**已确认**：`Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 依赖白名单 + `GlobalUsings.cs`，与 `Microsoft.Extensions.VectorData.Abstractions` 处理同构，允许直接注入、不新增门面接口（[HD-008 §13 Q5](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-决策记录) + [design-review-report.md §18 B15](../design-review-report.md#b15q5比照-vectordata-先例缺物理落地机制iembeddinggenerator-依赖白名单例外未实际生效c91)，已处理（2026-07-06）；不再是开放问题）。
+
+## Inkwell.Abstractions.Auth
+
+> 由 [HD-014 §2.1 / §3](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 锁定。**本 HD 是 H3 第一张业务命名空间 HD**——`IAuthService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），非 6 大基础设施端口之一，故独立落 `Auth/` 子目录（与 `Persistence/Auth/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Auth` / `Inkwell.Abstractions.Persistence.Auth`）。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Auth/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 单实现拓扑）——`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增)）**不**新增 `Auth` 字段。
+
+```text
+src/core/Inkwell.Abstractions/
+  Auth/                                   # 新增子目录（HD-014）
+    IAuthService.cs                       # 顶层业务门面（6 方法：LoginAsync/LogoutAsync/ValidateSessionAsync/VerifyPasswordForUnlockAsync/UnlockAccountAsync/ListAccountsAsync）
+    AuthSession.cs                        # record，登录 / 会话校验成功返回 DTO
+    AuthAccountSummary.cs                 # record，账号列表投影（不含 PasswordHash）
+    AuthOptions.cs                        # SessionTtlHours(24)/MaxFailedUnlockAttempts(5)/EnableSensitiveDataLogging
+    AuthOptionsValidator.cs               # IValidateOptions<AuthOptions>
+```
+
+**文件计数**：HD-014 在 `Auth/` 新增 5 个 `*.cs` + 在 `Persistence/Auth/`（见 [§Inkwell.Abstractions 追加小节](#persistenceauthhd-014-落地2026-07-06)）新增 2 个 `*.cs`，合计 7 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）= **60** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Auth` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 单实现拓扑；`Inkwell.Core.csproj` 本 HD 首次出现物理文件）：
+
+```text
+src/core/Inkwell.Core/
+  Inkwell.Core.csproj                     # 首次出现；依赖白名单仅 Inkwell.Abstractions（项目引用）+ BCL
+  Auth/
+    AuthService.cs                        # 唯一 IAuthService 实现
+    PasswordHasher.cs                     # 内部密码哈希封装（算法 = PBKDF2，2026-07-06 Owner 确认，见 HD-014 §6.1）
+    SessionTokenGenerator.cs              # 内部会话 Token 生成（RandomNumberGenerator，BCL）
+    SessionCacheEntry.cs                  # 内部 record，ICacheProvider 序列化载体
+    AuthBuilderExtensions.cs              # UseDefaultAuthService()
+```
+
+> `Persistence/Auth/User.cs` + `IUserRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Auth 小节](#persistenceauthhd-014-落地2026-07-06)）；`UserEntity` / `UserMappingExtensions` / `EfCoreUserRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
 
 ## providers/Inkwell.Persistence.EFCore
 

@@ -67,7 +67,7 @@ downstream: []
 
 | 表名                 | 业务模块               | 锁定 HD | 说明                                                                                                                                                               |
 | -------------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `users`              | Inkwell.Auth           | TBD     | [REQ-001](../01-requirements/requirements.md)                                                                                                                      |
+| `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md)                                                                                                                      |
 | `agents`             | Inkwell.Agents         | TBD     | [REQ-002](../01-requirements/requirements.md)                                                                                                                      |
 | `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
 | `skills`             | Inkwell.Skills         | TBD     | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
@@ -156,3 +156,23 @@ downstream: []
 - **错误传递机制**：Persist 端口与全部 EFCore Provider 错误处理统一走 .NET BCL 异常类型（`KeyNotFoundException` / `InvalidOperationException` / `TimeoutException` / `IOException` / `ArgumentException` / `OperationCanceledException` + `InkwellConfigurationException` / `InkwellBuilderException` 两保留子类）；OTel `exception.type` / `.message` / `.stacktrace` / `.escaped` / `.id` 五字段取代 `error.code`。
 - **业务命名空间零 `Result<T>` / `Error` 引用**（[ADR-023 errata·02](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常)）：`Common/Result.cs` + `Common/Error.cs` 抽象删除；具名 Repository 方法全裸 `Task<T>` / `Task<bool>` / `Task<PagedResult<T>>` / `Task<IReadOnlyList<T>>` / `Task`（[ADR-023 主决策](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)）。
 - **上游证据链**：[HD-001 §13 第三 / 第四轮 errata](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#13-errata-记录) + [HD-002 §13.3 / §13.4 errata](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-errata-记录-2026-05-10) + [HD-009 §13.3 / §13.4 errata](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) + [file-structure.md 末尾 errata 记录（2026-05-12）](file-structure.md)。
+
+## Inkwell.Core.Auth
+
+> 由 [HD-014 §5](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#5-数据库设计增量追加至-database-designmd) 锁定。本节是 H3 第一张业务命名空间贡献的表结构（此前"表清单"占位表中 `users` 行为 `TBD`，现更新为 `HD-014`）。
+
+### 表 `users`（[REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md) 解封子能力）
+
+- `Id`：`Guid` v7，主键
+- `Username`：`string`，唯一索引，长度上限 100（作者判断，非 Owner 拍板，需求未指定具体上限）
+- `PasswordHash`：`string`，无业务长度上限（容纳未来任意算法输出；算法本体 = PBKDF2，2026-07-06 Owner 确认，见 [HD-014 §6.1](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#61-已解决问题原需要-owner-确认2026-07-06-已由默认-agent-通过-vscode_askquestions-真实确认)）
+- `IsSuper`：`bool`，默认 `false`（[OQ-007 closed §C](../01-requirements/open-questions.md#oq-007-团队角色暂不区分的下游含义)，仅由后端运维 SQL 设置，无 API 可写）
+- `IsLocked`：`bool`，默认 `false`
+- `FailedUnlockAttempts`：`int`，默认 `0`（[UF-002](../01-requirements/user-flow.md#uf-002-自动锁定与解锁) 解锁失败计数，阈值 5 次，[HD-014 §1.3 Q3](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#13-关键决策摘要)）
+- `LastLoginTime`：`DateTimeOffset?`，可空
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+- `RowVersion`：`IHasRowVersion`（乐观并发，防"失败计数递增"与"Admin 解封"并发写互相覆盖）
+
+**索引**：`Username` 唯一索引；`IsLocked` 非唯一索引（[UF-012](../01-requirements/user-flow.md#uf-012-admin-解封账号) 账号 tab 默认过滤已锁账号）。
+
+**Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
