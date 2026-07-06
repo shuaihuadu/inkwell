@@ -2039,3 +2039,110 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §18 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060，按 user-memory 已知陷阱处理）
+
+## 19. HD-010 Inkwell.Persistence.EFCore.InMemory Final Adapter 首轮评审（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，仅评审增量产物：[HD-010 Inkwell.Persistence.EFCore.InMemory](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md)（status: draft，2026-07-06 起草）+ [file-structure.md `## providers/Inkwell.Persistence.EFCore.InMemory` 章节追加](file-structure.md#providersinkwellpersistenceefcoreinmemory)。报告主体 §1 ~ §18 的 `status / reviewers` 字段**不**因本节调整。全程以 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+
+### 19.0 评审范围与基线
+
+- **本轮评审对象**：HD-010 全文（§1 ~ §13）+ file-structure.md `## providers/Inkwell.Persistence.EFCore.InMemory` 章节追加
+- **不在本轮范围**：HD-001 ~ HD-009 主体设计（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）；HD-011 / HD-012（SqlServer / Postgres final adapter，尚未起草）；HD-013（跨 Provider 契约测试包，尚未起草）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-010 frontmatter 完整，upstream 12 项均可定位：REQ-002 / REQ-006 / REQ-009 / REQ-013 / REQ-014（[requirements.md](../01-requirements/requirements.md)）+ ADR-004 / ADR-013 / ADR-017 / ADR-021 / ADR-023（[adr/](../03-architecture/adr/)）+ HD-001 / HD-002 / HD-009 全部真实存在且 `status: reviewed`
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-010 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 19.1 完备性扫描（HD-010 范围内）
+
+按 [h3-detailed-design.md 章节清单](../../.he/docs/stages/h3-detailed-design.md) 逐项打分：
+
+- **文件结构**：`pass` — §2 文件清单（1 csproj + 3 `*.cs`）与 §3.0 ~ §3.3 十字段表一一对应，且与 [file-structure.md `## providers/Inkwell.Persistence.EFCore.InMemory`](file-structure.md#providersinkwellpersistenceefcoreinmemory) 文件树逐行核对一致（计数"3 个 `*.cs` + 1 个 `.csproj`"手工核算无误）。证据：[HD-010 §2](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#2-文件清单) + [file-structure.md 对应章节](file-structure.md#providersinkwellpersistenceefcoreinmemory)
+- **数据库 / 表 / 字段 / 索引 / 约束**：`n/a`（显式声明）— §13 明确"本 HD **不**追加 database-design.md（InMemory 不引入新表结构，schema 沿用 HD-009 已锁定的 Entity 定义）"；核对属实，HD-010 全文无 `Entities/` / `Configurations/` 新文件。证据：[HD-010 §13](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#13-同步追加跨模块文件)
+- **接口 / 错误码**：`partial` — 端口签名、BCL 异常透传（§3.2 `不额外 catch，透传`）均与 [ADR-023](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) 最终态一致，无 `Result<T>` / 错误码残留；**但** §3.1 `UseInMemoryDatabase()` 完整代码中 `InMemoryRowVersionInterceptor` 的 DI 注册方式与其消费方式（`AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())`）不匹配（详 §19.2 C96，属实质性接口契约缺陷，非文档呈现问题）。证据：[HD-010 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs)
+- **服务 / 进程 / 后台任务**：`n/a` — HD-010 是 library，不独立进程；§9 显式声明"无独立部署单元"。证据：[HD-010 §9](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#9-部署--配置)
+- **每个目录 / 程序文件职责**：`pass` — 3 个 `*.cs` × 10 字段全填，无 `<TBD>` / `<待定>`；csproj 依赖白名单 + 禁用清单均列明。证据：[HD-010 §3.0 ~ §3.3](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#3-各文件-10-字段)
+- **配置文件字段 / 默认值**：`pass` — §7 显式声明"不引入新 `PersistenceOptions` 字段，仅新增一个方法参数 `databaseName`（默认 `"inkwell"`）"，隔离策略（`InMemoryDatabaseRoot` 逐次新建）有官方文档引用支撑。证据：[HD-010 §7](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#7-配置项--inmemory-数据库命名与隔离策略)
+- **日志格式 / 字段**：`pass` — §3.2 / §3.3 均显式声明"N/A"并给出理由（高频路径噪音 / 与 HD-009 已有日志语义重叠），符合既有 HD 惯例。证据：[HD-010 §3.2 / §3.3 日志要求行](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md)
+- **监控指标 / 告警策略**：`n/a`（合理）— InMemory 场景无生产监控意义（进程内数据库，随进程存亡），HD-009 已覆盖 OTel span 基线；HD-010 未新增独立可观测性内容属合理移交，但**未像 HD-004 ~ HD-007 那样显式写一句 deferral 措辞**（轻微文档呈现缺口，详 §19.3 N29）
+- **部署步骤 / 回滚 / 备份恢复**：`pass` — §9 显式声明"不需要为 InMemory Provider 单独起容器"+ `appsettings.Development.json` Provider 选择字段。证据：[HD-010 §9](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#9-部署--配置)
+- **性能边界 / 安全边界 / 已知限制**：`partial` — §4 详细讨论了 RowVersion 值生成机制的边界，§10 决策记录给出证据链；**但未讨论 `.IsRowVersion()`（= `IsConcurrencyToken()` + `ValueGeneratedOnAddOrUpdate()`）这一"值生成"语义标记与拦截器手动赋值 `CurrentValue` 之间的交互边界**——这正是本轮 §19.2 C99 的核心发现，§4 只回答了"谁来生成新值"，未回答"被标记为 `ValueGeneratedOnAddOrUpdate` 的属性，手动设置是否会被 EF Core 管线接受/覆盖/忽略"这一更底层的边界问题。证据：[HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)
+
+**完备性结论**：9 项中 4 项 `pass`、3 项 `n/a`（2 项合理、1 项合理但缺显式措辞）、2 项 `partial`（接口契约缺陷 + 性能/安全边界讨论不完整）。**完备性维度的 2 个 `partial` 均指向同一类问题——设计文档描述了"应该发生什么"，但未验证/讨论"实际会不会发生"**，详见下方 §19.2 一致性扫描与 §19.3 反问清单。
+
+### 19.2 一致性扫描（HD-010 ↔ HD-009 / HD-002 / ADR-021 / ADR-023 + file-structure.md）
+
+- **C95（PASS）**— HD-010 §3.0 csproj 依赖白名单（`Microsoft.EntityFrameworkCore.InMemory` + ProjectReference `Inkwell.Persistence.EFCore` + `Inkwell.Abstractions`）与禁用清单（SqlServer / Postgres / `.Design` / `Inkwell.Core`）与 [ADR-021 §依赖规则补充](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) EFCore family 例外 + [ADR-017 §3.2](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 完全一致；§10 C1 ~ C4 自动化检查脚本与该白名单逐条对应。证据：[HD-010 §3.0 / §10](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) vs ADR-021 / ADR-017 §3.2
+- **C96（FAIL，blocking）**— HD-010 §3.1 完整代码中，`InMemoryRowVersionInterceptor` 的注册行是 `builder.Services.AddSingleton<InMemoryRowVersionInterceptor>();`（服务类型 = 具体类 `InMemoryRowVersionInterceptor` 本身），但紧随其后的 `AddDbContext` 配置调用的是 `.AddInterceptors(sp.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor>())`（按服务类型 `ISaveChangesInterceptor` 查询）。[`Microsoft.Extensions.DependencyInjection` 的 `AddSingleton<TService>()` 单类型参数重载](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.servicecollectionservicetextensions.addsingleton) 会把 `ServiceType` 和 `ImplementationType` 都注册为 `TService` 本身——`sp.GetServices<ISaveChangesInterceptor>()` 只返回"注册时显式声明服务类型为 `ISaveChangesInterceptor`"的实例，**不会**因为某个具体类恰好实现了该接口就自动纳入。这意味着 `InMemoryRowVersionInterceptor` 实际上**永远不会被 `AddInterceptors` 拾取、永远不会执行**——本 HD 的核心交付物（回应 [design-review-report N5/C7](#n5inmemory-provider-rowversion-自动管理可行性c7) 的 RowVersion 手动模拟机制）会静默失效：`RowVersion` 永远不会递增，§3.3 承诺的"并发冲突场景（核心用例）"单测会直接失败（因为两次独立 `SaveChanges` 都不会更新 `RowVersion`，EF Core 的乐观并发检测比较的是同一个从未变化的 `OriginalValue` vs 当前存储值，不会触发 `DbUpdateConcurrencyException`）。正确写法应为 `builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, InMemoryRowVersionInterceptor>();`。证据：[HD-010 §3.1 完整代码](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) 第 2 行 vs 第 4 ~ 6 行 `AddInterceptors` 调用
+- **C97（FAIL，blocking，跨 HD）**— HD-010 §3.1 注解中明确写"`AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 要求 HD-009 §3.11 `AddEfCorePersistenceBase()` 把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型"。**已实际逐字核对 [HD-009 §3.11](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 全文**：该节只有"职责：注册 base 服务（`EfCorePersistenceProvider` / `AuditingSaveChangesInterceptor` / `InkwellSeeder` / `MigrationRunner` / 全部 `Repositories/<TypeName>Repository`）"一句职责描述 + 对外接口签名 `internal static IServiceCollection AddEfCorePersistenceBase(this IServiceCollection services)`，**全文档没有任何一段"完整代码"块展示该方法体内部的具体注册语句**（对照 §3.9 / §3.10 均有"完整代码"标题段，§3.11 没有）。**结论：无法从 HD-009 现有文本确认"能"或"不能"——这是一处真实的文档空白，不是本 reviewer 的主观推测**。鉴于 C96 已证实 HD-010 自己对 `InMemoryRowVersionInterceptor` 的注册方式选择了错误的服务类型，存在**同样的错误被 HD-009 对 `AuditingSaveChangesInterceptor` 重复一遍**的现实风险——若如此，则不仅 InMemory Provider，**SqlServer / Postgres 三个 Provider 上的时间戳自动填充（`CreatedTime`/`UpdatedTime`）与 `IHasOwner` 校验也会一并静默失效**，这是比 C96 影响面更大的问题（C96 只影响 InMemory 一个 Provider 的 RowVersion，C97 若坐实则影响全部三个 Provider 的审计字段）。证据：[HD-010 §3.1 注](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) vs [HD-009 §3.11 全文](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs)（无完整代码块，逐字确认）
+- **C98（PASS）**— Migration/EnsureCreated 策略与 [ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 完全一致：HD-010 §3.2 `InMemoryDbContextInitializer.InitializeAsync` 直接委托 `db.Database.EnsureCreatedAsync(ct)`，是**真实建库**而非 no-op；§10 C3 自动化检查断言"无 `Migrations/` 子目录"；与 ADR-021 §5"InMemory 不支持 Migration"锁定条款完全对齐，无偏离。证据：[HD-010 §3.2 / §10 C3](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) vs [ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)
+- **C99（PASS）**— HD-010 §5 "为什么不创建 `InMemoryInkwellDbContext` 子类"的决策引用 [HD-009 §6 step 3](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#6-builder-dsl-衔接adr-021-builder-dsl-形状) 具体契约（"final adapter 扩展方法内部调 `services.AddDbContext<InkwellDbContext>(...)`"）——经核对 HD-009 §6 原文，该句确实逐字存在；HD-010 同时坦诚说明这与 [ADR-021 §决策 早期示意文件树](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)（曾列出 `InMemoryInkwellDbContext.cs`）不同，并给出"HD-009 §6 更具体、更晚锁定，故遵循 §6"的优先级判断依据，逻辑自洽、无凭空拍板。证据：[HD-010 §5](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) vs [HD-009 §6](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#6-builder-dsl-衔接adr-021-builder-dsl-形状) vs ADR-021 §决策
+- **C100（PARTIAL，non-blocking）**— HD-010 §4 引用 [EF Core 官方「Application-managed concurrency tokens」指南](https://learn.microsoft.com/ef/core/saving/concurrency#application-managed-concurrency-tokens) 作为 `SaveChangesInterceptor` 内手动递增 `RowVersion` 的依据，这一引用本身准确；**但该官方指南的典型示例场景是属性仅标记 `.IsConcurrencyToken()`（应用管理并发令牌），而 HD-009 §3.1 `ApplyRowVersion` 对 `IHasRowVersion` 属性统一调用 `.IsRowVersion()`——后者等价于 `.IsConcurrencyToken().ValueGeneratedOnAddOrUpdate()`，`ValueGeneratedOnAddOrUpdate()` 这层"数据库/存储侧生成新值"的语义标记通常意味着 EF Core 期望值由 Provider 自身在保存时生成（如 SqlServer `rowversion` 列的写后回读），而不是由应用代码在 `SavingChangesAsync` 阶段直接覆盖 `CurrentValue`**。HD-010 §4 未讨论"被标记 `ValueGeneratedOnAddOrUpdate` 的属性，在 InMemory Provider 上，拦截器手动设置的 `CurrentValue` 是否会被 EF Core 的值生成管线接受、忽略、或产生诊断警告"这一更底层的边界问题——本轮无法通过阅读设计文档确认这一点在实际 EF Core 10 InMemory Provider 上的行为，因为这是需要运行代码验证的库行为细节，超出"文档一致性核查"范畴。**不判定为 blocking 的理由**：HD-010 §3.3 已经承诺了恰好覆盖这一场景的单测（"并发冲突场景（核心用例）"——两个独立 `DbContext` 实例 + 显式断言 `DbUpdateConcurrencyException`），若该单测在 H5 实现阶段失败，将直接、明确地暴露这一边界问题，不会被静默放过；因此本条降级为 non-blocking，但建议在 H5 编码任务简报中显式标注"若 §3.3 并发冲突单测失败，需回炉重新评估 `.IsRowVersion()` 是否适合 InMemory Provider（备选：InMemory 侧改用 `.IsConcurrencyToken()`，不叠加 `ValueGeneratedOnAddOrUpdate()`，但这会造成三 Provider 间 `OnModelCreating` 配置的分叉，需要 HD-009 `InkwellDbContext` 引入 Provider-specific 判断，与 HD-010 §5"不创建子类"的决策产生新张力）"。证据：[HD-010 §4](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) vs [HD-009 §3.1 `ApplyRowVersion`](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs) vs [EF Core 官方并发文档](https://learn.microsoft.com/ef/core/saving/concurrency)
+- **C101（PASS）**— [file-structure.md `## providers/Inkwell.Persistence.EFCore.InMemory`](file-structure.md#providersinkwellpersistenceefcoreinmemory) 文件树、依赖注释、计数估算（"3 个 `*.cs` + 1 个 `.csproj`"）与 HD-010 §2 / §3.0 逐一核对一致；"不创建 `InMemoryInkwellDbContext` 子类 / 不创建独立 `BannedSymbols.txt`"的理由引用锚点（HD-010 §5 / §10）真实可跳转。证据：[file-structure.md 对应章节](file-structure.md#providersinkwellpersistenceefcoreinmemory) vs [HD-010 §2 / §5 / §10](Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md)
+
+**一致性结论**：7 项检查中 2 项 `FAIL`（C96 / C97，均 blocking）、1 项 `PARTIAL`（C100，non-blocking）、4 项 `PASS`（C95、C98、C99、C101）。**2 个 FAIL 项共享同一根问题**——`ISaveChangesInterceptor` 服务类型注册在 DI 层面被误用，且这一错误在 HD-010 自身代码中已确证存在（C96），在 HD-009 中因缺少完整代码而无法排除同样存在（C97）。
+
+### 19.3 反问清单
+
+#### Blocking
+
+##### B16：`InMemoryRowVersionInterceptor` 以错误的 DI 服务类型注册，导致 RowVersion 拦截器永不执行（C96）
+
+- **问题**：HD-010 §3.1 完整代码中 `builder.Services.AddSingleton<InMemoryRowVersionInterceptor>();` 把服务类型注册为具体类 `InMemoryRowVersionInterceptor` 本身，而消费端 `.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 是按接口服务类型 `ISaveChangesInterceptor` 查询——.NET DI 容器不会因为某具体类实现了某接口就自动把它纳入该接口的 `GetServices<T>()` 结果集，必须在注册时显式声明服务类型为该接口。当前写法下 `InMemoryRowVersionInterceptor` 永远不会被 `AddInterceptors` 拾取
+- **影响范围**：本 HD 唯一的核心交付物——回应 [design-review-report N5/C7](#n5inmemory-provider-rowversion-自动管理可行性c7) 的 RowVersion 手动模拟机制——会静默失效；§3.3 承诺的"并发冲突场景（核心用例）"单测在 H5 编码阶段会直接失败（`RowVersion` 永不递增，`DbUpdateConcurrencyException` 永不被抛出）；REQ-002 / REQ-006（依赖乐观并发的场景）在 InMemory dev/test 环境下得不到真实覆盖
+- **建议方向**：将该行改为 `builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, InMemoryRowVersionInterceptor>();`——这是纯机械修正，不涉及任何新的技术决策，不需要 Owner picker
+- **卡点等级**：**blocking**
+- **追溯**：C96
+
+##### B17：HD-009 `AddEfCorePersistenceBase()` 是否把 `AuditingSaveChangesInterceptor` 注册为 `ISaveChangesInterceptor` 服务类型——现有文本无法确认，且 HD-010 已证实同类错误确实会发生（C97）
+
+- **问题**：已逐字核对 [HD-009 §3.11](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 全文——该节仅有职责描述与方法签名，**没有任何"完整代码"块展示 `AddEfCorePersistenceBase()` 方法体内部具体如何注册 `AuditingSaveChangesInterceptor`**。明确结论：**当前 HD-009 文本既不能确认"能"也不能确认"不能"，需要 HD-009 补充说明（不是本 reviewer 代为拍板）**。鉴于 B16 已证实 HD-010 对结构完全相同的 `InMemoryRowVersionInterceptor` 确实犯了"注册为具体类而非接口服务类型"的错误，不能排除 HD-009 对 `AuditingSaveChangesInterceptor` 重复同样的错误
+- **影响范围**：若 HD-009 确实只把 `AuditingSaveChangesInterceptor` 注册为具体类，则**三个 Provider（InMemory / SqlServer / Postgres）上的 `CreatedTime` / `UpdatedTime` 自动填充与 `IHasOwner.OwnerUserId` 校验会全部静默失效**——这是比 B16 更大范围的问题（B16 仅影响 InMemory 一个 Provider 的 RowVersion 机制）；下游全部 ~30 个业务 Repository 的审计字段行为、[HD-009 §8.2 `AuditingSaveChangesInterceptorTests.cs`](Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 承诺的单测会连带失败
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - HD-009 §3.11 补一段"完整代码"展示 `AddEfCorePersistenceBase()` 方法体，明确写出 `services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.ISaveChangesInterceptor, AuditingSaveChangesInterceptor>();` 这一行（若实际决策确实如此）
+  - 若实际实现另有机制（例如不通过 DI 的 `GetServices<ISaveChangesInterceptor>()` 汇总模式，而是 `InkwellDbContext` 自身在 `OnConfiguring` 或构造函数中直接持有并附加拦截器实例），HD-009 需要显式声明该替代机制，HD-010 §3.1 的 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 消费方式需要同步调整以匹配
+- **卡点等级**：**blocking**（HD-009 虽已 `reviewed`，但本条是可执行验证发现的具体代码级缺陷，非重新评估已定决策；建议走小 errata 而非重新评审全文）
+- **追溯**：C97
+
+#### Non-blocking
+
+##### N29：HD-010 缺少显式"监控随 HD-009 已覆盖，不新增独立可观测性内容"措辞
+
+- **问题**：HD-004 ~ HD-008 均有一句显式 deferral 措辞说明监控指标的归属，HD-010 全文未出现"监控" / "告警"关键字，也未显式声明"HD-009 §3.2 / §4.2 已覆盖的 OTel span 基线对 InMemory Provider 同样适用，本 HD 不新增独立可观测性内容"
+- **影响范围**：不影响 HD-010 翻 `reviewed`（InMemory 场景本就无生产监控意义），仅是措辞缺失可能让读者误判为遗漏
+- **建议方向**：可在 §9 末尾补一句"可观测性沿用 HD-009 §3.2 EfCorePersistenceProvider OTel span 基线，本 HD 不新增独立监控内容"
+- **卡点等级**：non-blocking
+
+##### N30：`.IsRowVersion()` 的 `ValueGeneratedOnAddOrUpdate()` 语义与拦截器手动赋值的交互边界未讨论（C100）
+
+- **问题**：HD-010 §4 论证了"为什么需要手动生成新值"，但未讨论"被 `.IsRowVersion()` 标记为 `ValueGeneratedOnAddOrUpdate` 的属性，在 InMemory Provider 上是否真的允许拦截器手动覆盖 `CurrentValue` 并被持久化管线接受"这一更底层的 EF Core 行为边界
+- **影响范围**：不影响 HD-010 翻 `reviewed`（这是需要运行代码验证的库行为细节，超出文档一致性核查范畴）；但若 H5 实现阶段 §3.3 承诺的并发冲突单测失败，需要重新评估 InMemory 是否应改用 `.IsConcurrencyToken()`（不叠加 `ValueGeneratedOnAddOrUpdate()`），而这会与 HD-010 §5"不为 InMemory 创建 DbContext 子类"的决策产生新张力（因为 `OnModelCreating` 目前是三 Provider 共享的，若 InMemory 需要不同的属性标记方式，需要 Provider-specific 判断）
+- **建议方向**：在 H5 `HD-010` 对应编码任务简报中显式标注"§3.3 并发冲突单测是本机制的验收门禁，若失败需回炉评估 `.IsRowVersion()` vs `.IsConcurrencyToken()` 分歧"，把这一风险从"设计假设"转为"编码阶段的显式验收标准"，不需要现在就拍板
+- **卡点等级**：non-blocking
+
+### 19.4 评审结论与下一步
+
+- **整体评审决议**：**REJECT（需修复后重新提交，非结构性问题）**——HD-010 的整体设计思路（不建子类、复用 base DbContext、InMemory 专属 `EnsureCreatedAsync` + `RowVersion` 拦截器）扎实自洽，csproj 依赖规则、Migration 策略、file-structure.md 同步均 100% 通过（C95、C98、C99、C101 全 PASS）；但发现 **2 项 blocking**（B16 / B17），且 B16 是**可复现、可确认的代码级 bug**（不是"设计不够清楚"，而是"设计给出的示例代码本身不会按预期工作"）——本 HD 存在的目的就是解决 RowVersion 手动模拟这一具体问题，而当前代码样本恰好让这个机制失效，这是评审报告口径下的"核心交付物未达成"，故判定为 REJECT 而非 PASS-AS-ERRATA
+- **判定 REJECT 而非 PASS-AS-ERRATA 的理由**：B16 / B17 均可通过纯机械修正解决（改一行 DI 注册代码 + 补一段 HD-009 完整代码），不需要 Owner 拍板任何新的技术方向；但由于两处缺陷都直接命中"本 HD 存在的核心目的能否达成"这一验收标准（而非外围文档措辞问题），按 HD-008 §18.4 先例的"文档呈现缺口 PASS-AS-ERRATA" vs 本轮"机制性代码缺陷 REJECT"两类问题应区别对待——避免把"HD-010 已通过评审"的信号过早释放给 H5 CodingExecutor
+- **HD-010 修复路径**：
+  1. ⬜ 修复 B16：HD-010 §3.1 完整代码 `InMemoryRowVersionInterceptor` 注册行改为按 `ISaveChangesInterceptor` 服务类型注册（纯机械修正，`h3-detailed-design-author` 子代理可直接修，不需要 picker）
+  2. ⬜ 修复 B17：HD-009 §3.11 补一段"完整代码"展示 `AddEfCorePersistenceBase()` 内部注册语句，明确 `AuditingSaveChangesInterceptor` 的服务类型注册方式；若发现 HD-009 实际也犯了同 B16 一样的错误，一并修正（此项修复会触碰已 `reviewed` 的 HD-009，需按小 errata 流程处理，不需要整份 HD-009 重新评审）
+  3. ⬜ 修复后重新核对 §3.3 单测断言仍然成立（RowVersion 递增、并发冲突抛 `DbUpdateConcurrencyException`）
+  4. ⬜ 可选处理 N29 / N30（non-blocking，不阻塞下一轮评审通过）
+  5. ⬜ 修复完成后建议再走一轮增量评审（确认 C96 / C97 转 PASS）后，Owner 再在 HD-010 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
+- **对 file-structure.md 的结论**：本轮追加章节（`## providers/Inkwell.Persistence.EFCore.InMemory`）本身准确（C101 PASS），**不需要**因 B16/B17 而改动——问题在 HD-010/HD-009 的代码样本，不在文件树描述
+
+### 19.5 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` / `FAIL` 都附了具体章节锚点引用
+- ✅ 2 个 `blocking` 反问（B16/B17）均能映射到具体一致性冲突（C96/C97）+ 影响范围 + 可执行的建议方向（且明确标注"纯机械修正，不需要 picker"）
+- ✅ 2 个 `non-blocking` 反问（N29/N30）不影响 HD-010 核心设计方向，且 N30 给出了"若单测失败如何处置"的前瞻性验收标准
+- ✅ 未使用"看起来" / "似乎" / "感觉"等主观词汇——C96/C97 的结论均基于 .NET DI 容器服务类型解析的确定性规则，而非猜测
+- ✅ 未凭文件名臆测：已实际打开 HD-009 §3.11 全文核对"无完整代码块"这一事实，而非假设其存在
+- ✅ 用户请求的"重点核查"两项（RowVersion 模拟策略、HD-009 assumption 核实）均给出了明确结论（分别是 C96/B16"确证是 bug" 和 C97/B17"确证 HD-009 现有文本无法确认，需补充说明"），未回避或只是重复记录问题
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-010 / HD-009 / file-structure.md / 报告主体，仅追加评审报告
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §19 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
