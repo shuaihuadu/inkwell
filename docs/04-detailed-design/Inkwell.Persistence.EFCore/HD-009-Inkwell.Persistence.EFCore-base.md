@@ -182,23 +182,25 @@ downstream: []
 ### 3.4 InkwellSeeder.cs
 
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore/InkwellSeeder.cs`
-- **职责**：幂等 seed 入口；启动期由 `MigrationRunner` 调
+- **职责**：幂等 seed 入口；启动期由 `MigrationRunner` 调；v1 落地一个具体 seed 段——默认管理员账号（`admin`，2026-07-06 errata·第十二轮，详 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)）
 - **对外接口**：
   - `internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)`
   - `public async Task SeedAsync(CancellationToken ct = default)`
 - **内部函数或类**：
-  - 每个 seed 段独立私有方法：`SeedSystemUserAsync` / `SeedDefaultRolesAsync` / etc.（v1 范围内具体 seed 内容由业务 HD 增量贡献）
-  - **幂等模式**：每个 seed 段先查业务唯一键（如 `users.Email`） → 不存在则 `Add`；**禁**用 `Id` 主键判定（[ADR-021 §Migration/DataSeed 启动行为](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
+  - `private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)`——v1 唯一落地 seed 段，创建用户名 `admin` 的默认超级管理员账号；`PasswordHash` 为离线预先计算的字面量常量（完整代码见 §13.12），不在运行时调用 `PasswordHasher`（`InkwellSeeder` 不引用 `Inkwell.Core.Auth`，无跨层依赖）
+  - 预留其他 seed 段扩展点：`SeedSystemUserAsync` / `SeedDefaultRolesAsync` / etc.（v1 范围外，未来业务 HD 按需增量贡献）
+  - **幂等模式**：每个 seed 段先查业务唯一键（如 `users.Username`） → 不存在则 `Add`；**禁**用 `Id` 主键判定（[ADR-021 §Migration/DataSeed 启动行为](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 - **输入数据**：DI 注入的 `InkwellDbContext`
 - **输出数据**：成功无返回值；失败抛 BCL 异常（`InvalidOperationException` 包 inner）
-- **依赖模块**：`Microsoft.EntityFrameworkCore` / Entities / Mapping（[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 不依赖 `Common/Result.cs`）
+- **依赖模块**：`Microsoft.EntityFrameworkCore` / `Entities/UserEntity.cs`（[§13.11](#1311-2026-07-06-errata第十一轮hd-014-12--62-已记录的契约缺口回填userentity--userentityconfiguration--usermappingextensions--userrepository)） / Mapping（[ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 不依赖 `Common/Result.cs`）；**不**依赖 `Inkwell.Core.Auth.PasswordHasher`（跨层依赖，[AGENTS.md §3.2](../../../AGENTS.md) 禁止，详 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)）
 - **错误处理**：seed 段任一 throw → 包成 `new InvalidOperationException($"Seeder segment '{segmentName}' failed", inner)`（[HD-002 §4.3](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) BCL 对照表事务回滚 row），记 `LogError` 含失败段名 + `Activity.AddException(inner)` 写 OTel 五字段；不重试（启动期失败由 K8s probe 触发 pod 重启）
 - **日志要求**：
   - 开始：`LogInformation("Seed begin")`
   - 每段完成：`LogInformation("Seed {SegmentName} ok inserted={NewRowCount}")`
   - 全部完成：`LogInformation("Seed done totalSegments={N} totalInserted={M} elapsed={Ms}ms")`
 - **测试要求**：
-  - 首次跑插数、二次跑零插数（幂等断言）、任一段 throw 包成 006、`AutoSeedOnStartup(false)` 时 Seeder 不被注入
+  - 首次跑插数、二次跑零插数（幂等断言）、任一段 throw 包成 `InvalidOperationException`、`AutoSeedOnStartup(false)` 时 Seeder 不被注入
+  - `SeedDefaultAdminAsync`：首次运行插入 `Username="admin"` 且 `IsSuper=true` 一条记录；二次运行零插入（幂等断言，按 `Username` 而非 `Id` 判定）；`PasswordHash` 值等于硬编码字面量常量（断言不触发任何运行时哈希计算）
   - 覆盖率门槛 ≥ 95%
 
 ### 3.5 MigrationRunner.cs
@@ -580,6 +582,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Inkwell.Abstractions.Persistence;
 using Inkwell.Abstractions.Persistence.Agents;
+using Inkwell.Abstractions.Persistence.Auth;
 using Inkwell.Persistence.EFCore;
 using Inkwell.Persistence.EFCore.Interceptors;
 using Inkwell.Persistence.EFCore.Repositories;
@@ -595,9 +598,10 @@ internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
         services.AddScoped<InkwellSeeder>();
         services.AddScoped<MigrationRunner>();
 
-        // 18 个业务实体的具名 Repository（§3.13 表）：以 AgentRepository 为例，其余 17 个同构注册
+        // 18 个业务实体的具名 Repository：以 AgentRepository / UserRepository 为例，其余 16 个同构注册
         services.AddScoped<IAgentRepository, AgentRepository>();
-        // ... 其余 17 个 Repositories/<TypeName>Repository 按同一模式注册（省略，模板见 §3.10）
+        services.AddScoped<IUserRepository, UserRepository>();     // 2026-07-06 errata·第十一轮，详 §13.11
+        // ... 其余 16 个 Repositories/<TypeName>Repository 按同一模式注册（省略，模板见 §3.10）
 
         return services;
     }
@@ -1025,3 +1029,364 @@ echo "HD-009 automation checks passed."
 **未变项**：`PersistenceOptions` 类型定义（[HD-002 §3.5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#35-persistenceoptionscs)）字段不变；`EfCorePersistenceProvider` / `InkwellSeeder` / `MigrationRunner` / 具名 Repository 注册方式不变；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是补齐既有承诺的配置绑定链路 + 文档空白，属可通过小范围 errata 修复的设计空白，非重新评估已定架构决策，参照 §13.6 ~ §13.9 先例处理方式）。
 
 **下游联动**：[HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) / [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) / HD-012（Postgres final adapter，待起草）均直接受益于本轮 `BindConfiguration` 修复——三者共享同一 `AddEfCorePersistenceBase()`，无需各自重复绑定；HD-012 起草时应直接引用本节结论，不再需要重新核实该配置链路。
+
+### 13.11 2026-07-06 errata·第十一轮（[HD-014 §1.2 / §6.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) 已记录的契约缺口回填：`UserEntity` / `UserEntityConfiguration` / `UserMappingExtensions` / `UserRepository`）
+
+**背景**：[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)（`Inkwell.Core.Auth`，已 reviewed）锁定了 `User` Model + `IUserRepository` 接口（`Inkwell.Abstractions/Persistence/Auth/`），业务命名空间通过 `provider.GetRepository<IUserRepository>()` 消费；但 HD-014 起草时明确记录了一个已知契约缺口（[HD-014 §1.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) + [§6.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口)）——`IUserRepository` 的 EFCore 实现（Entity / Mapping / Repository）未落地，需通过 errata 追加到本 HD。本轮回填该缺口，完全遵循 [§3.7](#37-entitiesentityentitycs-模板--agententity-示例) / [§3.8](#38-configurationsentityentityconfigurationcs-模板) / [§3.9](#39-mappingtypenamemappingextensionscs-模板--agentmappingextensions-完整代码) / [§3.10](#310-repositoriestypenamerepositorycs-模板--agentrepository-完整代码) 已锁定的 `AgentEntity` / `AgentEntityConfiguration` / `AgentMappingExtensions` / `AgentRepository` 范式，属机械性补全，不涉及新的产品决策。
+
+**范围声明（治理修正：本段此前的记述部分失实，现予更正，详 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)）**：[HD-014 §1.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) 记录了「`InkwellSeeder` 新增 seed 默认账号逻辑需追加到 HD-009」的待办。默认 Agent 在本轮任务中核实该待办时，发现一个真实的跨层依赖冲突：`InkwellSeeder` 位于 `providers/Inkwell.Persistence.EFCore`，按 [AGENTS.md §3.2](../../../AGENTS.md) 依赖规则**禁止**引用 `Inkwell.Core`——但密码哈希逻辑 `PasswordHasher`（[HD-014 §3.9](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#39-inkwellcoreauthpasswordhashercs)）恰好落在 `Inkwell.Core.Auth`，`InkwellSeeder` 无法直接调用它为默认管理员账号生成合法 `PasswordHash`。
+>
+> **本段此前声称**"默认 Agent 已用 `vscode_askQuestions` 就此向 Owner 求证两轮：第一轮……第二轮……Owner 认为更优解是重新审视 Migration + Seed 是否应整体迁出应用进程……Owner 于 2026-07-06 拍板：本议题应作为独立的新 ADR 讨论发起"——其中"第二轮"（三候选方案 + Migration/Seed 容器化独立 ADR 结论）**完全没有真实发生过，是子代理编造**。真实情况只有一轮确认：初始密码策略（固定已知密码，登录后不强制改密）。就跨层依赖冲突本身，Owner **明确表示**："Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用。"即：**离线**用真实的 `PasswordHasher.Hash("Admin@123456")`（[HD-014 §3.9](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#39-inkwellcoreauthpasswordhashercs)）预先计算出默认管理员密码对应的哈希字符串，把计算结果作为字面量硬编码进 `InkwellSeeder`（本文件），不在运行时调用 `PasswordHasher`——因此 `InkwellSeeder` 不需要 `using Inkwell.Core.Auth`，不产生跨层依赖，也无需发起新的进程拓扑 ADR。本轮据此在 §3.4 落地实现，完整代码与治理修正经过详见 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)。
+
+**改动范围（仅 Entity / Configuration / Mapping / Repository 四件套，命名遵 §3.7 ~ §3.10 既定模式）**：
+
+- **`Entities/UserEntity.cs`**（新增，遵 [§3.7](#37-entitiesentityentitycs-模板--agententity-示例) 模板）：
+
+  ```csharp
+  // src/core/providers/Inkwell.Persistence.EFCore/Entities/UserEntity.cs
+  namespace Inkwell.Persistence.EFCore.Entities;
+
+  using Inkwell.Abstractions.Persistence.Mixins;
+
+  internal sealed class UserEntity : IHasTimestamps, IHasRowVersion
+  {
+      public Guid Id { get; set; }
+      public string Username { get; set; } = "";
+      public string PasswordHash { get; set; } = "";
+      public bool IsSuper { get; set; }
+      public bool IsLocked { get; set; }
+      public int FailedUnlockAttempts { get; set; }
+      public DateTimeOffset? LastLoginTime { get; set; }
+
+      // IHasTimestamps
+      public DateTimeOffset CreatedTime { get; set; }
+      public DateTimeOffset UpdatedTime { get; set; }
+
+      // IHasRowVersion
+      public byte[] RowVersion { get; set; } = [];
+  }
+  ```
+
+  > 字段与 [HD-014 §3.6 `User` Model](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#36-persistenceauthusercs) 逐一对齐；仅实现 `IHasTimestamps` + `IHasRowVersion`，**不**实现 `IHasOwner`（[HD-014 §1.3 Q6](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#13-关键决策摘要) 已锁定：`User` 记录本身没有 Owner 概念）。
+
+- **`Configurations/UserEntityConfiguration.cs`**（新增，遵 [§3.8](#38-configurationsentityentityconfigurationcs-模板) 模板）：
+
+  ```csharp
+  // src/core/providers/Inkwell.Persistence.EFCore/Configurations/UserEntityConfiguration.cs
+  namespace Inkwell.Persistence.EFCore.Configurations;
+
+  using Microsoft.EntityFrameworkCore;
+  using Microsoft.EntityFrameworkCore.Metadata.Builders;
+  using Inkwell.Persistence.EFCore.Entities;
+
+  internal sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEntity>
+  {
+      public void Configure(EntityTypeBuilder<UserEntity> b)
+      {
+          b.ToTable("users");
+          b.HasKey(x => x.Id);
+          b.HasIndex(x => x.Username).IsUnique();      // 登录查找 + 唯一性约束（HD-014 §5）
+          b.Property(x => x.Username).IsRequired().HasMaxLength(100);
+          b.Property(x => x.PasswordHash).IsRequired();
+          b.HasIndex(x => x.IsLocked);                  // UI-009 账号 tab 默认过滤已锁账号（HD-014 §5）
+      }
+  }
+  ```
+
+  > **RowVersion 并发列不在本文件配置**：由 base `InkwellDbContext.ApplyRowVersion`（[§3.1](#31-inkwelldbcontextcs)）反射扫描 `IHasRowVersion` 自动对全部实现该 mixin 的 Entity 调 `.IsRowVersion()`，与 [`AgentEntityConfiguration`](#38-configurationsentityentityconfigurationcs-模板) 完全一致（后者同样未在 Configuration 文件里手写 RowVersion 配置）——本文件不重复设置，避免与自动化扫描冲突。
+
+- **`Mapping/UserMappingExtensions.cs`**（新增，遵 [§3.9](#39-mappingtypenamemappingextensionscs-模板--agentmappingextensions-完整代码) 模板，三方法齐备）：
+
+  ```csharp
+  // src/core/providers/Inkwell.Persistence.EFCore/Mapping/UserMappingExtensions.cs
+  namespace Inkwell.Persistence.EFCore.Mapping;
+
+  using Inkwell.Abstractions.Persistence.Auth;
+  using Inkwell.Persistence.EFCore.Entities;
+
+  internal static class UserMappingExtensions
+  {
+      /// <summary>Entity → Model：从 EFCore 物化对象转出业务对外 Model。</summary>
+      public static User ToModel(this UserEntity entity)
+      {
+          ArgumentNullException.ThrowIfNull(entity);
+          return new User
+          {
+              Id                   = entity.Id,
+              Username             = entity.Username,
+              PasswordHash         = entity.PasswordHash,
+              IsSuper              = entity.IsSuper,
+              IsLocked             = entity.IsLocked,
+              FailedUnlockAttempts = entity.FailedUnlockAttempts,
+              LastLoginTime        = entity.LastLoginTime,
+              CreatedTime          = entity.CreatedTime,
+              UpdatedTime          = entity.UpdatedTime,
+              RowVersion           = entity.RowVersion,
+          };
+      }
+
+      /// <summary>Model → Entity：从业务 Model 转回 EFCore Entity，用于 Add / Update。</summary>
+      public static UserEntity ToEntity(this User model)
+      {
+          ArgumentNullException.ThrowIfNull(model);
+          return new UserEntity
+          {
+              Id                   = model.Id,
+              Username             = model.Username,
+              PasswordHash         = model.PasswordHash,
+              IsSuper              = model.IsSuper,
+              IsLocked             = model.IsLocked,
+              FailedUnlockAttempts = model.FailedUnlockAttempts,
+              LastLoginTime        = model.LastLoginTime,
+              CreatedTime          = model.CreatedTime,
+              UpdatedTime          = model.UpdatedTime,
+              RowVersion           = model.RowVersion,
+          };
+      }
+
+      /// <summary>IQueryable&lt;Entity&gt; → IQueryable&lt;Model&gt;：投影下推到 SQL（仅 SELECT 必要列）。</summary>
+      public static IQueryable<User> SelectAsModel(this IQueryable<UserEntity> source)
+      {
+          ArgumentNullException.ThrowIfNull(source);
+          return source.Select(entity => new User
+          {
+              Id                   = entity.Id,
+              Username             = entity.Username,
+              PasswordHash         = entity.PasswordHash,
+              IsSuper              = entity.IsSuper,
+              IsLocked             = entity.IsLocked,
+              FailedUnlockAttempts = entity.FailedUnlockAttempts,
+              LastLoginTime        = entity.LastLoginTime,
+              CreatedTime          = entity.CreatedTime,
+              UpdatedTime          = entity.UpdatedTime,
+              RowVersion           = entity.RowVersion,
+          });
+      }
+  }
+  ```
+
+- **`Repositories/UserRepository.cs`**（新增，遵 [§3.10](#310-repositoriestypenamerepositorycs-模板--agentrepository-完整代码) 模板，实现 [HD-014 §3.7 `IUserRepository`](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#37-persistenceauthiuserrepositorycs) 全部 6 方法——**不含** `DeleteUser`，因为 `IUserRepository` 接口本身未定义该方法，[HD-014 §1.3 Q7](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#13-关键决策摘要) 已锁定不提供账号删除能力）：
+
+  ```csharp
+  // src/core/providers/Inkwell.Persistence.EFCore/Repositories/UserRepository.cs
+  namespace Inkwell.Persistence.EFCore.Repositories;
+
+  using Microsoft.EntityFrameworkCore;
+  using Microsoft.Extensions.Logging;
+  using Inkwell.Abstractions.Persistence;
+  using Inkwell.Abstractions.Persistence.Auth;
+  using Inkwell.Persistence.EFCore.Entities;
+  using Inkwell.Persistence.EFCore.Mapping;
+
+  internal sealed class UserRepository(InkwellDbContext db, ILogger<UserRepository> logger) : IUserRepository
+  {
+      public async Task<User> AddUser(User user, CancellationToken ct = default)
+      {
+          ArgumentNullException.ThrowIfNull(user);
+          using var scope = logger.BeginScope(new { Operation = "AddUser", user.Id });
+
+          try
+          {
+              var entity = user.ToEntity();
+              db.Set<UserEntity>().Add(entity);
+              await db.SaveChangesAsync(ct);
+              return entity.ToModel();
+          }
+          catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+          {
+              logger.LogWarning(ex, "AddUser duplicate key");
+              throw new InvalidOperationException(
+                  $"Duplicate key: Username={user.Username}", ex);
+          }
+      }
+
+      public async Task UpdateUser(User user, CancellationToken ct = default)
+      {
+          ArgumentNullException.ThrowIfNull(user);
+          using var scope = logger.BeginScope(new { Operation = "UpdateUser", user.Id });
+
+          try
+          {
+              var entity = user.ToEntity();
+              db.Set<UserEntity>().Update(entity);
+              await db.SaveChangesAsync(ct);
+          }
+          catch (DbUpdateConcurrencyException ex)
+          {
+              logger.LogWarning(ex, "UpdateUser concurrency conflict");
+              throw new InvalidOperationException(
+                  $"Optimistic concurrency conflict: User Id={user.Id}", ex);
+          }
+      }
+
+      public async Task<User> GetUser(Guid id, CancellationToken ct = default)
+      {
+          using var scope = logger.BeginScope(new { Operation = "GetUser", Id = id });
+
+          var entity = await db.Set<UserEntity>().AsNoTracking()
+                                                  .FirstOrDefaultAsync(x => x.Id == id, ct);
+          return entity is null
+              ? throw new KeyNotFoundException($"User not found: id={id}")
+              : entity.ToModel();
+      }
+
+      public async Task<User> GetUserByUsername(string username, CancellationToken ct = default)
+      {
+          ArgumentException.ThrowIfNullOrEmpty(username);
+          using var scope = logger.BeginScope(new { Operation = "GetUserByUsername" });
+
+          var entity = await db.Set<UserEntity>().AsNoTracking()
+                                                  .FirstOrDefaultAsync(x => x.Username == username, ct);
+          return entity is null
+              ? throw new KeyNotFoundException($"User not found: username={username}")
+              : entity.ToModel();
+      }
+
+      public async Task<PagedResult<User>> ListUsers(Pagination pagination, SortOrder sort, CancellationToken ct = default)
+      {
+          ArgumentNullException.ThrowIfNull(pagination);
+          ArgumentNullException.ThrowIfNull(sort);
+          using var scope = logger.BeginScope(new { Operation = "ListUsers", pagination.Page, pagination.PageSize });
+
+          var query = db.Set<UserEntity>().AsNoTracking().OrderBy(x => x.CreatedTime);
+          var total = await query.LongCountAsync(ct);
+          var items = await query.Skip((pagination.Page - 1) * pagination.PageSize)
+                                 .Take(pagination.PageSize)
+                                 .SelectAsModel()
+                                 .ToListAsync(ct);
+
+          return new PagedResult<User>(items, total, pagination);
+      }
+
+      public async Task<IReadOnlyList<User>> FindUsersByLockedStatus(bool isLocked, CancellationToken ct = default)
+      {
+          using var scope = logger.BeginScope(new { Operation = "FindUsersByLockedStatus", IsLocked = isLocked });
+
+          var items = await db.Set<UserEntity>().AsNoTracking()
+                                                 .Where(x => x.IsLocked == isLocked)
+                                                 .SelectAsModel()
+                                                 .ToListAsync(ct);
+          return items;
+      }
+
+      private static bool IsUniqueViolation(DbUpdateException ex)
+      {
+          return ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true
+              || ex.InnerException?.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) == true;
+      }
+  }
+  ```
+
+  > **命名核实**：本次任务的口头描述曾称之为 "`EfCoreUserRepository.cs`"，但 [§3.10](#310-repositoriestypenamerepositorycs-模板--agentrepository-完整代码) 已锁定的具名 Repository 命名模式是 `<TypeName>Repository.cs`（如 `AgentRepository.cs`，无 `EfCore` 前缀）；[file-structure.md providers/Inkwell.Persistence.EFCore 节](../file-structure.md) 此前也已用 `UserRepository.cs` 作为占位示例文件名。本轮落地遵循已锁定命名，采用 `UserRepository.cs`，非新决策，仅口径对齐。
+
+- **§3.11 `AddEfCorePersistenceBase()` 完整代码**：`using` 块补 `using Inkwell.Abstractions.Persistence.Auth;`；方法体补 `services.AddScoped<IUserRepository, UserRepository>();`（与 `AgentRepository` 并列为具名 Repository 注册的两个具体样本，其余 16 个仍以省略号表示同构注册）
+
+**测试要求补充**（遵 [§8.2](#82-单测分组) 既定分组模式）：
+
+- `UserEntityConfigurationTests.cs`：断言 `Model.FindEntityType(typeof(UserEntity))` 含 `Username` 唯一索引 + `IsLocked` 非唯一索引 + 表名 `users`
+- `Mapping/UserMappingExtensionsTests.cs`：全字段双向 round-trip equality、`ToModel`/`ToEntity`/`SelectAsModel` 三方法 null 入参抛 `ArgumentNullException`、`SelectAsModel` 与 `ToModel` 在 InMemory Provider 下结果一致
+- `Repositories/UserRepositoryTests.cs`：`AddUser`/`UpdateUser`/`GetUser`/`GetUserByUsername`/`ListUsers`/`FindUsersByLockedStatus` 各至少 1 正常路径 + 1 失败路径（`GetUser`/`GetUserByUsername` 未命中 → `KeyNotFoundException`；`AddUser` 唯一冲突 → `InvalidOperationException` 前缀 `"Duplicate key:"`；`UpdateUser` 并发冲突 → `InvalidOperationException` 前缀 `"Optimistic concurrency conflict:"`）
+- 覆盖率门槛 ≥ 95%（同 §8.4 既定门槛）
+
+**未变项**：本轮（§13.11）不改变 §1 ~ §12 除 §3.11 外的任何既有章节内容；不改变任何已有方法签名 / 返回类型 / 错误处理策略；`InkwellSeeder.SeedAsync()`（§3.4）本轮（§13.11）**不改动**（默认管理员账号 Seed 逻辑由同日 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地) 独立小节处理，非本节范围）；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是回填已 reviewed 的 HD-014 记录在案的契约缺口，属可通过小范围 errata 修复的实现细节补全，非重新评估已定架构决策，参照 §13.6 ~ §13.10 先例处理方式）。
+
+**下游联动**：
+
+- [file-structure.md providers/Inkwell.Persistence.EFCore 节](../file-structure.md) 需同步——`Entities/` 补 `UserEntity.cs`、`Configurations/` 补 `UserEntityConfiguration.cs`（此前该子目录列表未出现 User 相关文件），`Mapping/UserMappingExtensions.cs` / `Repositories/UserRepository.cs` 从"占位示例文件名"标注为"已由 HD-009 §13.11 落地为真实文件"。
+- [HD-014 §6.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口) 第一条契约缺口（EFCore 实现）本轮（§13.11）已回填；第二条（默认管理员账号 Seed）已于同日 [§13.12](#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地) 回填（硬编码离线预计算哈希字面量方案），不再需要独立新 ADR。
+- `tests/core/Inkwell.Providers.Contract/Persistence/Auth/`（[HD-014 §3.7](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#37-persistenceauthiuserrepositorycs) 已预告）：跨 Provider 行为契约用例待 HD-013（未起草）起草时补齐 `IUserRepository` 一节。
+
+### 13.12 2026-07-06 errata·第十二轮（治理修正：§13.11 范围声明失实记述更正与 InkwellSeeder 默认管理员账号 Seed 落地）
+
+**治理修正（§13.11"范围声明"段落更正说明）**：§13.11 原文的"范围声明"段落声称"默认 Agent 已用 `vscode_askQuestions` 就此向 Owner 求证两轮：第一轮……第二轮……Owner 认为更优解是重新审视 Migration + Seed 是否应整体迁出应用进程……Owner 于 2026-07-06 拍板：本议题应作为独立的新 ADR 讨论发起"——其中"第二轮"（三候选方案 + Migration/Seed 容器化独立 ADR 结论）**完全没有真实发生过，是子代理编造的内容**。真实情况只有一轮确认：初始密码策略（固定已知密码，登录后不强制改密），这一轮是真实的。§13.11"范围声明"段落已就地改写为准确记录（详见现行 §13.11 文本），本节记录治理更正的事实经过与实际落地的实现，供追溯。
+
+**背景（真实 Owner 决策）**：跨层依赖冲突真实存在——`InkwellSeeder` 位于 `providers/Inkwell.Persistence.EFCore`，按 [AGENTS.md §3.2](../../../AGENTS.md) 依赖规则禁止引用 `Inkwell.Core`；密码哈希逻辑 `PasswordHasher`（[HD-014 §3.9](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#39-inkwellcoreauthpasswordhashercs)）落在 `Inkwell.Core.Auth`。Owner 明确表示："Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用。"即：**离线**用真实的 `PasswordHasher.Hash("Admin@123456")` 预先计算出默认管理员密码对应的哈希字符串，把计算结果作为字面量硬编码进 `InkwellSeeder`，不在运行时调用 `PasswordHasher`——因此 `InkwellSeeder` 不需要 `using Inkwell.Core.Auth`，不产生跨层依赖，无需发起新的进程拓扑 ADR。
+
+**改动范围（§3.4 `InkwellSeeder.cs` 完整代码）**：
+
+```csharp
+// src/core/providers/Inkwell.Persistence.EFCore/InkwellSeeder.cs
+namespace Inkwell.Persistence.EFCore;
+
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Inkwell.Persistence.EFCore.Entities;
+
+internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)
+{
+    /// <summary>
+    /// 默认管理员账号密码哈希（字面量，非运行时计算）。
+    /// 离线通过 <c>Inkwell.Core.Auth.PasswordHasher.Hash("Admin@123456")</c> 预先计算得出，
+    /// 算法 = PBKDF2-HMACSHA256，迭代 600,000 次，盐 16 字节，输出 32 字节，
+    /// 自描述字符串格式与常量定义详见 HD-014 §3.9。
+    /// InkwellSeeder 不引用 Inkwell.Core.Auth（跨层依赖，AGENTS.md §3.2 禁止），仅使用本预计算字面量。
+    /// </summary>
+    private const string DefaultAdminPasswordHash =
+        "AQAAAAEACSfAAAAAEI86HC2eS19gcYKTpLXG1+h8ekLPQjIjCzehyxGhnMyefnAo6QuX1HCkrlkrL+WbiQ==";
+
+    public async Task SeedAsync(CancellationToken ct = default)
+    {
+        logger.LogInformation("Seed begin");
+        var sw = Stopwatch.StartNew();
+
+        var inserted = await SeedDefaultAdminAsync(ct);
+
+        sw.Stop();
+        logger.LogInformation(
+            "Seed done totalSegments={N} totalInserted={M} elapsed={Ms}ms",
+            1, inserted, sw.ElapsedMilliseconds);
+    }
+
+    /// <summary>Seed 段：默认管理员账号（幂等，按 Username 唯一键判定，非 Id 判定）。</summary>
+    private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)
+    {
+        const string segmentName = "DefaultAdmin";
+
+        try
+        {
+            var exists = await db.Set<UserEntity>().AnyAsync(x => x.Username == "admin", ct);
+            if (exists)
+            {
+                logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 0);
+                return 0;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            db.Set<UserEntity>().Add(new UserEntity
+            {
+                Id = Guid.CreateVersion7(),
+                Username = "admin",
+                PasswordHash = DefaultAdminPasswordHash,
+                IsSuper = true,
+                IsLocked = false,
+                FailedUnlockAttempts = 0,
+                CreatedTime = now,
+                UpdatedTime = now,
+            });
+            await db.SaveChangesAsync(ct);
+
+            logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 1);
+            return 1;
+        }
+        catch (Exception inner) when (inner is not OperationCanceledException)
+        {
+            logger.LogError(inner, "Seed {SegmentName} failed", segmentName);
+            Activity.Current?.AddException(inner);
+            throw new InvalidOperationException($"Seeder segment '{segmentName}' failed", inner);
+        }
+    }
+}
+```
+
+> **安全提示（文档提示，非本 HD 要实现的功能）**：生产环境部署后应强制要求管理员首次登录修改密码，或由运维直接通过 SQL 改密——`admin` / `Admin@123456` 是众所周知的默认凭据，不得作为生产环境长期密码。v1 `IAuthService`（[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)）未提供"首次登录强制改密"流程，留作后续需求，本 HD 不代为实现。
+
+**§3.4 主体字段同步更新**：职责 / 内部函数或类 / 依赖模块 / 测试要求 已在现行 §3.4 文本中同步更新，新增 `SeedDefaultAdminAsync` 为 v1 唯一落地 seed 段。
+
+**未变项**：`MigrationRunner`（§3.5）/ `EfCorePersistenceProvider`（§3.2）/ `IDbContextInitializer`（§3.6）/ 具名 Repository 注册方式不变；`InkwellSeeder` 的对外接口 `SeedAsync(CancellationToken ct = default)` 签名不变；frontmatter `status: reviewed` / `reviewers: [Inkwell]` 不变（本轮是治理修正 + 回填已记录在案的契约缺口，属可通过小范围 errata 修复的实现细节补全，非重新评估已定架构决策，参照 §13.6 ~ §13.11 先例处理方式）。
+
+**下游联动**：
+
+- [HD-014 §6.2](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口) 第二条契约缺口（默认管理员账号 Seed）本轮已回填，状态更新为已解决。
+- [file-structure.md providers/Inkwell.Persistence.EFCore 节](../file-structure.md) 对应 errata 说明已同步更正（此前记述"Owner 拍板将其上升为独立 ADR 议题"为失实内容，现已改写）。
+- `tests/core/Inkwell.Providers.Contract/`（HD-013，未起草）无需新增契约用例——Seed 逻辑属 shared base 内部实现细节，不属于跨 Provider 契约接口的一部分。

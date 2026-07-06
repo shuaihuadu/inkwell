@@ -440,10 +440,12 @@ providers/Inkwell.Persistence.EFCore/
   Entities/                           # 集中的 EF Entity 类（~30 个）
     AgentEntity.cs
     ConversationEntity.cs
+    UserEntity.cs                      # HD-009 §13.11 落地（Username 唯一 / IsSuper / IsLocked / FailedUnlockAttempts / LastLoginTime）
     …
   Configurations/                     # IEntityTypeConfiguration<TEntity>（~30 个）
     AgentEntityConfiguration.cs
     ConversationEntityConfiguration.cs
+    UserEntityConfiguration.cs        # HD-009 §13.11 落地（users 表名 / Username 唯一索引 / IsLocked 索引）
     …
   Mapping/                            # ADR-022 锁手写 Extensions（~30 个）
     AgentMappingExtensions.cs         # ToModel() / ToEntity() / SelectAsModel()
@@ -500,6 +502,10 @@ providers/Inkwell.Persistence.EFCore/
 > **计数估算**：base 8 个 `*.cs` + 1 个 `BannedSymbols.txt` + 1 个 `.csproj`（HD-009 锁定）；Entities / Configurations / Mapping / Repositories 四子目录每个约 ~18 个业务实体（详 [HD-009 §3.13](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)），共 18 × 4 = 72 个业务实体文件，随业务 HD 与对应 H5 编码任务陆续落地。`Mapping/` 与 `Repositories/` 是 [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 2026-05-11 锁定的两个新增子目录（原 ADR-021 拓扑仅含 Entities / Configurations / DbContext / Provider / Seeder / MigrationRunner）。
 >
 > **2026-05-11 errata（HD-009 起草）**：本节由 HD-009 从「未起草」→「已起草」翻面；`Interceptors/AuditingSaveChangesInterceptor.cs` + `IDbContextInitializer.cs` + `DependencyInjection/InkwellPersistenceEfCoreServiceCollectionExtensions.cs` + `BannedSymbols.txt` 四项为 HD-009 落地新增。
+>
+> **2026-07-06 errata（[HD-009 §13.11](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1311-2026-07-06-errata第十一轮hd-014-12--62-已记录的契约缺口回填userentity--userentityconfiguration--usermappingextensions--userrepository)）**：`UserEntity.cs` / `UserEntityConfiguration.cs` / `UserMappingExtensions.cs` / `UserRepository.cs` 四件套回填 [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 记录在案的契约缺口（此前 `Mapping/` / `Repositories/` 列表中的 `UserMappingExtensions.cs` / `UserRepository.cs` 仅为示意占位文件名，本轮起真实落地）。
+>
+> **2026-07-06 errata（[HD-009 §13.12](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)，治理修正）**：`InkwellSeeder.cs` 新增默认管理员账号 seed 逻辑已落地——`InkwellSeeder` 依 [AGENTS.md §3.2](../AGENTS.md) 禁止引用 `Inkwell.Core`（含 `PasswordHasher`）的约束真实存在，Owner 明确表示"Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用"——离线预先计算好的哈希字符串作为字面量硬编码进 `InkwellSeeder`，不产生跨层依赖，无需发起新 ADR。此前本节记述"Owner 拍板将其上升为 Migration + Seed 是否容器化的独立 ADR 议题"系失实内容（HD-009 §13.11 原文的编造记述），现已一并更正。[HD-014 §6.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口) 该条待办已解决。
 
 ## providers/Inkwell.Persistence.EFCore.InMemory
 

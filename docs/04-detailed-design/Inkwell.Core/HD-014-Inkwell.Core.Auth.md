@@ -375,7 +375,7 @@ src/core/Inkwell.Core/
 ### 6.2 待后续 HD 处理的契约缺口
 
 - `IUserRepository` 的 EFCore 实现（Entity / Mapping / Repository 实现）需通过 errata 追加到已 reviewed 的 [HD-009](../Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)
-- `InkwellSeeder` 的默认管理员账号 seed 逻辑同样需要 errata 追加到 HD-009（详 [§1.2](#12-范围)）
+- ~~`InkwellSeeder` 的默认管理员账号 seed 逻辑同样需要 errata 追加到 HD-009~~ **已解决**（2026-07-06 [HD-009 §13.12](../Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地) 已回填：Owner 明确表示"Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用"——离线预先计算 `PasswordHasher.Hash("Admin@123456")` 得到的哈希字符串作为字面量硬编码进 `InkwellSeeder`，不产生跨层依赖）
 - `tests/core/Inkwell.Providers.Contract/Persistence/Auth/` 跨 Provider 契约用例待 [HD-013](../Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 起草时纳入
 - AGENTS.md §3.3 "OQ-003 closed §A" 引用编号疑似历史漂移（实际证据在 OQ-005），详顶部 callout；本 HD 不修改 AGENTS.md，仅记录供后续治理修正参考
 
