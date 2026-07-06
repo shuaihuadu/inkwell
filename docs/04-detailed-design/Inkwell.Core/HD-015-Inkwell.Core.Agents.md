@@ -420,3 +420,4 @@ src/core/Inkwell.Core/
   - **A. 按现有 H3 起草顺序继续**（`Inkwell.Core.Models` / `.Tools` / `.Skills` 等模块稍后起草，起草完成后再回来给本 HD 发 errata 补齐工具解析）
   - **B. 现在就插队起草 `Inkwell.Core.Tools`**（打断"HD-015 之后继续下一个模块"的既定单模块切片节奏）
   - **C. 其他优先级安排**
+- **Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）**：**选 B——插队优先起草 `Inkwell.Core.Tools`**。下一张 H3 详细设计 HD 将是 `Inkwell.Core.Tools`，起草完成后再回来给本 HD 发 errata 补齐 `AgentRunRequest.Tools` 字段解析。
