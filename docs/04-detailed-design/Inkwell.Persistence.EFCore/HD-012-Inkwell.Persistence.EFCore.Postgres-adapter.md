@@ -291,7 +291,11 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 
 - **Npgsql 官方推荐方案（本 HD 核实，非本 HD 采用）**：[Npgsql 并发令牌官方文档](https://www.npgsql.org/efcore/modeling/concurrency.html) 明确指出——PostgreSQL **没有** SQL Server 那种原生自动更新列类型；官方推荐做法是把 `uint` 属性通过 `.IsRowVersion()`（Fluent API）或 `[Timestamp]`（Data Annotations）绑定到 PostgreSQL 隐藏[系统列](https://www.postgresql.org/docs/current/ddl-system-columns.html) [`xmin`](https://www.postgresql.org/docs/current/ddl-system-columns.html)（记录最近一次修改该行的事务 ID，天然随写操作递增）。
 - **真实类型冲突（本 HD 起草期发现）**：[HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion` 契约类型是 `byte[]`（对齐 SqlServer 原生 `rowversion` 与 [HD-010 InMemory 手动模拟](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) 的共同类型），而 Npgsql `xmin` 方案要求 `uint`——两者不兼容，本 HD 无法在不修改上游契约的情况下直接采用 `xmin`。
-- **Owner picker 决策（2026-07-06，本文件顶部 callout 已记录三候选）**：Owner 选定**选项 A**——`Inkwell.Persistence.EFCore.Postgres` 复用 [HD-010 InMemory 的手动模拟拦截器算法](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs)，**不使用**原生 `xmin`；`RowVersion` 列在 Postgres 侧映射为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html) 列，值由 `PostgresRowVersionInterceptor`（§3.4）应用层维护。
+- **Owner picker 决策（2026-07-06，本文件顶部 callout 已记录三候选）**：Owner 选定**选项 A**——`Inkwell.Persistence.EFCore.Postgres` 复用 [HD-010 InMemory 的手动模拟拦截器算法](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs)，**不使用**原生 `xmin`；`RowVersion` 列在 Postgres 侧映射为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html) 列，值由 `PostgresRowVersionInterceptor`（§3.4）应用层维护。这一步只解决了「CLR 类型用什么」（`byte[]` 而非 `uint`），**不等于**已验证该手动模拟方案在 Postgres 上真的能正确工作——详见下一条。
+- **⚠️ 未验证的技术假设（design-review-report.md §21 B20，2026-07-06）**：本 HD 设计的手动模拟方案存在未验证的技术假设（详 [design-review-report.md §21 B20](../design-review-report.md#b20postgresrowversioninterceptor-手动赋值与isrowversion-存储生成语义的兼容性未经验证c116)）——`PostgresRowVersionInterceptor`（§3.4）手动赋值 `CurrentValue` 之后，这个新值是否真的被 Npgsql 持久化写入数据库、乐观并发冲突是否真的能被正确捕获，从未经过实测验证。**H5 编码任务启动前必须先完成 Testcontainers PostgreSQL spike 验证，spike 结果作为本节最终实现依据**（Owner picker，2026-07-06，真实拍板选定**选项 3**：先 spike 再定，不预先在数据库触发器方案与 Application-managed 覆写方案之间选择）。
+  - **spike 需要验证什么**：①验证 `PostgresRowVersionInterceptor` 手动赋的 `bytea` 新值是否真的被 Npgsql 写入数据库（而非被 EF Core 排除在 INSERT/UPDATE 列表外、依赖 `RETURNING` 读回原值覆盖）；②验证乐观并发冲突（两个并发事务修改同一行）是否真的能被 [`DbUpdateConcurrencyException`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.dbupdateconcurrencyexception) 正确捕获。
+  - **通过标准**：若①②皆是，选项 1（手动模拟，即本节当前设计）成立，方案不变；若任一为否，需切到触发器方案（选项 1'：数据库触发器）或 Application-managed 覆写（选项 2：`ValueGeneratedNever`，可能推翻 §6「不建子类」结论）。
+  - **spike 落地位置**：`tests/core/providers/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（§11.1 已锁定的集成测试 csproj），复用 [Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)；spike 结论回填本节并同步更新 §6 / §11 / §14（硬性前置任务标注见 §16.0）。
 - **三 Provider 对照**（按能力逐项列出，不用表格以规避 [markdownlint MD060](https://github.com/DavidAnson/markdownlint/blob/main/doc/md060.md) 中英文混排对齐问题）：
   - **并发令牌 CLR 类型**：InMemory（HD-010）= `byte[]`；SqlServer（HD-011）= `byte[]`；Postgres（本 HD）= `byte[]`（与 Npgsql 官方推荐的 `uint` 不同）
   - **值生成方式**：InMemory = `InMemoryRowVersionInterceptor`；SqlServer = 数据库引擎原生生成 `rowversion`；Postgres = `PostgresRowVersionInterceptor`（算法与 InMemory 相同）
@@ -318,6 +322,8 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 ## 6. 为什么本 HD 不创建 `PostgresInkwellDbContext` 子类
 
 沿用 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 已确立的判断路径（author 判断的显而易见项，与前两 HD 判断依据对称，非 Owner 拍板）：
+
+> **2026-07-06 追加（design-review-report.md §21 B20）**：本节「`IHasRowVersion` 无需覆写」这一条结论，以 §4 spike 验证选项 3 的结果为准——若 spike 证实需要 Provider-specific 覆写（`ValueGeneratedNever` 或触发器绑定），本节结论需重新评估，不代表最终定论。详见 §4 spike 验收标准。
 
 - **`IHasTimestamps` 列类型无需覆写**：核实结论——[Npgsql 官方 date/time 文档](https://www.npgsql.org/doc/types/datetime.html) 确认：UTC `DateTimeOffset` 默认映射为 [`timestamp with time zone`](https://www.postgresql.org/docs/current/datatype-datetime.html)（`timestamptz`）；[HD-009 §3.3 `AuditingSaveChangesInterceptor`](HD-009-Inkwell.Persistence.EFCore-base.md#33-interceptorsauditingsavechangesinterceptorcs) 写入的 `CreatedTime` / `UpdatedTime` 来自 `TimeProvider`（UTC），与该默认映射天然一致，不需要 `HasColumnType("timestamptz")` 显式覆写
 - **`IHasRowVersion` 无需覆写**：见 §4——Owner 已拍板放弃原生 `xmin`，`RowVersion` 走应用层拦截器 + 普通 `bytea` 列，`.IsRowVersion()` 调用本身（[HD-009 §3.1 `ApplyRowVersion`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）仍生效（标记为 concurrency token，触发 EF Core 通用冲突检测），只是"生成新值"这一步由拦截器而非数据库完成，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 判断依据完全一致
@@ -449,6 +455,7 @@ echo "HD-012 automation checks passed."
 - **重试参数配置方式与默认值**：author 判断的显而易见项，非 Owner 拍板 = 新增 `PostgresPersistenceOptions`（绑定 `Inkwell:Persistence:Postgres` 配置段），默认值 `MaxRetryCount=6` / `MaxRetryDelaySeconds=30` 核实自 EF Core `ExecutionStrategy` 基类 `DefaultMaxDelay` 常量，与 [HD-011 §3.2](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#32-sqlserverpersistenceoptionscs) 一致非巧合
 - **DbContext 子类化**：author 判断的显而易见项，非 Owner 拍板 = 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 判断依据对称
 - **Migration 执行策略**：复用 [HD-011 §8](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 已锁定的 Owner 决策（CI/CD 独立步骤），本 HD 不重新拍板
+- **RowVersion 验证路径（2026-07-06）**：**Owner picker（design-review-report.md §21 B20）** = 选项 3——H5 编码任务启动前先用 Testcontainers PostgreSQL 做一次 spike，实测 `PostgresRowVersionInterceptor` 手动赋值与 `.IsRowVersion()` / `ValueGeneratedOnAddOrUpdate` 语义组合的真实行为，根据 spike 结果再决定是否需要切到数据库触发器方案（选项 1'）或 Application-managed 覆写 `ValueGeneratedNever`（选项 2）；详 §4 spike 验证项与通过标准 + §16.0 硬性前置任务标注
 - **JSON 字符串列不映射 `jsonb`**：author 判断的显而易见项，非 Owner 拍板 = 重申 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) schema 最小公倍数约束，不引入 Provider-specific 列类型覆写；详 §6
 
 ## 15. 待补 / 后续 HD 衔接
@@ -458,6 +465,10 @@ echo "HD-012 automation checks passed."
 - **EFCore family 三 final adapter（HD-010 / HD-011 / HD-012）已全部起草完毕**：下一步是 HD-013 跨 Provider 契约测试包，需覆盖三 Provider 在 Migration / RowVersion / 事务重试三个维度的行为契约测试矩阵
 
 ## 16. 开放问题（需要 Owner 后续确认，非本 HD 拍板）
+
+### 16.0 H5 编码前置任务（硬性前置条件，非普通开放问题）
+
+- **H5 编码前置任务：Postgres RowVersion spike（Testcontainers）**——验收标准见 §4。本条**不是**「可以后续再议」的开放问题，而是 H5 [CodingExecutor](../../../.he/agents/coding-executor/AGENT.md) 编码任务启动前必须先完成的硬性前置条件（Owner picker，design-review-report.md §21 B20，2026-07-06，真实拍板选定选项 3）：spike 未完成或未通过 §4 通过标准前，`Interceptors/PostgresRowVersionInterceptor.cs`（§3.4）不得按当前设计原样落地为最终实现；spike 结果需回填 §4 / §6，若推翻现有结论需同步修订并重新走一轮聚焦复审。
 
 ### 16.1 已解决
 

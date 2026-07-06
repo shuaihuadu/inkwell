@@ -2452,6 +2452,7 @@ reviewer 在 chat 中列三路径 picker：
   - 选项 3：H5 编码任务启动前先做一次 Testcontainers PostgreSQL 集成测试 spike，实测该组合的真实行为，视结果决定是否需要选项 1/2
 - **卡点等级**：**blocking**（核心技术假设未验证，直接关系数据完整性与并发安全；是否需要 Owner 拍板取决于 spike 结果——若证实需要触发器或 `ValueGeneratedNever` 覆写，属于需要 Owner 确认的架构调整，不是 author 可单方面判断的显而易见项）
 - **追溯**：C116
+- **处理状态（2026-07-06）**：已处理——Owner 在 chat picker 中真实拍板**选项 3**（H5 编码前先做 Testcontainers PostgreSQL spike，根据结果再定选项 1'/触发器 或 选项 2/`ValueGeneratedNever` 覆写），HD-012 §4 / §6 / §16.0 / §14 已同步补充 spike 验收标准与硬性前置任务标注（详 §21.6）。**注意**：这仅是把"核心假设未经验证且无验证路径"的缺口，转为"有明确 Owner 拍板的验证路径 + 已嵌入设计文档的硬性前置任务"；spike 本身尚未执行，C116 暂不判定 `PASS`，待 spike 完成并回填结果后走一轮聚焦复审再确认
 
 ##### B21：file-structure.md 对应章节的治理修正说明与 HD-012 本体不同步（C117）
 
@@ -2460,6 +2461,7 @@ reviewer 在 chat 中列三路径 picker：
 - **建议方向**：把 file-structure.md 对应段落的表述同步改为与 HD-012 顶部 callout 一致的治理修正说明（"最初由子代理声称已确认但未真实发生；默认 Agent 复核后补做真实确认，Owner 选定选项 A，技术内容保留，仅更正确认来源表述"），或直接引用 HD-012 顶部 callout 链接、不重复展开
 - **卡点等级**：**blocking**（纯文档一致性修正，不涉及技术决策，可由 author 直接修复，无需 Owner picker）
 - **追溯**：C117
+- **处理状态（2026-07-06）**：已处理——file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 章节末尾"确认来源"表述已同步改为与 HD-012 顶部 callout 一致的治理修正说明，并交叉引用 B20 spike 前置任务（详 §21.6）；C117 转 `PASS`
 
 **本轮无 non-blocking 项**——完备性扫描与一致性扫描发现的缺口均已归入 C116/C117 两条 blocking（其余检查项全部 `pass`/`PASS`，未见独立的措辞类小缺口）。
 
@@ -2467,16 +2469,16 @@ reviewer 在 chat 中列三路径 picker：
 
 - **整体评审决议**：**PASS-AS-ERRATA**——HD-012 本体设计（csproj 依赖规则、DI 服务类型注册、Migration/Seed 两段式调用复用、`PersistenceOptions` 配置绑定复用、`EnableRetryOnFailure` 兼容性核实）扎实自洽，且正确吸取了 HD-010（B16）与 HD-011（B18/B19/N32）首轮评审暴露的全部已知教训，未重复任何一类既有错误；但发现 **2 项新 blocking**（B20/C116、B21/C117），其中 B20 是本 HD 存在的核心目的（Postgres 场景下 RowVersion 并发检测正确工作）能否真正达成的关键未验证假设，B21 是纯文档治理一致性缺口
 - **判定 PASS-AS-ERRATA 而非 REJECT 的理由**：对照 [HD-010 首轮评审 REJECT 判据](#19-hd-010-inkwellpersistenceefcoreinmemory-final-adapter-首轮评审2026-07-06)（"本 HD 存在的核心目的未达成"）——B20 虽然指向核心机制，但**未被证实为确定失败**，只是"未经验证的关键假设"，且已给出可执行的验证路径（POC spike）与两条明确的补救选项（触发器 / `ValueGeneratedNever` 覆写），修复成本可控、不需要推倒 HD-012 现有的 csproj 结构 / DI 装配 / Migration 策略等其余全部内容；B21 是纯文档措辞问题。二者均可通过范围明确的补救工作解决，不构成"本 HD 无法达成存在目的"的 REJECT 判据
-- **HD-012 翻 `reviewed` 前置条件**：
-  1. ⬜ 修复 B20：Owner 决定采用哪种验证/补救路径（§21.3 选项 1/2/3 之一），若最终确认需要 Postgres 侧数据库触发器或 `ValueGeneratedNever` 覆写，需同步修订 HD-012 §3.4 / §4 / §6（§6"不创建子类"的结论可能被推翻）
-  2. ⬜ 修复 B21：把 file-structure.md 对应段落的"确认来源"表述与 HD-012 顶部 callout 同步
-  3. ⬜ 修复后建议走一轮聚焦复审（仿 §19.6 / §20.7 模式，只核对 B20/B21 修复点），确认 C116/C117 转 `PASS` 后，Owner 才在 [HD-012 frontmatter](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 手动翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
+- **HD-012 翻 `reviewed` 前置条件（2026-07-06 更新）**：
+  1. ✅ 已处理：B20——Owner 已拍板选项 3（先 Testcontainers PostgreSQL spike 再定选项 1'/触发器 或 选项 2/`ValueGeneratedNever` 覆写），HD-012 §4 / §6 / §16.0 / §14 已同步补充 spike 验收标准与硬性前置任务标注。**但 spike 本身尚未执行**——C116 暂不判定 `PASS`，仍待 H5 编码任务启动前完成 spike 并回填结果
+  2. ✅ 已处理：B21——file-structure.md 对应段落已同步 HD-012 顶部 callout 的治理修正说明，C117 转 `PASS`
+  3. ⬜ **新增硬性前置条件**：H5 [CodingExecutor](../../.he/agents/coding-executor/AGENT.md) 编码任务启动前，必须先完成 Testcontainers PostgreSQL spike（验证项与通过标准见 HD-012 §4），并根据 spike 结果确认或修订 HD-012 §4 / §6 / §11 / §14；spike 结果回填后建议再走一轮聚焦复审（仿 §19.6 / §20.7 模式，重点核对 spike 结论是否需要推翻 §6"不建子类"结论），确认 C116 转 `PASS` 后，Owner 才在 [HD-012 frontmatter](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 手动翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）——若 Owner 希望在 spike 完成前先记录一个中间状态（例如某种"conditionally reviewed"式标注），具体措辞与是否引入新的 frontmatter `status` 枚举值需由 Owner 决定，本报告不代为创造新术语
 - **对 file-structure.md 的结论**：本轮发现 1 项需修复项（B21），修复范围仅限文字措辞，不涉及文件树 / 依赖关系变化
 - **EFCore family（HD-009 ~ HD-012）整体完成度总结**：
   - HD-009（shared base）：`status: reviewed`，已历经十轮 errata，当前文本自洽
   - HD-010（InMemory）：`status: reviewed`，首轮 REJECT → 修复 B16/B17 → 复审 PASS（§19.6）
   - HD-011（SqlServer）：`status: reviewed`，首轮 PASS-AS-ERRATA（B18/B19）→ 修复 → 聚焦复审 PASS（§20.7）
-  - HD-012（Postgres）：`status: draft`，首轮 **PASS-AS-ERRATA**（B20/B21），**尚未**可推荐 Owner 翻 `reviewed`——需先解决 B20（核心技术假设验证，可能是四份 HD 中唯一一个悬而未决的"设计核心目的能否达成"级别问题）与 B21（文档同步）
+  - HD-012（Postgres）：`status: draft`，首轮 **PASS-AS-ERRATA**（B20/B21）；**2026-07-06 更新**：B20/B21 均已处理（Owner 拍板 B20 选项 3 = 先 spike 再定，详 §21.6；B21 纯文档同步已修复）——但 H5 编码前置的 Testcontainers PostgreSQL spike 尚未执行，`status` **仍不建议**翻 `reviewed`，需 spike 完成 + 聚焦复审后再定
   - HD-013（跨 Provider 契约测试包）：未起草，是 EFCore family 收尾的最后一环，其 RowVersion 并发冲突测试用例设计应等 B20 有定论后再展开，避免基于未验证假设编写契约测试
 
 ### 21.5 自检
@@ -2491,3 +2493,15 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未给越界建议（如"建议你顺便重构 X"）
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §21 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+### 21.6 修复记录（2026-07-06，B20/B21 已处理）
+
+- **B20 处理结果**：Owner 在 chat picker 中真实拍板**选项 3**——H5 编码任务启动前先用 [Testcontainers PostgreSQL](https://dotnet.testcontainers.org/modules/postgresql/) 做一次 spike，实测 `PostgresRowVersionInterceptor` 手动赋值与 `.IsRowVersion()` / `ValueGeneratedOnAddOrUpdate` 语义组合的真实行为，根据 spike 结果再决定是否需要切到选项 1'（数据库触发器）或选项 2（Application-managed 覆写 `ValueGeneratedNever`）。已同步落地：
+  - [HD-012 §4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录) 新增未验证假设说明 + spike 验证项 + 通过标准
+  - [HD-012 §6](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#6-为什么本-hd-不创建-postgresinkwelldbcontext-子类) 补充"本结论以 spike 结果为准，不代表最终定论"
+  - HD-012 §16.0 新增硬性前置任务标注（区别于普通开放问题）
+  - [HD-012 §14](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#14-决策记录) 决策记录补一条 Q
+  - **未完成部分**：spike 本身尚未执行，`PostgresRowVersionInterceptor` 的真实行为仍待验证；C116 暂不判定 `PASS`，待 spike 结果回填后走聚焦复审再判定
+- **B21 处理结果**：file-structure.md `## providers/Inkwell.Persistence.EFCore.Postgres` 章节末尾"确认来源"表述已同步改为与 HD-012 顶部 callout 一致的治理修正说明，并交叉引用 B20 spike 前置任务；C117 转 `PASS`（纯文档一致性问题，无技术歧义）
+- **HD-012 `status` 判定**：**仍不建议翻 `reviewed`**——核心技术假设（B20/C116）需 H5 spike 实测验证后才能确认 HD-012 §3.4/§4/§6 设计是否成立；若 Owner 希望在 spike 完成前记录一个中间状态（例如约定一个"conditionally reviewed"或类似标注），需由 Owner 决定具体措辞与是否引入新的 frontmatter `status` 枚举值——本报告不代为创造新术语
+- **本次处理未做的事**：未执行 spike、未修改 HD-012 §3.4 拦截器实现代码、未翻转 HD-012 frontmatter `status`、未新增 `reviewers` 名单（人工签字位，AI 不代签）
