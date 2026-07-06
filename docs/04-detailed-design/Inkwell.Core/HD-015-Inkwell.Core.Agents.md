@@ -40,7 +40,7 @@ upstream:
 > - **NFR-004（审计日志）中"Agent 创建 / 修改 / 删除 / 共享"+"Agent 调用"两类事件的写入触点在范围内**——本 HD 的 `AgentService` / `AgentInvocationService` 实现在对应操作后调用 [HD-007 `IAuditLogger.LogAsync`](../Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md)；审计日志的存储 / 查询本身不在本 HD（归 `Inkwell.Core.AuditLogs`）。
 > - **REQ-009（知识库）/ REQ-010（长期记忆）/ REQ-011（触发器）/ REQ-012（编排）/ REQ-013（公开 API）/ REQ-014（调试 / trace）/ REQ-016（多模态）均不在本 HD 范围**——`AgentDefinition` 不持有这些维度的字段（[AGENTS.md §3.1](../../../AGENTS.md) 已锁定为独立业务命名空间 `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.PublicApi` / `.Traces` / `.Multimodal`，均未起草）。
 >
-> **⚠️ 发现的架构级冲突（未自行裁决，需 Owner 确认，详见文末 §8）**：[requirements.md §8.3](../../01-requirements/requirements.md)（"账号 / Agent 配置：永久保留，删除后软删除可恢复 30 天"）与 [ui-spec.md §3.5](../../01-requirements/ui-spec.md)（删除 Agent 二次确认文案"删除后将进入回收期 30 天，期间可恢复"）均要求 Agent 删除支持 30 天软删恢复；但**已 reviewed** 的 [HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)（2026-05-10 picker 拍板）锁定"v1 **不提供**软删除，全部硬删，历史靠 `audit_logs` 保留"，且 [database-design.md 总体设计原则](../database-design.md) 已写死"软删除：v1 不提供软删（HD-002 Q5）"。本 HD **未**擅自修改已 reviewed 的 HD-002，`DeleteAgent` 按当前锁定的 HD-002 Q5 实现为**硬删除**——但这与 UI 文案 / 需求文档字面承诺直接冲突，不是"作者判断可以自行决定"的范畴，已在 §8 列出候选方案交 Owner 裁决。
+> **2026-07-06 治理修正（已解决，原"架构级冲突"）**：起草期发现 [requirements.md §8.3](../../01-requirements/requirements.md)（"账号 / Agent 配置：永久保留，删除后软删除可恢复 30 天"）与 [ui-spec.md §3.5](../../01-requirements/ui-spec.md)（删除 Agent 二次确认文案"删除后将进入回收期 30 天，期间可恢复"）均要求 Agent 删除支持 30 天软删恢复；但**已 reviewed** 的 [HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)（2026-05-10 picker 拍板）锁定"v1 **不提供**软删除，全部硬删，历史靠 `audit_logs` 保留"。默认 Agent 已通过 `vscode_askQuestions` 向 Owner 真实确认，**Owner 于 2026-07-06 拍板选项 A：维持 HD-002 硬删除决策**，[requirements.md §8.3](../../01-requirements/requirements.md) / [ui-spec.md §3.5 + §4.4](../../01-requirements/ui-spec.md) / [user-flow.md](../../01-requirements/user-flow.md) / [acceptance-criteria.md AC-010](../../01-requirements/acceptance-criteria.md) 已同步 errata 修正"30 天可恢复"为"不可恢复"。`DeleteAgent` 按 HD-002 Q5 实现为**硬删除**，与需求文档不再冲突，详见 §8。
 >
 > **依赖规则遵循**（[AGENTS.md §3.2](../../../AGENTS.md)）：`Inkwell.Core.Agents` 只依赖 `Inkwell.Abstractions` + BCL；**不** `using` 任何 Provider 包，**不** `using Microsoft.Agents.AI.*`（[ADR-017 §依赖规则第 3 条](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)，该权限仅属于 `Inkwell.Core.AgentRuntime`）；持久化经 `IPersistenceProvider.GetRepository<IAgentRepository>()`（事务外读）/ `IUnitOfWork.GetRepository<IAgentRepository>()`（事务内写，[HD-002 §13.3 Q1=A2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；审计经 `IAuditLogger`（[HD-007](../Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md)）；Agent 执行经 `IAgentRuntime`（[HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)），本 HD 的 `IAgentInvocationService` 是**唯一**负责把 `AgentDefinition` 翻译成 `AgentRunRequest` 并调用 `IAgentRuntime` 的位置。
 >
@@ -91,7 +91,7 @@ upstream:
 - 审计日志的存储 / 查询（[HD-007](../Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 已锁定端口，本 HD 仅调用 `LogAsync` 写入触点）
 - Admin 解封账号 / 查询全量审计日志 —— 归已 reviewed 的 [HD-014](HD-014-Inkwell.Core.Auth.md) / 未起草的 `Inkwell.Core.AuditLogs`
 - `RevokeShareAsync` 的 `actorUserId` 是否为 `IsSuper` 的校验——同 [HD-014 §1.2](HD-014-Inkwell.Core.Auth.md#12-范围) 先例，归 `Inkwell.WebApi` 授权中间件前置拦截，本方法内不重复校验
-- Agent 软删除 / 30 天回收期恢复能力——**存在与已 reviewed HD-002 的冲突，未自行裁决**，详见顶部 callout + [§8](#8-需要-owner-确认的问题)
+- Agent 软删除 / 30 天回收期恢复能力——**不提供**（2026-07-06 Owner 拍板维持 HD-002 硬删除，需求文档已同步 errata），详见顶部 callout + [§8](#8-需要-owner-确认的问题)
 - WebApi 层的 HTTP 端点 —— 归未来 `Inkwell.WebApi` HD
 
 ### 1.3 关键决策摘要
@@ -109,7 +109,7 @@ upstream:
 | Q7  | `FindSharedAgents` 排除调用者自己的 Agent（`excludingOwnerUserId` 参数）                             | 作者判断 | [ui-spec.md §3](../../01-requirements/ui-spec.md) "团队共享" tab 语义上展示"团队成员"共享的 Agent，调用者自己的 Agent 已在"我的" tab 可见，重复出现无意义 |
 | Q8  | `AgentOptions.MaxAgentsPerOwner` 默认 `null`（不限）                                                 | 作者判断 | [requirements.md §6](../../01-requirements/requirements.md) 软目标"单用户 Agent 数：默认不限，但提供配置项可设上限"——字面已给出默认值 |
 | Q9  | `AgentOptions.InstructionsWarningThresholdChars` 默认 `32000`                                       | 作者判断 | [ui-spec.md §4.3.2](../../01-requirements/ui-spec.md) 已给出具体数值"超过 32K 字符时给出警告"，非本 HD 新拍板 |
-| Q10 | `DeleteAgent` 实现为**硬删除**（遵循已 reviewed 的 [HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)） | **未裁决，遵循既有锁定** | 与 UI 文案 / requirements.md §8.3 冲突，详见顶部 callout + [§8](#8-需要-owner-确认的问题)，本 HD 不擅自修改已 reviewed 的 HD-002 |
+| Q10 | `DeleteAgent` 实现为**硬删除**（遵循已 reviewed 的 [HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)） | 2026-07-06 Owner 真实拍板（选项 A） | 原与 UI 文案 / requirements.md §8.3 冲突，已同步 errata 修正需求文档文案，详见顶部"治理修正"callout + [§8](#8-需要-owner-确认的问题) |
 
 ### 1.4 `IAgentService` / `IAgentInvocationService` 端口位置判断（作者判断，非 Owner 拍板）
 
@@ -362,7 +362,7 @@ src/core/Inkwell.Core/
 
 **索引**：`OwnerUserId` 非唯一索引；`IsShared` 非唯一索引（"团队共享" tab 过滤路径）。
 
-**⚠️ 未决冲突**：本表**不**包含软删除字段（`DeletedTime` 等），遵循已 reviewed 的 [HD-002 §1.3 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) "v1 不提供软删"——但这与 [requirements.md §8.3](../01-requirements/requirements.md) / [ui-spec.md §3.5](../01-requirements/ui-spec.md) 的"30 天回收期可恢复"字面承诺冲突，详见 [HD-015 §8](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)，未自行裁决。
+**2026-07-06 已解决**：本表**不**包含软删除字段（`DeletedTime` 等），遵循已 reviewed 的 [HD-002 §1.3 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) "v1 不提供软删"。原与 [requirements.md §8.3](../01-requirements/requirements.md) / [ui-spec.md §3.5](../01-requirements/ui-spec.md) "30 天回收期可恢复"字面承诺冲突，2026-07-06 Owner 拍板维持硬删除后需求文档已同步 errata修正，不再冲突，详见 [HD-015 §8](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）——本节仅记录契约缺口，具体实现留待通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
 
@@ -402,16 +402,16 @@ src/core/Inkwell.Core/
 
 ## 8. 需要 Owner 确认的问题
 
-> 本节问题**均未自行裁决**；以下每条给出候选选项，不代答。
+> Q&A-1 已于 2026-07-06 由 Owner 真实拍板（详见该条内"Owner 决议"）；Q&A-2 仍未裁决，给出候选选项，不代答。
 
-### Q&A-1（重要，架构级）：Agent 删除的软删 / 硬删矛盾
+### Q&A-1（已解决，2026-07-06 Owner 真实拍板）：Agent 删除的软删 / 硬删矛盾
 
 - **背景**：[requirements.md §8.3](../../01-requirements/requirements.md)（"Agent 配置：永久保留，删除后软删除可恢复 30 天"）+ [ui-spec.md §3.5](../../01-requirements/ui-spec.md)（删除二次确认文案"删除后将进入回收期 30 天，期间可恢复，30 天后永久删除"）+ [AC-010](../../01-requirements/acceptance-criteria.md) 均要求 Agent 删除有 30 天软删恢复能力。但**已 reviewed** 的 [HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)（2026-05-10 picker）锁定"v1 全部硬删，不提供软删，历史靠 `audit_logs` 保留"，且 [database-design.md 总体设计原则](../database-design.md)已写死该结论。
 - **候选**：
   - **A. 维持 HD-002 Q5（硬删除）**——需要同步修正 [ui-spec.md §3.5](../../01-requirements/ui-spec.md) 与 [acceptance-criteria.md AC-010](../../01-requirements/acceptance-criteria.md) 的文案与验收标准，删除"30 天可恢复"承诺，改为"删除后不可恢复"类措辞；[requirements.md §8.3](../../01-requirements/requirements.md) 需追加针对 `agents` 表的例外说明
   - **B. 为 `agents` 表单独开例外，追加软删除能力**——需要对已 reviewed 的 [HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 发起 errata（新增 `ISoftDeletable` mixin 或等价机制，并说明为何 `agents` 表例外于 Q5 全局决策，避免其他表主观效仿造成不一致）
-  - **C. 其他方案**（请说明，例如"仅靠 `audit_logs` 记录已删除 Agent 的完整配置快照，允许 Admin 从审计日志手工恢复"这类折中方案）
-- **本 HD 当前实现**：按 A 的技术形态实现（`DeleteAgent` 硬删除），但**不代表 A 已被确认**——仅因为不能擅自修改已 reviewed 的 HD-002，需要先有 Owner 决定再回填。
+  - **C. 其他方案**（例如"仅靠 `audit_logs` 记录已删除 Agent 的完整配置快照，允许 Admin 从审计日志手工恢复"这类折中方案）
+- **Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）**：**选 A——维持 HD-002 硬删除**。已同步修正 [requirements.md §8.3](../../01-requirements/requirements.md) / [ui-spec.md §3.5 + §4.4](../../01-requirements/ui-spec.md) / [user-flow.md](../../01-requirements/user-flow.md) / [acceptance-criteria.md AC-010](../../01-requirements/acceptance-criteria.md)，"30 天可恢复"改为"不可恢复"类措辞；[database-design.md 总体设计原则](../database-design.md) 原文本就已锁定硬删除，无需再改。`DeleteAgent` 当前实现（硬删除）确认为最终形态，不再是待裁决状态。
 
 ### Q&A-2：`Inkwell.Core.Tools` 缺失期间的 v1 起草顺序
 
