@@ -2206,3 +2206,127 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未越界修改 HD-010 / HD-009 正文，仅追加评审报告子节
 - ✅ 报告路径仍为 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §19.6，未另开顶层章节）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 20. HD-011 Inkwell.Persistence.EFCore.SqlServer Final Adapter 首轮评审 + 治理修正核查（2026-07-06）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，评审对象：[HD-011 Inkwell.Persistence.EFCore.SqlServer](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（status: draft，2026-07-06 起草）+ 同会话对 [HD-009 §13.7 / §13.8](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 的联动修正 + [ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [ADR-019](../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 2026-07-06 errata。**本轮额外承担一项治理性任务**：核查此前一次治理修正 commit（`03d80263`，"HD-009/HD-011 同步 Migration 策略变更 + 修正失实『Owner picker』标注"）本身的准确性——即核实 HD-011 §8/§14/§16 中"Owner 拍板"与"author 判断，非 Owner 拍板"两类标注是否属实、是否有遗漏。报告主体 §1 ~ §19 的 `status / reviewers` 字段**不**因本节调整。全程使用 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+
+### 20.0 评审范围与基线
+
+- **本轮评审对象**：HD-011 全文（§1 ~ §17）+ HD-009 §13.7 / §13.8 联动修正 + ADR-021 / ADR-019 对应 errata + 治理修正 commit `03d80263` 的准确性
+- **不在本轮范围**：HD-001 ~ HD-010 主体设计（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）；HD-012（Postgres final adapter，尚未起草）；HD-013（跨 Provider 契约测试包，尚未起草）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-011 frontmatter 完整，upstream 15 项均可定位：REQ-002 / REQ-006 / REQ-009 / REQ-013 / REQ-014（[requirements.md](../01-requirements/requirements.md)）+ ADR-004 / ADR-013 / ADR-017 / ADR-019 / ADR-021 / ADR-023（[adr/](../03-architecture/adr/)）+ HD-001 / HD-002 / HD-009 / HD-010 全部真实存在，HD-009 / HD-010 均 `status: reviewed`
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-011 是合理 per-module slice 切片，目录未"严重偏离" h3-detailed-design.md
+
+### 20.1 完备性扫描（HD-011 范围内）
+
+按 [h3-detailed-design.md 章节清单](../../.he/docs/stages/h3-detailed-design.md) 逐项打分：
+
+- **文件结构**：`pass` — §2 文件清单（1 csproj + 2 `*.cs` + 1 `Migrations/` 目录）与 §3.0 ~ §3.3 十字段表一一对应，与 [file-structure.md `## providers/Inkwell.Persistence.EFCore.SqlServer`](file-structure.md#providersinkwellpersistenceefcoreinmemory) 文件树逐行核对一致（计数"3 个 `*.cs` + 1 个 `.csproj`"手工核算无误，`Migrations/` 目录本身不计入文件数）。证据：[HD-011 §2](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#2-文件清单) + [file-structure.md 对应章节](file-structure.md)
+- **数据库 / 表 / 字段 / 索引 / 约束**：`n/a`（显式声明）— §17 明确"本 HD **不**追加 `database-design.md`（SqlServer 不引入新表结构，schema 沿用 HD-009 已锁定的 Entity 定义）"；核对属实，HD-011 全文无 `Entities/` / `Configurations/` 新文件。证据：[HD-011 §17](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#17-同步追加跨模块文件)
+- **接口 / 错误码**：`partial` — `UseSqlServer(...)` 签名 / BCL 异常透传（§3.3 `不额外 catch，透传`）均与 [ADR-023](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) 最终态一致；**但** §3.1 完整代码消费 `IOptions<PersistenceOptions>().Value.CommandTimeoutSeconds` 的前提——即"appsettings.json `Inkwell:Persistence:CommandTimeoutSeconds` 会被绑定进独立的 `IOptions<PersistenceOptions>` DI 注册"——在 HD-001 / HD-002 / HD-009 全文中均无对应"完整代码"证实（详 §20.2 C104，属实质性配置绑定缺陷，非文档呈现问题）。证据：[HD-011 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs)
+- **流程 / 后台任务**：`partial` — §8 Migration 执行策略描述清楚"由谁在何时调用"发生了变化，**但**未给出"WebApi/Worker 启动时如何仅执行 Seed、跳过 Migrate"的具体调用路径（`MigrationRunner.RunAsync()` 目前把二者耦合在同一方法内，详 §20.2 C103）。证据：[HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) + [HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)
+- **每个目录 / 程序文件职责**：`pass` — 3 个 `*.cs` × 10 字段全填，无 `<TBD>` / `<待定>`；csproj 依赖白名单 + 禁用清单均列明。证据：[HD-011 §3.0 ~ §3.3](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#3-各文件-10-字段)
+- **配置文件字段 / 默认值**：`partial` — §10 配置项汇总表列出 4 个配置键 + 默认值，`SqlServerPersistenceOptions` 自身的绑定（`BindConfiguration("Inkwell:Persistence:SqlServer")`）正确；**但**"共享 `PersistenceOptions` 字段能否真正从 `appsettings.json` 生效"这一前提未经证实（同 C104）。证据：[HD-011 §10](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#10-配置项汇总)
+- **日志格式 / 字段**：`pass` — §3.1 / §3.2 / §3.3 均显式声明日志要求或"N/A + 理由"，与 HD-009 / HD-010 既有惯例一致。证据：[HD-011 §3.1 ~ §3.3 日志要求行](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)
+- **监控指标 / 告警策略**：`partial` — 全文未出现"监控" / "告警"关键字，也未像 [HD-010 §9 建议的 N29 措辞](#19-hd-010-inkwellpersistenceefcoreinmemory-final-adapter-首轮评审2026-07-06) 那样显式声明"可观测性沿用 HD-009 baseline，本 HD 不新增独立监控内容"（详 §20.3 N32，non-blocking，措辞缺口，不影响翻 reviewed）
+- **部署步骤 / 回滚 / 备份恢复**：`pass` — §12 显式声明"无独立部署单元"+ dev/prod 场景说明；§8 Migration 由 CI/CD 独立步骤执行的描述完整（谁执行、何时执行、执行什么命令）。证据：[HD-011 §12](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#12-部署--配置) + [§8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板)
+- **性能边界 / 安全边界 / 已知限制**：`pass` — §5 连接重试策略 + 幂等性约束 + 连接字符串脱敏；§4 RowVersion 原生行为边界讨论清楚（与 HD-010 §4 形成完整对照）；§15 待补事项列明 Postgres 侧需重复核查 `EnableRetryOnFailure` 兼容性，不臆断已覆盖。证据：[HD-011 §4](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#4-rowversion-在-sqlserver-下的真实行为对照-hd-010-4非本-hd-自创机制) + [§5](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#5-连接重试策略与连接字符串管理) + [§15](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#15-待补--后续-hd-衔接)
+
+**完备性结论**：9 项中 4 项 `pass`、1 项 `n/a`（合理）、4 项 `partial`（3 项指向同一根问题——`PersistenceOptions` 配置绑定链未证实 C104；1 项是 Migration/Seed 耦合的调用路径缺口 C103；1 项是监控措辞缺口 N32，non-blocking）。
+
+### 20.2 一致性扫描（HD-011 ↔ HD-009 / HD-010 / ADR-021 / ADR-019 / ADR-023）
+
+- **C102（PASS）**— HD-011 §3.0 csproj 依赖白名单（`Microsoft.EntityFrameworkCore.SqlServer` + `Microsoft.EntityFrameworkCore.Design`(`PrivateAssets="all"`) + ProjectReference `Inkwell.Persistence.EFCore` + `Inkwell.Abstractions`）与禁用清单（InMemory / Npgsql / `Inkwell.Core`）与 [ADR-021 §依赖规则补充](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) EFCore family 例外 + [ADR-017 §3.2](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 完全一致；§13 C1 ~ C5 自动化检查脚本与该白名单逐条对应，且 C5 显式防止未来 errata 误删 `EnableRetryOnFailure`。证据：[HD-011 §3.0 / §13](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) vs ADR-021 / ADR-017 §3.2
+- **C103（FAIL，blocking，跨 HD）**— [HD-009 §3.5 `MigrationRunner.RunAsync()`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)（2026-07-06 errata·第八轮修订后）明确"对外接口不变"，其唯一公共方法 `RunAsync()` 内部顺序为：先无条件调 `initializer.InitializeAsync(db, ct)`（SqlServer 场景即 `MigrateAsync`），再按 `AutoSeedOnStartup` 开关调 `seeder.SeedAsync(ct)`——两步耦合在同一方法体内，没有拆分成可独立调用的两个入口。而 [HD-009 §13.8](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#138-2026-07-06-errata第八轮adr-021--adr-019-2026-07-06-erratamigration-执行策略改为-cicd-独立步骤) 与 [HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 均声称"`InkwellSeeder.SeedAsync()` 不受影响，仍在 `Inkwell.WebApi` 启动时运行"，且这一描述对 SqlServer / Postgres 场景**没有加任何限定词**（不像 InMemory 场景那样明确"不受影响"）。若 `Inkwell.WebApi` 启动代码对 SqlServer 场景确实"不再调用 `MigrationRunner.RunAsync()`"（因为调它就会顺带触发已被禁止的 `MigrateAsync()`），那么同一方法体内的 `seeder.SeedAsync()` 调用也不会发生——这与"Seed 仍受影响，仍在启动时运行"的文字承诺直接矛盾；若"仍调用 `RunAsync()`"，则又会违反"应用启动不再自动执行 Migration"的核心决策。HD-011 §9 Builder DSL 示例用 `.AutoSeedOnStartup(false)` 側面回避了这一矛盾（prod 示例关闭自动 seed），但这只是示例场景恰好不触发问题，并未解决"若某环境确实需要 `AutoSeedOnStartup(true)` + SqlServer + 不跑 Migrate"这一组合下代码该怎么写的设计空白。证据：[HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 完整对外接口段 vs [HD-009 §13.8](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#138-2026-07-06-errata第八轮adr-021--adr-019-2026-07-06-erratamigration-执行策略改为-cicd-独立步骤) vs [HD-011 §8 / §9](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)
+- **C104（FAIL，blocking，跨 HD）**— HD-011 §3.1 完整代码消费 `sp.GetRequiredService<IOptions<PersistenceOptions>>().Value.CommandTimeoutSeconds`，其正确性依赖"`Inkwell:Persistence` 配置段已被绑定进独立的 `IOptions<PersistenceOptions>` DI 注册"这一前提。**已逐一核对 [HD-001 §3.8 ~ §3.11](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#38-builderiinkwellbuildercs) `AddInkwell()` / `InkwellBuilder.Build()` 相关全部条目**：`AddInkwell()` 只把 `"Inkwell"` 整段绑定到**根** `InkwellOptions`（其 `.Persistence` 是嵌套属性），只注册并校验 `IOptions<InkwellOptions>`，全文没有任何一处显式把嵌套的 `InkwellOptions.Persistence` 再单独绑定成一个可独立解析的 `IOptions<PersistenceOptions>`。继续核对 [HD-002](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009 §3.11](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 全文，均无 `AddOptions<PersistenceOptions>().BindConfiguration(...)` 或等价代码。**全仓库唯一一处触碰 `IOptions<PersistenceOptions>` 注册的代码就是 HD-011 §3.1 自己的 `builder.Services.Configure<PersistenceOptions>(o => o.ConnectionString = connectionString);`**——这一行只把 `ConnectionString` 字段设置为参数值，**不会**让 `CommandTimeoutSeconds`（或 `PersistenceOptions` 上任何其他字段）从 `appsettings.json` 的 `Inkwell:Persistence:CommandTimeoutSeconds` 生效；无论运维在配置文件里怎么改这个键，`IOptions<PersistenceOptions>.Value.CommandTimeoutSeconds` 都会保持 C# 属性默认值 30，**配置被静默忽略**。HD-010（InMemory adapter）从未消费 `IOptions<PersistenceOptions>`，因此这一缺口此前从未被任何 final adapter 的实际代码暴露；HD-011 是第一个真正读取该值的 final adapter，因而首次暴露此问题。证据：[HD-011 §3.1 完整代码](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) vs [HD-001 §3.8~§3.11](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 全文 vs [HD-002](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 全文 vs [HD-009 §3.11](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 全文（`grep -rn "AddOptions<PersistenceOptions>\|Configure<PersistenceOptions>\|BindConfiguration(\"Inkwell:Persistence\")"` 全仓库仅 1 处命中，即 HD-011 §3.1 自身）
+- **C105（PASS）**— `EnableRetryOnFailure` 与 `ExecuteInTransactionAsync` 的兼容性修正在 HD-011 与 [HD-009 §13.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 之间完全对齐：HD-009 §13.7 描述"`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装"+ "`work` 委托禁止混入外部 I/O"的幂等性约束；HD-011 §5.2 / §11.3 均正确引用该结论，未重复解释机制，未引入新的矛盾表述。证据：[HD-011 §5.2](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#52-连接重试策略enableretryonfailure) vs [HD-009 §13.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure)
+- **C106（PASS）**— HD-011 §4 "RowVersion 在 SqlServer 下的真实行为"与 [HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) 形成的对照表逐项核实：SqlServer 原生 `rowversion` 列类型自动生成 vs InMemory 手动模拟拦截器，二者的"并发冲突检测天然生效（Provider 无关）"结论一致；HD-011 §4 明确"不引入任何 `SaveChangesInterceptor`"，与 §2 文件清单不含 `Interceptors/` 子目录吻合，不存在 HD-010 B16 那类"注册具体类但按接口消费"的 DI 服务类型风险面（因为本 HD 根本没有新增拦截器注册）。证据：[HD-011 §4](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#4-rowversion-在-sqlserver-下的真实行为对照-hd-010-4非本-hd-自创机制) vs [HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)
+- **C107（PASS，含一处已知但非本 HD 独有的文档空白）**— HD-011 §3.1 依赖 [HD-009 §3.11 `AddEfCorePersistenceBase()`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs)（`internal`，需 `InternalsVisibleTo` 才能被 `Inkwell.Persistence.EFCore.SqlServer` 调用）；HD-010 §3.1 依赖模块行显式标注"`internal + InternalsVisibleTo`"，但 HD-011 §3.1 依赖模块行只写"`Inkwell.Persistence.EFCore.DependencyInjection`（`AddEfCorePersistenceBase()`）"，未复述这一可见性前提。经核对 [HD-009 §3.0 csproj 十字段](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#30-inkwellpersistenceefcorecsproj) 全文，**base csproj 从未声明 `<InternalsVisibleTo Include="Inkwell.Persistence.EFCore.SqlServer" />`（或等价 `AssemblyInfo`）条目**——这是 HD-009 自身的既有文档空白，非 HD-011 本轮引入，也不是 HD-011 独有（HD-010 同样依赖该可见性但同样未见 HD-009 declare 对应条目，只是 HD-010 review 未触及此点）。判定 `PASS`（不计入 HD-011 blocking）的理由：HD-011 对该依赖的文字表述比 HD-010 更简略，是 HD-011 一处可以补的措辞，但真正的"声明缺口"根源在 HD-009 §3.0，且对全部三个 final adapter 一视同仁，不因 HD-011 一份文档而单独卡审。证据：[HD-011 §3.1 依赖模块行](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) vs [HD-010 §3.1 依赖模块行](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) vs [HD-009 §3.0](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#30-inkwellpersistenceefcorecsproj) 全文（无 `InternalsVisibleTo` 声明）
+- **C108（PASS）**— [file-structure.md `## providers/Inkwell.Persistence.EFCore.SqlServer`](file-structure.md) 文件树、依赖注释、计数估算与 HD-011 §2 / §3.0 逐一核对一致；"不创建 `SqlServerInkwellDbContext` 子类"的理由引用锚点（HD-011 §6）真实可跳转；2026-07-06 errata 说明段准确复述了 `EnableRetryOnFailure` 兼容性修正的来龙去脉。证据：[file-structure.md 对应章节](file-structure.md) vs [HD-011 §2 / §6](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)
+
+**一致性结论**：7 项检查中 2 项 `FAIL`（C103 / C104，均 blocking）、5 项 `PASS`（C102、C105、C106、C107、C108）。**C103 与 C104 是两类不同根因**：C103 是"策略耦合导致新决策无法落地"的流程设计缺口（根在 HD-009 §3.5），C104 是"配置绑定链条从未被任何设计文档实际画出来"的静默配置失效缺口（根在 HD-001/HD-002/HD-009，由 HD-011 首次编码消费暴露）。
+
+### 20.3 治理修正核查（专门回应用户"这次治理修正本身是否准确"的要求）
+
+> 核查对象：commit `03d80263c9646410381bc7ed16beeeaf41b9d080`（"docs(design): HD-009/HD-011 同步 Migration 策略变更 + 修正失实『Owner picker』标注"）对 HD-009 / HD-011 的改动，重点核实两类标注：(1) 声称"Owner 拍板/已确认"的条目是否有可信的确认过程支撑；(2) 改标为"author 判断的显而易见项，非 Owner 拍板"的条目是否措辞准确、技术判断本身是否站得住脚。
+
+- **G1（PASS）**— HD-011 顶部 callout"跨 HD 前置修正（2026-07-06，Owner picker 授权）"（`EnableRetryOnFailure` 与 `ExecuteInTransactionAsync` 兼容性修正）：按 `/memories/repo/inkwell-h3-workflow.md` 记录的事后复核结果，该条目技术内容属实且已经过真实用户确认（"事后补问用户也真的同意了"）。HD-011 §14 决策记录同款表述"Owner picker（2026-07-06）= 启用重试 + 同步修正 HD-009"与 [HD-009 §13.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 落地内容一致，未发现夸大或遗留失实表述
+- **G2（PASS）**— HD-011 §8 / §14 / §16.1"Migration 执行策略"Owner 拍板表述（"应用启动不再自动执行 Migration，改由 CI/CD pipeline 独立步骤执行"）：按同一份 repo 记忆记录，此条目此前曾被子代理谎称"Owner 已确认维持现状"，事后真实复核时用户给出的是**相反**决定（改为 CI/CD 独立步骤），当前 HD-011 / HD-009 §13.8 / ADR-021 errata / ADR-019 errata 四处的文字**与用户真实决定一致**（均描述为"改为 CI/CD 独立步骤"，无任何一处遗留"维持现状"的旧表述）。已用 `grep` 交叉核对 HD-011、HD-009、ADR-021、ADR-019 全文，未发现新的/遗留的"维持现状"字面残留
+- **G3（PASS）**— HD-011 §14"重试参数配置方式"（新增 `SqlServerPersistenceOptions`，比照 HD-008 Provider 专属 Options 先例）改标为"author 判断的显而易见项，非 Owner 拍板"：技术判断本身站得住脚——这是纯粹的实现层惯例复用（HD-008 `QdrantVectorStoreOptions` / `AzureOpenAIEmbeddingOptions` 已是既定先例），不涉及产品 / 运维策略选择，不需要 Owner 输入即可判断，重新标注准确
+- **G4（PASS）**— HD-011 §14"DbContext 子类化"（不创建 `SqlServerInkwellDbContext`）改标为"author 判断的显而易见项，非 Owner 拍板"：技术判断本身站得住脚——理由（`.IsRowVersion()` / `datetimeoffset` 列类型在 SqlServer provider 下均无需覆写）有 EF Core 官方文档支撑，且与 HD-010 §5 对 InMemory 场景的同款判断完全对称、逻辑一致，不涉及需要 Owner 拍板的产品级决策
+- **G5（PASS）**— file-structure.md 本轮**未**因治理修正而改动：核实治理修正内容（Migration 策略"谁在何时调用"+ 决策来源措辞更正）不涉及任何文件树 / 文件计数 / csproj 依赖关系的变化，file-structure.md 现有 `## providers/Inkwell.Persistence.EFCore.SqlServer` 章节（HD-011 起草时已建立）本身准确、无需同步——不属于遗漏
+- **G6（PASS）**— 全文 grep `Owner` 关键字（12 处命中，详见 HD-011 全文引用）逐条核对：2 处"Owner picker/拍板"真实可信（G1/G2）、2 处"author 判断，非 Owner 拍板"标注准确（G3/G4）、其余 8 处均为对上述 4 条结论的复述（§16 开放问题、§8 callout 等），未发现第三类未经核实又声称"已确认"的新表述
+
+**治理修正核查结论**：6 项检查全部 `PASS`。此次治理修正 commit 本身准确——两类 Owner 真实拍板的决策未被夸大或曲解，两类改标为"author 判断"的决策技术依据站得住脚，且 file-structure.md 正确地未被无谓触碰。**本节发现的 C103 / C104 两个新 blocking 项与治理修正的准确性无关**——它们是本轮独立发现的设计缺口，不是治理修正遗留或引入的问题。
+
+### 20.4 反问清单
+
+#### Blocking
+
+##### B18：`MigrationRunner.RunAsync()` 未拆分 Migrate/Seed，导致"SqlServer/Postgres 跳过 Migrate 但仍执行 Seed"无可行调用路径（C103）
+
+- **问题**：[HD-009 §3.5](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) `MigrationRunner.RunAsync()` 唯一公共方法内部顺序耦合"先 Migrate（或 EnsureCreated）→ 再按开关 Seed"，且 §13.8 errata 明确声明"对外接口不变"。但 [HD-009 §13.8](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#138-2026-07-06-errata第八轮adr-021--adr-019-2026-07-06-erratamigration-执行策略改为-cicd-独立步骤) 与 [HD-011 §8](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 都承诺"SqlServer/Postgres 场景 `InkwellSeeder.SeedAsync()` 仍在 `Inkwell.WebApi` 启动时运行"——若启动代码为了遵守"不再自动执行 Migration"而不调 `RunAsync()`，Seed 也不会发生；若仍调 `RunAsync()`，则会顺带触发已被禁止的 `MigrateAsync()`。当前设计没有给出第三条路径
+- **影响范围**：H5 [CodingExecutor](../../.he/agents/coding-executor/AGENT.md) 编写 `Inkwell.WebApi/Program.cs` / `Inkwell.Worker/Program.cs` 启动逻辑时，若 Owner 希望 SqlServer/Postgres 环境 `AutoSeedOnStartup(true)`，将无法找到任何一条被设计文档允许的代码路径同时满足"不跑 Migrate"与"跑 Seed"；[HD-012](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#15-待补--后续-hd-衔接)（Postgres final adapter）会原样继承这一空白
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：把 `MigrationRunner` 拆成两个独立公共方法（如 `MigrateAsync(ct)` / `SeedAsync(ct)`），`Inkwell.WebApi` / `Inkwell.Worker` 启动代码对 InMemory 调二者、对 SqlServer/Postgres 只调 `SeedAsync(ct)`（不再经过 `IDbContextInitializer.InitializeAsync`）
+  - 选项 2：明确"SqlServer/Postgres 场景下 `AutoSeedOnStartup` 在 v1 只能为 `false`，Seed 也随 CI/CD 独立步骤执行"，修正 §8 / §13.8 措辞，去掉"仍在 WebApi 启动时运行"的无条件表述
+  - 选项 3：若 Owner 判断"Seed 依赖 schema 已就绪"这一前提本身就要求二者继续耦合，则需要明确 CI/CD 独立步骤是否也负责调用 Seed（而非 WebApi），并相应修正 §8 的职责边界描述
+- **卡点等级**：**blocking**（涉及具体技术方案选择，建议走一次 HD-009 小 errata 澄清，不一定需要 Owner picker——但选项 2/3 涉及"生产环境是否允许自动 Seed"这类运维策略，若 author 无法自行判断，需要反问 Owner）
+- **追溯**：C103
+
+##### B19：`PersistenceOptions`（`CommandTimeoutSeconds` 等）从未被绑定到独立 `IOptions<PersistenceOptions>` 注册，`appsettings.json` 配置会被静默忽略（C104）
+
+- **问题**：HD-011 §3.1 完整代码消费 `sp.GetRequiredService<IOptions<PersistenceOptions>>().Value.CommandTimeoutSeconds`，但全仓库（HD-001 `AddInkwell()`/`InkwellBuilder.Build()`、HD-002、HD-009 `AddEfCorePersistenceBase()`）都没有任何一处代码把 `appsettings.json` 的 `Inkwell:Persistence` 段绑定进独立可解析的 `IOptions<PersistenceOptions>`——现有绑定链只把整个 `"Inkwell"` 段绑定进**根** `IOptions<InkwellOptions>`（`.Persistence` 是其嵌套属性，与独立注册的 `IOptions<PersistenceOptions>` 是两个不同的 DI 服务实例）。HD-011 §3.1 自己唯一的 `Configure<PersistenceOptions>(o => o.ConnectionString = connectionString)` 只设置了 `ConnectionString` 一个字段
+- **影响范围**：`Inkwell:Persistence:CommandTimeoutSeconds`（以及未来任何加到 `PersistenceOptions` 的共享字段）在 SqlServer / Postgres 场景下会被**静默忽略**——运维改配置文件不会有任何效果，`CommandTimeoutSeconds` 永远是编译期默认值 30；H5 阶段若照抄 HD-011 §3.1 代码，会产出一个"配置项存在但不生效"的隐蔽缺陷，且现有 §3.1 测试要求清单里也没有一条"appsettings.json 设置 `CommandTimeoutSeconds` 后 `IOptions<PersistenceOptions>.Value.CommandTimeoutSeconds` 生效"的用例，缺陷不会被单测捕获
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：在 [HD-009 §3.11 `AddEfCorePersistenceBase()`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#311-dependencyinjectioninkwellpersistenceefcoreservicecollectionextensionscs) 内补 `services.AddOptions<PersistenceOptions>().BindConfiguration("Inkwell:Persistence")`（三个 final adapter 共享，一次修复覆盖 InMemory/SqlServer/Postgres）
+  - 选项 2：在 HD-011（及 HD-010/HD-012）各自的 `Use*()` 方法内补等价绑定（`PostConfigure` 顺序需注意与 `Configure<PersistenceOptions>(o => o.ConnectionString = ...)` 的先后关系，避免互相覆盖）
+  - 选项 3：若 `PersistenceOptions` 的非 `ConnectionString` 字段本就不打算支持独立配置（例如统一改为方法参数传入），需要显式声明并同步修正 HD-002 §3.5 的"从 appsettings.json 绑定"职责描述
+- **卡点等级**：**blocking**（纯机械修正 + 选一种绑定方式，不涉及产品级决策，author 可自行判断修复方式，但需要在 HD-009/HD-011 落一次小 errata）
+- **追溯**：C104
+
+#### Non-blocking
+
+##### N31：HD-011 §3.1 依赖模块行未复述 `AddEfCorePersistenceBase()` 的 `InternalsVisibleTo` 可见性前提（C107）
+
+- **问题**：HD-010 §3.1 依赖模块行显式标注"`internal + InternalsVisibleTo`"，HD-011 §3.1 对同一依赖的表述更简略，未复述这一前提；根因是 HD-009 §3.0 csproj 十字段从未声明具体的 `<InternalsVisibleTo Include="..." />` 条目（对 InMemory/SqlServer/Postgres 三个 final adapter 一视同仁地缺失）
+- **影响范围**：不影响 HD-011 翻 `reviewed`（属 HD-009 既有空白，非 HD-011 独有或本轮引入）；H5 编码阶段若未在 base csproj 补 `InternalsVisibleTo` 条目，`AddEfCorePersistenceBase()` 调用会编译失败，是可在编译期立即发现的问题，不会静默通过
+- **建议方向**：走一次 HD-009 §3.0 小 errata，补齐 `<ItemGroup><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.InMemory" /><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.SqlServer" /><InternalsVisibleTo Include="Inkwell.Persistence.EFCore.Postgres" /></ItemGroup>` 条目；可与 B19 的 HD-009 errata 合并一次提交
+- **卡点等级**：non-blocking
+
+##### N32：HD-011 缺少显式"监控沿用 HD-009 baseline，不新增独立可观测性内容"措辞（对齐 HD-010 N29 先例）
+
+- **问题**：HD-004 ~ HD-010 多份 HD 均有一句显式 deferral 措辞说明监控指标归属，HD-011 全文未出现"监控" / "告警"关键字，也未显式声明"HD-009 OTel span 基线对 SqlServer Provider 同样适用，本 HD 不新增独立可观测性内容"
+- **影响范围**：不影响 HD-011 翻 `reviewed`（SqlServer 场景确无需要区别于 HD-009 baseline 的独立监控设计），仅是措辞缺失可能让读者误判为遗漏
+- **建议方向**：可在 §12 末尾补一句"可观测性沿用 HD-009 §3.2 `EfCorePersistenceProvider` OTel span 基线 + `EnableRetryOnFailure` 重试次数可通过 EF Core 内置 `Microsoft.EntityFrameworkCore.Database.Command` 事件观测，本 HD 不新增独立监控内容"
+- **卡点等级**：non-blocking
+
+### 20.5 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-011 本体设计（csproj 依赖规则、RowVersion 原生行为对照、`EnableRetryOnFailure` 与 `ExecuteInTransactionAsync` 兼容性修正、DbContext 不子类化判断、Migration/Seed 策略变更的决策来源标注）扎实自洽且经本轮治理修正核查确认准确（§20.3 全 `PASS`）；但发现 **2 项新 blocking**（B18/C103、B19/C104），均为**跨 HD 的设计空白**（根在 HD-009/HD-001，由 HD-011 首次编写消费代码时暴露），不是 HD-011 本体决策错误，且均可通过小范围 errata 修复，不需要推倒重来
+- **判定 PASS-AS-ERRATA 而非 REJECT 的理由**：对照 [HD-010 首轮评审 REJECT 判据](#19-hd-010-inkwellpersistenceefcoreinmemory-final-adapter-首轮评审2026-07-06)（"本 HD 存在的核心目的未达成"）——B18/B19 均不属于"HD-011 核心目的落空"：SqlServer 连接、重试、Migration 委托、RowVersion 原生行为等本 HD 的核心交付物全部自洽有效；B18 影响的是"Seed 在 SqlServer/Postgres 场景下的可选开关"这一边缘功能的可行性，B19 影响的是一个次要配置字段（`CommandTimeoutSeconds`）的生效与否，均不构成"本 HD 无法达成存在目的"，故判定为 PASS-AS-ERRATA
+- **HD-011 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B18：在 HD-009 §3.5 / §13.8（+ 必要时 HD-011 §8/§9）补齐"SqlServer/Postgres 场景如何在跳过 Migrate 的同时仍可选执行 Seed"的具体机制（选一种建议方向或反问 Owner 运维策略）
+  2. ⬜ 修复 B19：在 HD-009 §3.11（推荐）或 HD-011/HD-010/HD-012 各自 `Use*()` 方法补齐 `PersistenceOptions` 的 `AddOptions<T>().BindConfiguration(...)` 绑定，并在 HD-011 §3.1 测试要求补一条"appsettings.json 设置 `CommandTimeoutSeconds` 后生效"的用例
+  3. ⬜ 可选处理 N31（可与 B19 修复合并一次 errata）/ N32（non-blocking，不阻塞下一轮评审通过）
+  4. ⬜ 修复后建议再走一轮聚焦复审（仿 §19.6 模式，只核对 B18/B19 修复点），确认 C103/C104 转 `PASS` 后，Owner 才在 [HD-011 frontmatter](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 手动翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（**人工签字位，AI 不代签**）
+- **对 file-structure.md 的结论**：本轮不需要改动（§20.3 G5 已确认治理修正不涉及文件树变化；HD-011 起草时已建立的 `## providers/Inkwell.Persistence.EFCore.SqlServer` 章节本身准确）
+- **HD-012（Postgres final adapter）起草提醒**：应在起草期一并规避 B18（Migrate/Seed 耦合，Npgsql 侧同样受影响）与 B19（`PersistenceOptions` 绑定缺口，Postgres 侧同样会消费 `CommandTimeoutSeconds`），不要重复本轮发现的问题；HD-011 §15 已提示需重新核实 `EnableRetryOnFailure` 兼容性，建议一并核实 B18/B19 是否已被上游 errata 解决
+
+### 20.6 自检
+
+- ✅ 每条 `pass` / `partial` / `n/a` / `FAIL` 都附了具体章节锚点或代码片段证据
+- ✅ 2 个新 `blocking` 反问（B18/B19）均能映射到具体一致性冲突（C103/C104）+ 影响范围 + 可执行的建议方向
+- ✅ 治理修正核查（§20.3）6 项均基于可复核的事实（repo memory 记录的真实用户确认过程 + 全文 grep 交叉核对），未使用"看起来" / "似乎" / "感觉"等主观词
+- ✅ 未凭文件名臆测：已实际逐字核对 HD-001 §3.8~§3.11、HD-002 全文、HD-009 §3.0/§3.5/§3.11 全文，确认 `InternalsVisibleTo` 与 `PersistenceOptions` 绑定两处空白均是"读了全文确认不存在"，非假设
+- ✅ 未自行对 B18/B19 的技术方案选项做最终拍板——均以"建议方向"列出多个选项，需要 author 判断或反问 Owner
+- ✅ 未在报告中编造任何"Owner 已确认"的新表述；对治理修正的核查结论明确区分"真实确认（G1/G2）"与"author 技术判断（G3/G4）"
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-011 / HD-009 / file-structure.md / 报告主体，仅追加评审报告
+- ✅ 未给越界建议（如"建议你顺便重构 X"）
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §20 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
