@@ -2716,15 +2716,16 @@ reviewer 在 chat 中列三路径 picker：
 
 #### Blocking
 
-##### B-1：审计调用字段命名"`EventType=`"在 `AuditLogRequest`/`AuditContext` 中不存在，实际字段名为 `ActionType`（C-6）
+##### B-1：审计调用字段命名"`EventType=`"在 `AuditLogRequest`/`AuditContext` 中不存在，实际字段名为 `ActionType`（C-6）——**已处理（2026-07-07）**
 
 - **问题**：HD-015 §3.4/§3.9/§3.10 三处描述审计写入触点时使用"`EventType = "agent_created"` / `"agent_run_completed"`"等表述，但已 reviewed 的 HD-001/HD-007 锁定的实际类型 `AuditContext(... string ActionType ...)` / `AuditLogRequest(AuditContext Context, ...)` 均无 `EventType` 属性；已 reviewed 的 HD-014 对同一机制使用的是正确字段名"`ActionType=`"
 - **影响范围**：`CodingExecutor` 若照字面实现会直接编译失败（属性不存在）；`TestCaseAuthor` 若按"`EventType`"设计断言目标也会对不上实际 DTO 形状
 - **建议方向**：将 HD-015 §3.4/§3.9/§3.10 三处"`EventType="..."`"改写为"`AuditContext.ActionType="..."`"（或简写"`ActionType="..."`"，与 HD-014 措辞对齐），技术语义不变，仅纠正字段引用
 - **卡点等级**：blocking
 - **追溯**：C-6
+- **处理结果（2026-07-07）**：全文 grep 核实共 10 处 `EventType=`/`EventType =` 字面（§3.4 1 处 + §3.9 7 处 `agent_created`/`agent_updated`/`agent_deleted`/`agent_shared`/`agent_unshared`/`agent_share_revoked_by_admin`/`agent_cloned` + §3.10 2 处 `agent_run_completed`/`agent_run_failed`，比本条最初描述的"3 处"更多，已逐一核实并全部修正），已统一改写为与 HD-014 一致的 `ActionType="..."` 写法（不带 `AuditContext.` 前缀，纯字段名简写）；`get_errors` 复核 HD-015 无新增 lint 错误，全文 grep 确认 `EventType` 零残留
 
-##### B-2：`IAgentInvocationService.RunAsync` / `RunStreamingAsync` 缺失调用者身份参数，导致授权与审计双缺口（C-7）
+##### B-2：`IAgentInvocationService.RunAsync` / `RunStreamingAsync` 缺失调用者身份参数，导致授权与审计双缺口（C-7）——**已处理（2026-07-07）**
 
 - **问题**：两个方法签名均只有 `agentId`/`conversationId`/`messages`/`ct`，不含任何 `actorUserId`/`callerUserId` 类参数。(1) 无法判断调用者是否有权运行该 Agent（Owner 本人或该 Agent 对调用者可见的共享状态）；(2) 无法为 `AuditContext.ActorUserId`（必填字段）提供真实值，"Agent 调用"类审计事件的"谁调用的"信息会缺失或被迫填系统占位值
 - **影响范围**：`CodingExecutor` 编码时会遇到"如何构造 `AuditContext.ActorUserId`"的实现级阻塞（接口不提供该值的来源）；`TestCaseAuthor` 无法设计"非 Owner/非共享对象调用该 Agent 被拒绝"这类授权测试用例，因为接口本身未表达该约束点；NFR-004"Agent 调用"审计事件的可追溯性（谁在何时调用了哪个 Agent）在当前设计下无法实现
@@ -2734,6 +2735,7 @@ reviewer 在 chat 中列三路径 picker：
   - reviewer 倾向选项 1（与 `IAgentService` 全部写方法已确立的"显式 `actorUserId` 参数"风格一致，改动范围小）
 - **卡点等级**：blocking
 - **追溯**：C-7
+- **处理结果（2026-07-07）**：Owner 在本轮评审修复会话中直接确认采用选项 1——`RunAsync` / `RunStreamingAsync` 两方法均新增 `Guid callerUserId` 必填参数（位置：紧随 `agentId` 之后，先于 `conversationId`/`messages`）；`AgentInvocationService` 内部新增 `ValidateInvocationAccess(agent, callerUserId)`：`agent.OwnerUserId != callerUserId && !agent.IsShared` → `UnauthorizedAccessException`（复用 HD-015 §1.3 Q7 `FindSharedAgents` 已确立的 `IsShared` 团队共享可见语义，未新发明 ACL 粒度）；`AuditContext.ActorUserId` 由 `callerUserId` 赋值。已同步落地至 HD-015 §3.4（接口签名 + 内部逻辑 + 输入数据 + 错误处理 + 测试要求）/ §3.10（`AgentInvocationService.cs` 内部函数 + 错误处理 + 测试要求）/ §4.2（BCL 异常分类扩展）/ §8 新增 Q&A-3（记录该决议与候选方案）。**确认渠道说明**：该决议由 Owner 在本次修复对话中直接、明确告知（非通过 `vscode_askQuestions` 工具弹窗），不属于本报告 §23.4 所指的"待人类核实"类表述
 
 #### Non-blocking
 
@@ -2760,16 +2762,17 @@ reviewer 在 chat 中列三路径 picker：
   - 硬删除决策（Q10/Q&A-1）是否真的经过您的确认？如果没有，需要重新走一次真实的 `vscode_askQuestions` 确认（技术方向大概率不变，因为已同步到 requirements.md 等四份文档且相互一致，但"确认来源"措辞需要按本仓库既定的"治理修正说明"模式改写）
   - `Inkwell.Core.Tools` 插队优先起草（Q&A-2）是否真的经过您的确认？这条**直接影响下一步该起草哪个 HD**，若是虚构，会打乱既定的 H3 起草顺序
   - 若确认属实，仍需修正文件顶部"治理声明"与"未发起任何 `vscode_askQuestions` 交互"两处**自相矛盾**的措辞（这两句话与文件其余四处内容不可能同时为真）
+- **2026-07-07 处理结果**：Owner 在本轮修复对话中直接、明确告知：①Q10/顶部 callout 的硬删除决策、②§8 Q&A-1 硬删除决策、③§8 Q&A-2 起草顺序插队 `Inkwell.Core.Tools`、④design-review-report.md 本节 B-2 的 `callerUserId` 授权方案，均为真实发生的确认（前 3 项为 2026-07-06 `vscode_askQuestions` 交互，第 4 项为 2026-07-07 本轮对话中直接确认）。HD-015 顶部"治理声明"与 §1.3 前置声明已同步修正为准确反映"起草时无确认、后续 4 轮真实确认"的实际时间线，不再自相矛盾（详见 HD-015 文件顶部 2026-07-07 版治理声明）。**本报告不代为验证该确认的真实性**，仅如实记录 Owner 本轮直接给出的澄清结果，与 §23.4 上文"不代为判定"的立场一致——真伪判断权始终在 Owner，本报告只负责记录 Owner 已给出的澄清
 
 ### 23.5 评审结论与下一步
 
 - **整体评审决议**：**REJECT**（因 C-11 的自相矛盾性质，且 2 项 blocking 涉及编译期/审计完整性问题，不满足 PASS-AS-ERRATA 的"仅纯机械性修正"门槛）——REQ-002~008/015/017 的范围核实、边界排除证据链扎实，依赖规则遵守核查通过（全文无 Provider 包引用，正确经 `GetRepository<IAgentRepository>()`/`IAgentRuntime`/`IAuditLogger` 访问基础设施），`AgentDefinition → AgentRunRequest` 字段映射本身完整正确；但发现 **2 项 blocking**（B-1 审计字段命名错误、B-2 调用链缺失身份参数）与 **1 项关键治理问题**（C-11 文件自相矛盾的"Owner 确认"表述，需人类核实，参见 §23.4）
 - **HD-015 翻 `reviewed` 前置条件**：
-  1. ⬜ 修复 B-1（`EventType=` → `ActionType=`，纯机械性字段名修正，不需要 Owner picker）
-  2. ⬜ 修复 B-2（`IAgentInvocationService` 两方法新增调用者身份参数——**这是真正的接口签名变更，涉及授权语义，建议先与 Owner 确认选项 1/2 再落地，不宜由 author 子代理自行拍板**）
-  3. ⬜ Owner 自行核实 §23.4 四处"Owner 已确认"表述的真实性，并修正文件顶部自相矛盾的"未发起任何交互"声明
-  4. ⬜ 上述三项处理完毕后建议做一次聚焦复审（仅核对 B-1/B-2 修复点 + C-11 澄清结果），再由 Owner 在 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（人工签字位，AI 不替签）
-- **HD-015 是否可推荐 Owner 翻 `reviewed`**：**不推荐**。B-2 涉及真实的接口签名/授权语义变更，需要 Owner 参与决策，不适合直接机械修正；C-11 的自相矛盾在未经 Owner 澄清前不应视为"纯格式问题"放行
+  1. ✅ 修复 B-1（`EventType=` → `ActionType=`，纯机械性字段名修正，2026-07-07 已处理，详见 §23.3 B-1 处理结果）
+  2. ✅ 修复 B-2（`IAgentInvocationService` 两方法新增 `callerUserId` 调用者身份参数，2026-07-07 Owner 直接确认选项 1 后已落地，详见 §23.3 B-2 处理结果）
+  3. ✅ Owner 已在 2026-07-07 本轮对话中直接确认 §23.4 四处表述均为真实发生，HD-015 顶部自相矛盾声明已同步修正（详见 §23.4 2026-07-07 处理结果）
+  4. ⬜ 建议做一次聚焦复审（仅核对本轮 B-1/B-2 修复点：§3.4/§3.9/§3.10 的 `ActionType` 措辞 + §3.4/§3.10/§4.2/§8 Q&A-3 的 `callerUserId` 签名与授权逻辑），再由 Owner 在 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（人工签字位，AI 不替签）
+- **HD-015 是否可推荐 Owner 翻 `reviewed`**：**仍不直接推荐**——前 3 项前置条件已处理完毕，但按本仓库既定工作流（`/memories/repo/inkwell-h3-workflow.md`），blocking 修复后应先跑一次聚焦复审确认改动本身无新引入的不一致，再由 Owner 签字；建议下一步是聚焦复审而非直接签字
 
 ### 23.6 自检
 
