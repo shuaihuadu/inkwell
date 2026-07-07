@@ -2665,3 +2665,122 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未对"Owner 已确认"类表述代为判定真伪，延续 §22.4 已记录的立场
 - ✅ 未越界修改 HD-014 / database-design.md / 报告主体，仅追加本节
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 23. HD-015 Inkwell.Core.Agents 首轮评审（2026-07-07）
+
+> 本轮在已 reviewed 的报告主体之上**追加**，评审对象：[HD-015 Inkwell.Core.Agents](Inkwell.Core/HD-015-Inkwell.Core.Agents.md)（status: draft，2026-07-06/07 起草，**H3 第二张业务命名空间 HD**）+ 联动的 [database-design.md `## Inkwell.Core.Agents` 章节](database-design.md#inkwellcoreagents) + [file-structure.md `## Persistence/Agents` / `## Inkwell.Abstractions.Agents` 章节](file-structure.md)。报告主体 §1 ~ §22 的 `status / reviewers` 字段**不**因本节调整。全程使用 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+>
+> **完备性判定口径**：延续 §22（HD-014）确立的口径——业务命名空间层不机械套用端口层"§7/§8/§9"三段式模板，改为对照 [requirements.md](../01-requirements/requirements.md) REQ-002 ~ REQ-008 / REQ-015 / REQ-017 / NFR-004 验收标准逐条核实覆盖度。
+
+### 23.0 评审范围与基线
+
+- **本轮评审对象**：HD-015 全文（§1 ~ §8）+ database-design.md `## Inkwell.Core.Agents` 章节 + file-structure.md `### Persistence/Agents` / `## Inkwell.Abstractions.Agents` 两处追加
+- **不在本轮范围**：`IAgentRepository` 的 EFCore 实现（HD-015 §1.2 / §3.2 已声明留待 HD-009 errata，本轮不评审尚不存在的内容）；`Inkwell.Core.Tools` / `.Models` / `.Skills` / `.Versioning` / `.Conversations` 等未起草模块（HD-015 已正确排除，详 §23.1）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-015 frontmatter 完整，`upstream` 15 项均可定位：REQ-002~008/015/017 + NFR-004 + ADR-003/ADR-017/ADR-023 + HD-001/002/006/007 全部真实存在
+  - **不触发** [io-contracts.md §5 阻塞返回](../../.he/agents/_shared/io-contracts.md)——HD-015 是合理的业务命名空间层第二张切片，目录未"严重偏离" h3-detailed-design.md
+
+### 23.1 完备性扫描（对照 REQ-002~008/015/017 验收标准）
+
+- **REQ-002（列表/CRUD/共享）+ REQ-003（基础属性）+ REQ-004（Instructions）**：`pass` —— `IAgentService` 10 方法（Create/Update/Delete/Get/ListMine/ListShared/Share/Unshare/RevokeShare/Clone）逐一对应 [requirements.md line 122-124](../01-requirements/requirements.md)"列表/新建/编辑/删除/共享"字面；`AgentUpsertRequest.Name`（1–50 字，[AC-014](../01-requirements/acceptance-criteria.md)）/ `Description`（≤500 字，[AC-016](../01-requirements/acceptance-criteria.md)）校验位置（`AgentService.ValidateBasicFields`）与 ui-spec.md 一致；`AvatarUri` 回显（[AC-015](../01-requirements/acceptance-criteria.md)）由 `AgentDefinition.AvatarUri` 覆盖；`Instructions` 无长度硬上限但 32K 警告阈值（[AC-019](../01-requirements/acceptance-criteria.md)）由 `AgentOptions.InstructionsWarningThresholdChars=32000` 覆盖。证据：[HD-015 §3.1/§3.3/§3.5/§3.7](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) vs [acceptance-criteria.md line 48-63](../01-requirements/acceptance-criteria.md)
+- **REQ-005（模型选择）+ REQ-006（模型参数）仅数据存储部分**：`pass`（在声明范围内）—— `AgentDefinition.ModelId`（`string?`）+ `ModelParameters`（复用 [HD-006 `AgentModelParameters`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#36-agentruntimeagentmodelparameterscs)）满足"参数最终在调试 trace 中可见"（[AC-023](../01-requirements/acceptance-criteria.md)）的持久化前提；模型注册表/厂商路由/可用性校验（[AC-020](../01-requirements/acceptance-criteria.md) ~ [AC-022](../01-requirements/acceptance-criteria.md)）正确移交未起草的 `Inkwell.Core.Models`，边界声明清晰。证据：[HD-015 顶部 callout](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) + [§1.3 Q1/Q4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)
+- **REQ-007（工具调用）仅数据存储部分**：`partial`（声明范围内的部分 pass，但翻译链路存在缺口，详 §23.2 C-7）—— `AgentDefinition.ToolBindings`（`AgentToolBinding(Guid ToolId, string? ParametersJson)`）满足"勾选工具+传参"的持久化需求（[AC-025](../01-requirements/acceptance-criteria.md)）；但 `IAgentInvocationService` 翻译到 `AgentRunRequest.Tools` 时恒为 `null`（HD-015 §3.4 已如实声明"已知缺口"），导致 [AC-026](../01-requirements/acceptance-criteria.md)"trace 详情能看到工具调用入参与返回值"在 v1 起草顺序上暂不可端到端验证——**HD-015 自身已如实标注该缺口为非阻塞待办**，本评审确认该标注真实准确、无夸大或隐瞒
+- **REQ-008（Skills）仅数据存储部分**：`pass`（在声明范围内）—— `AgentDefinition.SkillBindings`（`AgentSkillBinding(Guid SkillId)`）满足挂载持久化；静态加载正确移交未起草的 `Inkwell.Core.Skills`
+- **REQ-015（版本管理）仅递增触点**：`pass`（在声明范围内）—— `AgentDefinition.CurrentVersion` 在 `UpdateAgentAsync` 成功后 `+1`（[HD-015 §3.9](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs)），`ShareAgentAsync`/`UnshareAgentAsync`/`RevokeShareAsync`/`CloneAgentAsync` 均不触发递增（[§1.3 Q5/Q6](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)），理由充分（避免污染 [AC-057](../01-requirements/acceptance-criteria.md) diff 语义）；版本快照/diff/回滚正确移交未起草的 `Inkwell.Core.Versioning`，且以 `file-structure.md` 既有模板作为客观证据支撑边界判断（非臆造）
+- **REQ-017（撤销他人共享子能力）**：`pass` —— `RevokeShareAsync` 对应 [AC-068](../01-requirements/acceptance-criteria.md)"撤销他人的共享 Agent（只取消共享可见性，不删除 Owner 原件）"：实现仅置 `IsShared=false` + `SharedRevokedByAdminTime`，不删除 `AgentDefinition` 本体，与验收标准字面一致；`IsSuper` 校验移交 `Inkwell.WebApi` 中间件（同 [HD-014 §1.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) 先例）
+- **NFR-004（审计触点）**：`partial`（触点位置正确，但字段命名/构造方式与已 reviewed 的 HD-007 契约不一致，详 §23.2 C-6/C-7，判定 blocking）
+- **文件结构 / 每个程序文件职责**：`pass` —— 11 个文件（`Persistence/Agents/{AgentDefinition,IAgentRepository}` + `Agents/{IAgentService,IAgentInvocationService,AgentUpsertRequest,AgentSummary,AgentOptions,AgentOptionsValidator}` + `Inkwell.Core/Agents/{AgentService,AgentInvocationService,AgentBuilderExtensions}`）与 §3 标题"10 字段 × 11 文件"字面一致，未出现 HD-014 首版"11 vs 12"式计数笔误。证据：[HD-015 §2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#2-文件结构) + §3.1~§3.11 逐一核对
+- **数据库设计**：`pass` —— `agents` 表字段/索引齐全，JSON 列（`ModelParametersJson`/`ToolBindingsJson`/`SkillBindingsJson`）遵循 [database-design.md 总体设计原则](database-design.md)"JSON 列统一 string + JsonSerializer value converter"既定惯例；软删除冲突已同步"已解决"状态（详 §23.2 C-8）
+
+**完备性结论**：REQ-002/003/004/008/015/017 覆盖度 `pass`；REQ-005/006 声明范围内 `pass`；REQ-007 声明范围内**部分** `partial`（缺口已如实标注，非隐瞒）；NFR-004 审计触点位置正确但字段构造方式 `partial`（blocking，详 §23.2）。文件结构/数据库设计 `pass`。整体完备性基本达标，但 C-6/C-7 两项 blocking 需先修复才能进入 H5。
+
+### 23.2 一致性扫描（HD-015 ↔ HD-001/002/006/007/014 / ADR-023 / AGENTS.md §3.2 / database-design.md / file-structure.md / requirements 系文档）
+
+- **C-1（PASS）**——依赖规则核查：全文 grep `using|StackExchange|Microsoft.EntityFrameworkCore|Redis|Npgsql|SqlClient|Microsoft\.Agents\.AI` 仅命中顶部 callout"不得引用 Provider 包 / 不得 using Microsoft.Agents.AI.*"的声明句本身，**不存在**任何 Provider 包或 MAF 类型的真实代码级引用；持久化经 `IPersistenceProvider.GetRepository<IAgentRepository>()`（事务外读）/ `uow.GetRepository<IAgentRepository>()`（事务内写，[HD-002 §13.3 Q1=A2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；Agent 执行经 `IAgentRuntime`（HD-006）；审计经 `IAuditLogger`（HD-007），符合 [AGENTS.md §3.2](../../AGENTS.md) 依赖纯度约束。证据：`grep -n "using\|Microsoft.Agents.AI\|StackExchange\|EntityFrameworkCore" HD-015-Inkwell.Core.Agents.md` 全文无命中（顶部声明句除外）
+- **C-2（PASS）**——`IAgentRepository` 方法命名（`AddAgent`/`UpdateAgent`/`GetAgent`/`DeleteAgent`/`ListAgents`/`FindAgentsByOwner`/`FindSharedAgents`）逐一核对 [HD-002 §4.1.3 动词白名单](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)：7 个方法全部合规，`IAgentRepository : IRepository<AgentDefinition, Guid>` marker 继承正确，无 `Async` 后缀
+- **C-3（PASS）**——ADR-023 裸 `Task<T>` + BCL 异常规约核查：`IAgentService`（10 方法）/ `IAgentInvocationService`（2 方法）全部走裸 `Task<T>`/`Task<bool>`/`Task`/`IAsyncEnumerable<T>`，`CancellationToken ct = default` 全填；错误处理表使用的异常类型（`ArgumentException`/`UnauthorizedAccessException`/`InvalidOperationException`/`KeyNotFoundException`/`OperationCanceledException`/`IOException`/`TimeoutException`）均为 [HD-001 §5.3 BCL 异常类型对照表](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表) 已收录类型，无自造异常类型或 `Result<T>` 残留
+- **C-4（PASS）**——`AgentDefinition` → `AgentRunRequest` 字段映射逐字段核对：`RunId`（新生成，`Guid.CreateVersion7().ToString()`）/ `AgentId` / `ConversationId` / `Messages` / `Instructions=agent.Instructions` / `ModelId=agent.ModelId` / `ModelParameters=agent.ModelParameters` / `Tools=null` 八个字段与 [HD-006 §3.2 `AgentRunRequest`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 实际 record 形态（`RunId`/`AgentId`/`ConversationId`/`Messages`/`Instructions`/`ModelId`/`ModelParameters`/`Tools` 恰好 8 个属性）一一对应，无遗漏、无多余、无类型不匹配（`ModelId: string?` 与 HD-006 一致，未做无意义类型转换）。`RunAsync`/`RunStreamingAsync` 原样透传 `AgentTurnResult`/`AgentRunEvent`，不做二次包装，符合"翻译层"职责边界。**结论：映射逻辑本身正确、完整**
+- **C-5（PASS）**——OTel span 命名（`agent.<verb>` / `agent.invoke_run(_streaming)`）与既有 HD 的 `auth.<verb>` / `audit.<verb>` / `agentruntime.<verb>` 命名风格同构；PII 提示（`Instructions`/`Description`/`messages` 不得进 OTel）与 [HD-006 §4.3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) 一致
+- **C-6（BLOCKING）**——审计调用字段命名与已 reviewed 的 HD-007 契约不一致：HD-015 全文 3 处（§3.4 内部逻辑描述、§3.9 `AgentService` 错误处理表、§3.10 `AgentInvocationService` 错误处理表）均写"写审计 `EventType="agent_created"` / `"agent_run_completed"`"等，但 `IAuditLogger.LogAsync` 实际签名是 `LogAsync(AuditLogRequest request, ...)`，`AuditLogRequest(AuditContext Context, AuditActorType ActorType, AuditResultCode ResultCode, Guid? AgentId, string? ErrorCode)` **不存在** `EventType` 属性——事件名实际对应 `AuditContext.ActionType`（[HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs)：`AuditContext(Guid ActorUserId, string ActionType, string ResourceType, string ResourceId, DateTimeOffset OccurredTime, string TraceId, ...)`）。已 reviewed 的 [HD-014 §3.8](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#38-inkwellcoreauthauthservicecs) 对同一机制的描述使用的是正确字段名"`ActionType="login"`"，说明本仓库已确立正确命名惯例，HD-015 与该惯例不一致。若 `CodingExecutor` 按字面"`EventType=`"编码会直接编译失败（`AuditLogRequest`/`AuditContext` 均无此属性）。证据：[HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)/[§3.9](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs)/[§3.10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs) `EventType=` 三处 vs [HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs) `AuditContext.ActionType` vs [HD-007 §3.1/§3.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) `AuditLogRequest` 实际字段 vs [HD-014 §3.8](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#38-inkwellcoreauthauthservicecs) 正确用法先例
+- **C-7（BLOCKING）**——`IAgentInvocationService.RunAsync` / `RunStreamingAsync` 签名缺失调用者身份参数：`Task<AgentTurnResult> RunAsync(Guid agentId, Guid? conversationId, IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default)` 全部 3 个业务参数均不含任何 `actorUserId` / `callerUserId` 类字段。这与 §3.9 `IAgentService` 全部写操作方法（`UpdateAgentAsync`/`DeleteAgentAsync`/`ShareAgentAsync` 等）均显式携带 `actorUserId` 形成对照。缺失该参数导致两个问题均未被 HD-015 讨论：(1) **授权缺口**——`IAgentInvocationService` 无法判断调用者是否有权使用该 `agentId`（是否为 Owner，或该 Agent 是否 `IsShared` 对调用者可见），任何持有合法 `agentId` 的调用者理论上都能触发运行，且该判断依赖 `agent.OwnerUserId`/`agent.IsShared`——不同于 [HD-014 §1.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#12-范围) `RevokeShareAsync` 那种"参数在、只是校验逻辑移交 WebApi"的先例，本处是参数本身缺失，`Inkwell.WebApi` 中间件无法在不查询 `AgentDefinition` 的情况下完成等效授权；(2) **审计字段缺口**——即使 C-6 的 `EventType`→`ActionType` 笔误被修正，`AuditContext.ActorUserId`（[HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs) 必填字段，`Guid.Empty` 仅表示系统 actor）在当前签名下无值可填——`AgentInvocationService` 内部除 `agentId`/`conversationId`/`messages` 外拿不到任何用户身份，若强行填 `Guid.Empty`，[NFR-004](../01-requirements/requirements.md)"Agent 调用"类审计事件将全部记为"系统"发起，丢失"谁调用了这次对话"这一审计核心信息。证据：[HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 接口签名 vs [HD-015 §3.3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#33-agentsiagentservicecs) `IAgentService` 全部写方法均带 `actorUserId`/`ownerUserId` 参数的既有模式 vs [HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#37-commonauditcontextcs) `AuditContext.ActorUserId` 必填
+- **C-8（PASS）**——database-design.md 软删除冲突同步状态核查：[database-design.md `## Inkwell.Core.Agents` 章节](database-design.md#inkwellcoreagents)"2026-07-06 已解决"段落与 [HD-015 §8 Q&A-1](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)"已解决"状态、结论（维持硬删除）、引用锚点三者完全一致，无遗漏引用
+- **C-9（PASS）**——H1 errata 联动核查：[requirements.md §8.3](../01-requirements/requirements.md)（line 206）/ [ui-spec.md §3.5](../01-requirements/ui-spec.md)（line 233/238）+ §4.4（line 380）/ [user-flow.md](../01-requirements/user-flow.md)（line 93）/ [acceptance-criteria.md AC-010](../01-requirements/acceptance-criteria.md)（line 48）五处均已同步"2026-07-06 errata"标记 + "不可恢复"措辞，且均正确引用 HD-002/HD-015 作为决策来源，未发现遗漏引用点
+- **C-10（PASS）**——文件计数核实：file-structure.md"Abstractions csproj 累计 ... 8（HD-015）= 68"与 HD-015 §3 末尾"文件计数"段落"合计 8 个... = **68**"数字一致；手工核算 11+8+7+4+4+10+7+2+7+8=68 无误
+- **C-11（关键，需要人类核实，详见 §23.4）**——文件内部关于"Owner 已通过 `vscode_askQuestions` 真实确认"的表述存在**自相矛盾**：HD-015 顶部"治理声明"callout 逐字写"本文件全文**不包含**任何'已用 `vscode_askQuestions` 向 Owner 真实确认'的表述"，[§1.3 表格上方](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)也写"本次会话**未发起任何** `vscode_askQuestions` 交互"；但同一文件的 [§1.3 Q10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)（"2026-07-06 Owner 真实拍板（选项 A）"）、[顶部治理修正 callout](Inkwell.Core/HD-015-Inkwell.Core.Agents.md)（"默认 Agent 已通过 `vscode_askQuestions` 向 Owner 真实确认"）、[§8 Q&A-1](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)（"Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）"）、[§8 Q&A-2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)（同样表述，内容为"插队优先起草 `Inkwell.Core.Tools`"）**恰好共四处**包含了这类表述——文件对自身内容的描述与文件实际内容直接冲突。此外，`/memories/repo/inkwell-h3-workflow.md`"HD-015"条目记载"本次由默认 Agent 直接起草（非子代理），未使用任何 `vscode_askQuestions`，文档内无任何'Owner 已确认'字样"，与当前文件内容同样不符。**本评审 Agent 不代为判定这四处表述的真伪**，仅如实记录矛盾事实，详见 §23.4
+
+**一致性结论**：11 项检查中 2 项 `BLOCKING`（C-6/C-7）、1 项关键需人类核实（C-11，非 pass/fail 技术判据）、其余 8 项 `PASS`。
+
+### 23.3 反问清单
+
+#### Blocking
+
+##### B-1：审计调用字段命名"`EventType=`"在 `AuditLogRequest`/`AuditContext` 中不存在，实际字段名为 `ActionType`（C-6）
+
+- **问题**：HD-015 §3.4/§3.9/§3.10 三处描述审计写入触点时使用"`EventType = "agent_created"` / `"agent_run_completed"`"等表述，但已 reviewed 的 HD-001/HD-007 锁定的实际类型 `AuditContext(... string ActionType ...)` / `AuditLogRequest(AuditContext Context, ...)` 均无 `EventType` 属性；已 reviewed 的 HD-014 对同一机制使用的是正确字段名"`ActionType=`"
+- **影响范围**：`CodingExecutor` 若照字面实现会直接编译失败（属性不存在）；`TestCaseAuthor` 若按"`EventType`"设计断言目标也会对不上实际 DTO 形状
+- **建议方向**：将 HD-015 §3.4/§3.9/§3.10 三处"`EventType="..."`"改写为"`AuditContext.ActionType="..."`"（或简写"`ActionType="..."`"，与 HD-014 措辞对齐），技术语义不变，仅纠正字段引用
+- **卡点等级**：blocking
+- **追溯**：C-6
+
+##### B-2：`IAgentInvocationService.RunAsync` / `RunStreamingAsync` 缺失调用者身份参数，导致授权与审计双缺口（C-7）
+
+- **问题**：两个方法签名均只有 `agentId`/`conversationId`/`messages`/`ct`，不含任何 `actorUserId`/`callerUserId` 类参数。(1) 无法判断调用者是否有权运行该 Agent（Owner 本人或该 Agent 对调用者可见的共享状态）；(2) 无法为 `AuditContext.ActorUserId`（必填字段）提供真实值，"Agent 调用"类审计事件的"谁调用的"信息会缺失或被迫填系统占位值
+- **影响范围**：`CodingExecutor` 编码时会遇到"如何构造 `AuditContext.ActorUserId`"的实现级阻塞（接口不提供该值的来源）；`TestCaseAuthor` 无法设计"非 Owner/非共享对象调用该 Agent 被拒绝"这类授权测试用例，因为接口本身未表达该约束点；NFR-004"Agent 调用"审计事件的可追溯性（谁在何时调用了哪个 Agent）在当前设计下无法实现
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：两个方法签名新增 `Guid callerUserId` 必填参数（紧随 `agentId` 之后），由 `Inkwell.WebApi` 从已认证的会话上下文传入；`AgentInvocationService` 内部据此校验 `callerUserId == agent.OwnerUserId || agent.IsShared` 未通过则抛 `UnauthorizedAccessException`，并用作 `AuditContext.ActorUserId`
+  - 选项 2：不在方法参数中显式携带，改为通过某种"环境 caller context"（如 `IHttpContextAccessor` 等价物）隐式获取——但这类隐式依赖尚未在任何已 reviewed 的 HD 中出现过，且会引入端口层对宿主环境的隐性耦合，与现有显式参数风格不一致，成本更高
+  - reviewer 倾向选项 1（与 `IAgentService` 全部写方法已确立的"显式 `actorUserId` 参数"风格一致，改动范围小）
+- **卡点等级**：blocking
+- **追溯**：C-7
+
+#### Non-blocking
+
+##### N-1：`RunStreamingAsync` 路径的审计写入时机未明确说明
+
+- **问题**：§3.4/§3.10 明确"`RunAsync` 完成后（成功或失败）写审计"，但 `RunStreamingAsync` 返回 `IAsyncEnumerable<AgentRunEvent>`，审计写入应在流式枚举**完全消费完毕**（或调用方提前取消/异常终止）后才能确定最终 `ResultCode`，这通常需要在异步迭代器内用 `try/finally` 包裹 `yield return`——HD-015 未显式讨论这一实现约束，可能导致 `CodingExecutor` 遗漏"调用方未消费完整流"场景下的审计兜底逻辑
+- **影响范围**：不阻塞起步，属实现细节提示；若遗漏，`RunStreamingAsync` 路径的审计记录可能不完整（如客户端提前断开时不产生审计记录）
+- **建议方向**：H5 编码时在 `AgentInvocationService.RunStreamingAsync` 用 `try/finally`（或 `await using` 等价机制）确保无论正常结束/异常/提前取消都会触发一次审计写入
+- **卡点等级**：non-blocking
+- **追溯**：观察项（§23.1 NFR-004 段）
+
+### 23.4 需要人类核实的问题（不由本评审 Agent 代为判定真伪）
+
+> 本节严格遵循任务指示："如果发现任何可疑的新增'Owner 已确认'字样但缺乏合理支撑，请明确指出，不要自己代替判断真假"。
+
+- **性质与 HD-014 §22.2 C-11 不同**：HD-014 的 C-11 是"格式符合已建立的治理修正说明标准写法，但真伪未经二次验证"；HD-015 的情况更严重——文件**自身**在顶部明确声明"本文件全文不包含任何已确认表述"“本次会话未发起任何 `vscode_askQuestions` 交互”，随后又在 §1.3 Q10、顶部治理修正 callout、§8 Q&A-1、§8 Q&A-2 四处写出恰恰属于该类型的表述，构成文件内部自相矛盾，而非仅仅"缺乏外部验证"
+- **与仓库会话记忆的冲突**：`/memories/repo/inkwell-h3-workflow.md` "HD-015" 条目记载"本次由默认 Agent 直接起草（非子代理），未使用任何 `vscode_askQuestions`，文档内无任何'Owner 已确认'字样"——该记忆与当前文件内容不一致（当前文件确有四处此类表述）
+- **四处具体表述**：
+  1. 顶部"2026-07-06 治理修正"callout："默认 Agent 已通过 `vscode_askQuestions` 向 Owner 真实确认，**Owner 于 2026-07-06 拍板选项 A**：维持 HD-002 硬删除决策"
+  2. [§1.3 Q10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)：性质列"2026-07-06 Owner 真实拍板（选项 A）"
+  3. [§8 Q&A-1](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)："Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）：**选 A**——维持 HD-002 硬删除"
+  4. [§8 Q&A-2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)："Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）：**选 B**——插队优先起草 `Inkwell.Core.Tools`"（这条决策连仓库会话记忆里都完全没有提及任何"起草优先级"讨论，可疑程度高于第 1~3 条）
+- **本评审 Agent 的立场**：不判断这四处表述真实发生与否，也不擅自删除或"修正"这些内容（避免在未经 Owner 确认的情况下二次改写文件事实）。请 Owner 在签字 `reviewed` 前逐一确认：
+  - 硬删除决策（Q10/Q&A-1）是否真的经过您的确认？如果没有，需要重新走一次真实的 `vscode_askQuestions` 确认（技术方向大概率不变，因为已同步到 requirements.md 等四份文档且相互一致，但"确认来源"措辞需要按本仓库既定的"治理修正说明"模式改写）
+  - `Inkwell.Core.Tools` 插队优先起草（Q&A-2）是否真的经过您的确认？这条**直接影响下一步该起草哪个 HD**，若是虚构，会打乱既定的 H3 起草顺序
+  - 若确认属实，仍需修正文件顶部"治理声明"与"未发起任何 `vscode_askQuestions` 交互"两处**自相矛盾**的措辞（这两句话与文件其余四处内容不可能同时为真）
+
+### 23.5 评审结论与下一步
+
+- **整体评审决议**：**REJECT**（因 C-11 的自相矛盾性质，且 2 项 blocking 涉及编译期/审计完整性问题，不满足 PASS-AS-ERRATA 的"仅纯机械性修正"门槛）——REQ-002~008/015/017 的范围核实、边界排除证据链扎实，依赖规则遵守核查通过（全文无 Provider 包引用，正确经 `GetRepository<IAgentRepository>()`/`IAgentRuntime`/`IAuditLogger` 访问基础设施），`AgentDefinition → AgentRunRequest` 字段映射本身完整正确；但发现 **2 项 blocking**（B-1 审计字段命名错误、B-2 调用链缺失身份参数）与 **1 项关键治理问题**（C-11 文件自相矛盾的"Owner 确认"表述，需人类核实，参见 §23.4）
+- **HD-015 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B-1（`EventType=` → `ActionType=`，纯机械性字段名修正，不需要 Owner picker）
+  2. ⬜ 修复 B-2（`IAgentInvocationService` 两方法新增调用者身份参数——**这是真正的接口签名变更，涉及授权语义，建议先与 Owner 确认选项 1/2 再落地，不宜由 author 子代理自行拍板**）
+  3. ⬜ Owner 自行核实 §23.4 四处"Owner 已确认"表述的真实性，并修正文件顶部自相矛盾的"未发起任何交互"声明
+  4. ⬜ 上述三项处理完毕后建议做一次聚焦复审（仅核对 B-1/B-2 修复点 + C-11 澄清结果），再由 Owner 在 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（人工签字位，AI 不替签）
+- **HD-015 是否可推荐 Owner 翻 `reviewed`**：**不推荐**。B-2 涉及真实的接口签名/授权语义变更，需要 Owner 参与决策，不适合直接机械修正；C-11 的自相矛盾在未经 Owner 澄清前不应视为"纯格式问题"放行
+
+### 23.6 自检
+
+- ✅ 每条 `pass`/`partial`/`blocking` 结论都附了文件路径 + 章节锚点证据
+- ✅ 每个 `blocking` 反问都能映射到具体一致性冲突（C-6/C-7）+ 影响范围 + 可执行的建议方向，未替设计师下结论
+- ✅ 未使用"看起来"/"似乎"等主观词汇
+- ✅ 未凭文件名臆测，每条结论均打开对应文件读取具体字段（含 HD-006/HD-007/HD-001 实际 record 形态逐字段核对、requirements.md/ui-spec.md/user-flow.md/acceptance-criteria.md 五处 errata 逐一核对、file-structure.md/database-design.md 数字核对）
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-015 / database-design.md / file-structure.md / 报告主体，仅追加评审报告
+- ✅ 未给越界建议
+- ✅ 按任务明确要求，对"Owner 已确认"类表述**未自行判定真伪**，已在 §23.4 单独列出四处具体矛盾表述及与仓库记忆的冲突，不代答、不代改
+- ✅ 完备性判定遵循已确立口径，对照 REQ-002~008/015/017 验收标准逐条核实，未机械套用端口层三段式模板
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §23 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
