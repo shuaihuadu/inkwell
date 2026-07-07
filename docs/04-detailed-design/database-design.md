@@ -219,6 +219,6 @@ downstream: []
 
 **索引**：`Name` 唯一索引。**不**包含 `RowVersion`（[HD-016 §1.3 Q3](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要)，v1 无运行期 Update 场景）；**不**包含 `OwnerUserId`（系统级目录，非用户私有资源）。
 
-**2026-07-07 已知开放问题**：本表 v1 是否需要运行期管理 API（Admin CRUD），以及具体内置工具清单是否需要在 v1 落地，均**未拍板**，详见 [HD-016 §8 Q&A-A / Q&A-C](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#8-需要-owner-确认的问题)。
+**2026-07-07 已解决**：本表 v1 是否需要运行期管理 API（Admin CRUD）以及具体内置工具清单是否需要在 v1 落地，此前均未拍板；Owner 已在对话中直接明确确认——维持只读目录设计（不补 CRUD API），且 v1 需要至少一个真实可用的内置工具（已落地 `get_current_datetime`，详见 [HD-016 §3.12](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#312-inkwellcoretoolscurrentdatetimetoolexecutorcs) + [§6.1 Seed 数据](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#61-tools-表-seed-数据2026-07-07-新增)），详见 [HD-016 §8 Q&A-A / Q&A-C](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#8-需要-owner-确认的问题)。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
