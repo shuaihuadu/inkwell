@@ -71,7 +71,7 @@ downstream: []
 | `agents`             | Inkwell.Core.Agents    | HD-015  | [REQ-002](../01-requirements/requirements.md) ~ [REQ-008](../01-requirements/requirements.md)                                                                      |
 | `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
 | `skills`             | Inkwell.Skills         | TBD     | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
-| `tools`              | Inkwell.Tools          | TBD     | [REQ-007](../01-requirements/requirements.md)                                                                                                                      |
+| `tools`              | Inkwell.Tools          | HD-016  | [REQ-007](../01-requirements/requirements.md)                                                                                                                      |
 | `knowledge_bases`    | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `kb_documents`       | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `kb_chunks`          | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
@@ -202,5 +202,23 @@ downstream: []
 **索引**：`OwnerUserId` 非唯一索引（"我的" tab 查询路径）；`IsShared` 非唯一索引（"团队共享" tab 过滤路径）。
 
 **2026-07-06 已解决**：本表**不**包含软删除字段，遵循已 reviewed 的 [HD-002 §1.3 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)"v1 不提供软删"。原与 [requirements.md §8.3](../01-requirements/requirements.md) / [ui-spec.md §3.5](../01-requirements/ui-spec.md)"30 天回收期可恢复"字面承诺冲突，Owner 已拍板维持硬删除，需求文档已同步 errata 修正，详见 [HD-015 §8](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)。
+
+**Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
+
+## Inkwell.Core.Tools
+
+> 由 [HD-016 §6](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#6-数据库设计增量追加至-database-designmd) 锁定。本节是 H3 第三张业务命名空间贡献的表结构（此前"表清单"占位表中 `tools` 行为 `TBD`，现更新为 `HD-016`）。
+
+### 表 `tools`（[REQ-007](../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `Name`：`string`，唯一索引，长度上限 100（作者判断，非 Owner 拍板，需求未指定具体上限）
+- `Description`：`string`，无长度上限
+- `ParametersJsonSchema`：`string`，无长度上限（[JSON Schema](https://json-schema.org/) 文本）
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+
+**索引**：`Name` 唯一索引。**不**包含 `RowVersion`（[HD-016 §1.3 Q3](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要)，v1 无运行期 Update 场景）；**不**包含 `OwnerUserId`（系统级目录，非用户私有资源）。
+
+**2026-07-07 已知开放问题**：本表 v1 是否需要运行期管理 API（Admin CRUD），以及具体内置工具清单是否需要在 v1 落地，均**未拍板**，详见 [HD-016 §8 Q&A-A / Q&A-C](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#8-需要-owner-确认的问题)。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。

@@ -194,6 +194,17 @@ src/core/Inkwell.Abstractions/Persistence/
     IAgentRepository.cs                # 具名 Repository（7 方法：AddAgent/UpdateAgent/GetAgent/DeleteAgent/ListAgents/FindAgentsByOwner/FindSharedAgents）
 ```
 
+### Persistence/Tools（HD-016 落地，2026-07-07）
+
+> 由 [HD-016 §2 / §3.1 / §3.2](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 锁定。上方示例中的 `Tools/` 条目现已是真实文件，非仅占位。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Tools/                               # 新增子目录（HD-016）
+    ToolDefinition.cs                  # 业务 Model（工具目录元数据）
+    IToolRepository.cs                 # 具名 Repository（4 方法：AddTool/GetTool/GetToolByName/ListTools）
+```
+
 ## Inkwell.Abstractions.FileStorage
 
 > 由 [HD-003 §2 / §3](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 锁定。
@@ -471,6 +482,39 @@ src/core/Inkwell.Core/
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）= 8 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
 
 > `Persistence/Agents/AgentDefinition.cs` + `IAgentRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Agents 小节](#persistenceagentshd-015-落地2026-07-06)）；`AgentEntity` / `AgentMappingExtensions` / `EfCoreAgentRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
+
+## Inkwell.Abstractions.Tools
+
+> 由 [HD-016 §2 / §3](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 锁定。**本 HD 是 H3 第三张业务命名空间 HD**——`IToolCatalogService` / `IToolBindingResolver` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Tools/` 子目录（与 `Persistence/Tools/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Tools` / `Inkwell.Abstractions.Persistence.Tools`）。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Tools/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）。
+
+```text
+src/core/Inkwell.Abstractions/
+  Tools/                                  # 新增子目录（HD-016）
+    IToolCatalogService.cs                 # 顶层业务门面（只读查询 + 绑定校验）
+    IToolBindingResolver.cs                # AgentToolBinding → AgentToolDefinition 翻译
+    ToolOptions.cs                          # MaxToolsPerAgent / EnableSensitiveDataLogging
+    ToolOptionsValidator.cs                # IValidateOptions<ToolOptions>
+```
+
+**文件计数**：HD-016 在 `Tools/` 新增 4 个 `*.cs` + 在 `Persistence/Tools/`（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）新增 2 个 `*.cs`，合计 6 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）= **74** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Tools` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）：
+
+```text
+src/core/Inkwell.Core/
+  Tools/
+    ToolCatalogService.cs                  # 唯一 IToolCatalogService 实现
+    IToolExecutor.cs                       # 内部执行委托接口（不暴露 Abstractions）
+    ToolExecutorRegistry.cs                # 内部执行器注册表
+    ToolBindingResolver.cs                 # 唯一 IToolBindingResolver 实现
+    ToolsBuilderExtensions.cs              # UseDefaultToolService()
+```
+
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 5（HD-016）= **13** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+
+> `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
 
 ## providers/Inkwell.Persistence.EFCore
 
