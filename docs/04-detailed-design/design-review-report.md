@@ -2787,3 +2787,41 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 完备性判定遵循已确立口径，对照 REQ-002~008/015/017 验收标准逐条核实，未机械套用端口层三段式模板
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §23 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+### 23.7 聚焦复审（2026-07-07，核对 B-1/B-2/C-11 修复点）
+
+> 本轮**不**重新执行 §23.1/§23.2 全量扫描，仅聚焦核对 §23.5 前置条件清单第 1~3 项声称的修复内容是否真实、自洽，并检查是否引入新的不一致。评审对象：[HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 当前文本（2026-07-07 版）。
+
+- **检查项 1：全文 grep 确认零残留 `EventType`（对应 B-1）——PASS**
+  - `grep -n "EventType" Inkwell.Core/HD-015-Inkwell.Core.Agents.md` 无任何命中；§3.4/§3.9/§3.10 三处审计写入描述均已统一改写为 `ActionType="agent_created"` / `"agent_updated"` / `"agent_deleted"` / `"agent_shared"` / `"agent_unshared"` / `"agent_share_revoked_by_admin"` / `"agent_cloned"` / `"agent_run_completed"` / `"agent_run_failed"`，措辞与已 reviewed 的 [HD-014 §3.8](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#38-inkwellcoreauthauthservicecs) `ActionType="login"` 写法对齐
+  - 交叉核实：全仓其余位置出现的 `EventType`（[HD-007 §3.1/§3.2](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md)、[file-structure.md](file-structure.md) 第 358 行）均属 `AuditLogEntry.EventType` / `AuditLogQuery.EventType`——`IAuditLogger` **读侧**查询/投影 DTO 的真实属性名，与本次 B-1 修正的**写侧**`AuditContext.ActionType` 是两个不同但均真实存在的字段，不构成同名混用问题，无需一并修改
+  - 结论：B-1 修复完整、无残留，未发现新的字段命名错误
+- **检查项 2：`callerUserId` 参数 + 权限校验逻辑自洽性（对应 B-2）——PASS**
+  - 签名核对：[§3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) `RunAsync(Guid agentId, Guid callerUserId, Guid? conversationId, IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default)` 与 `RunStreamingAsync` 同构，`callerUserId` 位置紧随 `agentId`、先于 `conversationId`/`messages`，与 [§8 Q&A-3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题) 决议描述的参数位置逐字一致
+  - 授权逻辑核对：`ValidateInvocationAccess(agent, callerUserId)`：`agent.OwnerUserId != callerUserId && !agent.IsShared` → `UnauthorizedAccessException`，在 [§3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 内部逻辑描述与 [§3.10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs) 实现细节两处逐字相同，无表述漂移
+  - **场景覆盖核实**（逐一验证真值表）：
+    - Owner 本人调用（`callerUserId == agent.OwnerUserId`）→ 条件左侧为 `false` → 整体 `false` → 不抛异常 → 允许调用，覆盖场景 1
+    - 非 Owner + `agent.IsShared = true`（团队共享可见）→ 条件左侧 `true`、右侧 `!true = false` → 整体 `false` → 不抛异常 → 允许调用，覆盖场景 2
+    - 非 Owner + `agent.IsShared = false`（未共享）→ 条件左侧 `true`、右侧 `!false = true` → 整体 `true` → 抛 `UnauthorizedAccessException` → 正确拒绝
+    - 三种场景真值表完整、无遗漏分支，逻辑与 [§1.3 Q7](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) `FindSharedAgents` 已确立的 `IsShared` 团队级可见语义复用一致，未新发明 ACL 粒度
+  - 未授权时行为核对：[§3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 错误处理表明确"`UnauthorizedAccessException`（先于 `IAgentRuntime` 调用发生）"，即校验失败时**不会**调用 `IAgentRuntime`、不产生模型调用副作用；测试要求（[§3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)/[§3.10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs) 均含）显式列出"`callerUserId` 非 Owner 且 `agent.IsShared=false` 时抛 `UnauthorizedAccessException` 且不调用 `IAgentRuntime`"+"`callerUserId` 为 Owner 或 `agent.IsShared=true` 时正常通过"两条断言，两种场景均有对应测试用例覆盖，非遗漏
+  - 审计字段核对：[§3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)/[§3.10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs) 均写"`AuditContext.ActorUserId = callerUserId`"，[§4.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#42-bcl-异常分类业务失败-vs-程序错误) BCL 异常分类表已同步把该 `UnauthorizedAccessException` 场景列入"业务失败/预期错误"分类，未遗漏
+  - 结论：B-2 修复逻辑完整自洽，覆盖 Owner 本人 + 团队共享可见两种放行场景与一种拒绝场景，未授权时正确短路、不触发下游调用，审计字段来源明确，§3.4/§3.10/§4.2/§8 Q&A-3 四处描述互相一致，无矛盾
+- **检查项 3：顶部治理声明措辞是否仍自相矛盾（对应 C-11）——PASS**
+  - 现行 [顶部治理声明](Inkwell.Core/HD-015-Inkwell.Core.Agents.md)（"2026-07-07 更新，修正原自相矛盾表述"）措辞已改为"本文件在 2026-07-06 **起草时**，正文确实不包含任何……表述"，把"无确认"的断言限定在起草会话这一时间范围内，随后明确列出 4 项后续真实确认及各自来源（①②③ 2026-07-06 `vscode_askQuestions`，④ 2026-07-07 本轮对话直接确认），不再与 [§1.3 Q10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) / [§8 Q&A-1/Q&A-2/Q&A-3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题) 四处确认记录冲突
+  - [§1.3 表格上方前言](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) 同步改为"本文件 2026-07-06 起草**当次会话**未发起任何 `vscode_askQuestions` 交互"，同样限定在起草会话范围，并显式声明"除 Q10（已由后续真实 Owner 确认更新，详见顶部治理声明）外"，与表格内 Q10 行"2026-07-06 Owner 真实拍板（选项 A）"不再矛盾
+  - 全文 grep "不包含任何|未发起任何" 仅命中这两处限定表述，未发现其余位置仍残留旧版"全文/本次会话完全没有任何确认"的无限定断言
+  - 结论：C-11 指出的自相矛盾已通过"限定时间范围 + 显式列出后续确认"的方式解决，现行表述内部一致
+- **检查项 4：是否引入新的不一致——发现 1 项非阻塞的既存遗留问题（非本轮 B-1/B-2 修复引入）**
+  - **D-1（non-blocking）**：[§8 小节开头提示](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)仍写"Q&A-1 已于 2026-07-06 由 Owner 真实拍板……；**Q&A-2 仍未裁决，给出候选选项，不代答**"，但 Q&A-2 小节自身已包含"Owner 决议（2026-07-06，默认 Agent 通过 `vscode_askQuestions` 真实确认）：选 B——插队优先起草 `Inkwell.Core.Tools`"的完整决议记录——即该提示行的措辞与 Q&A-2 小节实际内容不一致（提示说"未裁决"，正文却已有决议）
+    - **性质核实**：核对 `/memories/repo/inkwell-h3-workflow.md` HD-015 条目与 §23.4 记录，Q&A-2 的决议内容（"选 B"）在本轮 B-1/B-2 修复**之前**就已存在于 HD-015 §8，非本轮新引入；本轮修复未touch §8 小节开头提示这一行，是首轮评审遗留、此次聚焦复审新发现的既存表述滞后，与本轮 C-11 处理无因果关系
+    - **影响范围**：不影响编译/接口/授权语义（`CodingExecutor`/`TestCaseAuthor` 不依赖这行提示文字），仅文档内部提示与正文不同步，可能让读者误以为 Q&A-2 仍待裁决而重复询问 Owner
+    - **建议方向**：将该提示行"Q&A-2 仍未裁决，给出候选选项，不代答"更新为"Q&A-1/Q&A-2/Q&A-3 均已解决"类措辞（三个 Q&A 小节标题当前均已标注"已解决"或有明确 Owner 决议），或径直移除该提示行（§8 小节标题"需要 Owner 确认的问题"本身也已不再准确，因三项均有决议，但标题保留可作为"历史 Q&A 归档区"理解，不强制改名）
+    - **卡点等级**：non-blocking——不阻塞签字 `reviewed`，建议顺手一并修正，但不作为强制前置条件
+  - 除 D-1 外，未发现其他新引入的不一致（B-1/B-2 涉及的接口签名、审计字段、异常分类、测试要求四处描述互相吻合；`get_errors` 复核 HD-015 无 lint 错误）
+
+### 23.8 聚焦复审结论
+
+- **复审结论**：**PASS**——B-1（`EventType`→`ActionType`）、B-2（`callerUserId` 参数 + 授权校验）、C-11（治理声明自相矛盾）三项前置条件的修复内容均核实真实、完整、自洽，未发现新的 blocking 级问题；仅发现 1 项 non-blocking 的既存文档提示滞后（D-1）
+- **HD-015 是否可推荐 Owner 翻 `reviewed`**：**可以推荐**——聚焦复审确认本轮修复无遗漏、无新引入的不一致，`/memories/repo/inkwell-h3-workflow.md` 既定工作流"blocking 修复后聚焦复审确认→再由 Owner 签字"的前置条件已满足；D-1 是文档措辞级 non-blocking 问题，不构成签字阻塞，Owner 可自行决定是否顺手一并修正
+- 本报告不代 Owner 翻转 frontmatter `status` 字段，签字仍需人工在 [HD-015 frontmatter](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 手动操作
