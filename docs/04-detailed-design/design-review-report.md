@@ -2825,3 +2825,77 @@ reviewer 在 chat 中列三路径 picker：
 - **复审结论**：**PASS**——B-1（`EventType`→`ActionType`）、B-2（`callerUserId` 参数 + 授权校验）、C-11（治理声明自相矛盾）三项前置条件的修复内容均核实真实、完整、自洽，未发现新的 blocking 级问题；仅发现 1 项 non-blocking 的既存文档提示滞后（D-1）
 - **HD-015 是否可推荐 Owner 翻 `reviewed`**：**可以推荐**——聚焦复审确认本轮修复无遗漏、无新引入的不一致，`/memories/repo/inkwell-h3-workflow.md` 既定工作流"blocking 修复后聚焦复审确认→再由 Owner 签字"的前置条件已满足；D-1 是文档措辞级 non-blocking 问题，不构成签字阻塞，Owner 可自行决定是否顺手一并修正
 - 本报告不代 Owner 翻转 frontmatter `status` 字段，签字仍需人工在 [HD-015 frontmatter](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 手动操作
+
+## 24. HD-016 Inkwell.Core.Tools 首轮评审（2026-07-07）
+
+> 评审对象：[HD-016 `Inkwell.Core.Tools`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md)（H3 第三张业务命名空间详细设计，`status: draft`）。前置检查：[requirements.md](../01-requirements/requirements.md) `status: reviewed`（满足）；[repo-impact-map.md](../01-requirements/repo-impact-map.md) 存在（满足）；`docs/04-detailed-design/` 核心章节齐全（满足）。前置闸门通过，进入正式评审。
+
+### 24.1 完备性（对照 requirements.md REQ-007 验收标准逐条核实覆盖度）
+
+- **AC-025**（勾选工具并填参数保存）——覆盖：[§3.3 `IToolCatalogService.ListAvailableToolsAsync`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#33-toolsitoolcatalogservicecs) 提供勾选所需的目录列表；实际的"保存"动作（写入 `AgentDefinition.ToolBindings`）在已 reviewed 的 [HD-015 `AgentUpsertRequest.ToolBindings`](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#35-agentsagentupsertrequestcs)，HD-016 顶部范围声明已如实标注"绑定校验触点留给 `Inkwell.WebApi`"，不越权臆造，判定 **pass**
+- **AC-026**（触发工具对话，trace 可见入参/返回值）——覆盖：[§3.4 `IToolBindingResolver.ResolveAsync`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#34-toolsitoolbindingresolvercs) 组装的 `AgentToolDefinition.InvokeAsync` 委托是工具被调用的唯一入口，`ArgumentsJson`/`ResultJson` 承载体已在 [HD-006 `AgentToolCallRecord`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#37-agentruntimeagenttooldefinitioncs--agenttoolcallrecordcs) 锁定；trace 可见性本身明确排除在 `Inkwell.Core.AgentRuntime`/`Inkwell.Core.Traces`（[HD-016 §1.4](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#14-与-inkwellcoreagentruntime-的边界声明工具定义-vs-工具执行)已声明边界），判定 **pass**（衔接点完整，执行编排本身合理排除在外）
+- **AC-027**（工具失败标红 + trace "failed" + EX-003）——覆盖：[§3.12 `CurrentDateTimeToolExecutor` 错误处理](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#312-inkwellcoretoolscurrentdatetimetoolexecutorcs)声明异常原样上抛，由 `Inkwell.Core.AgentRuntime` 统一捕获转换为 `AgentToolCallRecord.IsError=true`（[HD-006 §205](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#37-agentruntimeagenttooldefinitioncs--agenttoolcallrecordcs)），判定 **pass**（该 AC 大部分职责本就归属未起草的 `Inkwell.Core.AgentRuntime` 实现 HD，HD-016 层面的衔接证据完整）
+- **AC-028**（缺必填参数保存被拒，红字提示）——覆盖：[§3.3 `ValidateToolBindingAsync`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#33-toolsitoolcatalogservicecs) + [§3.7 `ExtractRequiredFields`/`ParseProvidedFieldNames`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#37-inkwellcoretoolstoolcatalogservicecs) 实现细节完整，错误消息格式（`"Tool '<name>' is missing required parameter: '<field>'"`）与 [ui-spec.md](../01-requirements/ui-spec.md) 提示文案"工具 <名称> 缺少必填参数：<字段>"逐字对应，判定 **pass**
+- **REQ-008（Skills）排除结论**——经查 [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md) 原文"想做'调用第三方 API'必须走 REQ-007 工具调用路径，不是 Skill 路径"，独立核实原文存在（第 67 行），HD-016 §1 排除判断证据链成立，判定 **pass**
+- **REQ-005/REQ-006/REQ-015/REQ-017 排除结论**——`ToolDefinition` 确不持有 Agent 归属/版本/共享字段（[§3.1](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#31-persistencetoolstooldefinitioncs) 字段列表核实），排除成立，判定 **pass**
+- **NFR-004（审计）覆盖度**——发现缺口，详见 [§24.4 B-2](#244-一致性表)，不在此处重复判 fail/pass（该缺口跨 HD-015/HD-016 边界，非 HD-016 单方职责）
+
+**完备性小结**：REQ-007 四条 AC 逐条有证据支撑，判定 **pass**；REQ-008/REQ-005/REQ-006/REQ-015/REQ-017 排除结论均有独立核实的证据支撑，无凭空臆断。
+
+### 24.2 依赖规则核查（AGENTS.md §3.2，重点项）
+
+- 全文 grep `Microsoft\.Agents\.AI|StackExchange\.Redis|Npgsql|Minio|EntityFrameworkCore\.SqlServer|Azure\.Storage` 命中的 4 处均为**说明性引用**（解释"MAF 是什么"、"边界在哪里"），不构成真实依赖声明；`Inkwell.Abstractions/Tools/` + `Inkwell.Core/Tools/` 全部对外接口/实现的"依赖模块"字段逐一核对，仅出现 `Inkwell.Abstractions.*` 内部类型 + `System.*` BCL 命名空间，**无任何 Provider 包**，判定 **pass**
+- 持久化访问路径 `IPersistenceProvider.GetRepository<IToolRepository>()` 与已 reviewed 的 [HD-002 §13.5 errata·第五轮](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#135-2026-05-18-errata第五轮q1--a2-picker-落地getrepositorytrepository-泛型工厂入口) 锁定的签名 `TRepository GetRepository<TRepository>() where TRepository : class` 完全一致，判定 **pass**
+- `IToolRepository` 具名动词 `Add`/`Get`/`List` 均在 [HD-002 §4.1.3 动词白名单](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 内，未出现白名单外动词，判定 **pass**
+
+### 24.3 Tools 定义 vs 执行边界自洽性核查（用户要求重点项）
+
+- **`IToolExecutor` 具体实现 `CurrentDateTimeToolExecutor` 依赖面核实**：[§3.12 依赖模块](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#312-inkwellcoretoolscurrentdatetimetoolexecutorcs) 仅列 `System.TimeProvider` / `System.TimeZoneInfo` / `System.Text.Json.Nodes` 三个 BCL 命名空间，构造函数仅注入 `TimeProvider`（BCL 类型，非 MAF 类型），逐字段核实**零 MAF 依赖、零第三方 SDK 依赖**成立，判定 **pass**
+- **`AgentToolDefinition` 承载形态核实**：[HD-006 §200](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#37-agentruntimeagenttooldefinitioncs--agenttoolcallrecordcs) 原文 `public sealed record AgentToolDefinition { ... Func<string, CancellationToken, Task<string>> InvokeAsync ... }` 逐字段核实——该 record 本身定义在 `Inkwell.Abstractions.AgentRuntime`（HD-006，已 reviewed），HD-006 本体亦声明"零 MAF 依赖"（[HD-006 §100](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 依赖模块字段"**严禁**因本 HD 引入 `Microsoft.Agents.AI.*`"），故 HD-016 引用该类型不构成对 MAF 的间接依赖，判定 **pass**
+- **"全部代码可脱离 MAF 独立编译运行"判定标准复核**：逐一核对 §3.1~§3.12 共 12 个文件的"对外接口"/"内部函数或类"字段，均为 BCL 类型（`Guid`/`string`/`Task<T>`/`Func<>`/`JsonNode`/`TimeProvider`/`TimeZoneInfo`）+ `Inkwell.Abstractions.*` 内部类型，**不存在**任何字段/参数/返回值类型来自 MAF 程序集（`Microsoft.Agents.AI.*`），该判定标准经得起逐字段核实，**成立**
+- **结论**：HD-016 声称的"工具定义 vs 工具执行"边界自洽，`IToolExecutor` 具体实现确实不触碰 MAF 类型/不需要 MAF 编排，判定标准可验证、非空话
+
+### 24.4 一致性表
+
+- **C-1（PASS）**——HD-015 errata 对接核实：[HD-015 §3.4/§3.10](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 构造函数新增 `IToolBindingResolver toolBindingResolver` 依赖 + 调用 `ResolveAsync(agent.ToolBindings)`，与 [HD-016 §3.4](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#34-toolsitoolbindingresolvercs) 接口签名 `Task<IReadOnlyList<AgentToolDefinition>> ResolveAsync(IReadOnlyList<AgentToolBinding> bindings, CancellationToken ct = default)` 完全匹配；`AgentToolBinding(Guid ToolId, string? ParametersJson)`（[HD-015 §153](Inkwell.Core/HD-015-Inkwell.Core.Agents.md)）与 HD-016 内部逻辑对 `binding.ToolId`/`binding.ParametersJson` 的引用逐字段一致，双方签名/类型匹配无漂移
+- **C-2（PASS）**——`database-design.md`/`file-structure.md` 数字核对：`tools` 表清单行（第 74 行）`TBD→HD-016` 已更新；Abstractions 累计 68→74、Inkwell.Core 累计 8→14，两处文件与 HD-016 §2 自述数字完全一致，未发现算错
+- **C-3（PASS）**——`§6.1` Seed 数据 `Guid` 字面量 `00000000-0000-0000-0000-000000000101` 与 `§3.12 CurrentDateTimeToolExecutor.ToolId` 字面量逐字比对一致，无漂移
+- **B-1（blocking，DI 生命周期不匹配）**——[§3.11 `ToolsBuilderExtensions.UseDefaultToolService`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#311-inkwellcoretoolstoolsbuilderextensionscs) 把 `ToolExecutorRegistry` 注册为 `AddSingleton<ToolExecutorRegistry>()`，但其构造函数（[§3.9](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#39-inkwellcoretoolstoolexecutorregistrycs)）依赖 `IEnumerable<IToolExecutor>`，而 `IToolExecutor` 的唯一实现 `CurrentDateTimeToolExecutor` 在同一方法内注册为 `AddScoped<IToolExecutor, CurrentDateTimeToolExecutor>()`——这是标准的"Singleton 消费 Scoped 依赖"DI 反模式（与 `/memories/repo/inkwell-h3-workflow.md` HD-010 B16/C96 记录的"注册生命周期与消费方式不匹配"同一根因类别，只是这次是 Singleton→Scoped 方向）。在启用 scope 校验的宿主（ASP.NET Core / Generic Host `ValidateScopes=true`，Development 环境默认开启）下，首次解析 `ToolExecutorRegistry` 会直接抛 `InvalidOperationException`（"Cannot resolve scoped service from root provider"）。该缺陷还直接与 [§3.11 测试要求第 4 条](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#311-inkwellcoretoolstoolsbuilderextensionscs)"`IServiceProvider` 可解析出至少一个 `IToolExecutor`"自相矛盾——若测试用 `BuildServiceProvider(validateScopes: true)`（常见测试写法），该测试本身会因这个缺陷立即失败。**证据**：[§3.9 对外接口](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#39-inkwellcoretoolstoolexecutorregistrycs) + [§3.11 内部函数或类](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#311-inkwellcoretoolstoolsbuilderextensionscs)
+- **B-2（blocking，AC-083/NFR-004 覆盖缺口，跨 HD-015/HD-016 边界）**——[acceptance-criteria.md AC-083](../01-requirements/acceptance-criteria.md#nfr-004--审计日志)原文"**Skill 与工具的挂载变更**、共享/撤销共享、Admin 解封账号/撤销共享均产生审计条目"，与 [requirements.md NFR-004 完整原文](../01-requirements/requirements.md)"...Agent 创建/修改/删除/共享、Agent 调用...**Skill 与工具的挂载变更**"均明确把"工具挂载变更"列为独立的审计事件类别（与"共享/撤销共享"并列，而后者在 [HD-015 `AgentService`](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs) 确有独立 `ActionType="agent_shared"`/`"agent_unshared"`）。但核实发现：①[HD-016 §1.3 Q1](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要) 引用 NFR-004 时的措辞是"审计事件清单（登录/登出、Agent CRUD/共享/调用）未提及'工具目录查询'或'绑定解析'"——该转述**省略**了 NFR-004 原文明确写有的"Skill 与工具的挂载变更"这一分句；②[HD-015 `UpdateAgentAsync`](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs) 无论 `ToolBindings`/`SkillBindings` 是否发生变化，一律只写笼统的 `ActionType="agent_updated"`，**没有**任何区分"这次更新专门改了工具/Skill 挂载"的独立审计信号。结果：**AC-083 要求的"工具挂载变更产生审计条目"这条验收标准，在已起草的全部 HD（HD-014/HD-015/HD-016）中均未被真正满足**——HD-016 的论证本身没错（HD-016 自己确实只做只读查询，不该写审计），但这条论证被用来"证明整个工具挂载审计需求已被覆盖或不需要覆盖"，而实际上覆盖链条在 HD-015 侧断裂，HD-016 §1.3 Q1 的措辞客观上掩盖了这个断裂点。**证据**：[acceptance-criteria.md 第 182 行](../01-requirements/acceptance-criteria.md) + [requirements.md 第 163 行](../01-requirements/requirements.md) + [HD-015 §3.9 `UpdateAgentAsync` 错误处理行](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs)
+- **C-4（non-blocking）**——[HD-015 §3.10 测试要求行](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs)第 (1) 条仍写"`BuildRunRequest` 字段映射正确性（`Instructions`/`ModelId`/`ModelParameters` 1:1 透传，`Tools`恒为 `null`）"，与同一行后半段"2026-07-07 errata 新增——`IToolBindingResolver` mock 验证 `Tools` 字段等于其返回值"自相矛盾（`Tools`不再恒为 `null`）——2026-07-07 errata 修正 `AgentRunRequest.Tools` 的赋值来源时，遗漏同步修正第 (1) 条测试要求里的旧描述，属 HD-015 侧的 errata 遗留问题，非 HD-016 本身缺陷，建议随 HD-015 下一次 errata 一并修正
+- **C-5（non-blocking）**——OTel span 命名 `tools.<verb>`（[§3.3/§3.4/§3.7](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#33-toolsitoolcatalogservicecs)）与既有 HD 建立的"业务命名空间用单数域名词做前缀"惯例（`agent.<verb>`/`auth.<verb>`/`audit.<verb>`，[design-review-report.md §22.4](#224-一致性表)/[§23 C-5](#235-评审结论与下一步) 已确认的命名同构风格）不完全对齐——`tools`为复数形式，虽然与 `cache.<verb>`/`queue.<verb>` 同为名词不违反硬性规则，但与"Tools"域理应类比"Agent"域产出单数 `tool.<verb>` 存在轻微不一致，不影响功能，建议后续统一时机顺手对齐
+- **C-6（non-blocking）**——`ToolOptions`（[§3.5](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#35-toolsstooloptionscs)）声明的 `MaxToolsPerAgent` 与 `EnableSensitiveDataLogging` 两个字段在全文任何 §3.x 逻辑描述中均未被实际消费/门控——对照已 reviewed 的 [HD-015 `AgentOptions.MaxAgentsPerOwner`](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs)（在 `CreateAgentAsync` 配额校验中真实使用）与 [HD-014 `AuthOptions.EnableSensitiveDataLogging`](Inkwell.Core/HD-014-Inkwell.Core.Auth.md)（门控 `Username` 是否明文进日志）均有真实消费点，HD-016 这两个字段目前是"声明但从未生效"的死配置，建议要么在 `ValidateToolBindingAsync`/`CurrentDateTimeToolExecutor` 日志逻辑中接入，要么在 §1.3 决策表补一条说明"预留字段，v1 暂不生效"
+
+### 24.5 反问清单
+
+- **问题**：`ToolExecutorRegistry` 注册为 `AddSingleton`，但依赖的 `IToolExecutor` 注册为 `AddScoped`，构成 DI 生命周期不匹配（详 [§24.4 B-1](#244-一致性表)）
+  **影响范围**：REQ-007 端到端场景（H5 编码/H4 测试起步即会在 DI 容器启动阶段失败，`ToolsBuilderExtensionsTests.cs` 第 4 条测试无法通过）
+  **建议方向**：二选一——① 把全部 `IToolExecutor` 实现改为 `AddSingleton`（`CurrentDateTimeToolExecutor` 本身无状态、仅依赖单例 `TimeProvider`，具备改 Singleton 的条件）；② 把 `ToolExecutorRegistry` 改为 `AddScoped`（每次请求重建索引表，性能代价更高但保持 `IToolExecutor` 的 Scoped 语义弹性）。不代作者选择，需 HD-016 作者/Owner 决定
+  **卡点等级**：blocking
+- **问题**：AC-083 要求"工具挂载变更产生审计条目"，但 HD-014/HD-015/HD-016 均未实现区分"工具/Skill 挂载变更"的独立审计信号（详 [§24.4 B-2](#244-一致性表)）
+  **影响范围**：REQ-007/NFR-004 端到端验收（AC-083 无法通过）；TestCaseAuthor 若照单全收 HD-015/HD-016 现有设计起草 TC，会漏掉这条验收标准对应的用例
+  **建议方向**：需要 Owner 决定由谁承接这条缺口——① 在已 reviewed 的 HD-015 `AgentService.UpdateAgentAsync` 内新增字段级 diff 判断，`ToolBindings`/`SkillBindings` 变化时写独立 `ActionType`（如 `"agent_tool_bindings_changed"`/`"agent_skill_bindings_changed"`）；② 或认定"挂载变更"已被笼统的 `"agent_updated"` 事件覆盖、AC-083 措辞需要澄清/收窄（需改 acceptance-criteria.md，跨 H1 产物，影响更大）。两个方向都不应由 HD-016 单方决定，需回 HD-015 或升级到 Owner 层面裁决
+  **卡点等级**：blocking
+
+### 24.6 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——REQ-007 四条 AC 覆盖证据扎实、REQ-008/005/006/015/017 排除结论有独立核实证据；依赖规则遵守核查通过（无 Provider 包引用、无 MAF 依赖）；"工具定义 vs 执行编排"边界自洽性经逐字段核实成立，判定标准可验证非空话；HD-015 errata 对接的接口签名/类型完全匹配；Q&A-A/B/C 三项"已解决"标注的技术内容（只读设计维持不变、绑定参数优先合并逻辑、`CurrentDateTimeToolExecutor` 零外部依赖）与正文实现逐一核实一致，未发现"确认状态"与"实际实现"不符的情况。但发现 **2 项 blocking**（B-1 DI 生命周期不匹配的编译期/运行期缺陷、B-2 跨 HD 的 AC-083 审计覆盖缺口）+ **4 项 non-blocking**（C-4/C-5/C-6 文档/命名/死配置类）
+- **HD-016 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B-1（`ToolExecutorRegistry`/`IToolExecutor` 生命周期二选一对齐，纯技术修正，不需要 Owner picker，可直接由 author 修复）
+  2. ⬜ B-2 需要 Owner 决定归属与修复方向（不能由 author 子代理自行拍板，涉及跨已 reviewed HD-015 的审计事件设计或 acceptance-criteria.md 澄清）
+  3. （可选）顺手处理 C-4/C-5/C-6（non-blocking，不阻塞签字）
+- **HD-016 是否可推荐 Owner 翻 `reviewed`**：**不推荐**——存在 2 项 blocking，其中 B-2 需要 Owner 亲自裁决修复方向、不属于机械修正范畴；建议顺序：先修 B-1（机械） → 就 B-2 归属方向问 Owner（HD-015 补审计 or 收窄 AC-083 措辞）→ 落地修复 → 聚焦复审 → Owner 签字
+
+### 24.7 自检
+
+- ✅ 每条 `pass`/`blocking`/`non-blocking` 结论都附了文件路径 + 章节锚点证据
+- ✅ 每个 `blocking` 反问都能映射到具体一致性冲突（B-1 DI 缺陷 / B-2 AC-083 覆盖缺口）+ 影响范围 + 不代作者下结论的建议方向
+- ✅ 未使用"看起来"/"似乎"等主观词汇
+- ✅ 未凭文件名臆测——`AgentToolDefinition`/`AgentToolBinding`/`IPersistenceProvider.GetRepository<T>` 均逐字段打开 HD-006/HD-015/HD-002 原文核实；NFR-004/AC-083 逐字核对 requirements.md/acceptance-criteria.md 原文；ADR-010 排除依据逐字核对原文
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未越界修改 HD-016 / HD-015 / database-design.md / file-structure.md，仅追加评审报告
+- ✅ 未给越界建议（B-1/B-2 均给出多个候选方向，不替作者/Owner 选择）
+- ✅ Q&A-A/B/C"已解决"标注的技术内容与正文实现逐一核实一致（只读设计未变、绑定参数优先合并逻辑真实存在于 §3.10、`CurrentDateTimeToolExecutor` 确认零外部依赖），未对"确认过程"本身的真伪下结论
+- ✅ 完备性判定对照 REQ-007 验收标准逐条核实，未机械套用端口层三段式模板
+- ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §24 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
