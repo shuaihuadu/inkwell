@@ -203,7 +203,7 @@ v1 仅一类主角色：**Member（已登录用户）**。
 v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H2 / H3 决定）：
 
 - 账号：永久保留。
-- Agent 配置：永久保留；**删除为硬删除，不支持恢复**（2026-07-06 errata：H3 [HD-002 §1.3 Q5](../04-detailed-design/Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 锁定 v1 仅硬删除，[HD-015 §8](../04-detailed-design/Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 起草期发现与本条原文"软删除可恢复 30 天"冲突，Owner 拍板保留硬删除、修正本条文字）。
+- Agent 配置：永久保留；**删除为硬删除，不支持恢复**（详见 [HD-002 §1.3 Q5](../04-detailed-design/Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）。
 - 对话历史：永久保留，可由 Owner 删除。
 - 审计日志：至少保留 6 个月（v1 默认值，可配置）。
 - 临时上传文件（解析后已入向量库）：原文件保留以便复核 / 重新解析。
