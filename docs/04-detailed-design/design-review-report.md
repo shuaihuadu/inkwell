@@ -3261,3 +3261,65 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 完备性判定遵循已确立口径（§22/§23/§24/§26 先例），对照 NFR-004/ADR-008 验收标准核实，未机械套用端口层三段式模板
 - ✅ 报告路径仍走 H3 规范默认 design-review-report.md（追加 §28 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 29. HD-018 Inkwell.Core.AuditLogs 聚焦复审（2026-07-08）
+
+> 评审对象：[HD-018 Inkwell.Core.AuditLogs](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md)（status: draft）在 commit `387af8d`（"HD-018 首轮评审（REJECT）+ 修复 B-1/B-2/B-3"）之后的三处修复点，联动的 [database-design.md `## Inkwell.Core.AuditLogs`](database-design.md#inkwellcoreauditlogs) + [file-structure.md `## Inkwell.Abstractions.AuditLogs`](file-structure.md#inkwellabstractionsauditlogs)。**本次是聚焦复审，不做全量重审**——仅核对 [§28 B-1/B-2/B-3](#283-反问清单) 三项修复是否真落地、修复过程是否引入新问题，不重新扫描 [§28.1](#281-完备性扫描对照-nfr-004--req-017--adr-008-相关验收标准)/[§28.2](#282-一致性扫描hd-018--hd-001--hd-002--hd-007--hd-009--hd-010--hd-017--adr-008--agentsmd-32--database-designmd--file-structuremd) 已判定 `PASS` 的其余检查项（C-4~C-9）。全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）。
+
+### 29.1 B-1 复核：`DefaultAuditLogger` 是否已改为 `IServiceScopeFactory`
+
+- **构造函数签名**：[HD-018 §3.5](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#35-inkwellcoreauditlogsdefaultauditloggercs) 现文本 `public DefaultAuditLogger(ChannelWriter<AuditLog> channelWriter, IServiceScopeFactory scopeFactory, IOptions<AuditLoggerOptions> options)`——已**不再**直接声明 `IPersistenceProvider persistence` 参数，`IServiceScopeFactory` 替换到位。全文 grep `IPersistenceProvider persistence\)` 命中仅 1 处（[§9 CI 自检 C4](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#9-ci-自检命令grep-列表) 的检测命令文本本身，用于未来检测同类反模式，非实际代码声明），确认无残留
+- **`QueryAsync` 内部 scope 创建/dispose 逻辑**：[HD-018 §3.5](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#35-inkwellcoreauditlogsdefaultauditloggercs) 现文本第 (3)/(4) 步——`using var scope = scopeFactory.CreateScope();` → `scope.ServiceProvider.GetRequiredService<IPersistenceProvider>()` → 调用 `ListAuditLogs` → 取得 `page` 后**在同一 `using` 块内**立即完成 `AuditLog → AuditLogEntry` 投影（`page.Items.Select(...)`），投影结果是纯内存值类型，不依赖 `scope` dispose 后已释放的 `DbContext`。`using` 语句保证 scope 在方法返回前正确释放，未发现提前释放或遗漏释放
+- **`LogAsync` 是否需要同样处理**：`LogAsync`（[HD-018 §3.5](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#35-inkwellcoreauditlogsdefaultauditloggercs)）内部仅调用 `MapToAuditLog(request)`（纯内存映射，无持久化访问）+ `channelWriter.WriteAsync(auditLog, ct)`（`ChannelWriter<AuditLog>` 本身是 `AddSingleton` 注册的单例类型，非 Scoped），全程不触碰 `IPersistenceProvider`——**核实结论：`LogAsync` 不需要 scope 处理，且现文本也确未引入**，与 [HD-018 §1.3 Q9](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)"职责分离：`AuditLogWriteBackgroundService` 完全不需要感知映射细节"的设计意图一致
+- **两个 `BackgroundService` 是否同样正确**：[§3.6 `AuditLogWriteBackgroundService.ProcessWithRetryAsync`](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#36-inkwellcoreauditlogsauditlogwritebackgroundservicecs) 每次重试循环内部 `using var scope = scopeFactory.CreateScope();`（每次 `attempt` 独立创建，不跨重试复用同一 scope）；[§3.8 `AuditLogRetentionCleanupBackgroundService.CleanupOnceAsync`](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#38-inkwellcoreauditlogsauditlogretentioncleanupbackgroundservicecs) 每次 tick 内部同样 `using var scope = scopeFactory.CreateScope();`——两者本轮修复前即已正确（[§28.2 C-1](#282-一致性扫描hd-018--hd-001--hd-002--hd-007--hd-009--hd-010--hd-017--adr-008--agentsmd-32--database-designmd--file-structuremd) 原文明确"唯独 `DefaultAuditLogger` 自己没有采用同样的规避方式"，即两个 `BackgroundService` 从未被判定有问题），本轮未发现回归
+- **DI 注册一致性**：[§3.9 `AuditLoggerBuilderExtensions`](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#39-inkwellcoreauditlogsauditloggerbuilderextensionscs) 未改动 `AddSingleton<IAuditLogger, DefaultAuditLogger>()` 注册方式（该注册方式本身由已 reviewed 的 HD-007 §6 锁定，不应改，本轮也确未改）；`IServiceScopeFactory` 是 ASP.NET Core / .NET Generic Host 内置的框架级单例服务，无需额外注册即可被 Singleton 消费，不构成新的生命周期冲突
+- **file-structure.md 同步**：[`## Inkwell.Abstractions.AuditLogs`](file-structure.md#inkwellabstractionsauditlogs) callout 现文本显式写明"`DefaultAuditLogger` 以 `AddSingleton` 注册，构造函数注入 `IServiceScopeFactory`，`QueryAsync` 内部按需 `CreateScope()` 解析 Scoped 的 `IPersistenceProvider`，避免 Singleton 消费 Scoped 依赖"，与 HD-018 §3.5 现文本一致，无跨文档漂移
+- **B-1 结论**：**已修复**，无遗漏。`LogAsync` 因不触碰持久化层无需 scope 处理（已确认非遗漏而是设计使然）；两个 `BackgroundService` 本轮前已正确，未受影响
+
+### 29.2 B-2 复核：`RemoveAuditLogsOlderThan` → `DeleteAuditLogsOlderThan` 改名是否彻底
+
+- **全文 grep `RemoveAuditLogsOlderThan`**：仅命中 [design-review-report.md §28](#28-hd-018-inkwellcoreauditlogs-首轮评审2026-07-08) 本身（历史评审记录原文引用旧名，属评审报告的既定 append-only 惯例，不应改写历史章节），HD-018 正文、database-design.md、file-structure.md 均**无**残留
+- **全文 grep `DeleteAuditLogsOlderThan`**：命中 [HD-018 §3.2](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#32-persistenceauditlogsiauditlogrepositorycs)（接口签名）/ [§3.1 错误处理行](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#31-persistenceauditlogsauditlogcs)（引用说明）/ [§3.6](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#36-inkwellcoreauditlogsauditlogwritebackgroundservicecs)（本节实为 §3.8 清理服务调用点，核实无误）/ [§3.8](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#38-inkwellcoreauditlogsauditlogretentioncleanupbackgroundservicecs)（`CleanupOnceAsync` 实际调用 + 测试要求行）+ [file-structure.md](file-structure.md#persistenceauditlogshd-018-落地2026-07-08)（`IAuditLogRepository.cs # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/DeleteAuditLogsOlderThan）"）——全部引用点命名一致，无新旧名混用
+- **§0 错误援引 HD-002 §4.1.3 是否已订正**：[HD-018 §0 第 3 点](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#0-范围核实hd-007-查询侧现状--本-hd-实际边界) 现文本已改为"`IAuditLogRepository` 查询方法"等中性表述，不再逐字列出"`Add`/`List`/`Remove`"错误动词组合；[§3.2 职责行](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#32-persistenceauditlogsiauditlogrepositorycs) 现文本明确写"3 个具名动词方法（`Add`/`List`/`Delete`...白名单**不含** `Remove`）"，不仅改了动词本身，还**主动补充了"不含 Remove"的澄清句**，比机械改名更完整地回应了 C-2 指出的"错误自我援引"问题
+- **接口/测试引用一致性**：`IAuditLogRepositoryContractTests.cs`（[§3.2 测试要求](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#32-persistenceauditlogsiauditlogrepositorycs)）仅描述为"契约测试（接口形态锁定）"，未逐方法列名，不构成残留风险点
+- **B-2 结论**：**已修复**，全文命名一致，且 §0 的错误援引已订正并强化（补充"不含 Remove"说明），无遗漏
+
+### 29.3 B-3 复核：database-design.md / file-structure.md 陈旧"待 Owner 确认"提示是否已同步
+
+- **database-design.md**：[`## Inkwell.Core.AuditLogs`](database-design.md#inkwellcoreauditlogs) 章节末尾现文本为"**已解决（2026-07-08）**：[HD-018 §8 Q&A-B] 发现的 [HD-007 `MaxPageSize`] 默认值 `200` 与 [HD-001 `Pagination.MaxPageSize=100`] 硬编码常量不一致...问题，已由 Owner 真实确认的 [HD-007 2026-07-08 errata] 修复——`MaxPageSize` 收紧为默认 `100`...死区已消除"——已从"待 Owner 确认"改写为"已解决"，与 HD-007 §3.6 现文本（`MaxPageSize` 确为 `100`）一致
+- **file-structure.md**：[`## Inkwell.Abstractions.AuditLogs`](file-structure.md#inkwellabstractionsauditlogs) 章节对应段落现文本同样为"**已解决（2026-07-08）**：...`MaxPageSize` 收紧为默认 `100`，与 `Pagination.MaxPageSize` 对齐，死区已消除"，措辞与 database-design.md 基本一致（非逐字复制但语义等价），无跨文档漂移
+- **与 HD-007 §3.6 现文本交叉核实**：[HD-007 §3.6](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#36-auditauditloggeroptionscs) 现文本 `[Range(1, 100)] public int MaxPageSize { get; init; } = 100;` 确认默认值/上界均为 `100`，三处文档（database-design.md/file-structure.md/HD-007 本体）现状完全一致，无三方漂移
+- **全文残留扫描**：`MaxPageSize.*200` 正则命中 12 处，逐一核实：database-design.md/file-structure.md 2 处均为"已解决"说明中回顾性提及旧值 `200`（用于解释"改了什么"，非声称现状仍是 200）；design-review-report.md 3 处均为 §28 历史评审记录原文（含旧配置值 `MaxPageSize=200` 的既有 `pass` 判定行，属评审报告 append-only 惯例，不应回改）；HD-007 本体 5 处（含顶部 errata callout + §1.3 Q-pagination-bounds 决策记录 + §3.6 字段说明）均为如实记录"从 200 改为 100"的 errata 说明；HD-018 §1.3 Q6 1 处引用"`AuditLoggerOptions.MaxPageSize` 默认 `200`"是**描述 HD-018 起草时发现问题那一刻的历史状态**（该行紧接着即引用"§8 Q&A-B 已解决"标注当前已修复），不是当前有效配置声明。**结论：无一处属于"现状仍是 200"的失实声明**，全部是历史说明或评审记录
+- **B-3 结论**：**已修复**，两处提示行均已同步为"已解决"，三方（database-design.md/file-structure.md/HD-007）现状一致
+
+### 29.4 是否引入新问题
+
+- **未发现新增技术缺陷**：本轮修复范围严格限定在 B-1（构造函数参数类型）/B-2（方法改名+关联文本）/B-3（两处提示行文案），未触及其他文件/字段/签名，`git diff --stat`（据用户任务描述已由用户本人核实）与本次逐文件 grep 交叉核对结果一致，未发现修复过程中误改其他正确内容的迹象
+- **C-10 遗留（信息性，非本轮新问题）**：[HD-018 §8 Q&A-A/Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 两处"Owner 在本次会话中通过 `vscode_askQuestions` 真实确认"表述**原样保留、未在本轮修复中改写**——这是 [§28.2 C-10](#282-一致性扫描hd-018--hd-001--hd-002--hd-007--hd-009--hd-010--hd-017--adr-008--agentsmd-32--database-designmd--file-structuremd) 已记录的"需人类自行核实"事项，非本轮新发现、也非本轮修复引入的新问题，本报告不重复发起验证（用户任务描述已再次确认由用户自行二次核实）
+- **§9 CI 自检 C4 建议是否已采纳**：[§28.3 B-1 建议方向](#b-1defaultauditlogger-作为-singleton-直接构造函数注入-scoped-的-ipersistenceprovider singleton-消费-scoped-依赖di-反模式c-1) 曾建议"扩大 C4 检测范围覆盖 `DefaultAuditLogger`"，核实 [HD-018 §9](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#9-ci-自检命令grep-列表) 现文本 C4 仍维持仅检测 `BackgroundService` 派生类的原有范围，未采纳该建议——**该建议本身在 §28.3 中已标注为"reviewer 倾向"而非 blocking 要求**，未采纳不构成新缺陷，仅记录为遗留改进项，不影响本轮 PASS 判定
+
+### 29.5 复审结论
+
+- **B-1**：`DefaultAuditLogger` 已确认改为 `IServiceScopeFactory`，`QueryAsync` scope 创建/投影/dispose 逻辑正确；`LogAsync` 不需要 scope 处理（不触碰持久化层，非遗漏）；两个 `BackgroundService` 本轮前已正确，未受影响；file-structure.md 同步一致。**PASS**
+- **B-2**：`RemoveAuditLogsOlderThan` 全文无残留（仅评审报告历史记录保留旧名，符合 append-only 惯例）；`DeleteAuditLogsOlderThan` 全部引用点命名一致；§0 错误援引已订正并强化说明。**PASS**
+- **B-3**：database-design.md/file-structure.md 两处提示行均已同步为"已解决"，与 HD-007 §3.6 现状三方一致；全文 `MaxPageSize=200` 残留逐一核实均为历史说明，无失实声明。**PASS**
+- **新问题**：未发现修复过程引入的新缺陷；§9 CI 自检 C4 的非阻塞性改进建议未采纳，不影响结论；C-10（Q&A-A/Q&A-B 确认真伪）原样遗留，非本轮范围
+- **整体决议**：**PASS**——首轮 3 项 blocking（B-1/B-2/B-3）均已核实真实修复，无新增 blocking，无回归
+
+### 29.6 HD-018 是否支持翻 `status: reviewed`
+
+- **内容层面**：本轮聚焦复审确认 B-1/B-2/B-3 三项修复真实、完整、无回归，[§28.1](#281-完备性扫描对照-nfr-004--req-017--adr-008-相关验收标准) 完备性判定与 [§28.2](#282-一致性扫描hd-018--hd-001--hd-002--hd-007--hd-009--hd-010--hd-017--adr-008--agentsmd-32--database-designmd--file-structuremd) 其余 6 项 `PASS` 判定未受本轮改动影响（改动范围未触及对应文件位置）。**独立判断：内容质量支持翻 `status: reviewed`**
+- **未决事项（不影响本报告的独立判断，但签字前需人工处理）**：[§28.2 C-10](#282-一致性扫描hd-018--hd-001--hd-002--hd-007--hd-009--hd-010--hd-017--adr-008--agentsmd-32--database-designmd--file-structuremd)/[§28.4](#284-评审结论与下一步) 已记录的 HD-018 §8 Q&A-A/Q&A-B"Owner 已确认"表述真伪，本评审 Agent **不代为判定**，需 Owner 自行核实后再签字
+- **签字位声明**：本节仅给出"内容是否支持翻 reviewed"的独立判断，`status`/`reviewers` 字段翻转仍由 Owner 人工执行（[AGENTS.md §3.3 签字位](../../AGENTS.md)），AI 不代签
+
+### 29.7 自检
+
+- ✅ 每条结论均附文件路径 + 章节锚点证据（HD-018 §3.5/§3.2/§3.6/§3.8/§9/§0/§8 + database-design.md + file-structure.md + HD-007 §3.6）
+- ✅ 全文 grep 交叉验证（`RemoveAuditLogsOlderThan`/`DeleteAuditLogsOlderThan`/`MaxPageSize.*200`/`IPersistenceProvider persistence\)`/`Remove`），未凭文件名或记忆臆测
+- ✅ 未使用"看起来"/"似乎"等主观词汇
+- ✅ 未运行任何 git 命令
+- ✅ 未修改 HD-018 或其他任何文件正文，仅追加本节评审报告
+- ✅ 未编造任何"Owner 已确认"的新决策；C-10 遗留事项原样标注为待人工核实，未重复发起验证、未代为判定真伪
+- ✅ 未擅自判定 frontmatter `status`/`reviewers` 应该是什么，仅给出"内容是否支持翻 reviewed"的独立判断
+- ✅ 聚焦复审范围严格限定在 B-1/B-2/B-3 三项修复点，未重新扫描已判定 `PASS` 的 §28.1/§28.2 其余检查项
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
