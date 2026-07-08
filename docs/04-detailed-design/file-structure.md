@@ -226,7 +226,7 @@ src/core/Inkwell.Abstractions/Persistence/
 src/core/Inkwell.Abstractions/Persistence/
   AuditLogs/                            # 新增子目录（HD-018）
     AuditLog.cs                         # 业务 Model（审计日志持久化记录），IHasTimestamps only
-    IAuditLogRepository.cs              # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/RemoveAuditLogsOlderThan）
+    IAuditLogRepository.cs              # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/DeleteAuditLogsOlderThan）
 ```
 
 ## Inkwell.Abstractions.FileStorage
@@ -583,7 +583,7 @@ src/core/Inkwell.Abstractions/Audit/
 
 **文件计数**：HD-018 在 `Persistence/AuditLogs/`（见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）新增 2 个 `*.cs` + 在 `Audit/` 新增 2 个 `*.cs`，合计 4 个；Abstractions csproj 累计 82（HD-001~HD-017，见 [HD-017 §Conversations 小节文件计数](#inkwellabstractionsconversations)）+ 4（HD-018）= **86** 个 `*.cs` + 1 个 `.csproj`。
 
-**对接 `Inkwell.Core.AuditLogs` 的完整实现**（file-structure.md 早在 HD-007 章节即已预锁 `DefaultAuditLogger.cs` / `AuditLoggerBuilderExtensions.cs` 文件名，本 HD 落地并补齐 3 个额外文件）：
+**对接 `Inkwell.Core.AuditLogs` 的完整实现**（file-structure.md 早在 HD-007 章节即已预锁 `DefaultAuditLogger.cs` / `AuditLoggerBuilderExtensions.cs` 文件名，本 HD 落地并补齐 3 个额外文件；`DefaultAuditLogger` 以 `AddSingleton` 注册，构造函数注入 `IServiceScopeFactory`，`QueryAsync` 内部按需 `CreateScope()` 解析 Scoped 的 `IPersistenceProvider`，避免 Singleton 消费 Scoped 依赖）：
 
 ```text
 src/core/Inkwell.Core/
@@ -597,7 +597,7 @@ src/core/Inkwell.Core/
 
 `Inkwell.Core.csproj` 累计 14（HD-014~HD-017）+ 5（HD-018）= **19** 个 `*.cs` + 1 个 `.csproj`。
 
-> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）由本 HD 起草并落地；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**待 Owner 确认**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现 HD-007 `AuditLoggerOptions.MaxPageSize` 默认值 `200` 与 HD-001 `Pagination.MaxPageSize=100` 不一致（101~1000 区间不可达），本节仅记录不擅自修改 HD-007。
+> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）由本 HD 起草并落地；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**已解决（2026-07-08）**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现的 HD-007 `AuditLoggerOptions.MaxPageSize` 默认值 `200` 与 HD-001 `Pagination.MaxPageSize=100` 不一致（101~1000 区间不可达）问题，已由 Owner 真实确认的 HD-007 2026-07-08 errata 修复——`MaxPageSize` 收紧为默认 `100`，与 `Pagination.MaxPageSize` 对齐，死区已消除。
 
 ## providers/Inkwell.Persistence.EFCore
 
