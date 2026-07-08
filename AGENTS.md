@@ -17,6 +17,10 @@
 > **2026-05-11 增量更新·第五轮**：H2 评审接受 [ADR-022 Entity ↔ Model Mapper 选型](docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)：锁手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`），禁 AutoMapper / Mapperly / Mapster；`providers/Inkwell.Persistence.EFCore/` shared base 新增 `Mapping/` + `Repositories/` 子目录；业务命名空间只见 Model、不见 Entity，Model 默认无后缀，撞名降级 `XxxDefinition`。csproj 数不变 13。§3.1 由 AI 在 Owner 一次性授权下同步应用，请在 [docs/07-reviews/2026-05-10-h2-architecture-review.md §11](docs/07-reviews/2026-05-10-h2-architecture-review.md) 评审记录中复核。
 >
 > **2026-05-18 增量更新·第六轮（H3 层）**：[HD-002 / HD-009 设计层 picker 回审](docs/04-detailed-design/design-review-report.md) Q1=A2 决议：`IPersistenceProvider` 增 `GetRepository<TRepository>()` 泛型工厂入口（业务命名空间通过 `provider.GetRepository<IXxxRepository>()` / `uow.GetRepository<IXxxRepository>()` 取具名 Repo，不直接 inject 具名 `IXxxRepository`）。§3.1 / §3.2 由默认 Agent 在 Owner 授权下同步应用（[design-review-report.md §13.3 E7/E8](docs/04-detailed-design/design-review-report.md)），请在该评审记录 §13.4 签字位复核。
+>
+> **2026-07-08 增量更新·第七轮**：Owner 决定移除 EF Core **InMemory 关系型数据库** Provider（不支持外键约束，本地开发/测试价值有限）——**注意**：`Inkwell.Core.InMemoryVectorStore` / `Inkwell.Core.InMemoryCacheProvider` 是不同子系统，不受影响。持久化收敛为两 Provider（SQL Server 2025 / PostgreSQL 17），dev / 测试改用 [Testcontainers](https://testcontainers.com/) 起真实 SqlServer / Postgres 实例；EFCore family 由 4 csproj（1 base + 3 final adapter）回落为 3 csproj（1 base + 2 final adapter），providers/ 9 → 8，csproj 总数 13 → 12；[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 已直接就地修订（未走新 ADR）；H3 detailed design `HD-010`（InMemory adapter）文件已删除。§2.2 / §3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用。
+>
+> **2026-07-09 增量更新·第八轮**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](docs/01-requirements/requirements.md)）。`NFR-004`（审计日志）/ `IAuditLogger` 端口 / `Inkwell.Core.AuditLogs` 业务实现 / `ADR-008`（审计日志存储与查询）均已移除；`REQ-017` Admin 管理页收窄为两项能力（解封账号、撤销共享），不再含"查看全量审计日志"；`REQ-013` API Key 调用不再提及审计记录。§3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用（移除 `IAuditLogger` 接口引用与 `.AuditLogs` 命名空间；6 大基础设施端口收窄为 5 个）。
 
 ## 1. 项目身份
 
@@ -48,7 +52,7 @@
 
 - **运行时**：.NET 10 + ASP.NET Core 10 + C# 14
 - **Agent 引擎**：Microsoft Agent Framework（MAF）— `Microsoft.Agents.AI` / `.AGUI` / `.Workflows` / `.DurableTask`
-- **数据访问**：EF Core 10 Code-First + Migrations，三 Provider（InMemory / SQL Server 2025 / PostgreSQL 17）通过 `IPersistenceProvider` 抽象（[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）
+- **数据访问**：EF Core 10 Code-First + Migrations，两 Provider（SQL Server 2025 / PostgreSQL 17）通过 `IPersistenceProvider` 抽象（[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）；dev / 测试用 [Testcontainers](https://testcontainers.com/) 起真实实例（2026-07-08 移除 InMemory 关系型 Provider）
 - **向量库**：Qdrant 1.x，gRPC SDK
 - **缓存**：Redis 8（dev 容器 / prod Azure Cache for Redis 或自建 StatefulSet），通过 `ICacheProvider` 抽象（[ADR-016](docs/03-architecture/adr/ADR-016-cache-provider-redis.md)）
 - **文件存储**：`IFileStorageProvider` 抽象 + 三 Provider（LocalFileSystem / AzureBlob / MinIO）（[ADR-015](docs/03-architecture/adr/ADR-015-object-storage-provider-switchable.md)）
@@ -82,7 +86,7 @@
 
 **`src/core/Inkwell.Abstractions/`**（端口层 / 1 csproj）
 
-- 全部接口：`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger` / 业务模块对外接口
+- 全部接口：`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / 业务模块对外接口
 - `IPersistenceProvider` 是**事务 + SaveChanges + Repository 工厂**三能力 facade；业务命名空间通过 `provider.GetRepository<IXxxRepository>()` 取具名 Repo（事务作用域外） / `uow.GetRepository<IXxxRepository>()`（事务作用域内），二者签名同款（[design-review-report.md §13](docs/04-detailed-design/design-review-report.md) Q1=A2 picker(2026-05-18)）
 - **向量存储抽象复用** [`Microsoft.Extensions.VectorData.VectorStore`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) + `VectorStoreCollection<TKey, TRecord>`（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)，Inkwell 不重发明 `IVectorStore`，仅提供 Builder DSL `UseQdrantVectorStore` / `UseInMemoryVectorStore` / `UseAzureOpenAIEmbeddings`）
 - DTO / Model / Options
@@ -91,13 +95,12 @@
 **`src/core/Inkwell.Core/`**（适配器默认实现 + 业务层 / 1 csproj）
 
 - 抽象的进程内默认实现：`InMemoryCacheProvider` / `LocalFileSystemFileStorageProvider` / `ChannelsQueueProvider`（[ADR-018](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) dev / unit test 默认） / `InMemoryVectorStore`（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) dev / unit test 默认，基于 [`Microsoft.Extensions.VectorData.InMemory`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)）
-- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.AuditLogs` / `.Conversations` / `.Health`
+- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`
 - `Inkwell.Core.AgentRuntime` 命名空间——**唯一**允许 `using Microsoft.Agents.AI.*` 的位置（[ADR-017 §依赖规则](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](docs/03-architecture/risk-analysis.md)）
 
-**`src/core/providers/`**（多 Provider 适配器 / 9 csproj）
+**`src/core/providers/`**（多 Provider 适配器 / 8 csproj）
 
 - `Inkwell.Persistence.EFCore/`——EFCore family **共享 base**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）：Entity / `OnModelCreating` / 唯一 [`IPersistenceProvider`](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) 实现 `EfCorePersistenceProvider` / `InkwellSeeder`（幂等） / `MigrationRunner`；新增 `Mapping/` 子目录存放 per-entity `<TypeName>MappingExtensions.cs`（手写扩展方法 `Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`）+ `Repositories/` 子目录存放 `<XxxRepository>` 实现（动词白名单限定 `Get*` / `Find*` / `Add*` / `Update*` / `Remove*` / `Count*` / `List*` / `Exists*` / `Iterate*`）；业务接口只见 Model 不见 Entity
-- `Inkwell.Persistence.EFCore.InMemory/`——`UseInMemoryDatabase` + [`EnsureCreated`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)：[`Microsoft.EntityFrameworkCore.InMemory`](https://learn.microsoft.com/ef/core/providers/in-memory) 不支持 Migration）
 - `Inkwell.Persistence.EFCore.SqlServer/`——`UseSqlServer` + 自有 `Migrations/`
 - `Inkwell.Persistence.EFCore.Postgres/`——`UseNpgsql` + 自有 `Migrations/`
 - `Inkwell.FileStorage.MinIO/`
@@ -140,9 +143,9 @@
 - **业务命名空间 → 端口层**：`Inkwell.Core.*`（除 `Inkwell.Core.AgentRuntime`）业务命名空间**只能依赖 `Inkwell.Abstractions`** + 进程内 BCL；不得直接 `using Microsoft.Agents.AI.*`、`using StackExchange.Redis`、`using Azure.Storage.Blobs`、`using Microsoft.EntityFrameworkCore.SqlServer`、`using Npgsql.*`、`using Minio.*`。CI 强制由 [Roslyn analyzer / `BannedSymbols.txt`](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/) 验证。
 - **注入风格统一**：业务命名空间统一通过 DI inject `IPersistenceProvider`，再 `provider.GetRepository<IXxxRepository>()` 拿具名 Repo；**不**直接 inject 具名 `IXxxRepository`（防止 13 个具名 Repo 重复出现在每个业务 csproj 的 ctor 参数列）。CI 强制由 [Roslyn analyzer / `BannedSymbols.txt`](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/) 在业务 csproj 范围内拒 ctor 参数类型 = `IXxxRepository`
 - **`Inkwell.Core.AgentRuntime` 命名空间例外**：是**唯一**允许 `using Microsoft.Agents.AI.*` 的位置；对外暴露 `IAgentRuntime` 接口（在 `Inkwell.Abstractions`），禁止把 MAF type 泄漏到接口签名。
-- **providers/* → 端口层**：`src/core/providers/Inkwell.*` 只能引用 `Inkwell.Abstractions` + 该 Provider 自身的 SDK（如 `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `StackExchange.Redis`）；**禁止**引用 `Inkwell.Core`。**EFCore family 例外**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`providers/Inkwell.Persistence.EFCore.{InMemory,SqlServer,Postgres}` **允许**引用同 providers/ 下的 `Inkwell.Persistence.EFCore` shared base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。其他 family（FileStorage / Cache / Queue / VectorStore）**不享受此例外**——如需同样拓扑必须以独立 ADR 为入口（[RISK-017](docs/03-architecture/risk-analysis.md)）。
+- **providers/\* → 端口层**：`src/core/providers/Inkwell.*` 只能引用 `Inkwell.Abstractions` + 该 Provider 自身的 SDK（如 `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `StackExchange.Redis`）；**禁止**引用 `Inkwell.Core`。**EFCore family 例外**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`providers/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` **允许**引用同 providers/ 下的 `Inkwell.Persistence.EFCore` shared base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。其他 family（FileStorage / Cache / Queue / VectorStore）**不享受此例外**——如需同样拓扑必须以独立 ADR 为入口（[RISK-017](docs/03-architecture/risk-analysis.md)）。
 - **`Inkwell.WebApi` / `Inkwell.Worker` → 全部**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）：DI 装配是唯一允许同时 `using` 多个 providers + Inkwell.Core 的位置。`Inkwell.WebApi` 仅注册 enqueue 侧，`Inkwell.Worker` 跑 consumer + DurableTask runner。
-- **审计日志注入**：业务命名空间通过 `IAuditLogger`（在 `Inkwell.Abstractions`）写审计；写入失败**不得吞错**，必须走 [ADR-008](docs/03-architecture/adr/ADR-008-audit-log-store-and-query.md) 失败处理路径。
+
 - **prototypes/**：原型仅用于 H1 评审，**不进 main 分支的产品代码**——若产品代码引用了 `prototypes/*` 视为违规。
 
 ### 3.3 禁区（v1 显式不做 / 不引入）
@@ -166,9 +169,6 @@
   - 公开 API 不引入多 Token / Token TTL / mTLS（[ADR-007](docs/03-architecture/adr/ADR-007-public-api-token-auth.md)）
 - **凭据**
   - **不引入 Azure Key Vault**（[OQ-A006 closed §B](docs/03-architecture/open-questions-arch.md)）— 仅 K8s Secret + Compose `.env`
-- **审计**
-  - 不做审计导出（[OQ-020 closed §B](docs/01-requirements/open-questions.md)）— 合规导出走后端运维 SQL
-  - 不引入 ELK / Loki 双 sink（[ADR-008](docs/03-architecture/adr/ADR-008-audit-log-store-and-query.md)）
 - **基础设施**
   - 不引入消息队列**外部中间件**（RabbitMQ / Azure Service Bus）——`IQueueProvider` 接口 + `ChannelsQueueProvider`（dev） + `RedisStreamQueueProvider`（integration / prod）是与 [`IPersistenceProvider`](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](docs/03-architecture/adr/ADR-016-cache-provider-redis.md) / [`IFileStorageProvider`](docs/03-architecture/adr/ADR-015-object-storage-provider-switchable.md) 同构的环境对称 Provider，**不被视为外部中间件**（[ADR-018](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) + [OQ-A008 closed §B](docs/03-architecture/open-questions-arch.md)）。
   - 不引入跨 region active-passive（[RISK-004](docs/03-architecture/risk-analysis.md)）— v1 单 region SLA = 99%

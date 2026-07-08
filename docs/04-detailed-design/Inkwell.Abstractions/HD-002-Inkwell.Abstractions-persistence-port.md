@@ -65,7 +65,7 @@ upstream:
 - 具名 Mapping 扩展（`AgentMappingExtensions` / 等 ~30 个）→ HD-009 `providers/Inkwell.Persistence.EFCore/Mapping/`（[ADR-022](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁手写 Extensions 模式）
 - `InkwellSeeder` → HD-009
 - `MigrationRunner` → HD-009
-- 三 final adapter csproj（`Inkwell.Persistence.EFCore.{InMemory,SqlServer,Postgres}`）→ HD-010 / HD-011 / HD-012
+- 两 final adapter csproj（`Inkwell.Persistence.EFCore.{SqlServer,Postgres}`）→ HD-011 / HD-012
 
 ### 1.3 关键决策摘要
 
@@ -73,9 +73,9 @@ upstream:
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Q1  | `IPersistenceProvider` = facade + `GetRepository<TRepository>()` 泛型工厂入口；具名 `IXxxRepository` 由业务 HD 起草，业务经 `provider.GetRepository<IXxxRepository>()`（事务作用域外）/ `uow.GetRepository<...>()`（事务作用域内）双入口取（2026-05-18 errata·第五轮，原 facade only 已 superseded） | picker 2026-05-10；[ADR-021 + AGENTS.md §3.2](../../../AGENTS.md) 拓扑张力                                                                                                                                                                                  |
 | Q2  | 主键 = `Guid` v7（[`Guid.CreateVersion7()`](https://learn.microsoft.com/dotnet/api/system.guid.createversion7)，.NET 9+ 内置）                                                                                                                                                                       | picker 2026-05-10；[ADR-004 §最小公倍数](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)                                                                                                                                       |
-| Q3  | Base Model = interface mixin 按需组合（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`）                                                                                                                                                                                                           | picker 2026-05-10；audit_logs / agui_run_events 不需所有字段                                                                                                                                                                                                |
+| Q3  | Base Model = interface mixin 按需组合（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`）                                                                                                                                                                                                           | picker 2026-05-10；agui_run_events 不需所有字段                                                                                                                                                                                                             |
 | Q4  | 事务 = `ExecuteInTransactionAsync<T>` 包装；不暴露显式 commit/rollback                                                                                                                                                                                                                               | picker 2026-05-10；避免业务忘 commit                                                                                                                                                                                                                        |
-| Q5  | 软删除 = **不提供**；v1 全部硬删，历史靠 [`audit_logs`](../../03-architecture/adr/ADR-008-audit-log-store-and-query.md) 保留                                                                                                                                                                         | picker 2026-05-10；HD-002 不引入 `ISoftDeletable` mixin                                                                                                                                                                                                     |
+| Q5  | 软删除 = **不提供**；v1 全部硬删                                                                                                                                                                                                                                                                     | picker 2026-05-10；HD-002 不引入 `ISoftDeletable` mixin                                                                                                                                                                                                     |
 | Q6  | 并发 = `IHasRowVersion` mixin → EFCore `IsRowVersion()` 自动 token；冲突包装为 [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception)（message 前缀 `"Optimistic concurrency conflict"`，inner = EF Core `DbUpdateConcurrencyException`）            | picker 2026-05-10 + [ADR-023 errata·01 BCL 对照](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流)；[REQ-002](../../01-requirements/requirements.md) Agent 配置防丢头 |
 
 ## 2. 文件结构
@@ -191,7 +191,7 @@ src/core/Inkwell.Abstractions/
 | 文件路径     | `src/core/Inkwell.Abstractions/Persistence/PersistenceOptionsValidator.cs`                                                                                                                                                                                                       |
 | 职责         | `IValidateOptions<PersistenceOptions>` 实现；DataAnnotations + 跨字段校验；**不**负责 Provider 白名单校验                                                                                                                                                                        |
 | 对外接口     | `internal sealed class PersistenceOptionsValidator : IValidateOptions<PersistenceOptions> { public ValidateOptionsResult Validate(string? name, PersistenceOptions options); }`                                                                                                  |
-| 内部函数或类 | (1) `Validator.TryValidateObject` DataAnnotations；(2) `MigrationTimeoutSeconds >= CommandTimeoutSeconds`；(3) ConnectionString 跨 Provider 表现 由 Builder DSL 装配期交叉校验（如 `Inkwell:Providers:Persistence != "InMemory"` 不允许空 `ConnectionString`）——不在本 Validator |
+| 内部函数或类 | (1) `Validator.TryValidateObject` DataAnnotations；(2) `MigrationTimeoutSeconds >= CommandTimeoutSeconds`；(3) ConnectionString 跨 Provider 表现 由 Builder DSL 装配期交叉校验（如 `Inkwell:Providers:Persistence` 为任何已知值时不允许空 `ConnectionString`）——不在本 Validator |
 | 输入数据     | `PersistenceOptions` 实例                                                                                                                                                                                                                                                        |
 | 输出数据     | `ValidateOptionsResult.Success` / `Fail(IEnumerable<string>)`                                                                                                                                                                                                                    |
 | 依赖模块     | `Microsoft.Extensions.Options` / `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                         |
@@ -223,7 +223,7 @@ src/core/Inkwell.Abstractions/
 | 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Mixins/IHasRowVersion.cs`                                                                                                                                                                                                                                                                                                           |
 | 职责         | 标记 mixin；Model 实现该接口表示需要乐观并发控制；`providers/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）自动调 [`IsRowVersion()`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.metadatabuilders.propertybuilder.isrowversion)                                                                                                           |
 | 对外接口     | `public interface IHasRowVersion { byte[] RowVersion { get; } }`                                                                                                                                                                                                                                                                                                               |
-| 内部函数或类 | 仅 readonly 属性；`byte[]` 由 EF Core 自动管理（SqlServer = `rowversion`；Postgres = `xmin` system column 映射；InMemory = 客户端递增 byte[8]）                                                                                                                                                                                                                                |
+| 内部函数或类 | 仅 readonly 属性；`byte[]` 由 EF Core 自动管理（SqlServer = `rowversion`；Postgres = 应用层拦截器手动递增）                                                                                                                                                                                                                                                                    |
 | 输入数据     | 实现方：Provider SaveChanges 时 EF Core 自动填充与校验                                                                                                                                                                                                                                                                                                                         |
 | 输出数据     | `byte[]` row version 值                                                                                                                                                                                                                                                                                                                                                        |
 | 依赖模块     | System.*                                                                                                                                                                                                                                                                                                                                                                       |
@@ -268,13 +268,13 @@ src/core/Inkwell.Abstractions/
 
 **降级规则**（仅命名冲突场景使用，按下表枚举判定）：
 
-| Inkwell Model                                                                                                                                                                                     | 外部冲突源                                                                                                                      | 降级后              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `Agent`                                                                                                                                                                                           | [`Microsoft.Agents.AI.AIAgent`](https://learn.microsoft.com/dotnet/ai/) / `Microsoft.Agents.AI.Agent`                           | `AgentDefinition`   |
-| `Tool`                                                                                                                                                                                            | [`Microsoft.Agents.AI.AIFunction`](https://learn.microsoft.com/dotnet/ai/)（语义近似）                                          | `ToolDefinition`    |
-| `Skill`                                                                                                                                                                                           | 业界 Skill / Plugin 概念广义重名 + Inkwell 内 [REQ-008 Skill 动态加载语义](../../01-requirements/requirements.md)强烈"配置"取向 | `SkillDefinition`   |
-| `Trigger`                                                                                                                                                                                         | 业界 Trigger 概念广义重名 + Inkwell 内 [REQ-011 Trigger fan-out 配置语义](../../01-requirements/requirements.md)                | `TriggerDefinition` |
-| `Conversation` / `Message` / `KnowledgeBase` / `KbDocument` / `KbChunk` / `MemoryItem` / `Orchestration` / `OrchestrationRun` / `Trace` / `AuditLog` / `User` / `PublicApiToken` / `AguiRunEvent` | 无冲突                                                                                                                          | 保持无后缀          |
+| Inkwell Model                                                                                                                                                                        | 外部冲突源                                                                                                                      | 降级后              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `Agent`                                                                                                                                                                              | [`Microsoft.Agents.AI.AIAgent`](https://learn.microsoft.com/dotnet/ai/) / `Microsoft.Agents.AI.Agent`                           | `AgentDefinition`   |
+| `Tool`                                                                                                                                                                               | [`Microsoft.Agents.AI.AIFunction`](https://learn.microsoft.com/dotnet/ai/)（语义近似）                                          | `ToolDefinition`    |
+| `Skill`                                                                                                                                                                              | 业界 Skill / Plugin 概念广义重名 + Inkwell 内 [REQ-008 Skill 动态加载语义](../../01-requirements/requirements.md)强烈"配置"取向 | `SkillDefinition`   |
+| `Trigger`                                                                                                                                                                            | 业界 Trigger 概念广义重名 + Inkwell 内 [REQ-011 Trigger fan-out 配置语义](../../01-requirements/requirements.md)                | `TriggerDefinition` |
+| `Conversation` / `Message` / `KnowledgeBase` / `KbDocument` / `KbChunk` / `MemoryItem` / `Orchestration` / `OrchestrationRun` / `Trace` / `User` / `PublicApiToken` / `AguiRunEvent` | 无冲突                                                                                                                          | 保持无后缀          |
 
 **判定原则**：
 
@@ -390,7 +390,7 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 
 | 字段                                                                                                                                             | 来源                                                                          | 何时输出                                                                                                                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `db.system`                                                                                                                                      | Provider 类型（`mssql` / `postgresql` / `inmemory`）                          | 每个 db 操作 span                                                                                                                                                         |
+| `db.system`                                                                                                                                      | Provider 类型（`mssql` / `postgresql`）                                       | 每个 db 操作 span                                                                                                                                                         |
 | `db.statement_summary`                                                                                                                           | EF Core 生成 SQL 的脱敏摘要（`SELECT ... FROM agents WHERE id = @id`）        | 仅在 `EnableSensitiveDataLogging=false` 时使用脱敏摘要；true 时直接输出原 SQL                                                                                             |
 | `db.transaction.scope_id`                                                                                                                        | `IUnitOfWork` 实例 hashcode                                                   | `ExecuteInTransactionAsync` 入口                                                                                                                                          |
 | `db.transaction.outcome`                                                                                                                         | `committed` / `rolled_back` / `cancelled`                                     | `ExecuteInTransactionAsync` 出口                                                                                                                                          |
@@ -400,8 +400,8 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 
 ## 5. 拓扑约束（重复 HD-001 §5.4 + Persist 特定）
 
-- **`Provider` 选择上移到 `Inkwell:Providers:Persistence`**（F9）：三值白名单 `"InMemory"` / `"SqlServer"` / `"PostgreSQL"` 由 [HD-001 §3.11.1 `InkwellProvidersOptions`](HD-001-Inkwell.Abstractions-foundation.md) 锁定（[ADR-004 §决策](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）—— v1 范围严格；新增 Provider 须新 ADR
-- **`AutoSeedOnStartup` 默认 true**（[ADR-021 D2](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）—— Builder DSL `.AutoSeedOnStartup(false)` 由 final adapter csproj 提供（HD-010 / HD-011 / HD-012）
+- **`Provider` 选择上移到 `Inkwell:Providers:Persistence`**（F9）：二值白名单 `"SqlServer"` / `"PostgreSQL"` 由 [HD-001 §3.11.1 `InkwellProvidersOptions`](HD-001-Inkwell.Abstractions-foundation.md) 锁定（[ADR-004 §决策](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）—— v1 范围严格；新增 Provider 须新 ADR
+- **`AutoSeedOnStartup` 默认 true**（[ADR-021 D2](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）—— Builder DSL `.AutoSeedOnStartup(false)` 由 final adapter csproj 提供（HD-011 / HD-012）
 - **`Inkwell.Abstractions/Persistence/` 不得**引入任何 EF Core 包；EF 实现严格隔离在 `providers/Inkwell.Persistence.EFCore/`（[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 - **业务命名空间不得**直接 inject `IUnitOfWork`；只能通过 `IPersistenceProvider.ExecuteInTransactionAsync` 在 lambda 内访问—— `IUnitOfWork` 实例不允许跨事务边界外漏
 
@@ -411,7 +411,7 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 
 #### 5.1.1 enum 存储约定（F4）
 
-- 所有 enum 类型 Model 属性销售到底层存储时，必须由 HD-009 EFCore base 统一以 `HasConversion<string>().HasMaxLength(64)` 配置为 `string` 列（而非 `int`），以保证三 Provider 存储一致（InMemory 不变，SqlServer / Postgres 不依赖数字枚举偏移）。
+- 所有 enum 类型 Model 属性销售到底层存储时，必须由 HD-009 EFCore base 统一以 `HasConversion<string>().HasMaxLength(64)` 配置为 `string` 列（而非 `int`），以保证两 Provider 存储一致（SqlServer / Postgres 不依赖数字枚举偏移）。
 - 上限 64 字符足以容纳全仓现有 enum 名称，超过上限的枚举需在提交前重命名。
 - 本约定不锁定 `HasConversion<string>()` 的具体实现位置（项目起步阶段可能是 `IModelCustomizer` 或 `IEntityTypeConfiguration<>` 扫描）—— HD-009 起草时锁定。
 
@@ -424,7 +424,7 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 
 ## 6. Builder DSL 衔接（HD-001 §6.3）
 
-HD-002 不直接定义 `Use*` 扩展方法；`UseInMemoryDatabase` / `UseSqlServer` / `UsePostgres` 由 final adapter csproj 提供（HD-010 / HD-011 / HD-012）。本 HD 锁定它们的契约：
+HD-002 不直接定义 `Use*` 扩展方法；`UseSqlServer` / `UsePostgres` 由 final adapter csproj 提供（HD-011 / HD-012）。本 HD 锁定它们的契约：
 
 ```csharp
 // providers/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/UseSqlServer.cs (HD-011)
@@ -461,10 +461,10 @@ public static IInkwellBuilder AutoSeedOnStartup(
 - `IPersistenceProvider` / `IRepository<,>` / `IUnitOfWork` 三个接口的 ABI 用 [`PublicApiAnalyzers`](https://github.com/dotnet/roslyn-analyzers/blob/main/src/PublicApiAnalyzers/PublicApiAnalyzers.Help.md) 锁定
 - 接口形态变更（add/remove/rename method）→ 需新建 ADR + 影响 HD-009 + 业务 HD
 
-### 8.3 跨 Provider 行为契约测试（前置 HD-009 + HD-010 + HD-011 + HD-012 起草后启动）
+### 8.3 跨 Provider 行为契约测试（前置 HD-009 + HD-011 + HD-012 起草后启动）
 
 - 公共契约用例包：`tests/core/Inkwell.Providers.Contract/Persistence/`（[RISK-002 + RISK-011](../../03-architecture/risk-analysis.md) 缓解地）
-- CI matrix：InMemory + SqlServer + Postgres 三套 Provider 跑同一套契约用例（断言三 Provider 行为一致）
+- CI matrix：SqlServer + Postgres 两套 Provider（Testcontainers 真实实例）跑同一套契约用例（断言两 Provider 行为一致）
 - 用例覆盖：CRUD 基本流 / 并发冲突（`IHasRowVersion`）/ 事务回滚 / 命令超时 / DataSeed 幂等 / Migration 启动
 
 ## 9. 部署 / 配置
@@ -489,8 +489,8 @@ public static IInkwellBuilder AutoSeedOnStartup(
 }
 ```
 
-- dev `docker-compose` `appsettings.Development.json` 用 `Inkwell:Providers:Persistence = "InMemory"` + 空 `ConnectionString`；prod K8s ConfigMap 注入 `Inkwell:Providers:Persistence` 和 `Inkwell:Persistence:ConnectionString`（[ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)）
-- **Builder DSL 装配期交叉校验**（F9）：`.UseSqlServer(...)` / `.UsePostgres(...)` / `.UseInMemoryDatabase(...)` 装配时读取 `Inkwell:Providers:Persistence`：取值不一致或同一调用两次 → 抛 `new InkwellBuilderException("Provider registration conflict for Persistence: configured=<x>, called=<y>")`（[HD-001 §3.3](HD-001-Inkwell.Abstractions-foundation.md#33-commoninkwellexceptioncs) 锁定的保留子类之一，message 含具体不一致点）
+- dev `docker-compose` `appsettings.Development.json` 用 `Inkwell:Providers:Persistence = "PostgreSQL"` + Testcontainers/真实实例 `ConnectionString`；prod K8s ConfigMap 注入 `Inkwell:Providers:Persistence` 和 `Inkwell:Persistence:ConnectionString`（[ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)）
+- **Builder DSL 装配期交叉校验**（F9）：`.UseSqlServer(...)` / `.UsePostgres(...)` 装配时读取 `Inkwell:Providers:Persistence`：取值不一致或同一调用两次 → 抛 `new InkwellBuilderException("Provider registration conflict for Persistence: configured=<x>, called=<y>")`（[HD-001 §3.3](HD-001-Inkwell.Abstractions-foundation.md#33-commoninkwellexceptioncs) 锁定的保留子类之一，message 含具体不一致点）
 
 ## 10. 决策记录（Picker 拍板）
 
@@ -498,9 +498,9 @@ public static IInkwellBuilder AutoSeedOnStartup(
 | ---------------------------- | ---------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Q1 IPersistenceProvider 形态 | C 只做 facade，具名 Repository 推迟到业务 HD                           | 2026-05-10  | [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [AGENTS.md §3.2](../../../AGENTS.md) |
 | Q2 主键策略                  | A `Guid` v7（`Guid.CreateVersion7()`）                                 | 2026-05-10  | .NET 9+ 内置 + [ADR-004 三 Provider 最小公倍数](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)                     |
-| Q3 Base Model                | A interface mixin（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`） | 2026-05-10  | [audit_logs / agui_run_events 不需所有字段](../../03-architecture/architecture.md)                                                               |
+| Q3 Base Model                | A interface mixin（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`） | 2026-05-10  | [agui_run_events 不需所有字段](../../03-architecture/architecture.md)                                                                            |
 | Q4 事务暴露                  | A `ExecuteInTransactionAsync<T>` 包装                                  | 2026-05-10  | 避免业务忘 commit                                                                                                                                |
-| Q5 软删除                    | D 不提供软删，全部硬删                                                 | 2026-05-10  | 历史靠 [audit_logs](../../03-architecture/adr/ADR-008-audit-log-store-and-query.md) 保留                                                         |
+| Q5 软删除                    | D 不提供软删，全部硬删                                                 | 2026-05-10  | v1 不引入软删除机制                                                                                                                              |
 | Q6 并发                      | A `IHasRowVersion` mixin + EFCore `IsRowVersion()` 自动 token          | 2026-05-10  | [REQ-002](../../01-requirements/requirements.md) Agent 配置防丢头                                                                                |
 
 ## 11. 待补 / 后续 HD 衔接
@@ -508,10 +508,10 @@ public static IInkwellBuilder AutoSeedOnStartup(
 - **对 HD-001 §3.11 InkwellOptions.cs 的精化**：HD-001 §3.11 内的占位类 `public sealed class PersistenceOptions { }` 由本 HD §3.5 完整定义并搬到 `Persistence/PersistenceOptions.cs`；`InkwellOptions.cs` 引用从 `using Inkwell.Abstractions.Persistence;` 解析。**对 HD-001 reviewer**：本 HD 并非"覆盖" HD-001，而是 HD-001 §3.11 显式让出的"由 HD-002 ~ HD-007 各自补全"职责的兑现
 - 具名 `IXxxRepository` 接口由各业务命名空间 HD 起草（每个业务 HD 在自己的 §X 同步追加 `Inkwell.Abstractions/Persistence/<Module>/IXxxRepository.cs` + `<Module>/<TypeName>.cs`，`<TypeName>` 默认与模块同根字（如 `Agent.cs`），撞名时降级 `<TypeName>Definition.cs`，详见 §4.1.2）
 - Entity 类（`AgentEntity` 等）+ DbContext + EfCorePersistenceProvider + Seeder + MigrationRunner → HD-009 `providers/Inkwell.Persistence.EFCore` shared base
-- 三 final adapter（`UseInMemoryDatabase` / `UseSqlServer` / `UsePostgres`）→ HD-010 / HD-011 / HD-012
+- 两 final adapter（`UseSqlServer` / `UsePostgres`）→ HD-011 / HD-012
 - 跨 Provider 契约用例包 `tests/core/Inkwell.Providers.Contract/Persistence/` → 起草于 HD-013（独立 HD，覆盖全部 4 端口家族契约测试）
 - **本 HD 不锁定业务命名空间错误语义**：错误处理全走 [.NET BCL 异常类型](https://learn.microsoft.com/dotnet/standard/exceptions/)表达 + OTel [`exception.*` 五字段](https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/)（§4.3 BCL 对照表）；零 `Result<T>` / `Error` 抽象、零错误码表；需返回多项错误场景（如批量校验）走 [`ValidationResult`](https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.validationresult) / `IEnumerable<string>` 等 BCL 对症抽象
-- **Soft delete 在 v2 重新评估**——若 v1 上线后审计需求暴露（如“误删恢复”）促发回炉，HD-002 v2 可加入 `ISoftDeletable` mixin + Global Filter
+- **Soft delete 在 v2 重新评估**——若 v1 上线后需求暴露（如“误删恢复”）促发回烉，HD-002 v2 可加入 `ISoftDeletable` mixin + Global Filter
 
 ## 12. 同步追加跨模块文件
 

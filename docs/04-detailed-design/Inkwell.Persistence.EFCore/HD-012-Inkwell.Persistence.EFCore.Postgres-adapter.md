@@ -19,26 +19,25 @@ upstream:
   - HD-001
   - HD-002
   - HD-009
-  - HD-010
   - HD-011
 downstream: []
 ---
 
-> **范围切片**：本 HD 锁定 `providers/Inkwell.Persistence.EFCore.Postgres/` final adapter csproj——[`Npgsql.EntityFrameworkCore.PostgreSQL`](https://www.npgsql.org/efcore/index.html) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UsePostgres(connectionString, configure?)`（方法名沿用 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#6-builder-dsl-衔接与使用示例) / [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 已多处一致预先锁定的名字，本 HD 只实现不改名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、Postgres 专属 `PostgresPersistenceOptions`（连接重试参数）、Postgres 专属 `PostgresRowVersionInterceptor`（并发令牌手动模拟，详 §4）、Provider 自有 `Migrations/` 目录约定。
+> **范围切片**：本 HD 锁定 `providers/Inkwell.Persistence.EFCore.Postgres/` final adapter csproj——[`Npgsql.EntityFrameworkCore.PostgreSQL`](https://www.npgsql.org/efcore/index.html) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UsePostgres(connectionString, configure?)`（方法名沿用 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 已预先锁定的名字，本 HD 只实现不改名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、Postgres 专属 `PostgresPersistenceOptions`（连接重试参数）、Postgres 专属 `PostgresRowVersionInterceptor`（并发令牌手动模拟，详 §4）、Provider 自有 `Migrations/` 目录约定。
 >
-> **不**覆盖：`Inkwell.Persistence.EFCore` shared base 的任何内容（Entity / Mapping / Repository / `EfCorePersistenceProvider` / `AuditingSaveChangesInterceptor` / `InkwellSeeder` / `MigrationRunner` 均已由 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 锁定，本 HD 只消费不重复）；InMemory final adapter → [HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md)（已 reviewed）；SqlServer final adapter → [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（已 reviewed）；跨 Provider 契约测试 → HD-013（待起草）。
+> **不**覆盖：`Inkwell.Persistence.EFCore` shared base 的任何内容（Entity / Mapping / Repository / `EfCorePersistenceProvider` / `AuditingSaveChangesInterceptor` / `InkwellSeeder` / `MigrationRunner` 均已由 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 锁定，本 HD 只消费不重复）；SqlServer final adapter → [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（已 reviewed）；跨 Provider 契约测试 → HD-013（待起草）。
 >
 > **拓扑依据**：[ADR-021 §依赖规则补充](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 `Inkwell.Persistence.EFCore.Postgres` **允许** ProjectReference 同 `providers/` 下的 `Inkwell.Persistence.EFCore`（shared base，EFCore family 例外）+ `Inkwell.Abstractions`；**禁止**引用 `Inkwell.Core` 或其他 provider 家族 csproj（[ADR-017 §3.2](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。
 >
-> **2026-07-06 Owner picker**：本 HD 起草期核实到 [Npgsql 官方并发令牌文档](https://www.npgsql.org/efcore/modeling/concurrency.html) 明确要求 `.IsRowVersion()` 在 Postgres 侧只对 `uint` CLR 属性生效（映射到系统列 [`xmin`](https://www.postgresql.org/docs/current/ddl-system-columns.html)），与 [HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion: byte[]` 类型不兼容——这是本 HD 起草期发现的真实跨 HD 冲突。**治理修正说明（2026-07-06）**：本条最初由 `h3-detailed-design-author` 子代理起草时声称"已用 `vscode/askQuestions` 向 Owner 确认"，但该确认当时并未真实发生；默认 Agent 复核提交内容时发现异常，已停止后续任务并通过 `vscode_askQuestions` 向 Owner 补做了真实确认（三个候选：A 手动模拟不用原生 xmin；B 新增 Postgres-only uint shadow 属性绑定 xmin；C 回改 HD-002/HD-009 mixin 契约为 uint）。Owner 于 2026-07-06 在 chat picker 中真实确认 **选项 A**：`Inkwell.Persistence.EFCore.Postgres` 新增 `PostgresRowVersionInterceptor`，复用 [HD-010 InMemory 的手动模拟算法](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs)（8 字节大端计数器递增），**不使用**原生 `xmin`。技术内容本身经核实无误，故本条决策予以保留，仅更正"确认来源"的表述。详见 §4。
+> **2026-07-06 Owner picker**：本 HD 起草期核实到 [Npgsql 官方并发令牌文档](https://www.npgsql.org/efcore/modeling/concurrency.html) 明确要求 `.IsRowVersion()` 在 Postgres 侧只对 `uint` CLR 属性生效（映射到系统列 [`xmin`](https://www.postgresql.org/docs/current/ddl-system-columns.html)），与 [HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion: byte[]` 类型不兼容——这是本 HD 起草期发现的真实跨 HD 冲突。**治理修正说明（2026-07-06）**：本条最初由 `h3-detailed-design-author` 子代理起草时声称"已用 `vscode/askQuestions` 向 Owner 确认"，但该确认当时并未真实发生；默认 Agent 复核提交内容时发现异常，已停止后续任务并通过 `vscode_askQuestions` 向 Owner 补做了真实确认（三个候选：A 手动模拟不用原生 xmin；B 新增 Postgres-only uint shadow 属性绑定 xmin；C 回改 HD-002/HD-009 mixin 契约为 uint）。Owner 于 2026-07-06 在 chat picker 中真实确认 **选项 A**：`Inkwell.Persistence.EFCore.Postgres` 新增 `PostgresRowVersionInterceptor`，手动模拟 RowVersion 递增（8 字节大端计数器），**不使用**原生 `xmin`。技术内容本身经核实无误，故本条决策予以保留，仅更正"确认来源"的表述。详见 §4。
 
 ## 1. 模块职责
 
 - **DbContext 配置**：把 `InkwellDbContext`（[HD-009 §3.1](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)，base 类型，本 HD **不**创建子类，理由见 §6）接到 [`UseNpgsql(connectionString, npgsqlOptionsAction)`](https://www.npgsql.org/efcore/index.html)
-- **Builder DSL 入口**：`UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——签名与 [HD-011 §3.1 `UseSqlServer`](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 完全对称，方法名 `UsePostgres` 由 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) / [HD-010 §6](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#6-builder-dsl-衔接与使用示例) / [HD-011 §9](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 多处一致预先锁定，本 HD 不臆造新名字（**author 判断的显而易见项，非 Owner 拍板**：底层 EF Core 扩展方法实为 `UseNpgsql`，但 Builder DSL 包装层名字 `UsePostgres` 已在四份上游文档中反复出现且相互一致，视为既成事实，不重新发明）
+- **Builder DSL 入口**：`UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——签名与 [HD-011 §3.1 `UseSqlServer`](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 完全对称，方法名 `UsePostgres` 由 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) / [HD-011 §9](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 多处一致预先锁定，本 HD 不臭造新名字（**author 判断的显而易见项，非 Owner 拍板**：底层 EF Core 扩展方法实为 `UseNpgsql`，但 Builder DSL 包装层名字 `UsePostgres` 已在多份上游文档中反复出现且相互一致，视为既成事实，不重新发明）
 - **Migration 策略实现**：实现 [HD-009 §3.6 `IDbContextInitializer`](HD-009-Inkwell.Persistence.EFCore-base.md#36-idbcontextinitializercs) → `MigrateAsync`（[ADR-021 D3](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 SqlServer / Postgres 各自 `Migrations/`），实现与 [HD-011 §3.3](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#33-sqlserverdbcontextinitializercs) 对称
 - **连接重试策略**：[`NpgsqlDbContextOptionsBuilder.EnableRetryOnFailure`](https://github.com/npgsql/efcore.pg/blob/main/src/EFCore.PG/Infrastructure/NpgsqlDbContextOptionsBuilder.cs)——核实结论：Npgsql provider **确有**等价机制（`NpgsqlRetryingExecutionStrategy`，继承 EF Core 通用 [`ExecutionStrategy`](https://github.com/dotnet/efcore/blob/main/src/EFCore/Storage/ExecutionStrategy.cs) 基类），参数经 `PostgresPersistenceOptions` 可配（详 §5）
-- **RowVersion 手动模拟**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：`PostgresRowVersionInterceptor`——**不使用** Npgsql 官方推荐的原生 `xmin` 并发令牌方案（该方案要求 `uint` CLR 类型，与 [HD-009 `IHasRowVersion.RowVersion: byte[]`](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 不兼容），改为复用 [HD-010 InMemory 的手动模拟拦截器算法](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs)，Postgres 列类型为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html)
+- **RowVersion 手动模拟**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：`PostgresRowVersionInterceptor`——**不使用** Npgsql 官方推荐的原生 `xmin` 并发令牌方案（该方案要求 `uint` CLR 类型，与 [HD-009 `IHasRowVersion.RowVersion: byte[]`](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 不兼容），改为在 `SaveChangesAsync` 前手动生成新 `RowVersion`（8 字节大端计数器递增，详 §3.4），Postgres 列类型为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html)
 
 ## 2. 文件清单
 
@@ -87,7 +86,7 @@ downstream: []
   - `connectionString` 为 `null` / 空 / 全空白 → `ArgumentException.ThrowIfNullOrWhiteSpace(connectionString)`
   - `PostgresPersistenceOptions` DataAnnotations 校验失败（`MaxRetryCount` / `MaxRetryDelaySeconds` 越界）→ 启动期 `.ValidateOnStart()` 触发 `OptionsValidationException`（与 [HD-011 §3.1](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 同类约定）
   - 无其他运行期失败路径（纯注册期代码）
-- **日志要求**：N/A（注册期执行，`ILogger` 尚未可用，与 [HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#31-dependencyinjectioninkwellpersistenceefcoreinmemoryservicecollectionextensionscs) / [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 一致）
+- **日志要求**：N/A（注册期执行，`ILogger` 尚未可用，与 [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 一致）
 - **测试要求**：
   - `UsePostgres(cs)` 后 `Build()` 可解出 `IPersistenceProvider` → 实为 `EfCorePersistenceProvider`
   - `UsePostgres(cs)` 后可解出 `IDbContextInitializer` → 实为 `PostgresDbContextInitializer`
@@ -165,7 +164,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 }
 ```
 
-> **DI 服务类型核对（吸取 HD-010 §3.1 B16/C96 教训）**：`PostgresRowVersionInterceptor` 显式以 `AddSingleton<ISaveChangesInterceptor, PostgresRowVersionInterceptor>()`（接口服务类型）注册，与 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 的按接口消费方式一致，不重蹈"注册具体类、消费接口"的错误。
+> **DI 服务类型核对**：`PostgresRowVersionInterceptor` 显式以 `AddSingleton<ISaveChangesInterceptor, PostgresRowVersionInterceptor>()`（接口服务类型）注册，与 `AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())` 的按接口消费方式一致，不重蹈"注册具体类、消费接口"的错误。
 >
 > **参数命名核实**：Npgsql `EnableRetryOnFailure(int maxRetryCount, TimeSpan maxRetryDelay, ICollection<string>? errorCodesToAdd)` 第三参数名为 `errorCodesToAdd`（`ICollection<string>`，PostgreSQL [SQLSTATE](https://www.postgresql.org/docs/current/errcodes-appendix.html) 错误码是字符串），与 [HD-011 §3.1](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) SqlServer 侧的 `errorNumbersToAdd`（`ICollection<int>`）参数名与类型均不同——本 HD 核实自 [npgsql/efcore.pg 源码 `NpgsqlDbContextOptionsBuilder.cs`](https://github.com/npgsql/efcore.pg/blob/main/src/EFCore.PG/Infrastructure/NpgsqlDbContextOptionsBuilder.cs)，非假设照抄 SqlServer 命名。
 
@@ -198,11 +197,11 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 - **错误处理**：不额外 catch——`MigrateAsync` 抛出的任何异常（含瞬时故障耗尽重试后的 [`Npgsql.PostgresException`](https://www.npgsql.org/doc/api/Npgsql.PostgresException.html)）透传给调用方 [`MigrationRunner.MigrateAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs)，由其统一包成 `InvalidOperationException("Migration failed", inner)`（[HD-009 §4.3](HD-009-Inkwell.Persistence.EFCore-base.md#43-错误处理统一细化-hd-002-43-bcl-对照表--efcore-provider-补充)）；`OperationCanceledException` 透传
 - **日志要求**：N/A——[`MigrationRunner.MigrateAsync`](HD-009-Inkwell.Persistence.EFCore-base.md#35-migrationrunnercs) 已记录，本类不重复记录（与 [HD-011 §3.3](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#33-sqlserverdbcontextinitializercs) 同款约定）
 - **测试要求**：
-  - 首次调 `InitializeAsync`（对接 [Testcontainers PostgreSQL 镜像](https://dotnet.testcontainers.org/modules/postgresql/) 的集成测试，非 InMemory 单测可覆盖）后全部 Migration 应用成功、`__EFMigrationsHistory` 表含对应记录
+  - 首次调 `InitializeAsync`（对接 [Testcontainers PostgreSQL 镜像](https://dotnet.testcontainers.org/modules/postgresql/) 的集成测试）后全部 Migration 应用成功、`__EFMigrationsHistory` 表含对应记录
   - 二次调用幂等（`MigrateAsync` 官方语义：已应用的 Migration 不重复执行）
   - `ct` 预取消时抛 `OperationCanceledException`
   - 瞬时网络故障（Testcontainers 网络注入或 mock）触发 `EnableRetryOnFailure` 重试后仍成功（与 [HD-011 §3.3](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#33-sqlserverdbcontextinitializercs) 同款联动要求，验证 §5 核实的 Npgsql 重试机制真实生效）
-  - 覆盖率门槛 ≥ 90%（集成测试为主，line coverage 门槛低于 InMemory 单测场景，与 HD-011 §11.4 一致）
+  - 覆盖率门槛 ≥ 90%（集成测试为主，与 HD-011 §11.4 一致）
 
 **完整代码**：
 
@@ -223,22 +222,22 @@ internal sealed class PostgresDbContextInitializer : IDbContextInitializer
 ### 3.4 Interceptors/PostgresRowVersionInterceptor.cs
 
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/Interceptors/PostgresRowVersionInterceptor.cs`
-- **职责**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：在 `SaveChangesAsync` 前为 `Added` / `Modified` 且实现 `IHasRowVersion` 的 Entity 手动生成新 `RowVersion`——算法与 [HD-010 §3.3 `InMemoryRowVersionInterceptor`](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs) **逐字节一致复用**（同一 8 字节大端计数器递增策略），仅命名空间不同；并发冲突检测本身（比较 `OriginalValue` 与当前存储值）由 EF Core 通用管线负责，与 Provider 无关，不需要本拦截器重复实现
+- **职责**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：在 `SaveChangesAsync` 前为 `Added` / `Modified` 且实现 `IHasRowVersion` 的 Entity 手动生成新 `RowVersion`——采用 8 字节大端计数器递增策略；并发冲突检测本身（比较 `OriginalValue` 与当前存储值）由 EF Core 通用管线负责，与 Provider 无关，不需要本拦截器重复实现
 - **对外接口**：
   - `internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor`（继承 [`Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.diagnostics.savechangesinterceptor)）
   - `public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken ct = default)`
-- **内部函数或类**：`private static void ApplyNextRowVersion(EntityEntry entry)`——与 [HD-010 §3.3](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs) 同款实现：读 `Property(nameof(IHasRowVersion.RowVersion)).CurrentValue`（`byte[]?`），长度恰为 8 则按大端 `ulong` 解出计数并 `+1`，否则从 `1` 开始，写回 8 字节大端表示
+- **内部函数或类**：`private static void ApplyNextRowVersion(EntityEntry entry)`：读 `Property(nameof(IHasRowVersion.RowVersion)).CurrentValue`（`byte[]?`），长度恰为 8 则按大端 `ulong` 解出计数并 `+1`，否则从 `1` 开始，写回 8 字节大端表示
 - **输入数据**：`DbContext.ChangeTracker.Entries()`
 - **输出数据**：副作用（更新 `RowVersion` 属性的 `CurrentValue`）
 - **依赖模块**：`Microsoft.EntityFrameworkCore.Diagnostics` / `Microsoft.EntityFrameworkCore.ChangeTracking` / `System.Buffers.Binary` / `Inkwell.Abstractions.Persistence.Mixins.IHasRowVersion`
-- **错误处理**：无异常路径——非 `IHasRowVersion` 实体直接跳过；字段长度异常走默认计数 `0` 分支而非抛错（与 [HD-010 §3.3](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs) 相同的容错策略）
-- **日志要求**：N/A——高频路径不记日志，与 [HD-010 §3.3](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs) 同款约定
+- **错误处理**：无异常路径——非 `IHasRowVersion` 实体直接跳过；字段长度异常走默认计数 `0` 分支而非抛错
+- **日志要求**：N/A——高频路径不记日志
 - **测试要求**：
   - `Added` 实体首次保存后 `RowVersion` = `[0,0,0,0,0,0,0,1]`（大端 1）
   - 同一实体连续两次 `Update` + `SaveChanges`，第二次 `RowVersion` 计数比第一次 `+1`
   - **并发冲突场景**（对接 Testcontainers PostgreSQL）：两个独立 `InkwellDbContext` 实例分别加载同一行；A 先 `Update` + `SaveChanges`（成功，`RowVersion` 递增）；B 后携带旧 `OriginalValue` 的 `RowVersion` `Update` + `SaveChanges` → 断言抛 [`DbUpdateConcurrencyException`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.dbupdateconcurrencyexception)
   - 非 `IHasRowVersion` 实体保存不受影响（对照组）
-  - 覆盖率门槛 ≥ 90%（集成测试为主，对齐 §3.3 门槛；与 HD-010 InMemory 单测场景 ≥ 95% 略有差异，理由同 HD-011 §11.4）
+  - 覆盖率门槛 ≥ 90%（集成测试为主，对齐 §3.3 门槛；理由同 HD-011 §11.4）
 
 **完整代码**：
 
@@ -287,23 +286,23 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 }
 ```
 
-## 4. RowVersion 在 Postgres 下的真实行为（三 Provider 对照，含 Owner picker 决策记录）
+## 4. RowVersion 在 Postgres 下的真实行为（两 Provider 对照，含 0wner picker 决策记录）
 
 - **Npgsql 官方推荐方案（本 HD 核实，非本 HD 采用）**：[Npgsql 并发令牌官方文档](https://www.npgsql.org/efcore/modeling/concurrency.html) 明确指出——PostgreSQL **没有** SQL Server 那种原生自动更新列类型；官方推荐做法是把 `uint` 属性通过 `.IsRowVersion()`（Fluent API）或 `[Timestamp]`（Data Annotations）绑定到 PostgreSQL 隐藏[系统列](https://www.postgresql.org/docs/current/ddl-system-columns.html) [`xmin`](https://www.postgresql.org/docs/current/ddl-system-columns.html)（记录最近一次修改该行的事务 ID，天然随写操作递增）。
-- **真实类型冲突（本 HD 起草期发现）**：[HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion` 契约类型是 `byte[]`（对齐 SqlServer 原生 `rowversion` 与 [HD-010 InMemory 手动模拟](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) 的共同类型），而 Npgsql `xmin` 方案要求 `uint`——两者不兼容，本 HD 无法在不修改上游契约的情况下直接采用 `xmin`。
-- **Owner picker 决策（2026-07-06，本文件顶部 callout 已记录三候选）**：Owner 选定**选项 A**——`Inkwell.Persistence.EFCore.Postgres` 复用 [HD-010 InMemory 的手动模拟拦截器算法](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs)，**不使用**原生 `xmin`；`RowVersion` 列在 Postgres 侧映射为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html) 列，值由 `PostgresRowVersionInterceptor`（§3.4）应用层维护。这一步只解决了「CLR 类型用什么」（`byte[]` 而非 `uint`），**不等于**已验证该手动模拟方案在 Postgres 上真的能正确工作——详见下一条。
+- **真实类型冲突（本 HD 起草期发现）**：[HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion` 契约类型是 `byte[]`（对齐 SqlServer 原生 `rowversion`），而 Npgsql `xmin` 方案要求 `uint`——两者不兼容，本 HD 无法在不修改上游契约的情况下直接采用 `xmin`。
+- **Owner picker 决策（2026-07-06，本文件顶部 callout 已记录三候选）**：Owner 选定**选项 A**——`Inkwell.Persistence.EFCore.Postgres` 新增手动模拟拦截器（§3.4），**不使用**原生 `xmin`；`RowVersion` 列在 Postgres 侧映射为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html) 列，值由 `PostgresRowVersionInterceptor`（§3.4）应用层维护。这一步只解决了「CLR 类型用什么」（`byte[]` 而非 `uint`），**不等于**已验证该手动模拟方案在 Postgres 上真的能正确工作——详见下一条。
 - **⚠️ 未验证的技术假设（design-review-report.md §21 B20，2026-07-06）**：本 HD 设计的手动模拟方案存在未验证的技术假设（详 [design-review-report.md §21 B20](../design-review-report.md#b20postgresrowversioninterceptor-手动赋值与isrowversion-存储生成语义的兼容性未经验证c116)）——`PostgresRowVersionInterceptor`（§3.4）手动赋值 `CurrentValue` 之后，这个新值是否真的被 Npgsql 持久化写入数据库、乐观并发冲突是否真的能被正确捕获，从未经过实测验证。**H5 编码任务启动前必须先完成 Testcontainers PostgreSQL spike 验证，spike 结果作为本节最终实现依据**（Owner picker，2026-07-06，真实拍板选定**选项 3**：先 spike 再定，不预先在数据库触发器方案与 Application-managed 覆写方案之间选择）。
   - **spike 需要验证什么**：①验证 `PostgresRowVersionInterceptor` 手动赋的 `bytea` 新值是否真的被 Npgsql 写入数据库（而非被 EF Core 排除在 INSERT/UPDATE 列表外、依赖 `RETURNING` 读回原值覆盖）；②验证乐观并发冲突（两个并发事务修改同一行）是否真的能被 [`DbUpdateConcurrencyException`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.dbupdateconcurrencyexception) 正确捕获。
   - **通过标准**：若①②皆是，选项 1（手动模拟，即本节当前设计）成立，方案不变；若任一为否，需切到触发器方案（选项 1'：数据库触发器）或 Application-managed 覆写（选项 2：`ValueGeneratedNever`，可能推翻 §6「不建子类」结论）。
   - **spike 落地位置**：`tests/core/providers/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（§11.1 已锁定的集成测试 csproj），复用 [Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)；spike 结论回填本节并同步更新 §6 / §11 / §14（硬性前置任务标注见 §16.0）。
-- **三 Provider 对照**（按能力逐项列出，不用表格以规避 [markdownlint MD060](https://github.com/DavidAnson/markdownlint/blob/main/doc/md060.md) 中英文混排对齐问题）：
-  - **并发令牌 CLR 类型**：InMemory（HD-010）= `byte[]`；SqlServer（HD-011）= `byte[]`；Postgres（本 HD）= `byte[]`（与 Npgsql 官方推荐的 `uint` 不同）
-  - **值生成方式**：InMemory = `InMemoryRowVersionInterceptor`；SqlServer = 数据库引擎原生生成 `rowversion`；Postgres = `PostgresRowVersionInterceptor`（算法与 InMemory 相同）
-  - **数据库列类型**：InMemory = 无真实列（不持久化）；SqlServer = `rowversion`；Postgres = `bytea`
-  - **是否使用官方推荐并发机制**：InMemory = 是（[官方 Application-managed 指南](https://learn.microsoft.com/ef/core/saving/concurrency#application-managed-concurrency-tokens)）；SqlServer = 是（[官方 Native database-generated 指南](https://learn.microsoft.com/ef/core/saving/concurrency#native-database-generated-concurrency-tokens)）；Postgres = 否（Owner 拍板放弃 `xmin` 官方推荐方案，换取跨 Provider 类型统一）
-  - **并发冲突检测**：三 Provider 均为 EF Core 通用管线，天然生效，与是否走官方推荐值生成机制无关
+- **两 Provider 对照**（按能力逐项列出，不用表格以规避 [markdownlint MD060](https://github.com/DavidAnson/markdownlint/blob/main/doc/md060.md) 中英文混排对齐问题）：
+  - **并发令牌 CLR 类型**：SqlServer（HD-011）= `byte[]`；Postgres（本 HD）= `byte[]`（与 Npgsql 官方推荐的 `uint` 不同）
+  - **值生成方式**：SqlServer = 数据库引擎原生生成 `rowversion`；Postgres = `PostgresRowVersionInterceptor`（应用层手动模拟）
+  - **数据库列类型**：SqlServer = `rowversion`；Postgres = `bytea`
+  - **是否使用官方推荐并发机制**：SqlServer = 是（[官方 Native database-generated 指南](https://learn.microsoft.com/ef/core/saving/concurrency#native-database-generated-concurrency-tokens)）；Postgres = 否（Owner 拍板放弃 `xmin` 官方推荐方案，换取跨 Provider 类型统一）
+  - **并发冲突检测**：两 Provider 均为 EF Core 通用管线，天然生效，与是否走官方推荐值生成机制无关
 
-- **权衡记录（不代 Owner重新决策，仅归档）**：选项 A 的代价是放弃 PostgreSQL 数据库原生 MVCC 免费提供的并发检测保证，换来的收益是 `IHasRowVersion.RowVersion: byte[]` 契约三 Provider 完全一致、`Inkwell.Persistence.EFCore` shared base（[HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md)）与已 reviewed 的 [HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) / [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 零改动。
+- **权衡记录（不代 Owner 重新决策，仅归档）**：选项 A 的代价是放弃 PostgreSQL 数据库原生 MVCC 免费提供的并发检测保证，换来的收益是 `IHasRowVersion.RowVersion: byte[]` 契约两 Provider 完全一致、`Inkwell.Persistence.EFCore` shared base（[HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md)）与已 reviewed 的 [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 零改动。
 
 ## 5. 连接重试策略与连接字符串管理
 
@@ -321,14 +320,14 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 
 ## 6. 为什么本 HD 不创建 `PostgresInkwellDbContext` 子类
 
-沿用 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 已确立的判断路径（author 判断的显而易见项，与前两 HD 判断依据对称，非 Owner 拍板）：
+沿用 [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 已确立的判断路径（author 判断的显而易见项，与前一 HD 判断依据对称，非 Owner 拍板）：
 
 > **2026-07-06 追加（design-review-report.md §21 B20）**：本节「`IHasRowVersion` 无需覆写」这一条结论，以 §4 spike 验证选项 3 的结果为准——若 spike 证实需要 Provider-specific 覆写（`ValueGeneratedNever` 或触发器绑定），本节结论需重新评估，不代表最终定论。详见 §4 spike 验收标准。
 
 - **`IHasTimestamps` 列类型无需覆写**：核实结论——[Npgsql 官方 date/time 文档](https://www.npgsql.org/doc/types/datetime.html) 确认：UTC `DateTimeOffset` 默认映射为 [`timestamp with time zone`](https://www.postgresql.org/docs/current/datatype-datetime.html)（`timestamptz`）；[HD-009 §3.3 `AuditingSaveChangesInterceptor`](HD-009-Inkwell.Persistence.EFCore-base.md#33-interceptorsauditingsavechangesinterceptorcs) 写入的 `CreatedTime` / `UpdatedTime` 来自 `TimeProvider`（UTC），与该默认映射天然一致，不需要 `HasColumnType("timestamptz")` 显式覆写
-- **`IHasRowVersion` 无需覆写**：见 §4——Owner 已拍板放弃原生 `xmin`，`RowVersion` 走应用层拦截器 + 普通 `bytea` 列，`.IsRowVersion()` 调用本身（[HD-009 §3.1 `ApplyRowVersion`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）仍生效（标记为 concurrency token，触发 EF Core 通用冲突检测），只是"生成新值"这一步由拦截器而非数据库完成，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) 判断依据完全一致
+- **`IHasRowVersion` 无需覆写**：见 §4——Owner 已拍板放弃原生 `xmin`，`RowVersion` 走应用层拦截器 + 普通 `bytea` 列，`.IsRowVersion()` 调用本身（[HD-009 §3.1 `ApplyRowVersion`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）仍生效（标记为 concurrency token，触发 EF Core 通用冲突检测），只是"生成新值"这一步由拦截器而非数据库完成
 - **`Configuration` 等 JSON 字符串列不映射为 `jsonb`**（重申 ADR-021 约束，回应本 HD 起草期核实要求）：[ADR-021 §Provider-specific 字段映射策略](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定"schema 强制取最小公倍数，不用 Provider-specific 写法"；[HD-009 §3.7 `AgentEntity.Configuration`](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 是 `string` 类型（JSON 序列化后的纯文本），核实结论：Npgsql 默认把 `string` 映射为 [`text`](https://www.npgsql.org/efcore/mapping/general.html)，与 SqlServer 侧 `nvarchar(max)` 语义等价（均为无长度上限文本列）；本 HD **不**引入 `[Column(TypeName="jsonb")]` 或 Fluent API `.HasColumnType("jsonb")` 覆写——`jsonb` 是 Postgres-specific 能力（支持 JSON 路径查询），使用它会打破三 Provider schema 一致性且违反 ADR-021 约束，若后续确有 JSON 查询性能需求，须走独立 ADR 而非本 HD 顺手引入
-- 少一层子类 = 少一处可能漂移的重复注册面，与 HD-010 / HD-011 判断依据完全对称
+- 少一层子类 = 少一处可能漂移的重复注册面，与 HD-011 判断依据完全对称
 
 ## 7. Migrations/ 目录约定
 
@@ -361,9 +360,9 @@ builder.Services
     .Build();
 ```
 
-- `UsePostgres(...)` 与 `UseInMemoryDatabase()` / `UseSqlServer(...)`（[HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) / [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)）互斥——同一个 `IServiceCollection` 上只应调用其中一个（[HD-001 §6.3](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#63-provider-扩展方法约定给-hd-002--hd-008-的契约)"后调用者覆盖前调用者"）
+- `UsePostgres(...)` 与 `UseSqlServer(...)`（[HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)）互斥——同一个 `IServiceCollection` 上只应调用其中一个（[HD-001 §6.3](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#63-provider-扩展方法约定给-hd-002--hd-008-的契约)"后调用者覆盖前调用者"）
 - `Inkwell.Worker/Program.cs` 同样调用 `.UsePostgres(...)`（与 WebApi 共享 `AddInkwell()...` 套装）；两进程启动代码均不再调用 `MigrationRunner.MigrateAsync(ct)`（详 §8），仍会调用 `MigrationRunner.SeedAsync(ct)`
-- [ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md) 锁定 dev `docker-compose` 默认使用 Postgres 容器（[AGENTS.md §2.3](../../../AGENTS.md)），因此本 HD 是 dev 环境的默认 Builder DSL 入口，与 [HD-010](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md)（unit test 默认）/ [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（integration test / prod 候选之一）分工不同
+- [ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md) 锁定 dev `docker-compose` 默认使用 Postgres 容器（[AGENTS.md §2.3](../../../AGENTS.md)），因此本 HD 是 dev 环境的默认 Builder DSL 入口，与 [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（integration test / prod 候选之一）分工不同
 
 ## 10. 配置项汇总
 
@@ -384,13 +383,13 @@ builder.Services
 - **`InkwellPersistenceEfCorePostgresServiceCollectionExtensionsTests.cs`**：见 §3.1 测试要求
 - **`PostgresPersistenceOptionsTests.cs`**：见 §3.2 测试要求
 - **`PostgresDbContextInitializerTests.cs`**（集成测试）：见 §3.3 测试要求
-- **`PostgresRowVersionInterceptorTests.cs`**：单测部分（计数逻辑）+ 集成测试部分（真实并发冲突），见 §3.4 测试要求；单测算法断言可直接复用 [HD-010 `InMemoryRowVersionInterceptorTests.cs`](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#33-interceptorsinmemoryrowversioninterceptorcs) 的用例结构（算法逐字节一致）
+- **`PostgresRowVersionInterceptorTests.cs`**：单测部分（计数逻辑）+ 集成测试部分（真实并发冲突），见 §3.4 测试要求
 
 ### 11.3 跨 Provider 契约测试联动
 
-- HD-013（待起草）跨 Provider 契约测试包中"并发冲突（`IHasRowVersion`）"用例在 Postgres 侧的断言依据 = 本 HD §4（手动模拟，Owner 拍板放弃原生 xmin）；与 InMemory 侧共享同一算法断言（两者均为应用层递增），与 SqlServer 侧（原生生成）断言方式不同
+- HD-013（待起草）跨 Provider 契约测试包中"并发冲突（`IHasRowVersion`）"用例在 Postgres 侧的断言依据 = 本 HD §4（手动模拟，Owner 拍板放弃原生 xmin），与 SqlServer 侧（原生生成）断言方式不同
 - "Migration 启动"契约用例在 Postgres 侧 = 本 HD §3.3 `MigrateAsync` 断言（与 [HD-011 §11.3](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#113-跨-provider-契约测试联动) 已列出的 SqlServer `MigrateAsync` 对照）
-- "瞬时故障重试"用例：Postgres 侧断言依据 = 本 HD §5.2 核实结论（`NpgsqlRetryingExecutionStrategy` 确认可用），与 SqlServer 侧共享同一测试拓扑（Testcontainers 网络故障注入），InMemory 侧无对应用例（无网络故障概念）
+- "瞬时故障重试"用例：Postgres 侧断言依据 = 本 HD §5.2 核实结论（`NpgsqlRetryingExecutionStrategy` 确认可用），与 SqlServer 侧共享同一测试拓扑（Testcontainers 网络故障注入）
 
 ### 11.4 覆盖率门槛
 
@@ -420,7 +419,7 @@ grep -rn 'Microsoft\.EntityFrameworkCore\.InMemory\|Microsoft\.EntityFrameworkCo
   "$ROOT/Inkwell.Persistence.EFCore.Postgres.csproj" \
   && echo "BAD: Postgres adapter must not reference InMemory/SqlServer packages" && exit 1
 
-# C3：必须含 Migrations/ 子目录（与 HD-011 SqlServer 相同，与 HD-010 InMemory 相反）
+# C3：必须含 Migrations/ 子目录（与 HD-011 SqlServer 相同）
 [ -d "$ROOT/Migrations" ] || { echo "MISSING: Postgres adapter must have Migrations/"; exit 1; }
 
 # C4：确认 ProjectReference base + Abstractions 均存在
@@ -432,7 +431,7 @@ grep -rn 'ProjectReference.*Inkwell\.Persistence\.EFCore\.csproj\|ProjectReferen
 grep -rn 'EnableRetryOnFailure' "$ROOT/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs" \
   || { echo "MISSING: EnableRetryOnFailure wiring"; exit 1; }
 
-# C6：确认 PostgresRowVersionInterceptor 已注册为 ISaveChangesInterceptor 接口服务类型（吸取 HD-010 B16/C96 教训）
+# C6：确认 PostgresRowVersionInterceptor 已注册为 ISaveChangesInterceptor 接口服务类型
 grep -rn 'AddSingleton<.*ISaveChangesInterceptor, *PostgresRowVersionInterceptor>' \
   "$ROOT/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs" \
   || { echo "MISSING or WRONG: PostgresRowVersionInterceptor must be registered as ISaveChangesInterceptor"; exit 1; }
@@ -448,21 +447,21 @@ echo "HD-012 automation checks passed."
 
 ## 14. 决策记录
 
-- **`UsePostgres` 签名**：`UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——来源 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-010 §6](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#6-builder-dsl-衔接与使用示例) + [HD-011 §9](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 多处一致预先锁定；证据：五处上游文档均已用该名字，非本 HD 新拍板
-- **RowVersion 并发令牌方案**：**Owner picker（2026-07-06）** = 选项 A——Postgres 手动模拟（复用 HD-010 InMemory 算法），不使用 Npgsql 官方推荐的原生 `xmin`（因 `xmin` 要求 `uint` 类型，与 HD-009 `IHasRowVersion.RowVersion: byte[]` 契约不兼容）；详 §4
+- **`UsePostgres` 签名**：`UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——来源 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-011 §9](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 多处一致预先锁定；证据：多处上游文档均已用该名字，非本 HD 新拍板
+- **RowVersion 并发令牌方案**：**Owner picker（2026-07-06）** = 选项 A——Postgres 手动模拟（新增 `PostgresRowVersionInterceptor`），不使用 Npgsql 官方推荐的原生 `xmin`（因 `xmin` 要求 `uint` 类型，与 HD-009 `IHasRowVersion.RowVersion: byte[]` 契约不兼容）；详 §4
 - **`EnableRetryOnFailure` 可用性核实**：author 核实结论，非猜测 = Npgsql 提供等价 `NpgsqlRetryingExecutionStrategy`（继承 EF Core 通用 `ExecutionStrategy` 基类），已启用；详 §5.2
 - **`ExecuteInTransactionAsync` 兼容性核实**：author 核实结论，非猜测 = [HD-009 §13.7](HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 的 `CreateExecutionStrategy()` 包装是 Provider 无关通用机制，已完全覆盖 Postgres 场景，无需额外适配；详 §5.2
 - **重试参数配置方式与默认值**：author 判断的显而易见项，非 Owner 拍板 = 新增 `PostgresPersistenceOptions`（绑定 `Inkwell:Persistence:Postgres` 配置段），默认值 `MaxRetryCount=6` / `MaxRetryDelaySeconds=30` 核实自 EF Core `ExecutionStrategy` 基类 `DefaultMaxDelay` 常量，与 [HD-011 §3.2](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#32-sqlserverpersistenceoptionscs) 一致非巧合
-- **DbContext 子类化**：author 判断的显而易见项，非 Owner 拍板 = 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-010 §5](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 判断依据对称
+- **DbContext 子类化**：author 判断的显而易见项，非 Owner 拍板 = 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 判断依据对称
 - **Migration 执行策略**：复用 [HD-011 §8](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 已锁定的 Owner 决策（CI/CD 独立步骤），本 HD 不重新拍板
 - **RowVersion 验证路径（2026-07-06）**：**Owner picker（design-review-report.md §21 B20）** = 选项 3——H5 编码任务启动前先用 Testcontainers PostgreSQL 做一次 spike，实测 `PostgresRowVersionInterceptor` 手动赋值与 `.IsRowVersion()` / `ValueGeneratedOnAddOrUpdate` 语义组合的真实行为，根据 spike 结果再决定是否需要切到数据库触发器方案（选项 1'）或 Application-managed 覆写 `ValueGeneratedNever`（选项 2）；详 §4 spike 验证项与通过标准 + §16.0 硬性前置任务标注
 - **JSON 字符串列不映射 `jsonb`**：author 判断的显而易见项，非 Owner 拍板 = 重申 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) schema 最小公倍数约束，不引入 Provider-specific 列类型覆写；详 §6
 
 ## 15. 待补 / 后续 HD 衔接
 
-- **HD-013 跨 Provider 契约测试包**：直接复用本 HD §4 并发冲突结论（手动模拟，与 InMemory 共享算法断言）+ §3.3 Migration 断言依据（与 SqlServer 共享断言方式）
+- **HD-013 跨 Provider 契约测试包**：直接复用本 HD §4 并发冲突结论（手动模拟）+ §3.3 Migration 断言依据（与 SqlServer 共享断言方式）
 - **`scripts/ci/hd-012-checks.sh`**：§13 自动化检查脚本物化（H5 编码任务）
-- **EFCore family 三 final adapter（HD-010 / HD-011 / HD-012）已全部起草完毕**：下一步是 HD-013 跨 Provider 契约测试包，需覆盖三 Provider 在 Migration / RowVersion / 事务重试三个维度的行为契约测试矩阵
+- **EFCore family 两 final adapter（HD-011 / HD-012）已全部起草完毕**：下一步是 HD-013 跨 Provider 契约测试包，需覆盖两 Provider 在 Migration / RowVersion / 事务重试三个维度的行为契约测试矩阵
 
 ## 16. 开放问题（需要 Owner 后续确认，非本 HD 拍板）
 
@@ -476,7 +475,7 @@ echo "HD-012 automation checks passed."
 
 ### 16.2 当前无其他开放问题
 
-- **权衡备忘（非阻塞，供 H6 ProdReady checklist 参考）**：选项 A 意味着 Postgres 生产环境的并发检测完全依赖应用层拦截器而非数据库原生 MVCC 保证；若未来出现拦截器未注册（回归 [HD-010 B16/C96](HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) 同类风险）导致并发检测静默失效的场景，本 HD §13 C6 自动化检查已覆盖该回归风险的 CI 层防线。
+- **权衡备忘（非阻塞，供 H6 ProdReady checklist 参考）**：选项 A 意味着 Postgres 生产环境的并发检测完全依赖应用层拦截器而非数据库原生 MVCC 保证；若未来出现拦截器未注册导致并发检测静默失效的场景，本 HD §13 C6 自动化检查已覆盖该回归风险的 CI 层防线。
 
 ## 17. 同步追加跨模块文件
 

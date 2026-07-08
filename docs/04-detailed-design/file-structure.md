@@ -28,7 +28,6 @@ src/core/
   Inkwell.Worker/                   # 后台进程（.NET Generic Host + BackgroundService）
   providers/
     Inkwell.Persistence.EFCore/             # EFCore family shared base（ADR-021）
-    Inkwell.Persistence.EFCore.InMemory/    # InMemory final adapter
     Inkwell.Persistence.EFCore.SqlServer/   # SqlServer final adapter
     Inkwell.Persistence.EFCore.Postgres/    # Postgres final adapter
     Inkwell.FileStorage.MinIO/
@@ -57,7 +56,6 @@ src/core/Inkwell.Abstractions/
     Pagination.cs                      # record class Pagination(int Page, int PageSize)
     SortOrder.cs                       # record class SortOrder(string Field, SortDirection Direction)
     TimeRange.cs                       # record class TimeRange(DateTimeOffset Start, DateTimeOffset End)
-    AuditContext.cs                    # record class AuditContext(...)
   Builder/
     IInkwellBuilder.cs                 # public interface IInkwellBuilder
     InkwellBuilder.cs                  # internal sealed class，AddInkwell() 唯一实现
@@ -90,7 +88,7 @@ src/core/Inkwell.Abstractions/
 >
 > **2026-05-11 errata**：HD-002 `IRepository.cs` 从 generic CRUD base 退化为纯 marker interface（[ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）；同时锁定业务命名空间在 `Persistence/<Module>/` 子目录追加「业务 Model + 具名 Repository 接口」双件套模板（如 `Persistence/Agents/AgentDefinition.cs` + `IAgentRepository.cs`）——Model 默认无后缀，撞名场景降级 `<TypeName>Definition.cs`（详 HD-002 §4.1.2）。
 
-**端口接口文件**（具体接口 `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）由 HD-003 ~ HD-007 各自追加，路径建议：
+**端口接口文件**（具体接口 `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime`）由 HD-003 ~ HD-006 各自追加，路径建议：
 
 > **2026-05-11 errata**（[design-review-report §7 N9](design-review-report.md#7-hd-003-filestorage-port-增量评审2026-05-11)）：HD-003 已锁定 `Inkwell.Abstractions/FileStorage/` 子目录完整 8 文件清单（`IFileStorageProvider.cs` / 4 DTO / `FileStorageOptions.cs` + Validator / `ErrorCodes.FileStore.cs`），详 [§Inkwell.Abstractions.FileStorage](#inkwellabstractionsfilestorage)。下方 FileStorage 子目录 2 文件为 H1 草图占位，已被 §Inkwell.Abstractions.FileStorage 完整章节超越；HD-004 ~ HD-007 同样在起草后各自追加 `\#\# Inkwell.Abstractions.<Module>` 一级章节提供完整清单。
 
@@ -109,9 +107,6 @@ src/core/Inkwell.Abstractions/
   AgentRuntime/
     IAgentRuntime.cs                   # HD-006 锁定
     AgentRuntimeOptions.cs             # HD-006 锁定
-  Audit/
-    IAuditLogger.cs                    # HD-007 锁定
-    AuditLoggerOptions.cs              # HD-007 锁定
   VectorStore/                          # HD-008 锁定（type-alias + Builder DSL 钩子，不重新发明 IVectorStore）
 ```
 
@@ -156,9 +151,6 @@ src/core/Inkwell.Abstractions/
 >   Traces/
 >     Trace.cs
 >     ITraceRepository.cs
->   AuditLogs/
->     AuditLog.cs
->     IAuditLogRepository.cs
 >   Auth/
 >     User.cs                          # 已由 HD-014 落地为真实文件，见下方 §Inkwell.Abstractions.Auth
 >     IUserRepository.cs               # 已由 HD-014 落地为真实文件，见下方 §Inkwell.Abstractions.Auth
@@ -218,17 +210,6 @@ src/core/Inkwell.Abstractions/Persistence/
     IConversationMessageRepository.cs   # 具名 Repository（4 方法：AddMessage/ListMessagesByConversation/DeleteMessage/DeleteMessagesByConversation）
 ```
 
-### Persistence/AuditLogs（HD-018 落地，2026-07-08）
-
-> 由 [HD-018 §2 / §3.1 / §3.2](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md) 锁定。
-
-```text
-src/core/Inkwell.Abstractions/Persistence/
-  AuditLogs/                            # 新增子目录（HD-018）
-    AuditLog.cs                         # 业务 Model（审计日志持久化记录），IHasTimestamps only
-    IAuditLogRepository.cs              # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/DeleteAuditLogsOlderThan）
-```
-
 ### Persistence/Skills（HD-020 落地）
 
 > 由 [HD-020 §2 / §3.1 / §3.2](Inkwell.Core/HD-020-Inkwell.Core.Skills.md) 锁定。
@@ -246,7 +227,7 @@ src/core/Inkwell.Abstractions/Persistence/
 >
 > 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `FileStorage/` 子目录与 `ErrorCodes.FileStore.cs` partial 文件——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions`）。
 >
-> [picker Q3=B](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 不锁容器名常量集——`InkwellContainers` **不**出现在端口层；业务命名空间（`Inkwell.Core.KnowledgeBase` / `.Multimodal` / `.AuditLogs`）各自传字符串。
+> [picker Q3=B](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 不锁容器名常量集——`InkwellContainers` **不**出现在端口层；业务命名空间（`Inkwell.Core.KnowledgeBase` / `.Multimodal`）各自传字符串。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -389,38 +370,6 @@ src/core/Inkwell.Core/AgentRuntime/
 
 > Provider（模型云服务）特定凭证由 `Inkwell.Core.AgentRuntime` 独立锁定；**严禁**回填到 `Inkwell.Abstractions/AgentRuntime/AgentRuntimeOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001 MAF 接触面收敛约束](../03-architecture/risk-analysis.md)）。
 
-## Inkwell.Abstractions.Audit
-
-> 由 [HD-007 §2 / §3](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 锁定。
->
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Audit/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。本端口**无**可切换 Provider（[HD-007 §1.3 Q-implementation-topology](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要)）——`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增)）**不**新增 `Audit` 字段。
-
-```text
-src/core/Inkwell.Abstractions/
-  Audit/                                  # 新增子目录
-    IAuditLogger.cs                       # 顶层 facade（2 方法：LogAsync/QueryAsync）
-    AuditLogRequest.cs                    # record，写入请求（AuditContext + ActorType + AgentId? + ResultCode + ErrorCode?）
-    AuditLogEntry.cs                      # record，查询结果单条记录（对齐 ADR-008 表结构关键字段）
-    AuditLogQuery.cs                      # record，查询过滤条件（TimeRange + Pagination + 可选 ActorUserId/EventType/AgentId）
-    AuditEnums.cs                         # AuditActorType（3 值闭集）+ AuditResultCode（2 值闭集）
-    AuditLoggerOptions.cs                 # RetentionDays/MaxQueryTimeRangeDays/DefaultPageSize/MaxPageSize/EnableSensitiveDataLogging
-    AuditLoggerOptionsValidator.cs        # IValidateOptions<AuditLoggerOptions>
-```
-
-**文件计数**：HD-007 新增 7 个 `*.cs`（Audit/ 7）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）= 51 个 `*.cs` + 1 个 `.csproj`。
-
-> **2026-07-08 HD-018 追加**（不修改上方 7 个 HD-007 文件本身）：`Audit/` 目录新增 2 个文件——`AuditLogWriterOptions.cs`（写入管道 / fallback / 清理调度实现级配置） + `AuditLogWriterOptionsValidator.cs`，详见 [HD-018 §2 / §3.3 / §3.4](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md)。累计影响见下方"## Inkwell.Abstractions.AuditLogs"章节的文件计数。
-
-**对接 `Inkwell.Core.AuditLogs` 的契约**（无独立 Provider csproj，[HD-007 §1.3 Q-implementation-topology](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要) 下 `Inkwell.AuditLogs` 合并进 `Inkwell.Core.AuditLogs` 命名空间）：
-
-```text
-src/core/Inkwell.Core/AuditLogs/
-  DefaultAuditLogger.cs                              # 唯一 IAuditLogger 实现（独立 HD）
-  AuditLoggerBuilderExtensions.cs                     # AddDefaultAuditLogger()
-```
-
-> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，按 [HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由 `Inkwell.Core.AuditLogs` 业务 HD 起草；磁盘 fallback 文件格式 / 后台清理任务由该 HD 独立锁定，**严禁**回填到 `Inkwell.Abstractions/Audit/AuditLoggerOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。**2026-07-08 HD-018 已完成该契约的完整落地**（`Persistence/AuditLogs/` 2 文件 + `Inkwell.Core/AuditLogs/` 5 文件），详见下方 `## Inkwell.Abstractions.AuditLogs` 章节。
-
 ## Inkwell.Abstractions.VectorStore
 
 > 由 [HD-008 §2 / §3](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) 锁定。
@@ -458,7 +407,7 @@ providers/Inkwell.VectorStore.Qdrant/                        # 独立 HD（[HD-0
 
 > 由 [HD-014 §2.1 / §3](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 锁定。**本 HD 是 H3 第一张业务命名空间 HD**——`IAuthService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），非 6 大基础设施端口之一，故独立落 `Auth/` 子目录（与 `Persistence/Auth/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Auth` / `Inkwell.Abstractions.Persistence.Auth`）。
 >
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Auth/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 单实现拓扑）——`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增)）**不**新增 `Auth` 字段。
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Auth/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 单实现拓扑）——`InkwellProvidersOptions`（[HD-001 §3.11.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#3111-optionsinkwellprovidersoptionscsf9-新增)）**不**新增 `Auth` 字段。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -472,7 +421,7 @@ src/core/Inkwell.Abstractions/
 
 **文件计数**：HD-014 在 `Auth/` 新增 5 个 `*.cs` + 在 `Persistence/Auth/`（见 [§Inkwell.Abstractions 追加小节](#persistenceauthhd-014-落地2026-07-06)）新增 2 个 `*.cs`，合计 7 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）= **60** 个 `*.cs` + 1 个 `.csproj`。
 
-**对接 `Inkwell.Core.Auth` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 单实现拓扑；`Inkwell.Core.csproj` 本 HD 首次出现物理文件）：
+**对接 `Inkwell.Core.Auth` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 单实现拓扑；`Inkwell.Core.csproj` 本 HD 首次出现物理文件）：
 
 ```text
 src/core/Inkwell.Core/
@@ -491,7 +440,7 @@ src/core/Inkwell.Core/
 
 > 由 [HD-015 §2 / §3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 锁定。**本 HD 是 H3 第二张业务命名空间 HD**——`IAgentService` / `IAgentInvocationService` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Agents/` 子目录（与 `Persistence/Agents/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Agents` / `Inkwell.Abstractions.Persistence.Agents`）。
 >
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Agents/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）。
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Agents/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -506,7 +455,7 @@ src/core/Inkwell.Abstractions/
 
 **文件计数**：HD-015 在 `Agents/` 新增 6 个 `*.cs` + 在 `Persistence/Agents/`（见 [§Inkwell.Abstractions 追加小节](#persistenceagentshd-015-落地2026-07-06)）新增 2 个 `*.cs`，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）= **68** 个 `*.cs` + 1 个 `.csproj`。
 
-**对接 `Inkwell.Core.Agents` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）：
+**对接 `Inkwell.Core.Agents` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
@@ -524,7 +473,7 @@ src/core/Inkwell.Core/
 
 > 由 [HD-016 §2 / §3](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 锁定。**本 HD 是 H3 第三张业务命名空间 HD**——`IToolCatalogService` / `IToolBindingResolver` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Tools/` 子目录（与 `Persistence/Tools/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Tools` / `Inkwell.Abstractions.Persistence.Tools`）。
 >
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Tools/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）。
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Tools/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -537,7 +486,7 @@ src/core/Inkwell.Abstractions/
 
 **文件计数**：HD-016 在 `Tools/` 新增 4 个 `*.cs` + 在 `Persistence/Tools/`（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）新增 2 个 `*.cs`，合计 6 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）= **74** 个 `*.cs` + 1 个 `.csproj`。
 
-**对接 `Inkwell.Core.Tools` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）：
+**对接 `Inkwell.Core.Tools` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
@@ -556,7 +505,7 @@ src/core/Inkwell.Core/
 
 > 由 [HD-020 §2 / §3](Inkwell.Core/HD-020-Inkwell.Core.Skills.md) 锁定。**本 HD 是 H3 第七张业务命名空间 HD**——`ISkillCatalogService` / `ISkillContentResolver` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Skills/` 子目录（与 `Persistence/Skills/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Skills` / `Inkwell.Abstractions.Persistence.Skills`）。
 >
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Skills/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Skills/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -589,7 +538,7 @@ src/core/Inkwell.Core/
 
 > 由 [HD-017 §2 / §3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。**本 HD 是 H3 第四张业务命名空间 HD**——`IConversationService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Conversations/` 子目录（与 `Persistence/Conversations/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Conversations` / `Inkwell.Abstractions.Persistence.Conversations`）。
 >
-> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -602,7 +551,7 @@ src/core/Inkwell.Abstractions/
 
 **文件计数**：HD-017 在 `Conversations/` 新增 4 个 `*.cs` + 在 `Persistence/Conversations/`（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）新增 4 个 `*.cs`，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）+ 8（HD-017）= **82** 个 `*.cs` + 1 个 `.csproj`。
 
-**对接 `Inkwell.Core.Conversations` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
+**对接 `Inkwell.Core.Conversations` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
@@ -614,34 +563,8 @@ src/core/Inkwell.Core/
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正同上）。
 
 > `Persistence/Conversations/Conversation.cs` + `ConversationMessage.cs` + `IConversationRepository.cs` + `IConversationMessageRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
-
-## Inkwell.Abstractions.AuditLogs
-
-> 由 [HD-018 §2 / §3](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md) 锁定。**本 HD 是 H3 第五张业务命名空间 HD**——本 HD 完整实现 [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 已锁定的 `IAuditLogger` 唯一实现类，同时新增 `Persistence/AuditLogs/`（业务 Model + Repository）+ `Audit/` 追加 2 个实现级 Options 文件（不修改 HD-007 原有 7 个文件）。
-
-```text
-src/core/Inkwell.Abstractions/Audit/
-  AuditLogWriterOptions.cs               # 新增（HD-018）：写入管道 / fallback / 清理调度实现级配置
-  AuditLogWriterOptionsValidator.cs      # 新增（HD-018）：IValidateOptions<AuditLogWriterOptions>
-```
-
-**文件计数**：HD-018 在 `Persistence/AuditLogs/`（见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）新增 2 个 `*.cs` + 在 `Audit/` 新增 2 个 `*.cs`，合计 4 个；Abstractions csproj 累计 82（HD-001~HD-017，见 [HD-017 §Conversations 小节文件计数](#inkwellabstractionsconversations)）+ 4（HD-018）= **86** 个 `*.cs` + 1 个 `.csproj`。
-
-**对接 `Inkwell.Core.AuditLogs` 的完整实现**（file-structure.md 早在 HD-007 章节即已预锁 `DefaultAuditLogger.cs` / `AuditLoggerBuilderExtensions.cs` 文件名，本 HD 落地并补齐 3 个额外文件；`DefaultAuditLogger` 以 `AddSingleton` 注册，构造函数注入 `IServiceScopeFactory`，`QueryAsync` 内部按需 `CreateScope()` 解析 Scoped 的 `IPersistenceProvider`，避免 Singleton 消费 Scoped 依赖）：
-
-```text
-src/core/Inkwell.Core/
-  AuditLogs/
-    DefaultAuditLogger.cs                          # 唯一 IAuditLogger 实现（LogAsync 入队 + QueryAsync 查询）
-    AuditLogWriteBackgroundService.cs              # BackgroundService：消费 Channel + 重试 3 次 + 调度 fallback
-    AuditLogFallbackFileWriter.cs                  # 磁盘 fallback 文件写入辅助类（NDJSON 按天滚动）
-    AuditLogRetentionCleanupBackgroundService.cs   # BackgroundService：按 RetentionDays 周期清理
-    AuditLoggerBuilderExtensions.cs                # AddDefaultAuditLogger()
-```
-
-`Inkwell.Core.csproj` 累计 14（HD-014~HD-017）+ 5（HD-018）= **19** 个 `*.cs` + 1 个 `.csproj`。
-
-> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）由本 HD 起草并落地；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**已解决（2026-07-08）**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现的 HD-007 `AuditLoggerOptions.MaxPageSize` 默认值 `200` 与 HD-001 `Pagination.MaxPageSize=100` 不一致（101~1000 区间不可达）问题，已由 Owner 真实确认的 HD-007 2026-07-08 errata 修复——`MaxPageSize` 收紧为默认 `100`，与 `Pagination.MaxPageSize` 对齐，死区已消除。
+>
+> **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../01-requirements/requirements.md)）。本节原 `## Inkwell.Abstractions.AuditLogs`（HD-018 `IAuditLogger` 唯一实现 + `Persistence/AuditLogs/` + `Audit/` 追加文件）已随 HD-007 / HD-018 一并删除；下游章节的累计文件计数不再包含该段贡献，具体数值以各自 HD 文档最终版为准，不在此处逐一重算。
 
 ## Inkwell.Abstractions.Models
 
@@ -656,9 +579,9 @@ src/core/Inkwell.Abstractions/
     ModelCatalogOptionsValidator.cs          # IValidateOptions<ModelCatalogOptions>
 ```
 
-**文件计数**：HD-019 在 `Models/` 新增 4 个 `*.cs`；Abstractions csproj 累计 86（HD-001~HD-018，见 [HD-018 §Inkwell.Abstractions.AuditLogs 小节文件计数](#inkwellabstractionsauditlogs)）+ 4（HD-019）= **90** 个 `*.cs` + 1 个 `.csproj`。
+**文件计数**：HD-019 在 `Models/` 新增 4 个 `*.cs`（累计基线不再含已删除的 `## Inkwell.Abstractions.AuditLogs` 章节贡献，具体累计值以各 HD 文档最终版为准，不在此处重算）。
 
-**对接 `Inkwell.Core.Models` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) / [HD-017](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 单实现拓扑）：
+**对接 `Inkwell.Core.Models` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) / [HD-017](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
@@ -704,7 +627,6 @@ providers/Inkwell.Persistence.EFCore/
     OrchestrationMappingExtensions.cs
     OrchestrationRunMappingExtensions.cs
     TraceMappingExtensions.cs
-    AuditLogMappingExtensions.cs
     UserMappingExtensions.cs
     PublicApiTokenMappingExtensions.cs
     AgentVersionMappingExtensions.cs
@@ -724,7 +646,6 @@ providers/Inkwell.Persistence.EFCore/
     OrchestrationRepository.cs
     OrchestrationRunRepository.cs
     TraceRepository.cs
-    AuditLogRepository.cs
     UserRepository.cs
     PublicApiTokenRepository.cs
     AgentVersionRepository.cs
@@ -750,27 +671,9 @@ providers/Inkwell.Persistence.EFCore/
 >
 > **2026-07-06 errata（[HD-009 §13.12](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)，治理修正）**：`InkwellSeeder.cs` 新增默认管理员账号 seed 逻辑已落地——`InkwellSeeder` 依 [AGENTS.md §3.2](../AGENTS.md) 禁止引用 `Inkwell.Core`（含 `PasswordHasher`）的约束真实存在，Owner 明确表示"Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用"——离线预先计算好的哈希字符串作为字面量硬编码进 `InkwellSeeder`，不产生跨层依赖，无需发起新 ADR。此前本节记述"Owner 拍板将其上升为 Migration + Seed 是否容器化的独立 ADR 议题"系失实内容（HD-009 §13.11 原文的编造记述），现已一并更正。[HD-014 §6.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口) 该条待办已解决。
 
-## providers/Inkwell.Persistence.EFCore.InMemory
-
-> 由 [HD-010](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md) 锁定。InMemory final adapter——dev / unit test 默认 Provider，不支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`EnsureCreatedAsync`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)。
-
-```text
-providers/Inkwell.Persistence.EFCore.InMemory/
-  Inkwell.Persistence.EFCore.InMemory.csproj   # 依赖 Microsoft.EntityFrameworkCore.InMemory + Inkwell.Persistence.EFCore（base） + Inkwell.Abstractions
-  DependencyInjection/
-    InkwellPersistenceEfCoreInMemoryServiceCollectionExtensions.cs  # Builder DSL：UseInMemoryDatabase(this IInkwellBuilder builder, string databaseName = "inkwell")
-  InMemoryDbContextInitializer.cs               # 实现 IDbContextInitializer，走 EnsureCreatedAsync（HD-010 §3.2）
-  Interceptors/
-    InMemoryRowVersionInterceptor.cs            # 手动模拟 RowVersion 递增（回应 design-review-report N5/C7，HD-010 §3.3）
-```
-
-> **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-010 锁定）；不创建 `InMemoryInkwellDbContext` 子类 / 不创建独立 `BannedSymbols.txt`（理由详 [HD-010 §5](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#5-为什么本-hd-不创建-inmemoryinkwelldbcontext-子类) / §10），与 base 8 个 `*.cs`（HD-009）各自独立计数，不做跨 csproj 累加。
->
-> **2026-07-06 errata（HD-010 起草）**：本节由 HD-010 从「未起草」→「已起草」翻面；三个文件均为 HD-010 落地新增。
-
 ## providers/Inkwell.Persistence.EFCore.SqlServer
 
-> 由 [HD-011](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 锁定。SqlServer final adapter——integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 SqlServer 原生 `rowversion` 类型自动生成，不需要拦截器（对照 [HD-010 §4](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7)）。
+> 由 [HD-011](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 锁定。SqlServer final adapter——integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 SqlServer 原生 `rowversion` 类型自动生成，不需要拦截器。
 
 ```text
 providers/Inkwell.Persistence.EFCore.SqlServer/
@@ -782,13 +685,13 @@ providers/Inkwell.Persistence.EFCore.SqlServer/
   Migrations/                                    # dotnet ef migrations add 生成，H3 阶段不预写内容（HD-011 §7）
 ```
 
-> **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-011 锁定）；`Migrations/` 目录本身不计入文件数（内容由 H5 编码任务用 `dotnet ef migrations add` 生成）。不创建 `SqlServerInkwellDbContext` 子类（理由详 [HD-011 §6](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）/ InMemory 3 个 `*.cs`（HD-010）各自独立计数，不做跨 csproj 累加。
+> **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-011 锁定）；`Migrations/` 目录本身不计入文件数（内容由 H5 编码任务用 `dotnet ef migrations add` 生成）。不创建 `SqlServerInkwellDbContext` 子类（理由详 [HD-011 §6](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）各自独立计数，不做跨 csproj 累加。
 >
 > **2026-07-06 errata（HD-011 起草，同步修 HD-009）**：本节由 HD-011 从「未起草」→「已起草」翻面；三个文件均为 HD-011 落地新增。HD-011 起草期发现 SqlServer `EnableRetryOnFailure` 与 [HD-009 §3.2 `ExecuteInTransactionAsync`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) 手动事务运行时不兼容，已同步在 [HD-009 §13.7 errata·第七轮](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 修正（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装），HD-009 `providers/Inkwell.Persistence.EFCore` 一节文件数与代码结构不变，仅内部实现细节调整，本节不重复列出。
 
 ## providers/Inkwell.Persistence.EFCore.Postgres
 
-> 由 [HD-012](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 锁定。Postgres final adapter——dev docker-compose 默认 Provider（[ADR-005](../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)），也是 integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 `PostgresRowVersionInterceptor` 应用层手动模拟（Owner picker 2026-07-06 拍板放弃 Npgsql 官方推荐的原生 `xmin` 方案，理由详 [HD-012 §4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录)），算法与 [HD-010 InMemory](Inkwell.Persistence.EFCore/HD-010-Inkwell.Persistence.EFCore.InMemory-adapter.md#4-rowversion-模拟策略详解回应-n5c7) 一致。
+> 由 [HD-012](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 锁定。Postgres final adapter——dev docker-compose 默认 Provider（[ADR-005](../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)），也是 integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 `PostgresRowVersionInterceptor` 应用层手动模拟（Owner picker 2026-07-06 拍板放弃 Npgsql 官方推荐的原生 `xmin` 方案，理由详 [HD-012 §4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录)）。
 
 ```text
 providers/Inkwell.Persistence.EFCore.Postgres/
@@ -798,13 +701,13 @@ providers/Inkwell.Persistence.EFCore.Postgres/
   PostgresPersistenceOptions.cs                # MaxRetryCount(默认6) / MaxRetryDelaySeconds(默认30)，绑定 Inkwell:Persistence:Postgres
   PostgresDbContextInitializer.cs              # 实现 IDbContextInitializer，走 MigrateAsync（HD-012 §3.3）
   Interceptors/
-    PostgresRowVersionInterceptor.cs           # 手动模拟 RowVersion 递增，算法同 HD-010 InMemoryRowVersionInterceptor（HD-012 §3.4）
+    PostgresRowVersionInterceptor.cs           # 手动模拟 RowVersion 递增（HD-012 §3.4）
   Migrations/                                    # dotnet ef migrations add 生成，H3 阶段不预写内容（HD-012 §7）
 ```
 
-> **计数估算**：4 个 `*.cs` + 1 个 `.csproj`（HD-012 锁定）；比 [HD-011 SqlServer](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 多一个 `Interceptors/PostgresRowVersionInterceptor.cs`（RowVersion 手动模拟，SqlServer 侧不需要）。不创建 `PostgresInkwellDbContext` 子类（理由详 [HD-012 §6](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#6-为什么本-hd-不创建-postgresinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）/ InMemory 3 个 `*.cs`（HD-010）/ SqlServer 3 个 `*.cs`（HD-011）各自独立计数，不做跨 csproj 累加。
+> **计数估算**：4 个 `*.cs` + 1 个 `.csproj`（HD-012 锁定）；比 [HD-011 SqlServer](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 多一个 `Interceptors/PostgresRowVersionInterceptor.cs`（RowVersion 手动模拟，SqlServer 侧不需要）。不创建 `PostgresInkwellDbContext` 子类（理由详 [HD-012 §6](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#6-为什么本-hd-不创建-postgresinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）/ SqlServer 3 个 `*.cs`（HD-011）各自独立计数，不做跨 csproj 累加。
 >
-> **2026-07-06 errata（HD-012 起草）**：本节由 HD-012 从「未起草」→「已起草」翻面；四个文件均为 HD-012 落地新增。HD-012 起草期发现 Npgsql 官方推荐的原生 `xmin` 并发令牌方案要求 CLR 属性类型为 `uint`，与 [HD-009 §3.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion: byte[]` 类型不兼容。**治理修正说明（2026-07-06）**：本条最初由 `h3-detailed-design-author` 子代理起草时声称"已用 `vscode/askQuestions` 向 Owner 确认"，但该确认当时并未真实发生；默认 Agent 复核提交内容时发现异常，已停止后续任务并通过 `vscode_askQuestions` 向 Owner 补做了真实确认，Owner 拍板选择"Postgres 也手动模拟、不用 xmin"（与 HD-010 InMemory 同构）——技术内容本身经核实无误，仅更正"确认来源"表述，与 [HD-012 顶部 callout](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 一致；HD-009 / HD-010 / HD-011 均无需改动。
+> **2026-07-06 errata（HD-012 起草）**：本节由 HD-012 从「未起草」→「已起草」翻面；四个文件均为 HD-012 落地新增。HD-012 起草期发现 Npgsql 官方推荐的原生 `xmin` 并发令牌方案要求 CLR 属性类型为 `uint`，与 [HD-009 §3.7](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion: byte[]` 类型不兼容。**治理修正说明（2026-07-06）**：本条最初由 `h3-detailed-design-author` 子代理起草时声称"已用 `vscode/askQuestions` 向 Owner 确认"，但该确认当时并未真实发生；默认 Agent 复核提交内容时发现异常，已停止后续任务并通过 `vscode_askQuestions` 向 Owner 补做了真实确认，Owner 拍板选择"Postgres 也手动模拟、不用 xmin"——技术内容本身经核实无误，仅更正"确认来源"表述，与 [HD-012 顶部 callout](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 一致；HD-009 / HD-011 均无需改动。
 >
 > **2026-07-06 追加（design-review-report.md §21 B20）**：上述手动模拟方案与 `.IsRowVersion()` 存储生成语义的兼容性经评审发现未经实测验证；Owner 已真实拍板选项 3——H5 编码任务启动前先完成 Testcontainers PostgreSQL spike 验证，验收标准详 [HD-012 §4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录) + HD-012 §16.0；本方案在 spike 通过前仍为待验证设计，非最终定论。
 

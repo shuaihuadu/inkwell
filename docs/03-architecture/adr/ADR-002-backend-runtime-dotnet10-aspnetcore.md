@@ -15,7 +15,6 @@ downstream:
   - ADR-003
   - ADR-004
   - ADR-007
-  - ADR-008
   - ADR-011
   - ADR-012
   - ADR-013
@@ -30,7 +29,7 @@ Inkwell 后端需要承担 [§3.1 模块拓扑](../../01-requirements/repo-impac
 - [REQ-007 工具调用](../../01-requirements/requirements.md) / [REQ-008 Skills](../../01-requirements/requirements.md) / [REQ-012 编排](../../01-requirements/requirements.md) / [REQ-014 trace](../../01-requirements/requirements.md) 都对接 Microsoft Agent Framework（[ADR-003](./ADR-003-agent-engine-microsoft-agent-framework.md)），该框架的一等公民 SDK 是 .NET。
 - [REQ-016 多模态](../../01-requirements/requirements.md) 需要后端持有 Azure Speech 凭据并代理请求。
 - [REQ-013 公开 API](../../01-requirements/requirements.md) 需要标准 HTTP 服务器、Token 鉴权 middleware、rate limit。
-- [NFR-004 审计日志](../../01-requirements/requirements.md) / [NFR-005 对话历史](../../01-requirements/requirements.md) 需要持久化层与 [ADR-004 EF Core Provider](./ADR-004-data-store-provider-switchable-ef-core.md) 配套。
+- [NFR-005 对话历史](../../01-requirements/requirements.md) 需要持久化层与 [ADR-004 EF Core Provider](./ADR-004-data-store-provider-switchable-ef-core.md) 配套。
 - [Q-A5 部署形态](../open-questions-arch.md) 锁定 Docker Compose（dev） + AKS（prod），必须可容器化。
 
 第三步反问 Q-A2 用户答".NET 10 + ASP.NET Core"。

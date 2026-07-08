@@ -53,6 +53,8 @@ downstream: []
 - **卡点等级**：closed
 - **回写**：→ [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) §决策；[tech-selection.md §4](./tech-selection.md)；[architecture.md §4](./architecture.md)。
 
+> **2026-07-08 决策更新（本条历史回答部分作废）**：Owner 决定移除 EF Core **InMemory 关系型数据库** Provider（不支持外键约束，本地开发 / 测试价值有限），持久化收敛为两 Provider（SQL Server 2025 / PostgreSQL 17），dev / 测试改用 [Testcontainers](https://testcontainers.com/) 起真实实例。上方"三库可切换" / "InMemory / SQL Server 2025 / PostgreSQL 17" 表述已不再成立；`InMemoryVectorStore`（向量存储子系统）不受影响。完整决策记录见 [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 2026-07-08 更新。本条历史记录保留不删，仅作废其中的三库表述。
+
 ---
 
 ## OQ-A002 在途任务跨锁屏存活机制（Q-A6-followup）

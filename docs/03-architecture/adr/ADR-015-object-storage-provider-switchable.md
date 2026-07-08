@@ -22,9 +22,9 @@ downstream:
 
 ## 上下文
 
-[REQ-009 知识库](../../01-requirements/requirements.md) + [REQ-016 多模态](../../01-requirements/requirements.md) + [ADR-008 审计日志（v2 导出）](./ADR-008-audit-log-store-and-query.md) 都需要一个文件存储层来承载用户上传文件、知识库原始文档 + 抽取产物、未来的审计导出归档等大文件。
+[REQ-009 知识库](../../01-requirements/requirements.md) + [REQ-016 多模态](../../01-requirements/requirements.md) 都需要一个文件存储层来承载用户上传文件、知识库原始文档 + 抽取产物等大文件。
 
-[OQ-A005](../open-questions-arch.md) 最初的默认值 A 是单一 Azure Blob（dev = Azurite emulator），这与 [ADR-004 IPersistenceProvider 切换](./ADR-004-data-store-provider-switchable-ef-core.md) 的思路不一致：关系数据已经支持 InMemory / SQL Server / PostgreSQL 三 Provider 切换，但文件存储被锁死在 Azure 上，会让“非 Azure 客户”的部署路径断裂；同时 dev 拉 Azurite 容器对单元测试 / 离线开发也是不必要的成本。
+[OQ-A005](../open-questions-arch.md) 最初的默认值 A 是单一 Azure Blob（dev = Azurite emulator），这与 [ADR-004 IPersistenceProvider 切换](./ADR-004-data-store-provider-switchable-ef-core.md) 的思路不一致：关系数据已经支持 SQL Server / PostgreSQL 两 Provider 切换，但文件存储被锁死在 Azure 上，会让“非 Azure 客户”的部署路径断裂；同时 dev 拉 Azurite 容器对单元测试 / 离线开发也是不必要的成本。
 
 Owner 在 H2 阶段提出新决议：文件存储应与关系层同构，提供三 Provider 切换；抽象接口名采用与 [`IPersistenceProvider`](./ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](./ADR-016-cache-provider-redis.md) 一致的 `*Provider` 后缀。本 ADR 落实这一决议。
 
@@ -63,7 +63,6 @@ public interface IFileStorageProvider
 - `uploads/` — 用户即时上传（多模态 / 临时）
 - `kb-source/` — 知识库原始文件
 - `kb-extracted/` — 知识库抽取产物（文本 / OCR / 元数据）
-- `audit-export/` — 审计导出（v2 启用，[ADR-008](./ADR-008-audit-log-store-and-query.md)）
 
 三 Provider 在底层概念上分别映射为：
 

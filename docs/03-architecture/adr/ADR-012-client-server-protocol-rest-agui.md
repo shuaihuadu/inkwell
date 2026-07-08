@@ -27,7 +27,7 @@ downstream: []
 
 需要支持的语义：
 
-- 同步 REST（CRUD：Agent / Skill / 知识库 / 编排 / Token / 审计日志查询）
+- 同步 REST（CRUD：Agent / Skill / 知识库 / 编排 / Token）
 - 流式 Run（聊天 / 编排执行）→ 模型 token 流式输出 + 工具调用事件 + trace 事件
 - 跨锁屏体验（[ADR-011](./ADR-011-auto-lock-with-inflight-task-survival.md)）仅依赖主进程长 SSE + 本地环缓 + 兑底重拉 endpoint
 

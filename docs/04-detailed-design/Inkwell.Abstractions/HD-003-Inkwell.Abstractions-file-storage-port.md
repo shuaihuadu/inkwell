@@ -9,7 +9,6 @@ upstream:
   - REQ-009
   - REQ-016
   - REQ-017
-  - NFR-004
   - NFR-006
   - ADR-002
   - ADR-005
@@ -45,7 +44,7 @@ upstream:
 - **不在内**：
   - 三 Provider 实现（[ADR-015](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) LocalFileSystem / AzureBlob / MinIO 各自独立 HD）
   - 客户端直传逻辑（[ADR-009 多模态](../../03-architecture/adr/ADR-009-multimodal-azure-speech.md)）
-  - 容器名常量集 / 业务侧 PII 脱敏规则（前者按 [picker Q3=B](#13-关键决策摘要) 留业务 HD；后者按 [HD-001 §7](HD-001-Inkwell.Abstractions-foundation.md) 锁 `IAuditLogger`）
+  - 容器名常量集 / 业务侧 PII 脱敏规则（前者按 [picker Q3=B](#13-关键决策摘要) 留业务 HD；后者留业务方自行定义）
   - Helm bucket 初始化 / Migration（由 `providers/Inkwell.FileStorage.MinIO/` HD + Helm chart 起草）
   - 内容类型探测 / 病毒扫描 / OCR 抽取（业务侧 `Inkwell.KnowledgeBase` HD）
 
@@ -457,7 +456,6 @@ public static class LocalFileSystemBuilderExtensions
 - **预签名 URL 直传协议细节**（PUT vs POST form / 必备 header / CORS 规则）—— 留到 Provider HD（特别是 `Inkwell.FileStorage.AzureBlob` 与 `Inkwell.FileStorage.MinIO`）起草
 - **客户端上传 SDK 接入**——前端 [ADR-001](../../03-architecture/adr/ADR-001-client-runtime-electron-react.md) Electron 端走 [`@ag-ui/client`](https://github.com/ag-ui-protocol) 还是直接 `fetch + PUT`，留到客户端 HD
 - **大文件分片上传 / 多模态语音流式上传**——v1 单次上传，v2 backlog（[ADR-015 §中性](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) 已声明）
-- **审计日志钩子**——Upload / Delete 触发 `IAuditLogger`（HD-007 待起草），由业务侧（如 `Inkwell.Core.KnowledgeBase`）显式调用，不由端口层埋点
 
 ## 12. 跨模块章节贡献
 

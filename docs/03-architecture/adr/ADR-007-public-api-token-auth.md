@@ -15,7 +15,7 @@ upstream:
 downstream: []
 ---
 
-# ADR-007 公开 API 鉴权：单 Token + 后端审计
+# ADR-007 公开 API 鉴权：单 Token
 
 ## 上下文
 
@@ -23,19 +23,18 @@ downstream: []
 
 公开的Agent，需要符合A2A的标准
 
-[OQ-004 closed §A](../../01-requirements/open-questions.md) 已锁"v1 单 Token 鉴权 + 显式 rate limit + 审计日志"。[EX-005](../../01-requirements/requirements.md) 要求公开 API 异常 / 鉴权失败 / 触发限流 都进 [NFR-004 审计日志](../../01-requirements/requirements.md)。
+[OQ-004 closed §A](../../01-requirements/open-questions.md) 已锁"v1 单 Token 鉴权 + 显式 rate limit"。[EX-005](../../01-requirements/requirements.md) 要求公开 API 异常 / 鉴权失败 / 触发限流都返回标准错误码。
 
 [Q-A4-followup](../open-questions-arch.md) 默认值 A 锁定缓存 / 限流由 ASP.NET Core 内置组件实现（不引入 Redis）。
 
 ## 决策
 
-**公开 API 鉴权采用：单 Token + Bearer scheme + ASP.NET Core 自定义 AuthenticationHandler；rate limit 使用 ASP.NET Core 内置 [Rate Limiting](https://learn.microsoft.com/aspnet/core/performance/rate-limit) middleware；审计日志走 [ADR-008](./ADR-008-audit-log-store-and-query.md)。**
+**公开 API 鉴权采用：单 Token + Bearer scheme + ASP.NET Core 自定义 AuthenticationHandler；rate limit 使用 ASP.NET Core 内置 [Rate Limiting](https://learn.microsoft.com/aspnet/core/performance/rate-limit) middleware。**
 
 - Token 签发：管理员在 Agent 详情页一键生成 ≥ 32 字节随机 Token（GUID + 加盐 SHA-256），保存的是 Token 哈希；明文只在生成时显示一次。
 - Token 撤销：管理员可在 UI 中失效任何 Token；失效后请求立即拒绝。
 - Token 范围：单 Token 关联单 Agent + 单租户，无超管 Token；不支持 RBAC（v1 范围裁剪）。
 - 限流：每 Token 默认 60 req/min（可配置上限）；触发限流返回 HTTP 429 + `Retry-After` header。
-- 审计字段（详见 [ADR-008](./ADR-008-audit-log-store-and-query.md)）：`request_id` / `agent_id` / `token_id_hash` / `ip` / `status_code` / `latency_ms` / `error_code` / `request_size` / `response_size`。
 
 ## 备选项
 
@@ -67,7 +66,7 @@ downstream: []
 ### 负面
 
 - 没有 RBAC：Token 持有者可以调用 Agent 全部能力；通过"一个 Agent 一个 Token + 谁分发谁负责"的运维约束缓解。
-- 没有 TTL：Token 一旦泄露需要管理员手动撤销；通过 UI 一键撤销 + 审计日志告警缓解。
+- 没有 TTL：Token 一旦泄露需要管理员手动撤销；通过 UI 一键撤销缓解。
 - v2 升级到 RBAC / TTL 会涉及 schema 迁移；现在的 token table 需要预留 `role` / `expires_at` 字段（v1 NULL）。
 
 ### 中性

@@ -29,7 +29,7 @@ upstream:
 > - **AC-031"trace 中能看到 Discovery / Activation / Execution 三阶段命中状态"不在本 HD 范围**——trace 记录 / 可视化归未起草的 `Inkwell.Core.Traces`；本 HD 仅保证 Discovery（目录查询 + 绑定解析）阶段产出可被上游记录的结果（[§3.4](#34-skillsiskillcontentresolvercs) `SkillResolutionResult`），不自行写 trace。
 > - **REQ-005/REQ-006/REQ-007/REQ-015/REQ-017 均不在本 HD 范围**——`SkillDefinition` 不持有 Agent 归属 / 版本 / 共享字段，同 [HD-016 §1.2](HD-016-Inkwell.Core.Tools.md#12-范围) 先例。
 >
-> **依赖规则遵循**（[AGENTS.md §3.2](../../../AGENTS.md)）：`Inkwell.Core.Skills` 只依赖 `Inkwell.Abstractions` + BCL；**不** `using` 任何 Provider 包，**不** `using Microsoft.Agents.AI.*`；持久化经 `IPersistenceProvider.GetRepository<ISkillRepository>()`（[HD-002 §13.3 Q1=A2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；本 HD 不写审计（[NFR-004](../../01-requirements/requirements.md) 审计事件清单未列"Skill 目录上传/查询"，仅列"Skill 与工具的挂载变更"——该事件已由已 reviewed 的 [HD-015 `AgentService.UpdateAgentAsync`](HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs)`ActionType="agent_skill_bindings_changed"` 覆盖，同 [HD-016 §1.3 Q1](HD-016-Inkwell.Core.Tools.md#13-关键决策摘要) 判断依据）。
+> **依赖规则遵循**（[AGENTS.md §3.2](../../../AGENTS.md)）：`Inkwell.Core.Skills` 只依赖 `Inkwell.Abstractions` + BCL；**不** `using` 任何 Provider 包，**不** `using Microsoft.Agents.AI.*`；持久化经 `IPersistenceProvider.GetRepository<ISkillRepository>()`（[HD-002 §13.3 Q1=A2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）。
 >
 > **上传的实际文件存储（`references/`/`assets/` 二进制内容）不在本 HD**——本 HD 假设调用方（未起草的 `Inkwell.WebApi`）已把这些文件经 [HD-003 `IFileStorageProvider.UploadAsync`](../Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 上传完毕并取得 `Uri`，本 HD 的 `SkillUploadRequest`（[§3.5](#35-skillsskilluploadrequestcs)）只接收已上传完成的 `Uri` 列表，不处理 multipart / 二进制流（同 [HD-015 `AgentDefinition.AvatarUri`](HD-015-Inkwell.Core.Agents.md#31-persistenceagentsagentdefinitioncs) 引用模式，避免本 HD 越权处理 HTTP 层职责）。
 
@@ -69,7 +69,6 @@ upstream:
 - `UpdateSkill`/`DeleteSkill`——v1 无编辑 / 删除 Skill 的界面或流程（[§1.2 顶部范围核实](#12-范围)已附证据），`ISkillRepository` 不声明这两个方法
 - Agent 侧 `AgentUpsertRequest.SkillBindings` 的接线校验触点（"`Inkwell.WebApi` 在调用 `IAgentService.CreateAgentAsync`/`UpdateAgentAsync` 前循环调用本 HD `ISkillCatalogService.GetSkillAsync` 校验存在性"这一编排步骤）——留给未起草的 `Inkwell.WebApi` HD，同 [HD-016 §1.2](HD-016-Inkwell.Core.Tools.md#12-范围)"不在内"第四条先例；已 reviewed 的 [HD-015 `AgentService`](HD-015-Inkwell.Core.Agents.md#39-inkwellcoreagentsagentservicecs) 本身**不**校验 `SkillBinding`，本 HD 不改写该结论
 - Skill 上传的 multipart / zip 解包、`references/`/`assets/` 二进制文件的实际存储——归未起草的 `Inkwell.WebApi`（经 [HD-003 `IFileStorageProvider`](../Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md)），详见顶部 callout
-- 审计日志的写入——同顶部范围核实结论，本 HD 不注入 `IAuditLogger`
 
 ### 1.3 关键决策摘要
 

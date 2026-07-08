@@ -50,10 +50,9 @@ inkwell/
 │   │   │   └── （内部 namespace 隔离：Inkwell.Core.Auth / .Agents /
 │   │   │     .Skills / .KnowledgeBase / .Memory / .Triggers /
 │   │   │     .Orchestrations / .Traces / .Versioning / .Multimodal /
-│   │   │     .AuditLogs / .Conversations / .Health / .AgentRuntime）
+│   │   │     .Conversations / .Health / .AgentRuntime）
 │   │   ├── providers/
 │   │   │   ├── Inkwell.Persistence.EFCore/                ← 共享 base（[ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
-│   │   │   ├── Inkwell.Persistence.EFCore.InMemory/
 │   │   │   ├── Inkwell.Persistence.EFCore.SqlServer/
 │   │   │   ├── Inkwell.Persistence.EFCore.Postgres/
 │   │   │   ├── Inkwell.FileStorage.MinIO/
@@ -72,7 +71,6 @@ inkwell/
 │   │   ├── Inkwell.Core.Tests/
 │   │   ├── providers/
 │   │   │   ├── Inkwell.Persistence.EFCore.Tests/             ← [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) base 单元测试
-│   │   │   ├── Inkwell.Persistence.EFCore.InMemory.Tests/
 │   │   │   ├── Inkwell.Persistence.EFCore.SqlServer.Tests/
 │   │   │   ├── Inkwell.Persistence.EFCore.Postgres.Tests/
 │   │   │   ├── Inkwell.FileStorage.MinIO.Tests/
@@ -98,12 +96,12 @@ inkwell/
 | 旧（AGENTS.md §3.1）                                                                                                                                            | 新                                                                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Inkwell.Common.*`                                                                                                                                              | `Inkwell.Abstractions`（Result / Error / Options 模型） + `Inkwell.Core`（Telemetry / Auth middleware 实现）                                                             |
-| `Inkwell.DataAccess`                                                                                                                                            | 接口 → `Inkwell.Abstractions`；实现 → `providers/Inkwell.Persistence.EFCore.{InMemory,SqlServer,Postgres}` 三 csproj                                                     |
+| `Inkwell.DataAccess`                                                                                                                                            | 接口 → `Inkwell.Abstractions`；实现 → `providers/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` 两 csproj                                                              |
 | `Inkwell.Cache`                                                                                                                                                 | 接口 → `Inkwell.Abstractions`；`InMemoryCacheProvider` 默认 → `Inkwell.Core`；`RedisCacheProvider` → `providers/Inkwell.Cache.Redis`                                     |
 | §队列（[ADR-018](./ADR-018-queue-abstraction-channels-default.md)）                                                                                            | 接口 `IQueueProvider` → `Inkwell.Abstractions`；`ChannelsQueueProvider` 默认 → `Inkwell.Core`；`RedisStreamQueueProvider` → `providers/Inkwell.Queue.Redis`（[OQ-A008 closed §B](../open-questions-arch.md)） |
 | `Inkwell.FileStorage`                                                                                                                                           | 接口 → `Inkwell.Abstractions`；`LocalFileSystemProvider` 默认 → `Inkwell.Core`；`MinIO` / `AzureBlob` → `providers/*`                                                    |
 | `Inkwell.AgentRuntime`                                                                                                                                          | **合进** `Inkwell.Core.AgentRuntime` 命名空间；对外接口 `IAgentRuntime` → `Inkwell.Abstractions`（[RISK-001](../risk-analysis.md) 缓解手段重写为 lint + 接口收敛软边界） |
-| 业务模块（Auth / Agents / Skills / KnowledgeBase / Memory / Triggers / Orchestrations / Traces / Versioning / Multimodal / AuditLogs / Conversations / Health） | **合进** `Inkwell.Core.<Module>` 命名空间，namespace + folder 软隔离；不再每业务一 csproj                                                                                |
+| 业务模块（Auth / Agents / Skills / KnowledgeBase / Memory / Triggers / Orchestrations / Traces / Versioning / Multimodal / Conversations / Health）             | **合进** `Inkwell.Core.<Module>` 命名空间，namespace + folder 软隔离；不再每业务一 csproj                                                                                |
 | `Inkwell.PublicApi` / `Inkwell.Api` / `Inkwell.AGUI`                                                                                                            | 应用入口层；[ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 锁定 `Inkwell.WebApi`（HTTP/REST/AGUI/Public） + `Inkwell.Worker`（队列 consumer + DurableTask runner）双进程                                                                                               |
 
 ### 依赖规则（替换 §3.2）
@@ -135,7 +133,7 @@ inkwell/
 具体规则：
 
 1. **业务代码**（`Inkwell.Core` 内业务命名空间 + `Inkwell.WebApi` + `Inkwell.Worker`）→ 只能依赖 `Inkwell.Abstractions` 中的接口；不允许直接 `using StackExchange.Redis` / `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `Minio`。
-2. **`providers/*`** → 只依赖 `Inkwell.Abstractions`，**不依赖** `Inkwell.Core`（避免循环 + 让 provider 可独立分发）。**EFCore family 例外**（[ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`Inkwell.Persistence.EFCore.{InMemory,SqlServer,Postgres}` 允许引用同位于 `providers/` 下的 `Inkwell.Persistence.EFCore` base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。
+2. **`providers/*`** → 只依赖 `Inkwell.Abstractions`，**不依赖** `Inkwell.Core`（避免循环 + 让 provider 可独立分发）。**EFCore family 例外**（[ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`Inkwell.Persistence.EFCore.{SqlServer,Postgres}` 允许引用同位于 `providers/` 下的 `Inkwell.Persistence.EFCore` base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。
 3. **`Inkwell.Core.AgentRuntime` 命名空间** → 唯一允许 `using Microsoft.Agents.AI.*` 的位置；对外暴露 `IAgentRuntime`。其他业务命名空间 lint 规则禁止 `using Microsoft.Agents.AI.*`（[RISK-001](../risk-analysis.md) 缓解手段从硬 csproj 边界降级为软 lint 边界）。
 4. **`Inkwell.Abstractions`** → 零外部包依赖（除 `Microsoft.Extensions.DependencyInjection.Abstractions`、`Microsoft.Extensions.Configuration.Abstractions` 等 .NET 标准抽象包）；不依赖 EF Core / Redis / Azure / Minio 任何 Provider 包。
 5. **`Inkwell.WebApi` / `Inkwell.Worker` → 全部**：DI 装配是唯一允许同时 `using` 多个 providers + `Inkwell.Core` 的位置（[ADR-019](./ADR-019-process-topology-webapi-worker-split.md)）。
@@ -156,7 +154,7 @@ public interface IInkwellBuilder
     IInkwellBuilder UseSqlServer(string connectionString);
     IInkwellBuilder UseAzureBlob(Action<AzureBlobOptions> configure);
     IInkwellBuilder UseRedis(string connectionString);
-    IInkwellBuilder UseDefaults();   // 等价于 UseInMemoryPersistence + UseLocalFileSystem + UseInMemoryCache
+    IInkwellBuilder UseDefaults();   // 等价于 UseLocalFileSystem + UseInMemoryCache（Persistence 无默认值，必须显式调用 UseSqlServer / UsePostgres，2026-07-08 移除 InMemory 关系型 Provider）
     IServiceCollection Build();
 }
 ```
@@ -238,7 +236,7 @@ grep -rn "apps/desktop" docs/ AGENTS.md
 grep -rn "Inkwell\.\(DataAccess\|Cache\|FileStorage\|AgentRuntime\)/" docs/ AGENTS.md
 
 # 检查业务模块仍以独立 csproj 引用（应无命中）
-grep -rn "Inkwell\.\(Auth\|Agents\|Skills\|KnowledgeBase\|Memory\|Triggers\|Orchestrations\|Traces\|Versioning\|Multimodal\|AuditLogs\|Conversations\|Health\)/" docs/ AGENTS.md
+grep -rn "Inkwell\.\(Auth\|Agents\|Skills\|KnowledgeBase\|Memory\|Triggers\|Orchestrations\|Traces\|Versioning\|Multimodal\|Conversations\|Health\)/" docs/ AGENTS.md
 ```
 
 ## 状态

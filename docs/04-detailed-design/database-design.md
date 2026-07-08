@@ -13,19 +13,19 @@ downstream: []
 
 > 本文件由 H3 起草过的所有持久化相关模块**累加贡献**——每个模块的 HD 在自己 §12 同步追加 `## <module>` 一级章节。**只追加**，禁止删除或改动其他模块章节。
 >
-> 全文最终在所有持久化 HD（HD-002 / HD-009 / HD-010 / HD-011 / HD-012 + 业务 HD）起草完毕后由人工评审统一翻 `status: reviewed`。
+> 全文最终在所有持久化 HD（HD-002 / HD-009 / HD-011 / HD-012 + 业务 HD）起草完毕后由人工评审统一翻 `status: reviewed`。
 
 ## 总体设计原则（[ADR-004](../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 
-- **三 Provider 切换**：InMemory / SQL Server 2025 / PostgreSQL 17，通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（F9：选择器集中在 `Inkwell:Providers` 段，详细连接 / 超时配置在 `Inkwell:Persistence` 段；参 [HD-001 §3.11.1 `InkwellProvidersOptions`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）
+- **两 Provider 切换**：SQL Server 2025 / PostgreSQL 17，通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（F9：选择器集中在 `Inkwell:Providers` 段，详细连接 / 超时配置在 `Inkwell:Persistence` 段；参 [HD-001 §3.11.1 `InkwellProvidersOptions`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）
 - **最小公倍数 schema**：禁用 Provider-specific 类型（`jsonb` / `nvarchar(max)` 等）；JSON 列统一 `string` + `JsonSerializer` value converter；UTC 时间统一 `DateTimeOffset`
 - **主键策略**：[`Guid` v7](https://learn.microsoft.com/dotnet/api/system.guid.createversion7)（[HD-002 Q2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)），16 字节 binary 映射
-- **命名（F5 解释 A）**：实体属性名 **= 列名 × PascalCase 直接下发**，不做 snake_case 转换。如 `CreatedTime` 属性 → DB 列名也是 `CreatedTime`。HD-009 EFCore base 不引入 `UseSnakeCaseNamingConvention()` 之类的扩展；表名由 `IEntityTypeConfiguration<TEntity>.Configure` 在跨字段路径上显式设置（如 `agents` / `audit_logs` 是业务表名约定区分于列名约定）。
+- **命名（F5 解释 A）**：实体属性名 **= 列名 × PascalCase 直接下发**，不做 snake_case 转换。如 `CreatedTime` 属性 → DB 列名也是 `CreatedTime`。HD-009 EFCore base 不引入 `UseSnakeCaseNamingConvention()` 之类的扩展；表名由 `IEntityTypeConfiguration<TEntity>.Configure` 在跨字段路径上显式设置（如 `agents` / `conversations` 是业务表名约定区分于列名约定）。
 - **时间戳**：`CreatedTime` / `UpdatedTime` 字段（Model 实现 `IHasTimestamps` mixin，F2），由 EFCore `SaveChangesInterceptor` 自动填充（HD-009）
 - **乐观并发**：`RowVersion` 字段（Model 实现 `IHasRowVersion` mixin），EFCore `IsRowVersion()` 自动管理（HD-009）
-- **软删除**：v1 **不提供**软删（[HD-002 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；历史靠 [`audit_logs`](../03-architecture/adr/ADR-008-audit-log-store-and-query.md) 保留
-- **enum 存储**（F4）：所有 enum 列一律 `HasConversion<string>().HasMaxLength(64)` 以 `string` 存储（不走 int），保证三 Provider 表现一致；实现在 HD-009 EFCore base
-- **Migration**：SqlServer / Postgres 各自 `Migrations/` 子目录（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）；InMemory 走 [`EnsureCreated`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)
+- **软删除**：v1 **不提供**软删（[HD-002 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）
+- **enum 存储**（F4）：所有 enum 列一律 `HasConversion<string>().HasMaxLength(64)` 以 `string` 存储（不走 int），保证两 Provider 表现一致；实现在 HD-009 EFCore base
+- **Migration**：SqlServer / Postgres 各自 `Migrations/` 子目录（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 - **Seed**：`InkwellSeeder.SeedAsync()` 启动时由 Builder DSL `.AutoSeedOnStartup(true)` 默认执行（[ADR-021 D2](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）；幂等
 
 ## Inkwell.Abstractions（Persistence 端口）
@@ -46,7 +46,7 @@ downstream: []
 ### 公共字段映射约定（HD-009 实现锁定，F5 解释 A：PascalCase 直入）
 
 - **`Guid Id`** → DB 列名 `Id`
-  - SqlServer：`binary(16)` / Postgres：`bytea` / InMemory：内存
+  - SqlServer：`binary(16)` / Postgres：`bytea`
   - 主键，Guid v7
 - **`DateTimeOffset CreatedTime`** → DB 列名 `CreatedTime`（F2）
   - SqlServer：`datetimeoffset` / Postgres：`timestamptz`
@@ -83,7 +83,6 @@ downstream: []
 | `messages`           | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
 | `traces`             | Inkwell.Traces         | TBD     | [REQ-014](../01-requirements/requirements.md)                                                                                                                      |
 | `agui_run_events`    | Inkwell.Conversations  | TBD     | [ADR-011](../03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md) + [ADR-012](../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) |
-| `audit_logs`         | Inkwell.Core.AuditLogs | HD-018  | [ADR-008](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)                                                                                             |
 | `public_api_tokens`  | Inkwell.PublicApi      | TBD     | [ADR-007](../03-architecture/adr/ADR-007-public-api-token-auth.md)                                                                                                 |
 
 ### 错误处理（2026-05-12 errata · [ADR-023 errata·01](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) 废 INK-PERSIST-NNN 错误码机制）
@@ -268,32 +267,8 @@ downstream: []
 
 **索引**：`(ConversationId, SequenceNumber)` 复合索引。**不**包含 `RowVersion` / `OwnerUserId`（消息一旦写入不可变，非用户直接拥有的独立资源，[HD-017 §1.3 Q7](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）。
 
-**2026-07-08 已解决**（Owner 在本次会话中通过 `vscode_askQuestions` 真实确认，详见 [HD-017 §8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）：删除消息 / 清空对话**需要**写审计日志（`ActionType="conversation_message_deleted"`/`"conversation_cleared"`）；`ConversationOptions.MaxMessagesPerConversation` 超限行为 v1 **暂不实现**（字段存在但不消费）；`agui_run_events` 表归属判定为**占位过时，实际应归 `Inkwell.Core.Traces`**（未起草，待该 HD 起草时更新本表归属）。
+**2026-07-08 已解决**（Owner 在本次会话中通过 `vscode_askQuestions` 真实确认，详见 [HD-017 §8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）：`ConversationOptions.MaxMessagesPerConversation` 超限行为 v1 **暂不实现**（字段存在但不消费）；`agui_run_events` 表归属判定为**占位过时，实际应归 `Inkwell.Core.Traces`**（未起草，待该 HD 起草时更新本表归属）。原决议另含"删除消息 / 清空对话需要写审计日志"一项，因 2026-07-09 v1 不做审计日志功能的决定已作废。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
-
-## Inkwell.Core.AuditLogs
-
-> 由 [HD-018 §6](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#6-跨模块章节贡献) 锁定。本节是 H3 第五张业务命名空间贡献的表结构（此前"表清单"占位表中 `audit_logs` 行为 `TBD`，现更新为 `HD-018`）。
-
-### 表 `audit_logs`（[NFR-004](../01-requirements/requirements.md) + [ADR-008](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)）
-
-- `Id`：`Guid` v7，主键
-- `EventType`：`string`，长度上限 100（开放字符串，[HD-007 §1.3 Q-event-type-model](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要)）
-- `ActorType`：`string`（`AuditActorType` 枚举，F4 enum 存储约定以 `string` 存储）
-- `ActorUserId`：`Guid`（**非** `IHasOwner`，[HD-018 §1.3 Q1](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)——审计日志不是"被拥有的资源"，此列仅为普通业务字段）
-- `AgentId`：`Guid?`，可空，**无外键约束**（[HD-018 §1.3 Q3](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)，允许引用已被硬删除的 Agent）
-- `TargetKind`：`string`，长度上限 100（开放字符串）
-- `TargetId`：`string`，长度上限 100
-- `PayloadJson`：`string?`，无长度上限（JSON 列，含合并后的 `ClientIp`，[HD-018 §1.3 Q4](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)）
-- `ResultCode`：`string`（`AuditResultCode` 枚举，`string` 存储）
-- `ErrorCode`：`string?`，长度上限 100
-- `RequestId`：`string`，长度上限 100（trace id）
-- `OccurredTime`：`DateTimeOffset`（业务事件发生时刻，[HD-018 §1.3 Q2](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)）
-- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`（实际 DB 写入时刻，因内部重试队列可能晚于 `OccurredTime`）
-
-**索引**：`CreatedTime` 单列索引（[ADR-008 §决策](../03-architecture/adr/ADR-008-audit-log-store-and-query.md)硬性要求）；`(ActorUserId, CreatedTime)` / `(AgentId, CreatedTime)` / `(EventType, CreatedTime)` 三个复合索引（作者判断，支撑 [NFR-004](../01-requirements/requirements.md)"按用户 / Agent / 时间检索"的组合过滤性能，[HD-018 §1.3](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)）。**不**包含 `RowVersion` / `OwnerUserId`（写入后不可变，非用户拥有的资源，[HD-018 §1.3 Q1](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#13-关键决策摘要)）。**保留期清理**：`AuditLogRetentionCleanupBackgroundService` 按 `AuditLoggerOptions.RetentionDays`（默认 180 天）周期批量删除，详见 [HD-018 §3.8](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#38-inkwellcoreauditlogsauditlogretentioncleanupbackgroundservicecs)。
-
-**已解决（2026-07-08）**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现的 [HD-007 `AuditLoggerOptions.MaxPageSize`](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#36-auditauditloggeroptionscs) 默认值 `200` 与 [HD-001 `Pagination.MaxPageSize=100`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 硬编码常量不一致（101~1000 区间实际不可达）问题，已由 Owner 真实确认的 [HD-007 2026-07-08 errata](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#36-auditauditloggeroptionscs) 修复——`MaxPageSize` 收紧为默认 `100`，与 `Pagination.MaxPageSize` 对齐，死区已消除。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。

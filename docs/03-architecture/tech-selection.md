@@ -33,11 +33,10 @@ downstream:
 | 客户端运行时    | Electron + React + Vite + TypeScript                                   | [ADR-001](./adr/ADR-001-client-runtime-electron-react.md)                      | high   |
 | 后端运行时      | .NET 10 + ASP.NET Core                                                 | [ADR-002](./adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md)                | high   |
 | Agent 引擎      | Microsoft Agent Framework                                              | [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md)             | high   |
-| 关系 + 向量数据 | IPersistenceProvider 抽象（InMemory / SqlServer / PostgreSQL）+ Qdrant + InMemoryVectorStore | [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | high   |
+| 关系 + 向量数据 | IPersistenceProvider 抽象（SqlServer / PostgreSQL）+ Qdrant + InMemoryVectorStore | [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | high   |
 | 部署形态        | Compose (dev) / AKS (prod)                                             | [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md)                      | high   |
 | 编排画布        | React Flow + MAF Workflows                                             | [ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)                    | high   |
 | 公开 API 鉴权   | 单 Token + Bearer                                                      | [ADR-007](./adr/ADR-007-public-api-token-auth.md)                              | high   |
-| 审计日志        | 主 DB 表 + UI 检索                                                     | [ADR-008](./adr/ADR-008-audit-log-store-and-query.md)                          | high   |
 | 多模态          | Azure Speech + 模型 vision                                             | [ADR-009](./adr/ADR-009-multimodal-azure-speech.md)                            | high   |
 | Skill 加载      | v1 仅静态                                                              | [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md)                       | high   |
 | 锁屏 + 在途任务 | 主进程长 SSE + 5 min idle                                              | [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)              | medium |
@@ -84,12 +83,12 @@ downstream:
 
 ## 4. 数据存储（ADR-004 + ADR-020 + ADR-021）
 
-- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 三 Provider 实现（InMemory / SQL Server 2025 / PostgreSQL 17）采用 Code First + EF Migration；EFCore family 物理布局为 4 csproj（1 共享 base + 3 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `Inkwell.Core/VectorStore/InMemoryVectorStore`。
-- **为什么**：与 [Q-A4](./open-questions-arch.md) 决策一致；关系层与向量层解耦避免 Provider 切换时的“最小公倍数”约束放大；Qdrant 在 Compose / AKS 部署成熟；v1 三 Provider 抽象与 [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 一同形成三 Provider 家族；ADR-020 复用 M.E.VectorData 与 [ADR-003 MAF](./adr/ADR-003-agent-engine-microsoft-agent-framework.md) 生态对齐，避免重复发明轮子；ADR-021 在不重费 Migration tooling 的前提下，Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在共享 base csproj，避免三 final adapter 各自依样实体带来的语义漂移。
-- **替代方案**：三引擎都做向量 / 仅 PostgreSQL + pgvector / Azure AI Search；Inkwell 自定义 IVectorStore / 仅 Qdrant 不交付 InMemory；EFCore family csproj 布局备选 A-E 共 5 种（详见 [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。
+- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 17）采用 Code First + EF Migration；EFCore family 物理布局为 3 csproj（1 共享 base + 2 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `Inkwell.Core/VectorStore/InMemoryVectorStore`。
+- **为什么**：与 [Q-A4](./open-questions-arch.md) 决策一致；关系层与向量层解耦避免 Provider 切换时的“最小公倍数”约束放大；Qdrant 在 Compose / AKS 部署成熟；v1 两 Provider 抽象与 [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 一同形成 Provider 家族模式；ADR-020 复用 M.E.VectorData 与 [ADR-003 MAF](./adr/ADR-003-agent-engine-microsoft-agent-framework.md) 生态对齐，避免重复发明轮子；ADR-021 在不重费 Migration tooling 的前提下，Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在共享 base csproj，避免两 final adapter 各自依样实体带来的语义漂移。
+- **替代方案**：两引擎都做向量 / 仅 PostgreSQL + pgvector / Azure AI Search；Inkwell 自定义 IVectorStore / 仅 Qdrant 不交付 InMemoryVectorStore；EFCore family csproj 布局备选 A-E 共 5 种（详见 [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。
 - **放弃理由**：详见 [ADR-004 §备选项](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020 §备选项](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)。
-- **团队维护影响**：SqlServer / Postgres Migration 迁移测试加 CI（InMemory 仅 EnsureCreated）；Qdrant 是新组件，需要建立运维 runbook；Code First 与 EF Migration 是团队已有经验；M.E.VectorData attribute model 类似 EF Code First，零额外学习曲线；DataSeed 幂等实践（按业务唯一键判定而非 Id）需在 H3 InkwellSeeder HD 中给出范例。
-- **成本/性能/安全/交付**：成本中（Qdrant 自托管 + EFCore family 4 csproj）；性能高（Qdrant gRPC 单查 < 50 ms；`EfCorePersistenceProvider` 唯一实现减少多份实现不一致风险）；安全中（向量库没有 row-level 权限，靠应用层）；交付中（SqlServer / Postgres 两 Provider Migration 协调 + InMemoryVectorStore 与 Qdrant 语义偏移走 [RISK-016](./risk-analysis.md) + EFCore family 幂等 / schema 漂移走 [RISK-017](./risk-analysis.md)）。
+- **团队维护影响**：SqlServer / Postgres Migration 迁移测试加 CI；Qdrant 是新组件，需要建立运维 runbook；Code First 与 EF Migration 是团队已有经验；M.E.VectorData attribute model 类似 EF Code First，零额外学习曲线；DataSeed 幂等实践（按业务唯一键判定而非 Id）需在 H3 InkwellSeeder HD 中给出范例。
+- **成本/性能/安全/交付**：成本中（Qdrant 自托管 + EFCore family 3 csproj）；性能高（Qdrant gRPC 单查 < 50 ms；`EfCorePersistenceProvider` 唯一实现减少多份实现不一致风险）；安全中（向量库没有 row-level 权限，靠应用层）；交付中（SqlServer / Postgres 两 Provider Migration 协调 + InMemoryVectorStore 与 Qdrant 语义偏移走 [RISK-016](./risk-analysis.md) + EFCore family 幂等 / schema 漂移走 [RISK-017](./risk-analysis.md)）。
 
 ## 5. 部署形态（ADR-005）
 
@@ -118,16 +117,9 @@ downstream:
 - **团队维护影响**：标准 ASP.NET Core middleware，无新依赖。
 - **成本/性能/安全/交付**：成本低；性能高；安全中（无 RBAC / TTL，靠运维约束）；交付高。
 
-## 8. 审计日志（ADR-008）
+## 8. ~~审计日志（ADR-008）~~（已移除）
 
-- **选择**：主 DB 表 + UI 检索（v1 不导出）；保留 90 天。
-- **为什么**：与 [OQ-020 closed §B](../01-requirements/open-questions.md) 一致；与业务事务同一致；不引入 ELK。
-- **替代方案**：主 DB + ELK 双 sink / 主 DB + Blob 双 sink / 走 Loki。
-- **放弃理由**：详见 [ADR-008 §备选项](./adr/ADR-008-audit-log-store-and-query.md)。
-- **团队维护影响**：与 [ADR-004 EF Core](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 同 Provider，无新依赖。
-- **成本/性能/安全/交付**：成本低；性能中（≤ 100 万条查询 < 200 ms）；安全中（PII 不脱敏，靠权限控制）；交付高。
-
-> **2026-07-05 errata**（同步 [ADR-008 2026-07-05 errata](./adr/ADR-008-audit-log-store-and-query.md)）：上方"保留 90 天"与 [requirements.md §8.3 数据生命周期](../01-requirements/requirements.md) "审计日志：至少保留 6 个月" 字面冲突，Owner picker 拍板对齐 H1，保留期修订为 **180 天（约 6 个月）**。上方"选择"一行文字保留原文不改，实际生效值以本 errata 为准。
+> **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../01-requirements/requirements.md)）。`ADR-008` 已删除；本节原内容（主 DB 表 + UI 检索、保留期 errata 等）不再适用，编号保留占位、不重排后续章节。
 
 ## 9. 多模态（ADR-009）
 

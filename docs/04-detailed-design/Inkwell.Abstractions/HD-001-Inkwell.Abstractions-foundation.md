@@ -21,11 +21,13 @@ upstream:
 >
 > **2026-05-11 errata·第四轮**（Owner 主动指令 + [ADR-023 errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) accepted by Inkwell）：删除 `Common/Result.cs` / `Common/Error.cs` 两个文件及全部引用。业务命名空间错误处理统一 BCL 异常，不再保留 “业务可选” 工具。受影响章节：§1.2 / §1.3 Q1 / §2.2 / §3.1 / §3.2 / §4.1 / §5.3 / §7 / §10 Q1 / §11 / §14.1。详 §13 errata 记录。
 >
-> **范围切片**：本 HD 仅覆盖 `Inkwell.Abstractions` 的"地基"——`InkwellException` 两子类、`IInkwellBuilder + AddInkwell()`、`InkwellOptions` 根、共享 DTO、6 大端口的命名 / 签名 / 错误 / 日志公共约定。具体的 6 个端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）与向量存储接入 拆到 HD-002 ~ HD-008，每个端口独立一张 HD。
+> **范围切片**：本 HD 仅覆盖 `Inkwell.Abstractions` 的"地基"——`InkwellException` 两子类、`IInkwellBuilder + AddInkwell()`、`InkwellOptions` 根、共享 DTO、5 大端口的命名 / 签名 / 错误 / 日志公共约定。具体的 5 个端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime`）与向量存储接入 拆到 HD-002 ~ HD-008，每个端口独立一张 HD。
 >
 > **拓扑依据**：[ADR-017 §依赖规则](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) — `Inkwell.Abstractions` **零外部包依赖**（除 `Microsoft.Extensions.*.Abstractions`、`Microsoft.Extensions.VectorData.Abstractions` 与 `Microsoft.Extensions.AI.Abstractions`[2026-07-06 errata·第六轮，详 §13]）。
 >
 > **2026-07-05 errata·第五轮**（[design-review-report §3.2 N2/C4](../design-review-report.md#n2auditcontextactoruserid-与-ihasownerowneruserid-类型分歧c4) + HD-007 起草期 Owner picker 拍板）：`Common/AuditContext.cs` 的 `ActorUserId` 字段类型由 `string` 改为 `Guid`，与 [HD-002 §3.9](HD-002-Inkwell.Abstractions-persistence-port.md) `IHasOwner.OwnerUserId: Guid` 强一致（均指向 `users.id`）；系统 actor（定时任务 / Trigger 触发）用 `Guid.Empty` 表示，构造期校验不再要求 `ActorUserId` 非空（`Guid.Empty` 是合法值）。受影响章节：§3.7。详见 [HD-007 §13 决策记录](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-决策记录)。
+>
+> **2026-07-09 errata·第七轮**（Owner 决定 v1 不做审计日志功能，详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../../01-requirements/requirements.md)）：上方 2026-07-05 第五轮 errata 描述的 `Common/AuditContext.cs` 已**整个删除**（仅服务于已删除的 `IAuditLogger`/HD-007）；§3.7 小节同步删除，本 errata 保留作为历史记录。
 >
 > **2026-07-06 errata·第六轮**（[design-review-report.md §18.3 B15](../design-review-report.md#b15q5比照-vectordata-先例缺物理落地机制iembeddinggenerator-依赖白名单例外未实际生效c91) + Owner picker 拍板选项 1）：`Microsoft.Extensions.AI.Abstractions` 对称纳入 `Inkwell.Abstractions.csproj` 依赖白名单 + `GlobalUsings.cs` 追加 `global using Microsoft.Extensions.AI;`，使 [HD-008 §6](HD-008-Inkwell.Abstractions-vector-store-type-alias.md#6-与-iembeddinggeneratortinput-tembedding-的衔接) 锁定的 `IEmbeddingGenerator<string, Embedding<float>>` 通过依赖 `Inkwell.Abstractions` 间接可见，与 `Microsoft.Extensions.VectorData.Abstractions`（C86 既有落地）完全同构；不修改 [AGENTS.md §3.2](../../../AGENTS.md)。受影响章节：§2 / §14.3。详 §13 errata 记录。
 
@@ -35,10 +37,10 @@ upstream:
 
 `Inkwell.Abstractions` 是 Ports & Adapters 拓扑（[ADR-017](../../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）中的**端口层**——它是整个后端的"接口总账本"：
 
-- 6 大基础设施端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / `IAuditLogger`）
+- 5 大基础设施端口接口（`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime`）
 - 业务模块对外接口（如 `IAgentService` / `IConversationService`，逐 module 定义）
 - 共享 Result / Error 模型与异常基类
-- 共享 DTO（`Pagination` / `SortOrder` / `TimeRange` / `AuditContext`）
+- 共享 DTO（`Pagination` / `SortOrder` / `TimeRange`）
 - Options 根 `InkwellOptions` + 子 Options 命名约定
 - DI 装配入口 `IInkwellBuilder` + `AddInkwell()` 静态扩展（与 [Microsoft Agent Framework `AgentApplicationBuilder`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI/) 风格一致）
 
@@ -51,7 +53,7 @@ upstream:
 | 类别             | 文件清单（位于 `src/core/Inkwell.Abstractions/`）                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ |
 | Common Exception | `Common/InkwellException.cs`（仅 `InkwellConfigurationException` / `InkwellBuilderException` 两子类）        |
-| Common DTO       | `Common/Pagination.cs` / `Common/SortOrder.cs` / `Common/TimeRange.cs` / `Common/AuditContext.cs`            |
+| Common DTO       | `Common/Pagination.cs` / `Common/SortOrder.cs` / `Common/TimeRange.cs`                                       |
 | Builder DSL      | `Builder/IInkwellBuilder.cs` / `Builder/InkwellBuilder.cs` / `Builder/InkwellServiceCollectionExtensions.cs` |
 | Options          | `Options/InkwellOptions.cs` / `Options/InkwellOptionsValidator.cs`                                           |
 | 端口接口公共约定 | 见 §5（命名 / 签名 / 错误处理 / 日志），不在本 HD 写具体接口                                                 |
@@ -63,7 +65,6 @@ upstream:
 - HD-004 `ICacheProvider` 接口
 - HD-005 `IQueueProvider` 接口 + `MessageEnvelope` DTO（[RISK-015 traceparent 跨服务字段](../../03-architecture/risk-analysis.md)）
 - HD-006 `IAgentRuntime` 接口
-- HD-007 `IAuditLogger` 接口
 - HD-008 向量存储 type-alias 复用 + Builder DSL `UseQdrantVectorStore` / `UseInMemoryVectorStore`
 
 ### 1.3 关键决策摘要
@@ -92,7 +93,6 @@ src/core/Inkwell.Abstractions/
     Pagination.cs                      # record class Pagination(int Page, int PageSize)
     SortOrder.cs                       # record class SortOrder(string Field, SortDirection Direction)
     TimeRange.cs                       # record class TimeRange(DateTimeOffset Start, DateTimeOffset End)
-    AuditContext.cs                    # record class AuditContext(...)
   Builder/
     IInkwellBuilder.cs                 # public interface IInkwellBuilder
     InkwellBuilder.cs                  # internal sealed class，AddInkwell() 内部实例
@@ -158,7 +158,7 @@ src/core/Inkwell.Abstractions/
 | 字段         | 内容                                                                                                                                                                |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Common/TimeRange.cs`                                                                                                                 |
-| 职责         | 时间区间 DTO；审计查询 / 用量统计 / Trace 查询 复用；统一使用 [`DateTimeOffset`](https://learn.microsoft.com/dotnet/api/system.datetimeoffset)（带时区）            |
+| 职责         | 时间区间 DTO；用量统计 / Trace 查询 复用；统一使用 [`DateTimeOffset`](https://learn.microsoft.com/dotnet/api/system.datetimeoffset)（带时区）                       |
 | 对外接口     | `public sealed record TimeRange(DateTimeOffset Start, DateTimeOffset End) { public TimeSpan Duration => End - Start; public bool Contains(DateTimeOffset point); }` |
 | 内部函数或类 | 构造期校验 `Start <= End`，违反抛 `ArgumentException`；`Contains` 半开区间 `[Start, End)`                                                                           |
 | 输入数据     | `Start` / `End`                                                                                                                                                     |
@@ -168,22 +168,9 @@ src/core/Inkwell.Abstractions/
 | 日志要求     | 调用方在查询日志中输出 `range.start` / `range.end`（ISO-8601）                                                                                                      |
 | 测试要求     | `TimeRangeTests.cs`：边界（Start == End 允许）、Start > End 异常、`Contains` 半开区间、跨时区两端等价（同 Instant）                                                 |
 
-### 3.7 `Common/AuditContext.cs`
+### 3.7 ~~`Common/AuditContext.cs`~~（已删除）
 
-> **2026-07-05 errata·第五轮**：`ActorUserId` 由 `string` 改为 `Guid`（详见本文件顶部 callout + [HD-007 §13](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-决策记录)）；`Guid.Empty` 是系统 actor 的合法字面量，不再纳入必填非空校验。
-
-| 字段         | 内容                                                                                                                                                                                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 文件路径     | `src/core/Inkwell.Abstractions/Common/AuditContext.cs`                                                                                                                                                                                                        |
-| 职责         | 审计上下文 DTO，承载"谁在什么时间从什么入口做的什么"，由 `IAuditLogger`（HD-007）消费                                                                                                                                                                         |
-| 对外接口     | `public sealed record AuditContext(Guid ActorUserId, string ActionType, string ResourceType, string ResourceId, DateTimeOffset OccurredTime, string TraceId, string? ClientIp = null, IReadOnlyDictionary<string,object?>? Metadata = null)`                  |
-| 内部函数或类 | 构造期校验 `ActionType` / `ResourceType` / `ResourceId` / `TraceId` 必非空；`ActorUserId` **不**做非空校验（`Guid.Empty` 表示系统 actor，是合法值，[HD-007 §1.3](HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要)）；`Metadata` 默认空字典   |
-| 输入数据     | `ActorUserId`（`Guid`，含 `Guid.Empty`） + 4 个必填字符串字段 + 2 可选字段                                                                                                                                                                                    |
-| 输出数据     | `AuditContext` 实例                                                                                                                                                                                                                                           |
-| 依赖模块     | System.*                                                                                                                                                                                                                                                      |
-| 错误处理     | `ActionType` / `ResourceType` / `ResourceId` / `TraceId` 为 null/empty/whitespace → `ArgumentException`                                                                                                                                                       |
-| 日志要求     | 序列化映射：`audit.actor_user_id` / `audit.action_type` / `audit.resource_type` / `audit.resource_id` / `audit.occurred_time` / `trace.id`（与 OTel `trace_id` 桥接，[ADR-013](../../03-architecture/adr/ADR-013-observability-otel-self-hosted-grafana.md)） |
-| 测试要求     | `AuditContextTests.cs`：必填字符串字段校验、`ActorUserId = Guid.Empty` 合法构造（不抛异常）、`Metadata` 空字典默认、record equality（同字段相等）                                                                                                             |
+> **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能，`Common/AuditContext.cs`（原承载"谁在什么时间从什么入口做的什么"，专供已删除的 `IAuditLogger` 消费）已整体删除，不再有对应文件。本节编号保留占位，不重排后续小节。
 
 ### 3.8 `Builder/IInkwellBuilder.cs`
 
@@ -196,7 +183,7 @@ src/core/Inkwell.Abstractions/
 | 输入数据     | `IServiceCollection`（注册 DI） / `IConfiguration`（读 `appsettings.json`）                                                                                                                                       |
 | 输出数据     | `IServiceCollection`（`Build()` 返回，允许继续链 `.AddXxx()`）                                                                                                                                                    |
 | 依赖模块     | `Microsoft.Extensions.DependencyInjection.Abstractions` / `Microsoft.Extensions.Configuration.Abstractions` / `Common/InkwellException.cs` / `Options/InkwellOptions.cs`                                          |
-| 错误处理     | `Build()` 检测必备端口未注册（如 `IPersistenceProvider`）→ `throw new InkwellBuilderException("未注册 IPersistenceProvider；请调用 .UseSqlServer/.UseInMemoryDatabase/.UsePostgres 之一")`                        |
+| 错误处理     | `Build()` 检测必备端口未注册（如 `IPersistenceProvider`）→ `throw new InkwellBuilderException("未注册 IPersistenceProvider；请调用 .UseSqlServer/.UsePostgres 之一")`                                             |
 | 日志要求     | 不直接打日志（DI 装配阶段无 `ILogger`）；通过抛 `InkwellException` 让 host `Program.cs` 兜底打 fatal                                                                                                              |
 | 测试要求     | `IInkwellBuilderContractTests.cs`：契约测试（验证接口形态稳定）；具体行为测试在 `InkwellBuilderTests.cs`                                                                                                          |
 
@@ -207,7 +194,7 @@ src/core/Inkwell.Abstractions/
 | 文件路径     | `src/core/Inkwell.Abstractions/Builder/InkwellBuilder.cs`                                                                                                                                                                                                                                                                                                           |
 | 职责         | `IInkwellBuilder` 的**唯一**内部实现；累积 Use*/Configure* 调用，到 `Build()` 时统一校验 + 注入                                                                                                                                                                                                                                                                     |
 | 对外接口     | `internal sealed class InkwellBuilder : IInkwellBuilder`；构造仅供 `InkwellServiceCollectionExtensions.AddInkwell` 调用（`internal` 可见）                                                                                                                                                                                                                          |
-| 内部函数或类 | `private readonly List<Action<InkwellOptions>> _optionsConfigurators` 累积链；`Build()` 内：(1) 应用所有 `_optionsConfigurators`；(2) 注册 `IValidateOptions<InkwellOptions>`；(3) 检测必备端口（`IPersistenceProvider` / `ICacheProvider` / `IQueueProvider` / `IFileStorageProvider` / `IAgentRuntime` / `IAuditLogger`）；(4) 缺失则抛 `InkwellBuilderException` |
+| 内部函数或类 | `private readonly List<Action<InkwellOptions>> _optionsConfigurators` 累积链；`Build()` 内：(1) 应用所有 `_optionsConfigurators`；(2) 注册 `IValidateOptions<InkwellOptions>`；(3) 检测必备端口（`IPersistenceProvider` / `ICacheProvider` / `IQueueProvider` / `IFileStorageProvider` / `IAgentRuntime`）；(4) 缺失则抛 `InkwellBuilderException`                  |
 | 输入数据     | 构造接收 `IServiceCollection` + `IConfiguration`                                                                                                                                                                                                                                                                                                                    |
 | 输出数据     | `Build()` 返回 `IServiceCollection`（链可续）                                                                                                                                                                                                                                                                                                                       |
 | 依赖模块     | `Common/InkwellException.cs` / `Options/InkwellOptions.cs` / `Microsoft.Extensions.DependencyInjection.Abstractions`                                                                                                                                                                                                                                                |
@@ -238,7 +225,7 @@ src/core/Inkwell.Abstractions/
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Options/InkwellOptions.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 职责         | 根 Options，承载全局设置 + Provider 选择器段 + 各端口子 Options 的引用槽位                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 对外接口     | `public sealed class InkwellOptions { [Required] public string ServiceName { get; init; } = "inkwell"; [Required] public string Environment { get; init; } = "dev"; public InkwellProvidersOptions Providers { get; init; } = new(); public PersistenceOptions Persistence { get; init; } = new(); public FileStorageOptions FileStorage { get; init; } = new(); public CacheOptions Cache { get; init; } = new(); public QueueOptions Queue { get; init; } = new(); public AgentRuntimeOptions AgentRuntime { get; init; } = new(); public AuditLoggerOptions Audit { get; init; } = new(); public VectorStoreOptions VectorStore { get; init; } = new(); }` |
+| 对外接口     | `public sealed class InkwellOptions { [Required] public string ServiceName { get; init; } = "inkwell"; [Required] public string Environment { get; init; } = "dev"; public InkwellProvidersOptions Providers { get; init; } = new(); public PersistenceOptions Persistence { get; init; } = new(); public FileStorageOptions FileStorage { get; init; } = new(); public CacheOptions Cache { get; init; } = new(); public QueueOptions Queue { get; init; } = new(); public AgentRuntimeOptions AgentRuntime { get; init; } = new(); public VectorStoreOptions VectorStore { get; init; } = new(); }`                                                         |
 | 内部函数或类 | 子 Options 类（`PersistenceOptions` 等）由 HD-002 ~ HD-008 各自补全；本 HD 仅声明占位 `public sealed class XxxOptions { }`（空 record/class）；新增 `InkwellProvidersOptions`（§3.11.1）                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 输入数据     | 由 `appsettings.json` `"Inkwell"` 段绑定（含 `"Inkwell:Providers"` 子段 + 各 `"Inkwell:<Module>"` 详细子段）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | 输出数据     | `InkwellOptions` 实例（DI 通过 `IOptions<InkwellOptions>` 注入）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -249,18 +236,18 @@ src/core/Inkwell.Abstractions/
 
 #### 3.11.1 `Options/InkwellProvidersOptions.cs`（F9 新增）
 
-| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 文件路径     | `src/core/Inkwell.Abstractions/Options/InkwellProvidersOptions.cs`                                                                                                                                                                                                                                                                                                                                                                                           |
-| 职责         | Provider 选择器段；用值型字符串声明每个端口在当前部署下选用哪个 Provider，供 Builder DSL `.UseXxx()` 装配期交叉校验                                                                                                                                                                                                                                                                                                                                          |
-| 对外接口     | `public sealed class InkwellProvidersOptions { [Required] public string Persistence { get; init; } = "InMemory"; [Required] public string FileStorage { get; init; } = "LocalFileSystem"; [Required] public string Cache { get; init; } = "InMemory"; [Required] public string Queue { get; init; } = "Channels"; [Required] public string VectorStore { get; init; } = "InMemory"; [Required] public string AgentRuntime { get; init; } = "AzureOpenAI"; }` |
-| 内部函数或类 | 字符串值由对应端口 HD（HD-002 ~ HD-008）锁定取值白名单（如 `Persistence ∈ {"InMemory","SqlServer","PostgreSQL"}`，[ADR-004](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）；本 HD 仅声明字段，校验逻辑在 Builder DSL 装配期                                                                                                                                                                                                  |
-| 输入数据     | 由 `appsettings.json` `"Inkwell:Providers"` 段绑定                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 输出数据     | `InkwellProvidersOptions` 实例                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 依赖模块     | `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 错误处理     | 字段缺失 → `IValidateOptions` 校验失败；Builder DSL `.UseXxx()` 与 `Providers.<Module>` 取值不一致 / 同一 Module 注册两次 → `throw new InkwellBuilderException($"Provider registration conflict for {moduleName}: ...")`（详 [§3.3](#33-commoninkwellexceptioncs)）                                                                                                                                                                                          |
-| 日志要求     | 装配期校验失败由 host 打 fatal；详细字段名 `providers.persistence` / `providers.queue` / 等用于 OTel resource 标签                                                                                                                                                                                                                                                                                                                                           |
-| 测试要求     | `InkwellProvidersOptionsTests.cs`：默认值、`appsettings.json` 绑定、缺必填字段校验失败、所有 6 个字段都被绑定                                                                                                                                                                                                                                                                                                                                                |
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Options/InkwellProvidersOptions.cs`                                                                                                                                                                                                                                                                                                                                                                                             |
+| 职责         | Provider 选择器段；用值型字符串声明每个端口在当前部署下选用哪个 Provider，供 Builder DSL `.UseXxx()` 装配期交叉校验                                                                                                                                                                                                                                                                                                                                            |
+| 对外接口     | `public sealed class InkwellProvidersOptions { [Required] public string Persistence { get; init; } = "PostgreSQL"; [Required] public string FileStorage { get; init; } = "LocalFileSystem"; [Required] public string Cache { get; init; } = "InMemory"; [Required] public string Queue { get; init; } = "Channels"; [Required] public string VectorStore { get; init; } = "InMemory"; [Required] public string AgentRuntime { get; init; } = "AzureOpenAI"; }` |
+| 内部函数或类 | 字符串值由对应端口 HD（HD-002 ~ HD-008）锁定取值白名单（如 `Persistence ∈ {"SqlServer","PostgreSQL"}`，[ADR-004](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)，2026-07-08 移除 InMemory 关系型 Provider）；本 HD 仅声明字段，校验逻辑在 Builder DSL 装配期                                                                                                                                                                     |
+| 输入数据     | 由 `appsettings.json` `"Inkwell:Providers"` 段绑定                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 输出数据     | `InkwellProvidersOptions` 实例                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 依赖模块     | `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 错误处理     | 字段缺失 → `IValidateOptions` 校验失败；Builder DSL `.UseXxx()` 与 `Providers.<Module>` 取值不一致 / 同一 Module 注册两次 → `throw new InkwellBuilderException($"Provider registration conflict for {moduleName}: ...")`（详 [§3.3](#33-commoninkwellexceptioncs)）                                                                                                                                                                                            |
+| 日志要求     | 装配期校验失败由 host 打 fatal；详细字段名 `providers.persistence` / `providers.queue` / 等用于 OTel resource 标签                                                                                                                                                                                                                                                                                                                                             |
+| 测试要求     | `InkwellProvidersOptionsTests.cs`：默认值、`appsettings.json` 绑定、缺必填字段校验失败、所有 6 个字段都被绑定                                                                                                                                                                                                                                                                                                                                                  |
 
 ### 3.12 `Options/InkwellOptionsValidator.cs`
 
@@ -374,7 +361,6 @@ builder.Services
     .UseAzureBlobFileStorage(builder.Configuration.GetSection("Inkwell:FileStorage:AzureBlob"))  // HD-003 提供
     .UseQdrantVectorStore(builder.Configuration.GetConnectionString("Qdrant"))  // HD-008 提供
     .UseAzureOpenAIAgentRuntime(builder.Configuration.GetSection("Inkwell:AgentRuntime"))  // HD-006 提供
-    .UseDefaultAuditLogger()  // HD-007 提供，写到 Persistence
     .Build();
 
 var app = builder.Build();
@@ -397,7 +383,7 @@ var app = builder.Build();
 ## 7. 性能 / 安全 / 可观测性
 
 - **性能**：本 HD 不引入 hot-path 抽象（`InkwellException` 两子类仅在 DI 装配期抛出，不在调用热路径）。**性能预算 picker 不在 HD-001 范围**——业务接口 SLA 由各业务 HD 起草时锁定，参照 [requirements.md NFR](../../01-requirements/requirements.md)。
-- **安全**：HD-001 本身不处理敏感字段；脱敏规则锁在 HD-007 `IAuditLogger`。调用方写日志前应过滤敏感字段。
+- **安全**：HD-001 本身不处理敏感字段。调用方写日志前应过滤敏感字段。
 - **可观测性**：错误语义靠 OTel `exception.type` 字段表达（[ADR-013](../../03-architecture/adr/ADR-013-observability-otel-self-hosted-grafana.md)）；Grafana 告警可按 `exception.type = "System.IO.FileNotFoundException"` 等 BCL 类型名维度聚合
 
 ## 8. 测试要求
@@ -439,8 +425,7 @@ var app = builder.Build();
     "FileStorage":  { "/* 由 HD-003 锁定（不含 Provider 字段） */": null },
     "Cache":        { "/* 由 HD-004 锁定（不含 Provider 字段） */": null },
     "Queue":        { "/* 由 HD-005 锁定（不含 Provider 字段） */": null },
-    "AgentRuntime": { "/* 由 HD-006 锁定（不含 Provider 字段） */": null },
-    "Audit":        { "/* 由 HD-007 锁定 */": null }
+    "AgentRuntime": { "/* 由 HD-006 锁定（不含 Provider 字段） */": null }
   }
 }
 ```
@@ -460,7 +445,7 @@ var app = builder.Build();
 
 ## 11. 待补 / 后续 HD 衔接
 
-- 本 HD 不锁定子 Options 字段——`PersistenceOptions` / `FileStorageOptions` / `CacheOptions` / `QueueOptions` / `AgentRuntimeOptions` / `AuditLoggerOptions` 内容由对应端口 HD-002 ~ HD-007 锁定
+- 本 HD 不锁定子 Options 字段——`PersistenceOptions` / `FileStorageOptions` / `CacheOptions` / `QueueOptions` / `AgentRuntimeOptions` 内容由对应端口 HD-002 ~ HD-006 锁定
 - 本 HD 不锁定向量存储 Builder DSL 钩子——`UseQdrantVectorStore` / `UseInMemoryVectorStore` / `UseAzureOpenAIEmbeddings` 由 HD-008 锁定
 - 本 HD 不锁定业务命名空间错误语义——[ADR-023 errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) + [errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 后业务命名空间错误语义全走 BCL 异常类型（§5.3 集中列表）；零 `Result<T>` / `Error` 抽象、零错误码表。需返回多项错误场景（如批量校验）走 [`ValidationResult`](https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.validationresult) / `IEnumerable<string>` 等 BCL 对症抽象，不锁在本 HD
 - 本 HD 不锁定性能预算数字——业务接口 SLA 由业务 HD 锁定，参照 [requirements.md NFR](../../01-requirements/requirements.md)
@@ -477,7 +462,7 @@ var app = builder.Build();
 
 本 HD `status: draft` 期间，根据 [`design-review-report.md` §6.4](../design-review-report.md) Owner 二次答复一次性落以下变更（已嵌入 §3 / §9 / §11，本节是变更摘要）：
 
-- **F2 时间字段命名**：`AuditContext.OccurredAtUtc` → `OccurredTime`（§3.7 接口 + 日志映射 `audit.occurred_time`）；类型保持 `DateTimeOffset` UTC
+- **F2 时间字段命名**：`AuditContext.OccurredAtUtc` → `OccurredTime`（已随 `AuditContext.cs` 一并删除，本条保留作为历史记录）
 - **F9 InkwellOptions 形态 C**：
   - §3.11 `InkwellOptions` 增加 `Providers` 字段引用新建 §3.11.1 `InkwellProvidersOptions`
   - 新增 §3.11.1 `Options/InkwellProvidersOptions.cs`，6 个端口选择器字段（Persistence / FileStorage / Cache / Queue / VectorStore / AgentRuntime）

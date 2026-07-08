@@ -16,9 +16,9 @@ upstream:
 ---
 
 <!-- markdownlint-disable MD060 -->
-<!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-007 / HD-014 / HD-015 / HD-016 / HD-017 / HD-018 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
+<!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-007 / HD-014 / HD-015 / HD-016 / HD-017 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
 
-> **本 HD 是 H3 第六张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-018 `Inkwell.Core.AuditLogs`](HD-018-Inkwell.Core.AuditLogs.md) 之后起草。
+> **本 HD 是 H3 第六张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-017 `Inkwell.Core.Conversations`](HD-017-Inkwell.Core.Conversations.md) 之后起草（HD-018 `Inkwell.Core.AuditLogs` 原为第五张，因 2026-07-09 审计日志功能整体取消已删除，本 HD 直接接续 HD-017）。
 >
 > **治理声明**：本文件全文不包含任何"已用 `vscode_askQuestions` 向 Owner 真实确认"的表述——本次起草会话未发起任何 `vscode_askQuestions` 交互。全部标注"作者判断"的条目均为作者基于现有证据链的判断；存在真实产品 / 技术含义分歧、无法从现有文档判定的问题，原样列入 [§7](#7-需要-owner-确认的问题)，不代答、不假装已确认。
 
@@ -28,7 +28,7 @@ upstream:
 
 1. **`requirements.md` §5.2"后端配置项"原文明确把"模型路由策略（默认模型、降级顺序）"与"各模型厂商的 API Key"并列列为"不在产品 UI 内配置，由后端配置文件管理"的条目**（[requirements.md 第 149~150 行](../../01-requirements/requirements.md)），与"数据库连接 / 对象存储"等基础设施配置同类归档——这是判定"模型清单 = 配置文件驱动、非数据库表"的最直接证据。
 2. **`acceptance-criteria.md` AC-021 字面**："UI-004 模型下拉的所有选项与后端配置文件声明的模型集合一致；客户端代码中**不**硬编码任何模型名（可由 H4 通过'切换后端配置后客户端列表随之变化'用例验证）"（[acceptance-criteria.md 第 68 行](../../01-requirements/acceptance-criteria.md)）——验收标准本身把"配置驱动"钉死为可测试行为，且验证手段是"切换配置文件"而非"写数据库记录"。
-3. **`database-design.md` 顶层"表清单"（H2 architecture.md §4 锁定的业务范围）不含任何 `models` / `model_definitions` 之类的行**（[database-design.md 表清单](../database-design.md)，逐行核对 `users`/`agents`/`agent_versions`/`skills`/`tools`/`knowledge_bases`/`kb_documents`/`kb_chunks`/`memory_items`/`triggers`/`orchestrations`/`orchestration_runs`/`conversations`/`messages`/`traces`/`agui_run_events`/`audit_logs`/`public_api_tokens` 共 18 张，无一张对应"模型"）——这不是本 HD 起草期才发现的疏漏，而是 H2 架构阶段从一开始就没有把模型清单当作持久化实体规划。
+3. **`database-design.md` 顶层"表清单"（H2 architecture.md §4 锁定的业务范围）不含任何 `models` / `model_definitions` 之类的行**（[database-design.md 表清单](../database-design.md)，逐行核对 `users`/`agents`/`agent_versions`/`skills`/`tools`/`knowledge_bases`/`kb_documents`/`kb_chunks`/`memory_items`/`triggers`/`orchestrations`/`orchestration_runs`/`conversations`/`messages`/`traces`/`agui_run_events`/`public_api_tokens`，具体张数以 database-design.md 最新版为准，无一张对应"模型"）——这不是本 HD 起草期才发现的疏漏，而是 H2 架构阶段从一开始就没有把模型清单当作持久化实体规划。
 4. **已 reviewed 的 [HD-015 §1.3 Q4](../Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) 对 [HD-006 `AgentRunRequest.ModelId: string?`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 的转述**（2026-07-08 修正引用归属——该句原文出自 HD-015 而非 HD-006 本体）："对应后端配置文件中的模型标识符，非数据库主键"——与上述三点结论完全一致。
 5. **已 reviewed 的 [HD-015 §1.3](HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) Q4** 引用同一 HD-006 注释，并在 [HD-015 §1.2"不在内"](HD-015-Inkwell.Core.Agents.md#12-范围) 明确写："模型注册表本身（后端配置文件声明的模型清单、厂商路由、可用性校验，AC-020 ~ AC-022）不在本 HD——归 `Inkwell.Core.Models`（[AGENTS.md §3.1](../../../AGENTS.md) 已锁定的独立业务命名空间，未起草）。本 HD **不**校验 `ModelId` 是否为已注册的合法模型，该校验职责留给 `Inkwell.Core.Models`（或 `Inkwell.WebApi` 组合两者时）。"
 
@@ -115,7 +115,7 @@ src/core/Inkwell.Core/
     ModelsBuilderExtensions.cs               # AddDefaultModelCatalog()
 ```
 
-**文件计数**：`Models/`（Abstractions）新增 4 个 + `Models/`（Core）新增 2 个，合计 6 个；Abstractions csproj 累计 86（HD-001~HD-018，[HD-018 §2 文件计数](HD-018-Inkwell.Core.AuditLogs.md#2-文件结构)）+ 4（HD-019）= **90** 个 `*.cs` + 1 个 `.csproj`。`Inkwell.Core.csproj` 累计 19（HD-014~HD-018）+ 2（HD-019）= **21** 个 `*.cs` + 1 个 `.csproj`。
+**文件计数**：`Models/`（Abstractions）新增 4 个 + `Models/`（Core）新增 2 个，合计 6 个；累计文件总数（HD-001~HD-017 + 本 HD-019，HD-018 已因 2026-07-09 审计日志功能取消删除）具体数值以各自 HD 文档最终版为准，不在此处逐一重算。
 
 **无新增数据库表 / 无新增 Persistence 文件**——[§0](#0-范围核实模型是否为持久化实体req-005--req-006-归属边界) 已核实模型清单为配置驱动，`database-design.md` 顶层表清单不追加任何行。
 
@@ -233,7 +233,7 @@ src/core/Inkwell.Core/
 | `model.list` | `ListModelsAsync`     | `model.catalog_count`                                                 |
 | `model.get`  | `GetModelAsync`       | `model.id`；异常时补 [HD-001 §4.2](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#42-日志结构化字段) 5 个 `exception.*` 标准字段 |
 
-命名沿用既有业务命名空间"单数域名词前缀"惯例（`agent.*`/`auth.*`/`audit.*`，[HD-016 §24 C-5](../design-review-report.md) 曾指出 `tools.*` 复数不一致，本 HD 用单数 `model.*` 避免同类问题）。
+命名沿用既有业务命名空间"单数域名词前缀"惯例（`agent.*`/`auth.*`，[HD-016 §24 C-5](../design-review-report.md) 曾指出 `tools.*` 复数不一致，本 HD 用单数 `model.*` 避免同类问题）。
 
 ## 5. 跨模块章节贡献
 

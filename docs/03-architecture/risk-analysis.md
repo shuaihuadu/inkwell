@@ -66,11 +66,11 @@ downstream:
 
 - **类别**：数据层
 - **触发条件**：业务查询需要 Provider-specific 特性（如 PostgreSQL `JSONB` 操作符 / SQL Server `OUTPUT` 子句 / `FILTER WHERE`），跨 Provider 实现性能差距数量级。
-- **影响范围**：[ADR-004 IPersistenceProvider](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 涉及的所有 Repository（`Inkwell.Identity` / `Inkwell.Agents` / `Inkwell.Conversations` / `Inkwell.AuditLogs` 等 7 个模块）。
+- **影响范围**：[ADR-004 IPersistenceProvider](./adr/ADR-004-data-store-provider-switchable-ef-core.md) 涉及的所有 Repository（`Inkwell.Identity` / `Inkwell.Agents` / `Inkwell.Conversations` 等 6 个模块）。
 - **缓解方案（可执行）**：
-  1. CI 加 [matrix job](https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs)：每个 PR 跑三套 Provider 集成测试。
-  2. Repository 层引入"Provider-specific Strategy"模式：`IUserRepository` 接口 + `PostgresUserRepository` / `SqlServerUserRepository` / `InMemoryUserRepository` 三实现，应用代码只引用接口。
-  3. H3 详细设计阶段绘制"查询性能矩阵"：列出每个关键查询在三种 Provider 下的预期 P95，作为验收门禁。
+  1. CI 加 [matrix job](https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs)：每个 PR 跑两套 Provider（SqlServer / Postgres，Testcontainers 真实实例）集成测试。
+  2. Repository 层引入"Provider-specific Strategy"模式：`IUserRepository` 接口 + `PostgresUserRepository` / `SqlServerUserRepository` 两实现，应用代码只引用接口。
+  3. H3 详细设计阶段绘制"查询性能矩阵"：列出每个关键查询在两种 Provider 下的预期 P95，作为验收门禁。
   4. 在 [tech-debt-tracker](../../../.he/docs/tech-debt-gc.md) 登记本风险，每个 sprint review。
 - **残余风险**：v1 范围内可能仍有未发现的 Provider-specific 边界，需要 H4 + H5 持续暴露。
 
@@ -104,7 +104,7 @@ downstream:
 - **影响范围**：[REQ-016 多模态](../01-requirements/requirements.md) 语音输入；[EX-004 多模态降级](../01-requirements/requirements.md)。
 - **缓解方案（可执行）**：
   1. 客户端 + 后端实现 [EX-004 §3 降级路径](../01-requirements/requirements.md)：Speech 失败 → toast + 文本输入兜底。
-  2. 后端记录每次 Azure Speech 调用的"调用量 + 时长 + 错误码"到 [审计日志](./adr/ADR-008-audit-log-store-and-query.md)。
+  2. 后端通过 [OpenTelemetry](./adr/ADR-013-observability-otel-self-hosted-grafana.md) 记录每次 Azure Speech 调用的"调用量 + 时长 + 错误码"指标。
   3. [Grafana](./adr/ADR-013-observability-otel-self-hosted-grafana.md) 配置月度调用量告警（达到 80% 阈值时邮件）。
   4. v2 评估 Whisper 自托管作为备路。
 - **残余风险**：Azure Speech 单 region 故障下语音功能不可用；客户体验可降级但不能 100% 替代。
@@ -154,7 +154,7 @@ downstream:
 - **影响范围**：[REQ-008 Skills](../01-requirements/requirements.md) + [EX-008](../01-requirements/requirements.md)。
 - **缓解方案（可执行）**：
   1. [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md) 已规定：Discovery 失败 → 不进 registry；Activation 失败 → 默认未命中。
-  2. 失败事件写 [审计日志](./adr/ADR-008-audit-log-store-and-query.md)，UI Skill 详情页显示错误状态。
+  2. 失败事件记入 OTel span 状态（`Activity.SetStatus(Error)`），UI Skill 详情页显示错误状态。
   3. H4 用例覆盖：(a) frontmatter 缺字段；(b) markdown 语法错误；(c) Activation 匹配过载（多条 Skill 同时命中）。
 - **残余风险**：v1 Skill 数量预期不大（< 50 条），错误概率与影响可控。
 
@@ -173,7 +173,7 @@ downstream:
 
 - **类别**：数据层 / 测试覆盖
 - **触发条件**：[ADR-015 IFileStorageProvider](./adr/ADR-015-object-storage-provider-switchable.md) 三 Provider（LocalFileSystem / AzureBlob / MinIO）在预签名 URL 有效期 / 大文件分片上传 / 列表分页与续传标记 / 元数据与 ContentType / 并发覆写 等语义上存在实现差异；三者 contract test 覆盖不全时，dev 在 LocalFileSystem 上运行正常但 prod 在 AzureBlob / MinIO 上出现运行时错误。
-- **影响范围**：所有依赖 `IFileStorageProvider` 的模块：`Inkwell.Multimodal`（[ADR-009](./adr/ADR-009-multimodal-azure-speech.md) 多模态预签名 URL） / `Inkwell.KnowledgeBase`（知识库原始件 + 抽取后 Markdown） / `Inkwell.AuditLogs` v2 导出。
+- **影响范围**：所有依赖 `IFileStorageProvider` 的模块：`Inkwell.Multimodal`（[ADR-009](./adr/ADR-009-multimodal-azure-speech.md) 多模态预签名 URL） / `Inkwell.KnowledgeBase`（知识库原始件 + 抽取后 Markdown）。
 - **缓解方案（可执行）**：
   1. 建立公共 contract test 包 `Inkwell.FileStorage.Tests.Contract`，覆盖上述 5 个语义点，三 Provider 公用同一套用例。
   2. CI [matrix job](https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs) 跑三 Provider：LocalFileSystem（本地临时目录） / Azurite（本地 AzureBlob 模拟） / MinIO（本地容器）。
@@ -261,16 +261,16 @@ downstream:
 ## RISK-017 EFCore family 幂等 DataSeed / schema 最小公倍数 / family 例外蔓延
 
 - **类别**：数据层 / 依赖拓扑
-- **触发条件**：[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 EFCore family = 4 csproj（1 共享 base + 3 final adapter）后，三个风险同时插足：（1）`InkwellSeeder.SeedAsync()` 默认 startup 运行，若幂等判定错误（多副本 WebApi 同时启动 / pod restart 圈 / dev 环境多次重启）会造成 seed 重复插入、唯一索引冲突、或升级版本后 seed 与 Migration 版本错位；（2）Entity 在共享 base 集中后，`OnModelCreating` 需同时兼容 SqlServer 2025 与 PostgreSQL 17 两套列型 / 索引 / 并发控制，最小公倍数 schema 会让特定引擎能力（`rowversion` / `jsonb` / `tsvector` / `xmin`）被险隐；（3）[ADR-017 §3.2](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 依赖规则为 EFCore family 破例后，其他 family（FileStorage / Cache / Queue / VectorStore）可能提出同类诉求的 “shared base + final adapter” 软价 PR，如果没有明确准入机制会蔓延为“provider 互相引用的跳板”，最终压垮 [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) Ports & Adapters 边界。
-- **影响范围**：[REQ-001](../01-requirements/requirements.md) ~ [REQ-017](../01-requirements/requirements.md) 全部依赖数据存储的模块（`Inkwell.Core.Auth` / `.Agents` / `.Conversations` / `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.Versioning` / `.AuditLogs` / `.Traces` 等）；`providers/Inkwell.Persistence.EFCore/` 共享 base 代码以及 SqlServer / Postgres final adapter Migration 文件；H3 [Inkwell.Abstractions HD](../04-detailed-design/) 中 `IPersistenceProvider` 接口容量化程度。
+- **触发条件**：[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 EFCore family = 3 csproj（1 共享 base + 2 final adapter）后，三个风险同时插足：（1）`InkwellSeeder.SeedAsync()` 默认 startup 运行，若幂等判定错误（多副本 WebApi 同时启动 / pod restart 圈 / dev 环境多次重启）会造成 seed 重复插入、唯一索引冲突、或升级版本后 seed 与 Migration 版本错位；（2）Entity 在共享 base 集中后，`OnModelCreating` 需同时兼容 SqlServer 2025 与 PostgreSQL 17 两套列型 / 索引 / 并发控制，最小公倍数 schema 会让特定引擎能力（`rowversion` / `jsonb` / `tsvector` / `xmin`）被险隐；（3）[ADR-017 §3.2](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 依赖规则为 EFCore family 破例后，其他 family（FileStorage / Cache / Queue / VectorStore）可能提出同类诉求的 “shared base + final adapter” 软价 PR，如果没有明确准入机制会蔓延为“provider 互相引用的跳板”，最终压垮 [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) Ports & Adapters 边界。
+- **影响范围**：[REQ-001](../01-requirements/requirements.md) ~ [REQ-017](../01-requirements/requirements.md) 全部依赖数据存储的模块（`Inkwell.Core.Auth` / `.Agents` / `.Conversations` / `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.Versioning` / `.Traces` 等）；`providers/Inkwell.Persistence.EFCore/` 共享 base 代码以及 SqlServer / Postgres final adapter Migration 文件；H3 [Inkwell.Abstractions HD](../04-detailed-design/) 中 `IPersistenceProvider` 接口容量化程度。
 - **缓解方案（可执行）**：
   1. **幂等详细设计位**：H3 `Inkwell.Core.Persistence.Bootstrap` HD 中为 `InkwellSeeder` 明列以下三点：（i）每条 seed 记录必须按**业务唯一键**（如 `User.Email` / `Agent.Name + Owner` / `Tool.PublicName + Version`）调用 [`UPSERT` 语义](https://learn.microsoft.com/ef/core/saving/transactions)，不重建 Id；（ii）seed 与 Migration 版本一体化，所有 `Migrations/` 下含初始数据的 Migration 只面向一个版本区间，跨版本增量走 [`HasData()`](https://learn.microsoft.com/ef/core/modeling/data-seeding) + Migration；（iii）[`MigrationRunner`](https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying) 启动时使用 Postgres `pg_advisory_lock` / SqlServer `sp_getapplock` 互斥锁避免多副本同时 seed。
-  2. **EFCore-Conditional schema 设计公约**：H3 `InkwellDbContext.OnModelCreating` HD 中明列公约——默认只用两引擎都支持的能力（[`ConcurrencyToken`](https://learn.microsoft.com/ef/core/modeling/concurrency) / [`HasIndex().IsUnique()`](https://learn.microsoft.com/ef/core/modeling/indexes) / `nvarchar`）；如需引擎特定能力（`jsonb` / `tsvector` / `rowversion`）必须走 [`Database.IsSqlServer()` / `IsNpgsql()` 分支](https://learn.microsoft.com/ef/core/providers/) + Provider-specific extension method，并在代码注释中明列 InMemory fallback 如何临近；该公约在 H3 [Inkwell.Core.Persistence HD](../04-detailed-design/) 中锁定，PR 走 [h3-detailed-design-reviewer](../../.he/agents/detailed-design-reviewer/) 机械化核查。
+  2. **EFCore-Conditional schema 设计公约**：H3 `InkwellDbContext.OnModelCreating` HD 中明列公约——默认只用两引擎都支持的能力（[`ConcurrencyToken`](https://learn.microsoft.com/ef/core/modeling/concurrency) / [`HasIndex().IsUnique()`](https://learn.microsoft.com/ef/core/modeling/indexes) / `nvarchar`）；如需引擎特定能力（`jsonb` / `tsvector` / `rowversion`）必须走 [`Database.IsSqlServer()` / `IsNpgsql()` 分支](https://learn.microsoft.com/ef/core/providers/) + Provider-specific extension method；该公约在 H3 [Inkwell.Core.Persistence HD](../04-detailed-design/) 中锁定，PR 走 [h3-detailed-design-reviewer](../../.he/agents/detailed-design-reviewer/) 机械化核查。
   3. **EFCore family 例外锁定 + 其他 family 准入机制**：[ADR-017 §3.2](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 增补 EFCore family 例外后，同时错错明列“其他 family 不享受此例外”；如未来某 family（如 FileStorage 多云统一 metadata）要走同样拓扑，必须以独立 ADR 为入口（备选项打分 + 后果 + 迁移路径），判定不能仅凭 PR 试调。[h2-architect-advisor](../../.he/agents/architect-advisor/) 作为准入 gate。
-  4. **contract test 改造**：`tests/core/Inkwell.Providers.Contract/` Persistence 章节加 SqlServer × Postgres 双 Provider matrix（InMemory 不跑 contract，仅跑 unit），覆盖：seed 幂等（连跑三次 SeedAsync） / Migration 重入（同一 Migration 起点 vs 升级后 Migration） / `OnModelCreating` Provider-specific 分支调起 / DbContextPooling 与多线程 SeedAsync；CI matrix 跳过文件存储那三套、独立运行。
+  4. **contract test 改造**：`tests/core/Inkwell.Providers.Contract/` Persistence 章节加 SqlServer × Postgres 双 Provider matrix，覆盖：seed 幂等（连跑三次 SeedAsync） / Migration 重入（同一 Migration 起点 vs 升级后 Migration） / `OnModelCreating` Provider-specific 分支调起 / DbContextPooling 与多线程 SeedAsync；CI matrix 跳过文件存储那三套、独立运行。
   5. **Migration drift detection**：CI 在 SqlServer × Postgres 两套上跑 [`dotnet ef migrations has-pending-model-changes`](https://learn.microsoft.com/ef/core/cli/dotnet)，防止 Entity 变更后仅为其中一套生成 Migration；[Directory.Build.props](../../../Directory.Build.props) 加 `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` 让 Provider-specific tooling 警告不被吞。
 - **残余风险**：
-  1. **InMemory 与两 EF Provider 语义差**：[`Microsoft.EntityFrameworkCore.InMemory`](https://learn.microsoft.com/ef/core/providers/in-memory) 在事务严格性 / 并发控制 / Provider-specific extension method 上仍有语义差，unit test 跑过不代表 prod 走路。补偿手段：InMemory 仅作为快速反馈御为 unit / dev seed，prod 接受测试以 SqlServer / Postgres contract test 为准。
+  1. **dev / 测试环境启动成本上升**：2026-07-08 移除 InMemory 关系型 Provider 后，dev / unit test 改用 Testcontainers 起真实 SqlServer / Postgres 实例，相比原 InMemory 快速反馈失去了零依赖 / 秒级启动的优势，本地开发与 CI 均需容器运行时。补偿手段：Testcontainers 镜像预拉取 + 复用容器（`Testcontainers.Xunit` / `ryuk` 生命周期管理）降低单次启动开销。
   2. **幂等未覆盖的跨版本路径**：seed 跨版本修改（如从 v1.0 升到 v1.1 后某条 seed 被修改）仍可能存在“老记录保留 vs 新记录覆盖”的决策质量问题。补偿手段：H6 [release-note-writer](../../.he/agents/release-note-writer/) 在发布说明中锅漆“seed 变更」独立章节、指向迁移脚本。
   3. **其他 family PR 试加例外**：即使明文锁定，能不能压制依赖蔓延仍取决于 PR 评审人。补偿手段：[h3-detailed-design-reviewer](../../.he/agents/detailed-design-reviewer/) 与 [h5-commit-auditor](../../.he/agents/commit-auditor/) 机械化打击`providers/<X>` 不在 EFCore family 例外名单上、但出现跨 provider `using` 的 commit。
 
