@@ -3323,3 +3323,96 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未擅自判定 frontmatter `status`/`reviewers` 应该是什么，仅给出"内容是否支持翻 reviewed"的独立判断
 - ✅ 聚焦复审范围严格限定在 B-1/B-2/B-3 三项修复点，未重新扫描已判定 `PASS` 的 §28.1/§28.2 其余检查项
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 30. HD-019 Inkwell.Core.Models 首轮评审（2026-07-08）
+
+> 评审对象：[HD-019 Inkwell.Core.Models](Inkwell.Core/HD-019-Inkwell.Core.Models.md)（status: draft，2026-07-08 起草，**H3 第六张业务命名空间 HD**）+ 联动的 [file-structure.md `## Inkwell.Abstractions.Models` 章节](file-structure.md#inkwellabstractionsmodels)。本 HD **不**追加 database-design.md 任何内容（§0 已核实模型清单非持久化实体）。完备性判定沿用 [§22](#22-hd-014-inkwellcoreauth-首轮评审2026-07-06)/[§23](#23-hd-015-inkwellcoreagents-首轮评审2026-07-07)/[§24](#24-hd-016-inkwellcoretools-首轮评审2026-07-07)/[§26](#26-hd-017-inkwellcoreconversations-首轮评审2026-07-08)/[§28](#28-hd-018-inkwellcoreauditlogs-首轮评审2026-07-08) 已确立的口径——对照 requirements.md/acceptance-criteria.md 验收标准逐条核实覆盖度，不机械套用端口层"§7/§8/§9"三段式模板。全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）。
+
+### 30.0 评审范围与基线
+
+- **本轮评审对象**：HD-019 全文（§0 ~ §8）+ file-structure.md `## Inkwell.Abstractions.Models` 新增章节
+- **不在本轮范围**：HD-001 ~ HD-018 正文本身的重新评审（已在前序评审中处理，本轮仅在发现跨引用/跨文档缺陷时反查）；`Inkwell.WebApi` 的 `ModelId` 组合校验设计（HD-019 §0 已声明归未起草的 `Inkwell.WebApi` HD，本轮不评审尚不存在的内容）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-019 frontmatter 完整，`upstream` 8 项均可定位：REQ-005 / REQ-006 / ADR-003 / ADR-017 / ADR-023 / HD-001 / HD-006 / HD-015 全部真实存在
+  - **不触发** io-contracts.md §5 阻塞返回——HD-019 是合理的业务命名空间第六张切片，目录未"严重偏离" h3-detailed-design.md
+
+### 30.1 完备性扫描（对照 REQ-005 / REQ-006 相关验收标准 + "非持久化实体"核心判断）
+
+- **HD-019 §0 核心判断"模型清单为配置驱动、非持久化实体"独立复核（`pass`，本轮最重要的核查项）**：
+  - [requirements.md 第 149~150 行](../01-requirements/requirements.md) 原文核实一致——"各模型厂商的 API Key" + "模型路由策略（默认模型、降级顺序）"确与"后端服务的端口、数据库连接、对象存储等基础设施配置"并列列为"不在产品 UI 内配置，由后端配置文件管理"，与 HD-019 引用逐字一致
+  - [acceptance-criteria.md 第 67~69 行](../01-requirements/acceptance-criteria.md) 原文核实一致——AC-020"具体 SKU 由后端配置决定"、AC-021"UI-004 模型下拉的所有选项与后端配置文件声明的模型集合一致；客户端代码中不硬编码任何模型名"、AC-022"模型不可用时下拉项灰显"，与 HD-019 引用逐字一致
+  - [database-design.md 表清单（第 64~82 行）](database-design.md) 独立核实——共 **18** 张表（`users`/`agents`/`agent_versions`/`skills`/`tools`/`knowledge_bases`/`kb_documents`/`kb_chunks`/`memory_items`/`triggers`/`orchestrations`/`orchestration_runs`/`conversations`/`messages`/`traces`/`agui_run_events`/`audit_logs`/`public_api_tokens`），确认无一张对应"模型"，与 HD-019 §0 第 3 点结论一致
+  - **HD-019 §0 第 4 点存在引用失实（详见 §30.2 C-1，判定 blocking）**：HD-019 称"已 reviewed 的 HD-006 `AgentRunRequest.ModelId: string?` 注释原文：'对应后端配置文件中的模型标识符，非数据库主键'"，但独立打开 [HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 全文核实，**该文件不包含这句话**；全文 grep "对应后端配置文件中的模型标识符"/"数据库主键" 命中的唯一出处是 [HD-015 §1.3 Q4"依据"列](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)（HD-015 自己的决策依据陈述，非 HD-006 的"注释原文"）。即该句话确实存在于本仓库，但**出处被错误归到了 HD-006 头上**，性质是引用来源张冠李戴，非凭空捏造内容
+  - **HD-019 §0 第 5 点核实一致**：[HD-015 §1.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#12-范围) 原文"模型注册表本身（后端配置文件声明的模型清单、厂商路由、可用性校验，AC-020 ~ AC-022）不在本 HD——归 `Inkwell.Core.Models`...本 HD 不校验 `ModelId` 是否为已注册的合法模型"逐字属实
+  - **结论**：核心判断"模型清单 = 配置驱动、非持久化实体"本身有 4 条独立可验证的充分证据支撑（requirements.md/acceptance-criteria.md/database-design.md/HD-015），**结论成立**；但作为佐证列出的第 5 条证据（HD-006 注释）引用来源有误，需订正引用归属（不影响结论本身，判定为 blocking 是因为"伪造引用来源"这一行为本身需要机械修正，且可能误导后续读者去 HD-006 里找一句不存在的话）
+- **REQ-005/REQ-006 范围边界核实（`pass`）**：[HD-015 §1.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#12-范围) 原文"模型注册表本身...归 `Inkwell.Core.Models`（未起草）"与 HD-019 §0 引用一致，双向核对无矛盾；HD-019 §1.4"与 HD-006/HD-015 的边界声明"逐条列出"本 HD 不修改任何已 reviewed 文件"，核实 HD-019 全文确未包含任何对 HD-006/HD-015 的 errata 段落，与该声明一致
+- **AC-020/AC-021/AC-022 逐条覆盖核实（`pass`）**：AC-020"至少含 Azure OpenAI 一项" → [§3.4 `ModelCatalogOptionsValidator`](Inkwell.Core/HD-019-Inkwell.Core.Models.md#34-modelsmodelcatalogoptionsvalidatorcs)"至少一项 `Provider == AzureOpenAI && IsAvailable == true`"覆盖；AC-021"不硬编码模型名+与配置一致" → `ModelCatalogService` 全部数据来自 `IOptions<ModelCatalogOptions>`，无硬编码模型名覆盖；AC-022"不可用灰显" → [§1.3 Q2](Inkwell.Core/HD-019-Inkwell.Core.Models.md#13-关键决策摘要)"`ListModelsAsync` 返回全部（含不可用）"覆盖，三条均有直接证据
+- **"不引入分页"判断独立复核（`pass`，本轮第二项重点核查）**：[§1.3 Q3](Inkwell.Core/HD-019-Inkwell.Core.Models.md#13-关键决策摘要) 论证——数据源是 `IOptions<ModelCatalogOptions>.Value` 绑定的进程内内存列表（非数据库查询，已在 §0 独立核实），量级为"个位数到几十个模型条目"（对照 [requirements.md §5.2](../01-requirements/requirements.md) 枚举的厂商"Azure OpenAI/OpenAI/Claude/Qwen/智谱/…"，现实配置规模确实远低于三位数）；[§3.5 `ListModelsAsync`](Inkwell.Core/HD-019-Inkwell.Core.Models.md#35-inkwellcoremodelsmodelcatalogservicecs) 实现确实是 `options.Value.Models.Select(MapToSummary).ToList()` 整体返回，**不存在**本仓库 2026-07-08 反复踩坑的 `new Pagination(1, 1000)` 模式（`Pagination` 类型全文 grep 0 命中，§8 C5 自检命令已覆盖）——`HD-014`/`HD-016`/`HD-017` 三次踩坑的根因是"用超过 `Pagination.MaxPageSize=100` 的页大小硬拉**数据库**查询结果"，与本 HD"内存列表整体一次性返回、完全不构造 `Pagination` 对象"是不同的代码形态，不构成同类反模式。**结论：该判断合理，不列入 blocking**
+- **§7 三项"已解决"标注与正文一致性核实（`pass`，本轮第三项重点核查）**：
+  - Q&A-A："不声明厂商专有参数 schema" —— 核实 [§1.2"不在内"](Inkwell.Core/HD-019-Inkwell.Core.Models.md#12-范围) + [§3.2 `ModelSummary`](Inkwell.Core/HD-019-Inkwell.Core.Models.md#32-modelsmodelsummarycs)/[§3.3 `ModelEntryOptions`](Inkwell.Core/HD-019-Inkwell.Core.Models.md#33-modelsmodelcatalogoptionscs) 字段列表（`Id`/`DisplayName`/`Provider`/`SupportsVision`/`IsAvailable`），确认全文**无**任何厂商专有参数扩展字段（如 `ExtraParametersJson`/`Dictionary<string,object>` 之类），标注与正文一致
+  - Q&A-B："不声明降级顺序字段" —— 同样核实 `ModelEntryOptions`/`ModelCatalogOptions` 字段列表，确认无 `FallbackOrder`/`Priority`/`RoutingRank` 等任何路由相关字段，标注与正文一致
+  - Q&A-C："连接信息不归本 HD" —— 核实 `ModelSummary` 字段列表确认无 `Endpoint`/`DeploymentName`/`ApiKey`/`ConnectionString` 等任何连接凭据字段，标注与正文一致
+  - **三项标注与正文设计完全吻合，均为 `pass`**
+- **文件结构/6 个程序文件职责描述完整性（`pass`）**：§3.1~§3.6 共 6 个文件小节、10 字段表格全部填写完整，每个方法均有对应的"内部函数或类"实现逻辑描述（含具体 C# 代码片段），未发现类似 HD-017 首轮 C-1 的"方法列出但逻辑描述缺失"问题
+
+**完备性结论**：核心"非持久化实体"判断成立（4 条独立证据支撑），"不分页"判断合理，§7 三项"已解决"标注与正文一致；但发现 1 项证据引用来源张冠李戴（详见 §30.2 C-1），需机械订正。
+
+### 30.2 一致性扫描（HD-019 ↔ HD-001 / HD-006 / HD-015 / ADR-017 / ADR-023 / AGENTS.md §3.2 / file-structure.md）
+
+- **C-1（BLOCKING）**——HD-019 §0 第 4 点声称"已 reviewed 的 [HD-006 `AgentRunRequest.ModelId: string?`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 注释原文：'对应后端配置文件中的模型标识符，非数据库主键'"，独立打开 [HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 全文（对外接口/内部函数或类/输入数据/输出数据/依赖模块/错误处理/日志要求/测试要求各字段）逐字核对，**不存在**这句话或任何语义等价的注释。全文 grep "对应后端配置文件中的模型标识符"确认该句在本仓库仅出现 1 次，位于 [HD-015 §1.3 Q4"依据"列](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)——是 HD-015 自己论证"`ModelId` 用 `string?` 而非 `Guid?`"这一决策的依据陈述，句子本身真实存在，但**引用来源被 HD-019 错误归到了 HD-006 头上**（HD-006 本身确实字段类型是 `string? ModelId`，但没有这句解释性注释）。**注**：本条不属于本仓库 2026-07-06 起反复出现的"编造 Owner 确认"模式（该句不涉及任何 Owner 拍板/确认，纯粹是证据引用的出处张冠李戴），性质更接近文档间"转述来源错位"，但同样需要机械修正，避免下游读者按图索骥去 HD-006 里找一句不存在的话
+  - **影响范围**：不影响 §0 核心结论本身（该结论仍有 requirements.md/acceptance-criteria.md/database-design.md/HD-015 四条独立证据支撑），但会误导后续核查者，且若 H4/H5 起草者照抄这句"引用"去 HD-006 找依据会扑空
+  - **建议方向**：将 HD-019 §0 第 4 点的表述从"已 reviewed 的 HD-006 `AgentRunRequest.ModelId: string?` 注释原文：'...'"改为准确归因，例如"已 reviewed 的 HD-015 §1.3 Q4 在论证 `ModelId` 类型时给出的依据陈述：'...'（该陈述描述的是 HD-006 `ModelId: string?` 字段的语义，但原句出自 HD-015 而非 HD-006 本体）"。**纯机械性引用来源修正，不需要 Owner picker**
+  - **卡点等级**：**blocking**
+  - **追溯**：§30.1 核心判断复核
+- **C-2（PASS）**——依赖规则核查（[AGENTS.md §3.2](../../AGENTS.md)）：全文 grep `using Microsoft\.EntityFrameworkCore|using StackExchange\.Redis|using Npgsql|using Minio|using Microsoft\.Agents\.AI|using Azure\.Storage|IPersistenceProvider|IUnitOfWork|Pagination\(` 仅命中 HD-019 §0/§1.2/§8 的"依赖规则遵循"声明句本身与 §8 CI 自检命令文本（描述"不得引用"/"检测该模式"的文字），全文**不存在**任何真实的 Provider 包引用、`Microsoft.Agents.AI.*` 引用、`IPersistenceProvider`/`IUnitOfWork` 依赖、或 `Pagination(...)` 构造调用。与 HD-019 顶部"依赖规则遵循"声明一致
+- **C-3（PASS）**——`Inkwell.Core.Agents`（HD-015）是否反向依赖本 HD：全文 grep [HD-015 全文](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 未发现任何 `IModelCatalogService`/`Inkwell.Core.Models` 引用，HD-015 §1.2 原文明确"该校验职责留给 `Inkwell.Core.Models`（或 `Inkwell.WebApi` 组合两者时）"——即 HD-015 本身也未曾假设直接依赖本 HD，与 HD-019 §0"跨业务命名空间依赖边界"结论（`ModelId` 校验应发生在 `Inkwell.WebApi`，而非 HD-015 直接依赖 HD-019）一致，无跨文档矛盾
+- **C-4（PASS）**——`ModelId` 类型三方一致性核实：[HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) `public string? ModelId { get; init; }`、[HD-015 §3.3](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#33-persistenceagentsagentdefinitioncs)（经 §1.3 Q4 核实为 `string?`）、[HD-019 §3.1](Inkwell.Core/HD-019-Inkwell.Core.Models.md#31-modelsimodelcatalogservicecs) `GetModelAsync(string modelId, ...)`（非空 `string`，供查询用，与可空存储字段 `string?` 语义不冲突——查询参数本身不允许 `null`，由 `ArgumentException.ThrowIfNullOrEmpty` 保证）三处类型一致，无需 errata
+- **C-5（PASS）**——`ADR-023` BCL 异常分流对照核实：[ADR-023 §](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) 原文"实体不存在 → `KeyNotFoundException`"与 [HD-019 §1.3 Q6](Inkwell.Core/HD-019-Inkwell.Core.Models.md#13-关键决策摘要)/[§4.2](Inkwell.Core/HD-019-Inkwell.Core.Models.md#42-bcl-异常分类)一致；`Get*Async` 命名与 [HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名)"`I<Module>Service`（业务端口）"命名类别一致，`IModelCatalogService` 落位判断有先例依据（HD-006/HD-007 单实现仍开端口）
+- **C-6（PASS）**——`ModelId` 大小写不敏感比较（`GetModelAsync` 用 `StringComparison.OrdinalIgnoreCase`，`ModelCatalogOptionsValidator` 用 `StringComparer.OrdinalIgnoreCase` 去重）内部一致，两处均用不区分大小写策略，无逻辑矛盾
+- **C-7（PASS）**——文件计数核实：[file-structure.md `## Inkwell.Abstractions.Models`](file-structure.md#inkwellabstractionsmodels) "Abstractions csproj 累计 86（HD-001~HD-018）+ 4（HD-019）= 90"，86 这一输入值与 [HD-018 §28.2 C-9](#28-hd-018-inkwellcoreauditlogs-首轮评审2026-07-08) 已核实的"82+4=86"结果一致；`Inkwell.Core.csproj` "累计 19（HD-014~HD-018）+2（HD-019）=21"，19 这一输入值与 [HD-018 §2](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#2-文件结构)"14+5=19"一致，两处加法均正确，未发现类似 HD-017 N-1 的加法错误
+- **C-8（PASS）**——ADR-017 依赖规则第 3 条引用核实：[ADR-017 第 139 行](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)原文"`Inkwell.Core.AgentRuntime` 命名空间 → 唯一允许 `using Microsoft.Agents.AI.*` 的位置"，与 HD-019 §1.2"不在内"清单援引一致
+
+**一致性结论**：8 项检查中 **1 项 BLOCKING**（C-1），0 项 non-blocking，其余 7 项 `PASS`。
+
+### 30.3 反问清单
+
+#### Blocking
+
+##### B-1：HD-019 §0 第 4 点将 HD-015 的决策依据陈述误引为"HD-006 注释原文"，引用来源张冠李戴（C-1）
+
+- **问题**：HD-019 §0 第 4 点写"已 reviewed 的 [HD-006 `AgentRunRequest.ModelId: string?`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 注释原文：'对应后端配置文件中的模型标识符，非数据库主键'"，但独立打开 HD-006 §3.2 全文核实，该文件不包含这句话或任何语义等价表述；全文 grep 确认这句话唯一出处是 [HD-015 §1.3 Q4"依据"列](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)——是 HD-015 自己论证 `ModelId` 类型选择的依据陈述，而非 HD-006 的字段注释
+- **影响范围**：不影响 HD-019 §0 核心结论本身（该结论仍有 requirements.md 第 149~150 行、acceptance-criteria.md AC-021、database-design.md 18 张表清单、HD-015 §1.2 四条独立证据支撑，结论依然成立）；但会误导 H4/H5 起草者或后续评审者按图索骥去 HD-006 里查找一句实际不存在的注释，浪费核实成本，且客观上让"证据链"的可信度打折扣（若一处引用出处有误，读者可能怀疑其余引用也需要重新核实）
+- **建议方向**：将该句表述改为准确归因，例如"已 reviewed 的 [HD-015 §1.3 Q4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) 在论证 `ModelId` 类型选择时给出的依据陈述：'对应后端配置文件中的模型标识符，非数据库主键'（该陈述描述的是 HD-006 `AgentRunRequest.ModelId: string?` 字段的语义，原句出自 HD-015 的决策依据列，非 HD-006 本体的字段注释）"，或等价的准确措辞。**纯机械性引用来源修正，不需要 Owner picker**（不涉及任何技术决策变更，只是修正一处引用出处）
+- **卡点等级**：**blocking**
+- **追溯**：C-1
+
+#### Non-blocking
+
+（本轮未发现 non-blocking 项。）
+
+### 30.4 评审结论与下一步
+
+- **整体评审决议**：**PASS-AS-ERRATA**——HD-019 §0 核心判断"模型清单 v1 为配置驱动、非持久化实体"有 4 条独立可验证证据支撑（requirements.md §5.2 原文/acceptance-criteria.md AC-020~022 原文/database-design.md 18 张表清单/HD-015 §1.2 原文），结论成立；"不引入分页"判断合理（内存列表整体返回，与本仓库已知的 `Pagination(1, 1000)` 硬拉数据库反模式是不同代码形态）；§7 三项"已解决"标注（Q&A-A/B/C）与正文设计逐一核实一致，均无编造嫌疑；依赖规则核查通过（全文无 Provider 包/`Microsoft.Agents.AI.*`/`IPersistenceProvider`/`Pagination` 引用）；`ModelId` 类型三方一致；文件计数两处加法正确。但发现 **1 项 blocking**：B-1 是证据引用来源张冠李戴（HD-015 的决策依据陈述被误引为"HD-006 注释原文"），需要机械订正
+- **HD-019 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B-1——订正 §0 第 4 点的引用归属，改为准确指向 HD-015 §1.3 Q4，不再声称该句是"HD-006 注释原文"。**纯机械性修正，不需要 Owner picker**
+  2. ⬜ Owner 在 HD-019 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（人工签字位，AI 不代签）——修复 B-1 并经聚焦复审后再进行
+- **§7 三项 Owner 确认核查（任务明确要求，未自行判定真伪）**：HD-019 §7 Q&A-A/Q&A-B/Q&A-C 三处"Owner 在本次会话中通过 `vscode_askQuestions` 真实确认"的表述，**用户在本轮任务描述中已直接告知"§7 三项问题已经 Owner 真实确认（均选择'维持本 HD 现状'）"**——按 `/memories/repo/inkwell-h3-workflow.md` 已记录的处理范式（HD-015 第 6 种正确处理范式：用户在对话中直接告知某决策为真时，应如实记录该确认的真实渠道，不必在本评审会话内重新发起 `vscode_askQuestions`），本评审 Agent 采信该项确认为真，**不**将其列为可疑项。三项标注的技术内容（不声明厂商专有参数 schema / 不声明降级顺序字段 / 连接信息不归本 HD）经独立核实与正文设计完全一致（详见 §30.1）
+- **HD-019 是否可推荐翻 `reviewed`**：**暂不推荐**——需先修复 B-1（纯机械订正，预期不需要额外 Owner picker）。修复后建议做一次聚焦复审（仅核对 B-1 修复点），聚焦复审通过后可推荐 Owner 签字
+- **后续路径建议**：B-1 机械修正 → 聚焦复审 → Owner 签字 `reviewed`
+
+### 30.5 自检
+
+- ✅ 每条 `pass`/`blocking` 结论都附了文件路径 + 章节锚点证据
+- ✅ 唯一的 `blocking` 反问（B-1）能映射到具体一致性冲突（C-1）+ 影响范围 + 可执行的建议方向，未替设计师下结论
+- ✅ 未使用"看起来"/"似乎"/"感觉"等主观词汇
+- ✅ 未凭文件名臆测——requirements.md §5.2/acceptance-criteria.md AC-020~022/database-design.md 表清单/HD-006 §3.2/HD-015 §1.2/§1.3 Q4/ADR-017/ADR-023/HD-001 §5.1 均逐字打开核实，全文 grep 交叉验证
+- ✅ 未运行任何 git 命令
+- ✅ 未修改 HD-019 或任何其他 HD 正文，仅追加本节评审报告
+- ✅ 未给越界建议
+- ✅ 按任务明确要求，对 §7 三项"Owner 已确认"表述**未凭空怀疑**——用户已在任务描述中直接告知其为真，采信并如实记录确认渠道，未重复发起 `vscode_askQuestions`
+- ✅ 未擅自判定 frontmatter `status`/`reviewers` 应该是什么，仅给出"内容是否支持翻 reviewed"的独立判断
+- ✅ 完备性判定遵循已确立口径（§22/§23/§24/§26/§28 先例），对照 REQ-005/REQ-006/AC-020~022 验收标准核实，未机械套用端口层三段式模板
+- ✅ 报告路径仍走 H3 规范默认 design-review-report.md（追加 §30 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
