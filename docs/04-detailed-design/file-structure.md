@@ -205,6 +205,19 @@ src/core/Inkwell.Abstractions/Persistence/
     IToolRepository.cs                 # 具名 Repository（4 方法：AddTool/GetTool/GetToolByName/ListTools）
 ```
 
+### Persistence/Conversations（HD-017 落地，2026-07-08）
+
+> 由 [HD-017 §2 / §3.1 ~ §3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Conversations/                        # 新增子目录（HD-017）
+    Conversation.cs                     # 业务 Model（会话），IHasTimestamps + IHasOwner + IHasRowVersion
+    ConversationMessage.cs              # 业务 Model（消息），IHasTimestamps
+    IConversationRepository.cs          # 具名 Repository（6 方法：AddConversation/GetConversation/UpdateConversation/ListConversationsByAgent/FindUsedAgentIdsByOwner/FindLastActivityByAgents）
+    IConversationMessageRepository.cs   # 具名 Repository（4 方法：AddMessage/ListMessagesByConversation/DeleteMessage/DeleteMessagesByConversation）
+```
+
 ## Inkwell.Abstractions.FileStorage
 
 > 由 [HD-003 §2 / §3](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 锁定。
@@ -516,6 +529,36 @@ src/core/Inkwell.Core/
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 6（HD-016）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
 
 > `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
+
+## Inkwell.Abstractions.Conversations
+
+> 由 [HD-017 §2 / §3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。**本 HD 是 H3 第四张业务命名空间 HD**——`IConversationService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Conversations/` 子目录（与 `Persistence/Conversations/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Conversations` / `Inkwell.Abstractions.Persistence.Conversations`）。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
+
+```text
+src/core/Inkwell.Abstractions/
+  Conversations/                           # 新增子目录（HD-017）
+    IConversationService.cs                # 顶层业务门面（8 方法）
+    ConversationSummary.cs                 # 会话列表投影 DTO（历史会话侧栏）
+    ConversationOptions.cs                 # MaxMessagesPerConversation / EnableSensitiveDataLogging
+    ConversationOptionsValidator.cs        # IValidateOptions<ConversationOptions>
+```
+
+**文件计数**：HD-017 在 `Conversations/` 新增 4 个 `*.cs` + 在 `Persistence/Conversations/`（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）新增 4 个 `*.cs`，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）+ 8（HD-017）= **82** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Conversations` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
+
+```text
+src/core/Inkwell.Core/
+  Conversations/
+    ConversationService.cs                 # 唯一 IConversationService 实现
+    ConversationBuilderExtensions.cs       # UseDefaultConversationService()
+```
+
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 6（HD-016）+ 2（HD-017）= **16** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+
+> `Persistence/Conversations/Conversation.cs` + `ConversationMessage.cs` + `IConversationRepository.cs` + `IConversationMessageRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
 
 ## providers/Inkwell.Persistence.EFCore
 

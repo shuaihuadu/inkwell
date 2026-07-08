@@ -1,0 +1,422 @@
+---
+id: HD-017
+title: Inkwell.Core.Conversations 详细设计 — 对话 / 消息历史存储与检索（不含长期记忆策略）
+stage: H3
+status: draft
+reviewers: []
+upstream:
+  - REQ-010
+  - NFR-005
+  - ADR-017
+  - ADR-023
+  - HD-001
+  - HD-002
+  - HD-006
+  - HD-015
+---
+
+<!-- markdownlint-disable MD060 -->
+<!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-007 / HD-014 / HD-015 / HD-016 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
+
+> **本 HD 是 H3 第四张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-016 `Inkwell.Core.Tools`](HD-016-Inkwell.Core.Tools.md) 之后起草。
+>
+> **治理声明**：本文件全文不包含任何"已用 `vscode_askQuestions` 向 Owner 真实确认"的表述——本次起草会话未发起任何 `vscode_askQuestions` 交互。全部标注"作者判断"的条目均为作者基于现有证据链的判断；存在真实产品含义分歧、无法从现有文档判定的问题，原样列入 [§8](#8-需要-owner-确认的问题)，不代答、不假装已确认。
+>
+> **范围核实结论（非臆造，逐条附证据）**：
+>
+> - **[REQ-010](../../01-requirements/requirements.md)"多轮对话与长期记忆"仅"多轮对话"部分在范围内**——[requirements.md REQ-010 字面](../../01-requirements/requirements.md)"多轮上下文；长期记忆策略对用户呈现（开 / 关 / 摘要式）"是两个并列子能力；[acceptance-criteria.md AC-036](../../01-requirements/acceptance-criteria.md)"在 UI-005 同一会话内连续 3 条以上消息，Agent 能引用之前的内容（多轮上下文连续）"对应本 HD；AC-037"长期记忆区段切换 关/开（保留全文）/开（摘要式）...记忆片段是否被注入"**不**对应本 HD——[repo-impact-map.md §2.10](../../01-requirements/repo-impact-map.md)明确把"长期记忆策略（开/关/摘要式三策略）"分派到独立后端模块 `src/server/Inkwell.Memory/`，与本 HD 对应的"对话历史表"是并列关系（原文"与对话历史表的关系推迟到 H3；本表不预设'衍生 vs 独立'"）；[AGENTS.md §3.1](../../../AGENTS.md) 拓扑也把 `.Memory` 与 `.Conversations` 列为两个独立业务命名空间。本 HD 据此把"长期记忆策略"整体排除，归未起草的 `Inkwell.Core.Memory`。
+> - **[NFR-005](../../01-requirements/requirements.md)"对话历史持久化"（全量存储到后端、多端一致）在范围内**——这是本 HD 存在的核心理由，[requirements.md §8.2](../../01-requirements/requirements.md)"对话历史：v1 强制全部存到后端"+ [§8.3](../../01-requirements/requirements.md)"对话历史：永久保留，可由 Owner 删除"+ [§8.4](../../01-requirements/requirements.md)"用户与 Agent 的对话历史归对应**用户**所有；分享 / 共享 Agent 不会带走对方的历史对话"三条共同决定了本 HD 的数据模型（会话历史按"（Agent, 参与用户）"二元组归属，而非归 Agent Owner，详见 [§1.3 Q1](#13-关键决策摘要)）。
+> - **REQ-002"我使用过" tab 数据来源（[AC-012](../../01-requirements/acceptance-criteria.md)）+ "最近使用时间"字段（[AC-013](../../01-requirements/acceptance-criteria.md)）的查询能力在范围内**——已 reviewed 的 [HD-015 §1.2](HD-015-Inkwell.Core.Agents.md#12-范围) 顶部范围声明原文两处均已明确排除并指向本 HD："'我使用过' tab 的数据来源...本 HD 不实现该查询，`IAgentService` 不提供 `ListUsedAgentsAsync`；留待 `Inkwell.WebApi` 结合未起草的 `Inkwell.Core.Conversations` 拼装（非本 HD 越权臆造该模块接口）"+ "`AgentSummary` 的'最近使用时间'字段的实际计算逻辑...最近使用时间的展示留 `Inkwell.WebApi` 结合 `Inkwell.Core.Conversations` 拼装"。本 HD 据此提供 `ListUsedAgentIdsAsync` / `GetLastActivityByAgentsAsync` 两个查询方法，供**未起草的 `Inkwell.WebApi`**组合 `IAgentService` 的结果使用；本 HD **不**改写已 reviewed 的 HD-015（`AgentSummary` 本身不新增字段，`IAgentService` 接口不变）。
+> - **消费方澄清（重要，纠正原任务描述的一处不准确前提）**：[HD-006 §3.2](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)"`Messages`（本轮 + 历史消息，`Inkwell.Conversations` 组装）"这句话描述的是**最终由谁产出 `AgentRunRequest.Messages` 内容**，但已 reviewed 的 [HD-015 §3.4](HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 显示 `IAgentInvocationService.RunAsync(Guid agentId, Guid callerUserId, Guid? conversationId, IReadOnlyList<AgentChatMessage> messages, CancellationToken ct)` 的 `messages` 是**调用方直接传入的参数**，`AgentInvocationService` 内部**不**反查历史、不依赖本 HD。也就是说，真正调用本 HD `GetHistoryMessagesAsync` 拼出 `messages` 列表、再传给 `IAgentInvocationService.RunAsync` 的是**未起草的 `Inkwell.WebApi`**，而不是 `IAgentInvocationService` 本身。本 HD 按此纠正后的消费关系设计接口，**不**建议、也不会反向修改已 reviewed 的 HD-015 签名（超出本次任务授权范围）；该纠正已在 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 详细说明，并在本文档末尾总结中提请确认。
+>
+> **依赖规则遵循**（[AGENTS.md §3.2](../../../AGENTS.md)）：`Inkwell.Core.Conversations` 只依赖 `Inkwell.Abstractions` + BCL；**不** `using` 任何 Provider 包，**不** `using Microsoft.Agents.AI.*`；持久化经 `IPersistenceProvider.GetRepository<IConversationRepository>()` / `GetRepository<IConversationMessageRepository>()`（事务外读）/ `IUnitOfWork.GetRepository<...>()`（事务内写，[HD-002 §13.3 Q1=A2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；`ConversationMessage.Role` / 消息内容复用 [HD-006 `AgentChatRole` / `AgentChatMessage` / `AgentMessageContentPart`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族（同项目内类型引用，不新增依赖，不重新发明），详见 [§1.3 Q2](#13-关键决策摘要) + [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 的一处已知序列化缺口。
+
+## 1. 模块概述
+
+### 1.1 职责
+
+`Inkwell.Core.Conversations` 承担：
+
+- 会话（Conversation）的创建与列表查询——按 `(AgentId, OwnerUserId)` 二元组组织，支撑 [UI-005 §5.1](../../01-requirements/ui-spec.md)"历史会话侧栏"（"+新建会话"+ 按时间倒序列出该 Agent 下当前用户参与的会话）
+- 会话消息（ConversationMessage）的持久化与检索——[NFR-005](../../01-requirements/requirements.md) 全量存储到后端；供未起草的 `Inkwell.WebApi` 组装 [HD-006 `AgentRunRequest.Messages`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)（详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）
+- 消息删除 / 整段对话清空——[ui-spec.md UI-005 §5.4](../../01-requirements/ui-spec.md)"删除消息"/"清空对话"，权限校验依据 [requirements.md §8.4](../../01-requirements/requirements.md)"对话历史归对应**用户**所有"
+- "我使用过" tab 数据来源查询（[AC-012](../../01-requirements/acceptance-criteria.md)）+ "最近使用时间"批量查询（[AC-013](../../01-requirements/acceptance-criteria.md)）——供未起草的 `Inkwell.WebApi` 组合 [HD-015 `IAgentService`](HD-015-Inkwell.Core.Agents.md) 的结果使用
+
+`IConversationService` 是本模块**业务对外接口**，落在 `Inkwell.Abstractions/Conversations/`（[HD-001 §5.1](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名约定）。
+
+### 1.2 范围
+
+**在内**：
+
+| 类别            | 文件（`Inkwell.Abstractions/`）                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| 业务 Model      | `Persistence/Conversations/Conversation.cs` / `Persistence/Conversations/ConversationMessage.cs`     |
+| 具名 Repository | `Persistence/Conversations/IConversationRepository.cs` / `IConversationMessageRepository.cs`         |
+| 业务对外接口    | `Conversations/IConversationService.cs`                                                              |
+| 业务 DTO        | `Conversations/ConversationSummary.cs`                                                               |
+| Options         | `Conversations/ConversationOptions.cs` + `Conversations/ConversationOptionsValidator.cs`             |
+
+| 类别    | 文件（`Inkwell.Core/Conversations/`）                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------ |
+| 实现    | `ConversationService.cs`（`IConversationService` 唯一实现）                                                  |
+| DI 装配 | `ConversationBuilderExtensions.cs`（`UseDefaultConversationService()`，风格对齐 [HD-016 `ToolsBuilderExtensions.cs`](HD-016-Inkwell.Core.Tools.md)） |
+
+**不在内**（明确排除，逐条附去向）：
+
+- **长期记忆策略（开 / 关 / 摘要式）及其存储**——[AC-037](../../01-requirements/acceptance-criteria.md) + [repo-impact-map.md §2.10](../../01-requirements/repo-impact-map.md) 已明确归 `Inkwell.Core.Memory`（未起草，对应 `memory_items` 表，[database-design.md](../database-design.md) 现有占位）；本 HD 不声明任何"记忆模式"字段，也不做摘要 / 召回逻辑
+- **知识库召回结果注入对话上下文**（[REQ-009](../../01-requirements/requirements.md)）——归 `Inkwell.Core.KnowledgeBase`（未起草）；本 HD 只存储"最终已拼装完成"的消息内容，不关心内容如何被拼装
+- **AG-UI 流式事件到 `AgentRunEvent` 的具体映射与转发**——已由 [HD-006 §1.2](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#12-范围) 明确归 `Inkwell.WebApi`（未起草）；本 HD 只存储 Run 完成后的**最终**消息（`AgentTurnResult.Message`），不存储中间流式增量事件
+- **调试 / Trace 全链路可视化与调试样本保存**（[REQ-014](../../01-requirements/requirements.md)）——归 `Inkwell.Core.Traces`（未起草）；本 HD 不落地 `traces` 表
+- **`agui_run_events` 表的实现**——[database-design.md](../database-design.md)当前顶层表清单把该表标注为 `Inkwell.Conversations` 归属，但依据上述"AG-UI 事件映射归 WebApi / trace 存储归 Traces"的边界声明，本 HD 判断该占位归属可能已过期（H2 早期占位，晚于后续 H3 模块拆分细化），**本 HD 不实现该表**，该归属疑问原样列入 [§8 Q&A-D](#8-需要-owner-确认的问题)，不擅自改写 database-design.md 该行
+- **IAgentInvocationService / IAgentRuntime 的调用编排本身**——归已 reviewed 的 [HD-015](HD-015-Inkwell.Core.Agents.md) / [HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)；本 HD 只提供历史查询 + 消息持久化，不发起 Run、不注入 `IAgentRuntime` 依赖（详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）
+- **审计日志的写入触点**——[NFR-004](../../01-requirements/requirements.md) 审计事件清单未列出任何"对话消息"相关的独立事件类别；本 HD 是否需要为"删除消息"/"清空对话"（不可逆的数据删除操作）写审计，存在真实产品含义分歧，**不由本 HD 自行拍板**，列入 [§8 Q&A-A](#8-需要-owner-确认的问题)
+- **WebApi 层的 HTTP 端点 / AG-UI SSE hosting**——归未起草的 `Inkwell.WebApi` HD
+
+### 1.3 关键决策摘要
+
+> 以下全部为**作者判断，非 Owner 拍板**；有真实产品含义分歧的条目已单独列入 [§8](#8-需要-owner-确认的问题)，不在此重复。
+
+| #   | 决策                                                                                                                                  | 理由                                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | `Conversation` 实现 `IHasOwner`，`OwnerUserId` 语义 = 会话历史归属的**参与用户**，**不是** `AgentDefinition.OwnerUserId`（Agent 创建者） | [requirements.md §8.4](../../01-requirements/requirements.md)"用户与 Agent 的对话历史归对应**用户**所有；分享 / 共享 Agent 不会带走对方的历史对话"——同一 Agent 被多个团队成员共享使用时，每个用户各自拥有独立的会话历史，`OwnerUserId` 复用 [HD-002 `IHasOwner` mixin](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 而非新造 `ParticipantUserId` 字段，减少 mixin 之外的自定义字段 |
+| Q2  | `ConversationMessage.Role` / 消息内容复用 [HD-006 `AgentChatRole` 枚举](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#34-agentruntimeagentchatmessagecs) + `AgentMessageContentPart` 封闭子类型族（序列化为 `ContentJson`），不重新发明消息角色 / 内容分片类型 | 任务要求明确复用而非重新发明；`GetHistoryMessagesAsync` 返回值直接是 `IReadOnlyList<AgentChatMessage>`（HD-006 已锁定类型），避免调用方（`Inkwell.WebApi`）做额外类型转换                                                                                                                                                                                                                       |
+| Q3  | `ConversationMessage` 新增 `SequenceNumber`（`int`，会话内严格递增）用于消息排序，不仅依赖 `CreatedTime`                                | 同一 Run 内用户消息与 Agent 回复可能落在同一时间粒度内产生排序歧义；`SequenceNumber` 提供确定性排序，避免依赖数据库时间戳精度                                                                                                                                                                                                                                                                    |
+| Q4  | `ListUsedAgentIdsAsync`（"我使用过" 数据源）判定依据 = 该 `(AgentId, OwnerUserId)` 二元组下**存在至少一条 `ConversationMessage`**，而非仅"存在 `Conversation` 记录" | [AC-012](../../01-requirements/acceptance-criteria.md)"该用户在 UI-005 进行过**任意对话**"——用户点击"+新建会话"但从未发送消息不构成"进行过对话"；若仅以 `Conversation` 记录存在性判定，会把"打开了对话页但没说话"误判为"已使用"                                                                                                                                                                     |
+| Q5  | `Conversation.Title` 仅取首条 **User 角色**消息中第一个 `TextPart.Text` 的前 30 字；若该消息不含 `TextPart`（纯图片 / 文档），`Title` 保持 `null` | [ui-spec.md UI-005 §5.1](../../01-requirements/ui-spec.md)"标题 = 首条用户消息前 30 字"字面仅描述文本场景；纯多模态消息如何取标题未定义，保守处理为 `null`（客户端可回退展示"新会话"占位文案，[ui-spec.md §5.6](../../01-requirements/ui-spec.md) 已有该文案）而非臆造图片 / 文档场景的标题生成规则                                                                                            |
+| Q6  | `ClearConversationAsync` 删除该会话下**全部消息**并把 `Conversation.Title` 重置为 `null`，但**不**删除 `Conversation` 记录本身            | [ui-spec.md UI-005 §5.4](../../01-requirements/ui-spec.md)"清空对话"字面只清空消息内容，未描述连会话条目一起从侧栏消失；侧栏保留一条"标题=null"的会话条目，语义上与"新会话"等价，避免臆造"清空后连会话条目也消失"这一更激进的行为                                                                                                                                                                     |
+| Q7  | `Conversation` 实现 `IHasRowVersion`（乐观并发），`ConversationMessage` 不实现                                                            | `Conversation` 存在"追加消息更新 `UpdatedTime`"与"删除消息 / 清空对话重置 `Title`"两条并发写路径，需要防止互相覆盖（同 [HD-014 `User`](HD-014-Inkwell.Core.Auth.md#13-关键决策摘要) / [HD-015 `AgentDefinition`](HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) 并发场景类比）；`ConversationMessage` 一旦写入不可变（除整体删除外无 Update 场景），不需要并发令牌（同 [HD-016 `ToolDefinition`](HD-016-Inkwell.Core.Tools.md#13-关键决策摘要) 不加 `RowVersion` 的理由类比） |
+| Q8  | `GetHistoryMessagesAsync` 返回该会话**全部**消息，不做分页 / 截断                                                                        | [HD-006 `AgentRunRequest.Messages`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 需要完整历史用于多轮上下文（[AC-036](../../01-requirements/acceptance-criteria.md)）；是否需要按 `ConversationOptions.MaxMessagesPerConversation` 截断超长历史窗口，存在真实产品/成本权衡（token 预算 vs 上下文完整性），列入 [§8 Q&A-C](#8-需要-owner-确认的问题)，不由本 HD 自行裁决 |
+| Q9  | `IConversationRepository` / `IConversationMessageRepository` 均不声明 `Delete`/`Update` 之外的软删除字段                                | 同 [HD-015 §1.3 Q10](HD-015-Inkwell.Core.Agents.md#13-关键决策摘要)"v1 不提供软删"已由 Owner 拍板维持的全仓一致结论（[HD-002 §1.3 Q5](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；"清空对话"/"删除消息"均为硬删除，与 [requirements.md §8.3](../../01-requirements/requirements.md)"对话历史：永久保留，可由 Owner 删除"中"可删除"部分一致（该条款未强制要求软删除留痕）                          |
+
+### 1.4 与消费方的边界声明（`Inkwell.WebApi` 是真正的调用方，而非 HD-015）
+
+已 reviewed 的 [HD-015 `IAgentInvocationService.RunAsync`](HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 签名为：
+
+```csharp
+Task<AgentTurnResult> RunAsync(Guid agentId, Guid callerUserId, Guid? conversationId, IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default);
+```
+
+`messages` 由**调用方**在调用前组装好传入，`AgentInvocationService` 内部**不**反查历史、**不**依赖 `IPersistenceProvider.GetRepository<IConversationRepository>()`。因此本 HD 的真实消费链路是：
+
+1. 未起草的 `Inkwell.WebApi` 收到用户发送消息的 HTTP 请求
+2. `Inkwell.WebApi` 调用本 HD `IConversationService.GetHistoryMessagesAsync(conversationId)` 取出历史消息
+3. `Inkwell.WebApi` 调用本 HD `IConversationService.AppendMessageAsync(conversationId, 新的用户消息)` 持久化用户本轮输入
+4. `Inkwell.WebApi` 把"历史 + 本轮用户消息"拼成 `messages` 列表，调用 [HD-015 `IAgentInvocationService.RunAsync(agentId, callerUserId, conversationId, messages, ct)`](HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)
+5. `Inkwell.WebApi` 拿到 `AgentTurnResult.Message`（或流式路径拼出的最终消息）后，再次调用本 HD `IConversationService.AppendMessageAsync(conversationId, Agent 回复消息)` 持久化
+
+本 HD **不**、也不应该反向依赖 [HD-015 `IAgentInvocationService`](HD-015-Inkwell.Core.Agents.md) 或 [HD-006 `IAgentRuntime`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)——[HD-006 §3.2](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 原文"`Messages`（本轮 + 历史消息，`Inkwell.Conversations` 组装）"应理解为"最终由 `Inkwell.Conversations` 提供数据源、由 `Inkwell.WebApi` 完成实际组装动作"，而非"`Inkwell.Conversations` 直接产出 `AgentRunRequest` 或直接调用 `IAgentInvocationService`"。本次纠正**不**修改 HD-006 / HD-015 正文，仅在本 HD 内部准确表述消费关系；该纠正是否需要反向修订 HD-006 §3.2 的措辞（使其更精确），列入本文档末尾的总结供用户确认。
+
+**已知技术缺口（不擅自修复，仅记录）**：[HD-006 §3.5 `AgentMessageContentPart`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#35-agentruntimeagentmessagecontentpartcs) 是 `abstract record` + 3 个 `sealed record` 子类型（`TextPart`/`ImagePart`/`DocumentPart`），但该文件当前定义**未**标注 [`[JsonPolymorphic]`/`[JsonDerivedType]`](https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/polymorphism) 特性——`System.Text.Json` 默认无法正确序列化 / 反序列化不含类型鉴别器的抽象基类型层级。本 HD `ConversationMessage.ContentJson`（[§3.2](#32-persistenceconversationsconversationmessagecs)）需要对 `IReadOnlyList<AgentMessageContentPart>` 做 JSON 往返序列化，**在 HD-006 补齐该特性标注之前，本设计在实现期（H5）会遇到反序列化失败**。本 HD 不擅自修改已 reviewed 的 HD-006 正文，该缺口原样列入 [§8 Q&A-B](#8-需要-owner-确认的问题)。
+
+## 2. 文件结构
+
+```text
+src/core/Inkwell.Abstractions/
+  Persistence/
+    Conversations/                          # 新增子目录（HD-017）
+      Conversation.cs                       # 业务 Model（会话）
+      ConversationMessage.cs                # 业务 Model（消息）
+      IConversationRepository.cs            # 具名 Repository（6 方法）
+      IConversationMessageRepository.cs     # 具名 Repository（4 方法）
+  Conversations/                             # 新增子目录（HD-017）
+    IConversationService.cs                 # 顶层业务门面（8 方法）
+    ConversationSummary.cs                  # 会话列表投影 DTO（历史会话侧栏）
+    ConversationOptions.cs                  # MaxMessagesPerConversation / EnableSensitiveDataLogging
+    ConversationOptionsValidator.cs         # IValidateOptions<ConversationOptions>
+
+src/core/Inkwell.Core/
+  Conversations/                             # 新增子目录（HD-017）
+    ConversationService.cs                  # 唯一 IConversationService 实现
+    ConversationBuilderExtensions.cs        # UseDefaultConversationService()
+```
+
+**文件计数**：`Persistence/Conversations/` 新增 4 个 + `Conversations/`（Abstractions）新增 4 个，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）+ 8（HD-017）= **82** 个 `*.cs` + 1 个 `.csproj`。`Inkwell.Core.csproj` 在 `Conversations/` 新增 2 个，累计（HD-014 起）5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **16** 个 `*.cs` + 1 个 `.csproj`。
+
+## 3. 程序文件设计（10 字段 × 10 文件）
+
+### 3.1 `Persistence/Conversations/Conversation.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Conversations/Conversation.cs`                                                                                                                                                                                                                                  |
+| 职责         | 会话业务 Model；按 `(AgentId, OwnerUserId)` 二元组归属一个团队成员与某个 Agent 之间的一条独立会话历史（[§1.3 Q1](#13-关键决策摘要)）                                                                                                                                                                       |
+| 对外接口     | `public sealed record class Conversation : IHasTimestamps, IHasOwner, IHasRowVersion { public required Guid Id { get; init; } public required Guid AgentId { get; init; } public required Guid OwnerUserId { get; init; } public string? Title { get; init; } public DateTimeOffset CreatedTime { get; init; } public DateTimeOffset UpdatedTime { get; init; } public byte[] RowVersion { get; init; } = []; }` |
+| 内部函数或类 | 无内部方法（纯数据 record）；`OwnerUserId` 语义 = 会话参与用户，**非** `AgentDefinition.OwnerUserId`（详见顶部治理声明 + [§1.3 Q1](#13-关键决策摘要)），文档需显著区分避免混淆                                                                                                                              |
+| 输入数据     | `AgentId`（校验存在于 [HD-015 `AgentDefinition`](HD-015-Inkwell.Core.Agents.md)） / `OwnerUserId`（校验存在于 [HD-014 `User`](HD-014-Inkwell.Core.Auth.md)，本 HD 不重复实现该校验细节，由 `ConversationService.StartConversationAsync` 经 `IAgentRepository.GetAgent` 触发 `KeyNotFoundException`，详见 §3.9） / `Title`（初始 `null`，首条用户文本消息写入后回填，[§1.3 Q5](#13-关键决策摘要)）                                                                     |
+| 输出数据     | `Conversation` 实例                                                                                                                                                                                                                                                                                        |
+| 依赖模块     | `Persistence/Mixins/{IHasTimestamps,IHasOwner,IHasRowVersion}.cs`（[HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）                                                                                                                                                     |
+| 错误处理     | Model 自身不做业务校验；`AgentId`/`OwnerUserId` 存在性校验由 `ConversationService`（§3.9）在构造前完成；并发冲突由 `IConversationRepository.UpdateConversation`（§3.3）实现层转换为 `InvalidOperationException`                                                                                            |
+| 日志要求     | Model 自身不做日志                                                                                                                                                                                                                                                                                          |
+| 测试要求     | `ConversationTests.cs`：(1) 全部字段可正常构造；(2) `Title` 为 `null` 与非 `null` 均合法；(3) record equality                                                                                                                                                                                              |
+
+### 3.2 `Persistence/Conversations/ConversationMessage.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Conversations/ConversationMessage.cs`                                                                                                                                                                                                                                                                                        |
+| 职责         | 会话内单条消息的持久化业务 Model；跨用户 / Agent 消息统一存储（[NFR-005](../../01-requirements/requirements.md)）                                                                                                                                                                                                                                                        |
+| 对外接口     | `public sealed record class ConversationMessage : IHasTimestamps { public required Guid Id { get; init; } public required Guid ConversationId { get; init; } public required AgentChatRole Role { get; init; } public required string ContentJson { get; init; } public string? AuthorName { get; init; } public required int SequenceNumber { get; init; } public DateTimeOffset CreatedTime { get; init; } public DateTimeOffset UpdatedTime { get; init; } }` |
+| 内部函数或类 | 无内部方法（纯数据 record）；`Role` 复用 [HD-006 `AgentChatRole`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#34-agentruntimeagentchatmessagecs) 枚举（`System`/`User`/`Assistant`/`Tool`）；`ContentJson` 是 [HD-006 `AgentMessageContentPart`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#35-agentruntimeagentmessagecontentpartcs) 封闭子类型族列表的序列化存储（[§1.3 Q2](#13-关键决策摘要)，**已知序列化缺口见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)**） |
+| 输入数据     | `ConversationId`（校验存在）/ `Role` / `ContentJson`（由 `ConversationService.AppendMessageAsync` 对传入的 `AgentChatMessage.Content` 序列化产出） / `AuthorName?`（[HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 多 Agent 编排场景标识发言方，本 HD 透传不解释语义） / `SequenceNumber`（[§1.3 Q3](#13-关键决策摘要)，会话内严格递增，由 `ConversationService` 在事务内计算，详见 §3.9）                                                          |
+| 输出数据     | `ConversationMessage` 实例                                                                                                                                                                                                                                                                                                                                              |
+| 依赖模块     | `Persistence/Mixins/IHasTimestamps.cs`（[HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)） / `AgentRuntime/AgentChatMessage.cs`（`AgentChatRole` 枚举，[HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)） / `AgentRuntime/AgentMessageContentPart.cs`（序列化对象形状，[HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)）                                       |
+| 错误处理     | Model 自身不做业务校验；`ContentJson` 反序列化失败（还原为 `IReadOnlyList<AgentMessageContentPart>` 时）由 `ConversationService.GetHistoryMessagesAsync` 实现层抛 `JsonException`（BCL，原样上抛，不包装）                                                                                                                                                              |
+| 日志要求     | Model 自身不做日志；`ContentJson` 原文**不得**进入任何 OTel 字段（可能承载用户输入 / Agent 回复的业务敏感数据，同 [HD-006 §4.3](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) PII 提示）                                                                                                                              |
+| 测试要求     | `ConversationMessageTests.cs`：(1) 四种 `Role` 均可构造；(2) record equality；(3) `ContentJson` 序列化 / 反序列化往返测试——**该测试在 [HD-006 §1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 缺口修复前预期失败，测试代码本身按目标行为编写，标注 `[Ignore]` 并注明依赖 HD-006 errata，不删除测试也不虚假标记通过**                                        |
+
+### 3.3 `Persistence/Conversations/IConversationRepository.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Conversations/IConversationRepository.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 职责         | 具名 Repository；继承 [HD-002 §3.2 `IRepository<TModel, TKey>`](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#32-persistenceirepositorycs) marker；6 个具名动词方法（`Add`/`Get`/`Update`/`List`/`Find`×2，[HD-002 §4.1.3 动词白名单](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)）                                                                                                                                     |
+| 对外接口     | `public interface IConversationRepository : IRepository<Conversation, Guid> { Task<Conversation> AddConversation(Conversation conversation, CancellationToken ct = default); Task<Conversation> GetConversation(Guid id, CancellationToken ct = default); Task<Conversation> UpdateConversation(Conversation conversation, CancellationToken ct = default); Task<PagedResult<Conversation>> ListConversationsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default); Task<IReadOnlyList<Guid>> FindUsedAgentIdsByOwner(Guid ownerUserId, CancellationToken ct = default); Task<IReadOnlyDictionary<Guid, DateTimeOffset>> FindLastActivityByAgents(IReadOnlyList<Guid> agentIds, Guid ownerUserId, CancellationToken ct = default); }` |
+| 内部函数或类 | 接口本身；实现由未来 `providers/Inkwell.Persistence.EFCore` errata 追加（同 [HD-014](HD-014-Inkwell.Core.Auth.md) / [HD-015](HD-015-Inkwell.Core.Agents.md) / [HD-016](HD-016-Inkwell.Core.Tools.md) 遗留契约缺口处理方式，本 HD 不改写已 reviewed 的 [HD-009](../Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)）                                                                                                                                                                                              |
+| 输入数据     | `Conversation` 实例（`AddConversation`/`UpdateConversation`） / `Guid id`（`GetConversation`） / `Guid agentId, Guid ownerUserId, Pagination, SortOrder`（`ListConversationsByAgent`） / `Guid ownerUserId`（`FindUsedAgentIdsByOwner`） / `IReadOnlyList<Guid> agentIds, Guid ownerUserId`（`FindLastActivityByAgents`）                                                                                                                                                                                                              |
+| 输出数据     | `Task<Conversation>`（`AddConversation`/`GetConversation`/`UpdateConversation`） / `Task<PagedResult<Conversation>>`（`ListConversationsByAgent`） / `Task<IReadOnlyList<Guid>>`（`FindUsedAgentIdsByOwner`） / `Task<IReadOnlyDictionary<Guid, DateTimeOffset>>`（`FindLastActivityByAgents`，键=`AgentId`，值=该 `(AgentId, ownerUserId)` 下最新一条 `ConversationMessage.CreatedTime`）                                                                                                                                          |
+| 依赖模块     | `Conversation.cs` / `Common/Pagination.cs` / `Common/SortOrder.cs` / `PagedResult.cs`（均 [HD-001](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) / [HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 已锁）                                                                                                                                                                                                                                                                       |
+| 错误处理     | `GetConversation` 找不到 → `KeyNotFoundException`；`UpdateConversation` 找不到 → `KeyNotFoundException`；`UpdateConversation` 并发冲突（`RowVersion` 不匹配）→ `InvalidOperationException`（message 前缀 `"Optimistic concurrency conflict:"`，inner = `DbUpdateConcurrencyException`，同 [HD-002 §1.3 Q6](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)）；命令超时 → `TimeoutException`                                                                                                   |
+| 日志要求     | 实现层（未来 errata）写 OTel span `db.repository.conversation.<verb>`（同 [HD-002 §3.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 既定模式）                                                                                                                                                                                                                                                                                                                                                            |
+| 测试要求     | `IConversationRepositoryContractTests.cs`：契约测试（接口形态锁定）；行为测试留待 EFCore 实现 errata 追加时补齐                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+### 3.4 `Persistence/Conversations/IConversationMessageRepository.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Conversations/IConversationMessageRepository.cs`                                                                                                                                                                                                                                                                                                                       |
+| 职责         | 具名 Repository；4 个具名动词方法（`Add`/`List`/`Delete`×2）                                                                                                                                                                                                                                                                                                                                                     |
+| 对外接口     | `public interface IConversationMessageRepository : IRepository<ConversationMessage, Guid> { Task<ConversationMessage> AddMessage(ConversationMessage message, CancellationToken ct = default); Task<PagedResult<ConversationMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, SortOrder sort, CancellationToken ct = default); Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default); Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default); }` |
+| 内部函数或类 | 接口本身；实现由未来 `providers/Inkwell.Persistence.EFCore` errata 追加（同 §3.3）                                                                                                                                                                                                                                                                                                                                |
+| 输入数据     | `ConversationMessage` 实例（`AddMessage`） / `Guid conversationId, Pagination, SortOrder`（`ListMessagesByConversation`） / `Guid conversationId, Guid messageId`（`DeleteMessage`） / `Guid conversationId`（`DeleteMessagesByConversation`）                                                                                                                                                                    |
+| 输出数据     | `Task<ConversationMessage>`（`AddMessage`） / `Task<PagedResult<ConversationMessage>>`（`ListMessagesByConversation`） / `Task<bool>`（`DeleteMessage`，`true`=找到并删除，`false`=未找到，幂等语义同 [HD-015 `DeleteAgent`](HD-015-Inkwell.Core.Agents.md) 惯例） / `Task<int>`（`DeleteMessagesByConversation`，返回实际删除的消息数，`0` 表示会话本就没有消息，非错误）                                        |
+| 依赖模块     | `ConversationMessage.cs` / `Common/Pagination.cs` / `Common/SortOrder.cs` / `PagedResult.cs`                                                                                                                                                                                                                                                                                                                     |
+| 错误处理     | `AddMessage` 不做 `conversationId` 存在性校验（信任调用方 `ConversationService` 已在同一事务内校验，同 [HD-002 §3.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) Repository 层"薄"惯例）；命令超时 → `TimeoutException`                                                                                                                                                            |
+| 日志要求     | 实现层写 OTel span `db.repository.conversation_message.<verb>`                                                                                                                                                                                                                                                                                                                                                   |
+| 测试要求     | `IConversationMessageRepositoryContractTests.cs`：契约测试（接口形态锁定）；行为测试留待 EFCore 实现 errata 追加时补齐                                                                                                                                                                                                                                                                                           |
+
+### 3.5 `Conversations/IConversationService.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Conversations/IConversationService.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 职责         | 顶层业务门面；会话生命周期管理 + 消息持久化 / 检索 + "我使用过" / "最近使用时间"查询（[REQ-010](../../01-requirements/requirements.md) / [NFR-005](../../01-requirements/requirements.md) / [AC-012](../../01-requirements/acceptance-criteria.md) / [AC-013](../../01-requirements/acceptance-criteria.md)）；全部签名走裸 `Task<T>` + BCL 异常（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)）                                                                                                                                                                                                                                                                                                              |
+| 对外接口     | `public interface IConversationService { Task<Guid> StartConversationAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default); Task<IReadOnlyList<ConversationSummary>> ListConversationsAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default); Task<IReadOnlyList<AgentChatMessage>> GetHistoryMessagesAsync(Guid conversationId, CancellationToken ct = default); Task<Guid> AppendMessageAsync(Guid conversationId, AgentChatMessage message, CancellationToken ct = default); Task DeleteMessageAsync(Guid conversationId, Guid messageId, Guid actorUserId, CancellationToken ct = default); Task ClearConversationAsync(Guid conversationId, Guid actorUserId, CancellationToken ct = default); Task<IReadOnlyList<Guid>> ListUsedAgentIdsAsync(Guid ownerUserId, CancellationToken ct = default); Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLastActivityByAgentsAsync(IReadOnlyList<Guid> agentIds, Guid viewerUserId, CancellationToken ct = default); }` |
+| 内部函数或类 | 接口本身；实现由 `Inkwell.Core.Conversations.ConversationService` 提供（唯一实现，§3.9）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 输入数据     | `Guid agentId` / `Guid ownerUserId` / `Guid conversationId` / `Guid messageId` / `Guid actorUserId`（[requirements.md §8.4](../../01-requirements/requirements.md) 权限校验，必须等于 `Conversation.OwnerUserId`） / `AgentChatMessage message`（[HD-006](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 已锁定类型） / `IReadOnlyList<Guid> agentIds` / `Guid viewerUserId`（[§8 Q&A-C](#8-需要-owner-确认的问题) 语义待确认）                                                                                                                                                                                                                                                                                              |
+| 输出数据     | 见各方法签名；`GetHistoryMessagesAsync` 返回 `IReadOnlyList<AgentChatMessage>`（供 `Inkwell.WebApi` 直接拼进 `AgentRunRequest.Messages`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 错误处理     | `StartConversationAsync`：`agentId` 不存在 → `KeyNotFoundException`；`GetHistoryMessagesAsync`/`AppendMessageAsync`/`DeleteMessageAsync`/`ClearConversationAsync`：`conversationId` 不存在 → `KeyNotFoundException`；`DeleteMessageAsync`：`messageId` 不属于该 `conversationId` → `KeyNotFoundException`；`DeleteMessageAsync`/`ClearConversationAsync`：`actorUserId != conversation.OwnerUserId` → `UnauthorizedAccessException`（[requirements.md §8.4](../../01-requirements/requirements.md)）；取消 → `OperationCanceledException`                                                                                                                                                                                                              |
+| 日志要求     | 实现层写 OTel span `conversation.<verb>`（详见 §4.3），字段 `conversation.conversation_id` / `conversation.agent_id` / `conversation.owner_user_id` / `conversation.operation_outcome` + 5 个 `exception.*`；`AgentChatMessage.Content` 原文不进 OTel（同 [HD-006 §4.3](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) PII 提示）                                                                                                                                                                                                                                                                                                                                                                        |
+| 测试要求     | `tests/core/Inkwell.Abstractions.Tests/Conversations/IConversationServiceContractTests.cs`：契约测试（ABI 锁定）；行为测试由 `Inkwell.Core` 独立测试项目覆盖（详见 §3.9）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+### 3.6 `Conversations/ConversationSummary.cs`
+
+| 字段         | 内容                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 文件路径     | `src/core/Inkwell.Abstractions/Conversations/ConversationSummary.cs`                                                                                                                     |
+| 职责         | 历史会话侧栏列表投影 DTO（[ui-spec.md UI-005 §5.1](../../01-requirements/ui-spec.md)），不含消息明细                                                                                    |
+| 对外接口     | `public sealed record ConversationSummary { public required Guid Id { get; init; } public string? Title { get; init; } public required DateTimeOffset LastActivityTime { get; init; } public required DateTimeOffset CreatedTime { get; init; } }` |
+| 内部函数或类 | 无；`LastActivityTime` 由 `ConversationService` 从 `Conversation.UpdatedTime` 直接投影（追加消息 / 清空对话时该字段被刷新，[§1.3 Q6](#13-关键决策摘要)）                                  |
+| 输入数据     | 由 `ConversationService.ListConversationsAsync` 从 `Conversation` 投影                                                                                                                    |
+| 输出数据     | `ConversationSummary` 实例                                                                                                                                                               |
+| 依赖模块     | 无（纯 DTO）                                                                                                                                                                              |
+| 错误处理     | 无                                                                                                                                                                                        |
+| 日志要求     | 无                                                                                                                                                                                        |
+| 测试要求     | `ConversationSummaryTests.cs`：(1) 全部字段可正常构造；(2) `Title` 为 `null` 合法；(3) record equality                                                                                    |
+
+### 3.7 `Conversations/ConversationOptions.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Conversations/ConversationOptions.cs`                                                                                                                                                                     |
+| 职责         | Conversations 模块详细配置；从 `appsettings.json` `"Inkwell:Conversations"` 段绑定                                                                                                                                                       |
+| 对外接口     | `public sealed class ConversationOptions { [Range(1, int.MaxValue)] public int? MaxMessagesPerConversation { get; init; } public bool EnableSensitiveDataLogging { get; init; } = false; }`                                             |
+| 内部函数或类 | DataAnnotations 校验；`MaxMessagesPerConversation` 默认 `null`（不限，[requirements.md §6](../../01-requirements/requirements.md)"单 Agent 单次对话最大轮数：默认不限，但提供配置项可设上限"字面已给出默认值，同 [HD-015 §1.3 Q8](HD-015-Inkwell.Core.Agents.md#13-关键决策摘要) `MaxAgentsPerOwner` 先例）；**该字段超限时的具体行为未定义，详见 [§8 Q&A-C](#8-需要-owner-确认的问题)** |
+| 输入数据     | 由 `IConfiguration` 绑定                                                                                                                                                                                                                 |
+| 输出数据     | `ConversationOptions` 实例（DI 通过 `IOptions<ConversationOptions>` 注入）                                                                                                                                                               |
+| 依赖模块     | `System.ComponentModel.DataAnnotations`                                                                                                                                                                                                  |
+| 错误处理     | DataAnnotations 校验失败 → `OptionsValidationException`，host 兜底                                                                                                                                                                       |
+| 日志要求     | DI 启动期 `IValidateOptions` 失败时输出 OTel `exception.type=Microsoft.Extensions.Options.OptionsValidationException`（[HD-001 §5.3](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表)）        |
+| 测试要求     | `ConversationOptionsTests.cs`：默认值（`null` / `false`）、`appsettings.json` 绑定、`MaxMessagesPerConversation` 显式设置正值合法                                                                                                        |
+
+### 3.8 `Conversations/ConversationOptionsValidator.cs`
+
+| 字段         | 内容                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Abstractions/Conversations/ConversationOptionsValidator.cs`                                                                                            |
+| 职责         | `IValidateOptions<ConversationOptions>` 实现；DataAnnotations 校验（无跨字段约束）                                                                                      |
+| 对外接口     | `internal sealed class ConversationOptionsValidator : IValidateOptions<ConversationOptions> { public ValidateOptionsResult Validate(string? name, ConversationOptions options); }` |
+| 内部函数或类 | `Validator.TryValidateObject` DataAnnotations                                                                                                                            |
+| 输入数据     | `ConversationOptions` 实例                                                                                                                                              |
+| 输出数据     | `ValidateOptionsResult.Success` / `Fail(IEnumerable<string>)`                                                                                                            |
+| 依赖模块     | `Microsoft.Extensions.Options` / `System.ComponentModel.DataAnnotations`                                                                                                 |
+| 错误处理     | 同 [HD-001 §3.12](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)，校验失败 → `Fail` 含全部消息                                                       |
+| 日志要求     | 失败由 `OptionsValidationException` 抛出，host 打 fatal                                                                                                                  |
+| 测试要求     | `ConversationOptionsValidatorTests.cs`：(1) DataAnnotations 边界合格；(2) 默认值通过；(3) 字段越界被拒                                                                   |
+
+### 3.9 `Inkwell.Core/Conversations/ConversationService.cs`
+
+| 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Core/Conversations/ConversationService.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 职责         | `IConversationService` 唯一实现；会话 / 消息持久化的完整业务逻辑                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 对外接口     | `internal sealed class ConversationService : IConversationService { public ConversationService(IPersistenceProvider persistence); /* 8 个接口方法实现 */ }`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 内部函数或类 | `private static string? ExtractTitle(AgentChatMessage message)`：`message.Role != AgentChatRole.User` → `null`；否则取 `message.Content` 中第一个 `TextPart` 的 `Text`，截断前 30 字符（[§1.3 Q5](#13-关键决策摘要)，无 `TextPart` → `null`）。`StartConversationAsync` 内部：(1) 经 `persistence.GetRepository<IAgentRepository>().GetAgent(agentId)` 校验 Agent 存在（找不到 → `KeyNotFoundException` 原样上抛）；(2) 构造 `Conversation { Id = Guid.CreateVersion7(), AgentId = agentId, OwnerUserId = ownerUserId, Title = null, ... }` 并 `AddConversation`。`AppendMessageAsync` 内部经 `persistence.ExecuteInTransactionAsync`（[HD-002 §3.4](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）在同一事务内：(1) `uow.GetRepository<IConversationRepository>().GetConversation(conversationId)`（找不到 → `KeyNotFoundException`）；(2) 计算 `SequenceNumber` = 该会话已有消息数（`ListMessagesByConversation` 大页拉取后取 `Items.Count`，同 [HD-016 §3.7](HD-016-Inkwell.Core.Tools.md) "~1000 用户软目标"式简化处理先例，理由：v1 单会话消息量预期远小于该量级，[§8 Q&A-C](#8-需要-owner-确认的问题) 会重新评估该假设）；(3) `AddMessage`；(4) 若 `conversation.Title is null` 且 `ExtractTitle(message)` 非 `null` → 回填 `Title`；(5) `UpdateConversation`（刷新 `UpdatedTime`）。`ClearConversationAsync` 内部同一事务：`DeleteMessagesByConversation` + `UpdateConversation`（`Title = null`）。`DeleteMessageAsync`/`ClearConversationAsync` 均先校验 `actorUserId == conversation.OwnerUserId`（详见 §4.2） |
+| 输入数据     | `IPersistenceProvider`（[HD-002](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 输出数据     | 见 §3.5 `IConversationService` 各方法签名                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 依赖模块     | `Inkwell.Abstractions.{Persistence.IPersistenceProvider,Persistence.IUnitOfWork,Persistence.Agents.IAgentRepository,Persistence.Conversations.{IConversationRepository,IConversationMessageRepository,Conversation,ConversationMessage},Conversations.{IConversationService,ConversationSummary},AgentRuntime.{AgentChatMessage,AgentChatRole,AgentMessageContentPart}}` / `System.Text.Json`（BCL）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 错误处理     | 见 §3.5 `IConversationService` 错误处理；`actorUserId != conversation.OwnerUserId` → `UnauthorizedAccessException`（message `"User '<actorUserId>' is not the owner of conversation '<conversationId>'"`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 日志要求     | 见 §3.5 日志要求（OTel span `conversation.<verb>`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 测试要求     | `ConversationServiceTests.cs`（`Inkwell.Core.Tests`）：(1) `StartConversationAsync` 成功路径 + `agentId` 不存在抛 `KeyNotFoundException`；(2) `AppendMessageAsync` 首条 User 文本消息正确回填 `Title`（截断 30 字）；(3) `AppendMessageAsync` 首条消息为纯图片（无 `TextPart`）时 `Title` 保持 `null`；(4) `SequenceNumber` 严格递增；(5) `DeleteMessageAsync`/`ClearConversationAsync` 非 `OwnerUserId` 调用抛 `UnauthorizedAccessException`；(6) `ClearConversationAsync` 后 `Title` 重置为 `null` 且消息数为 0；(7) `ListUsedAgentIdsAsync` 仅返回存在至少一条消息的 `AgentId`（[§1.3 Q4](#13-关键决策摘要)，"新建会话未发消息"场景不计入）                                                                                                                                                                                                                                                                                     |
+
+### 3.10 `Inkwell.Core/Conversations/ConversationBuilderExtensions.cs`
+
+| 字段         | 内容                                                                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件路径     | `src/core/Inkwell.Core/Conversations/ConversationBuilderExtensions.cs`                                                                                                                    |
+| 职责         | Builder DSL 扩展方法，注册 `IConversationService` 默认实现（风格对齐 [HD-016 `ToolsBuilderExtensions.UseDefaultToolService()`](HD-016-Inkwell.Core.Tools.md)）                            |
+| 对外接口     | `public static class ConversationBuilderExtensions { public static IInkwellBuilder UseDefaultConversationService(this IInkwellBuilder builder, Action<ConversationOptions>? configure = null); }` |
+| 内部函数或类 | (1) 校验 `builder` 非 null；(2) `builder.Services.AddScoped<IConversationService, ConversationService>()`；(3) 注册 `IValidateOptions<ConversationOptions>` + 绑定 `configure`；(4) 返回 `builder` |
+| 输入数据     | `IInkwellBuilder builder` / `Action<ConversationOptions>? configure`                                                                                                                       |
+| 输出数据     | `IInkwellBuilder`（支持链式调用）                                                                                                                                                          |
+| 依赖模块     | `Inkwell.Abstractions.Builder.IInkwellBuilder` / `Microsoft.Extensions.DependencyInjection`                                                                                               |
+| 错误处理     | `builder` 为 `null` → `ArgumentNullException`                                                                                                                                              |
+| 日志要求     | 无（DI 装配期不产生运行时日志）                                                                                                                                                            |
+| 测试要求     | `ConversationBuilderExtensionsTests.cs`：(1) 调用后 `IConversationService` 可从 `IServiceProvider` 解析；(2) `configure` 回调生效；(3) `builder` 为 `null` 抛异常                          |
+
+## 4. BCL 异常与日志（补充 HD-001 §4 / HD-002 §4 / HD-006 §4 / HD-015 §4 / HD-016 §4）
+
+### 4.1 错误码
+
+本模块**不分配** `INK-CONVERSATIONS-NNN` 错误码，与全仓其余 HD 一致（[ADR-023 errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流)），全部错误语义走 BCL 异常类型 + OTel `exception.*` 五字段。
+
+### 4.2 BCL 异常分类（业务失败 vs 程序错误）
+
+- **业务失败 / 预期错误**：`KeyNotFoundException`（Agent / 会话 / 消息不存在）/ `UnauthorizedAccessException`（`actorUserId` 非该会话 `OwnerUserId`，[requirements.md §8.4](../../01-requirements/requirements.md)）/ `InvalidOperationException`（`Conversation` 乐观并发冲突）/ `JsonException`（`ContentJson` 反序列化失败，见 [§1.4 已知缺口](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）
+- **程序错误**：`TimeoutException`（Repository 命令超时）
+- **取消**：`OperationCanceledException`（[HD-001 §4.3](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#43-取消传播)）
+
+### 4.3 OTel span / 字段
+
+- `conversation.start` ← `StartConversationAsync`
+- `conversation.list` ← `ListConversationsAsync`
+- `conversation.get_history` ← `GetHistoryMessagesAsync`
+- `conversation.append_message` ← `AppendMessageAsync`
+- `conversation.delete_message` ← `DeleteMessageAsync`
+- `conversation.clear` ← `ClearConversationAsync`
+- `conversation.list_used_agents` ← `ListUsedAgentIdsAsync`
+- `conversation.get_last_activity` ← `GetLastActivityByAgentsAsync`
+
+> 命名采用单数域名词前缀 `conversation.<verb>`，对齐既有 HD 单数惯例（`agent.`/`auth.`/`audit.`/`agentruntime.`），刻意规避 [HD-016 §24 C-5](../design-review-report.md) 已记录的"`tools.<verb>`（复数）与既有惯例不一致"这一 non-blocking 遗留问题的同类错误。
+
+**Inkwell 私有字段**：`conversation.conversation_id` / `conversation.agent_id` / `conversation.owner_user_id` / `conversation.message_count`（`AppendMessageAsync`/`ClearConversationAsync` 后回显） / `conversation.operation_outcome`（`succeeded` / `failed` / `not_found` / `unauthorized`）
+
+**OTel 标准字段**：同 [HD-006 §4.3](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) 5 个 `exception.*` 字段（`exception.type` / `exception.message` / `exception.stacktrace` / `exception.escaped` / `exception.id`）
+
+> **PII 提示**：`AgentChatMessage.Content`（`ContentJson` 反序列化 / 序列化前后的原文）**不得**进入任何 OTel 字段，同 [HD-006 §4.3](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#43-otel-span--字段) PII 处理方式一致。
+
+## 5. 公共约定继承（HD-001）
+
+- 命名：`IConversationService` ↔ [HD-001 §5.1](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service`；`Conversation`/`ConversationMessage` 均为业务 Model 默认无后缀（[HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#412-model-类命名规则2026-05-11-errataf6--adr-022)，未撞名，无需降级 `XxxDefinition`）
+- 签名：全部方法裸 `Task<T>` / `Task` + BCL 异常（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)）；`CancellationToken ct = default` 全方法必填
+- Repository 具名动词：`Add`/`Get`/`Update`/`List`/`Find`/`Delete` 六选一开头，无 `Async` 后缀（[HD-002 §4.1.3](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)）
+
+## 6. 数据库设计增量（追加至 `database-design.md`）
+
+### 表 `conversations`（[REQ-010](../../01-requirements/requirements.md) + [NFR-005](../../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `AgentId`：`Guid`，外键 → `agents.Id`，非唯一索引（按 Agent 过滤路径）
+- `OwnerUserId`：`Guid`（`IHasOwner`），非唯一索引（[§1.3 Q1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)，此处语义 = 会话参与用户，非 Agent Owner）
+- `Title`：`string?`，长度上限 30（[ui-spec.md UI-005 §5.1](../01-requirements/ui-spec.md)"首条用户消息前 30 字"）
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`（`UpdatedTime` 兼作"最近使用时间"依据）
+- `RowVersion`：`IHasRowVersion`（乐观并发，防"追加消息"与"清空对话"并发写互相覆盖）
+
+**索引**：`(AgentId, OwnerUserId)` 复合索引（历史会话侧栏查询路径，[ui-spec.md UI-005 §5.1](../01-requirements/ui-spec.md)）；`OwnerUserId` 非唯一索引（"我使用过"聚合查询路径）。
+
+### 表 `messages`（[REQ-010](../../01-requirements/requirements.md) + [NFR-005](../../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `ConversationId`：`Guid`，外键 → `conversations.Id`，非唯一索引
+- `Role`：`int`（[HD-006 `AgentChatRole`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 枚举持久化为整数）
+- `ContentJson`：`string`，无长度上限（[HD-006 `AgentMessageContentPart`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族序列化存储，**依赖 HD-006 补齐 `[JsonPolymorphic]` 特性标注，详见 [HD-017 §1.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#14-与消费方的边界声明webapi-是真正的调用方而非-hd-015) 已知缺口**）
+- `AuthorName`：`string?`，可空
+- `SequenceNumber`：`int`，会话内严格递增（[HD-017 §1.3 Q3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+
+**索引**：`(ConversationId, SequenceNumber)` 复合索引（会话内消息排序检索路径）。**不**包含 `RowVersion` / `OwnerUserId`（消息一旦写入不可变，非用户直接拥有的独立资源，[HD-017 §1.3 Q7](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）。
+
+> **`agui_run_events` 表暂不在本次范围内实现**——本 HD 判断该表在 [database-design.md](../database-design.md) 顶层表清单中标注的 `Inkwell.Conversations` 归属可能是 H2 早期占位、晚于后续 H3 模块拆分细化（详见 [HD-017 §1.2"不在内"](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#12-范围)），本次不修改该行占位，归属疑问列入 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)。
+
+**Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
+
+## 7. 文件结构增量（追加至 `file-structure.md`）
+
+### `### Persistence/Conversations`（追加至 `## Inkwell.Abstractions` 章节）
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Conversations/                        # 新增子目录（HD-017）
+    Conversation.cs                     # 业务 Model（会话）
+    ConversationMessage.cs              # 业务 Model（消息）
+    IConversationRepository.cs          # 6 个具名动词方法
+    IConversationMessageRepository.cs   # 4 个具名动词方法
+```
+
+### `## Inkwell.Abstractions.Conversations`（新增一级章节）
+
+```text
+src/core/Inkwell.Abstractions/
+  Conversations/                        # 新增子目录（HD-017）
+    IConversationService.cs             # 顶层业务门面（8 方法）
+    ConversationSummary.cs              # 会话列表投影 DTO
+    ConversationOptions.cs              # MaxMessagesPerConversation / EnableSensitiveDataLogging
+    ConversationOptionsValidator.cs     # IValidateOptions<ConversationOptions>
+```
+
+```text
+src/core/Inkwell.Core/
+  Conversations/                        # 新增子目录（HD-017）
+    ConversationService.cs              # 唯一 IConversationService 实现
+    ConversationBuilderExtensions.cs    # UseDefaultConversationService()
+```
+
+## 8. 需要 Owner 确认的问题
+
+### Q&A-A：会话消息删除 / 清空是否需要写审计日志
+
+- **背景**：[NFR-004](../../01-requirements/requirements.md) 审计事件清单（登录/登出、Agent CRUD/共享/调用、版本回滚、Skill 与工具挂载变更）未列出"对话消息删除"这一类别；但"删除消息"/"清空对话"是**不可逆的硬删除**（[§1.3 Q9](#13-关键决策摘要)），与已写审计的"Agent 删除"（硬删除 + 有独立 `ActionType`）在数据风险等级上相当，是否属于"遗漏未列举"还是"明确不需要"存在真实分歧，同 [HD-016 §8 Q&A-A](HD-016-Inkwell.Core.Tools.md) 类似但性质不同（Tools 只读查询天然不产生状态变更，本 HD 是真实的数据删除）。
+- **候选**：
+  - **A. 不写审计**——严格按 NFR-004 字面清单执行，未列举即不做
+  - **B. 补写审计**——`DeleteMessageAsync`/`ClearConversationAsync` 成功后各写 `ActionType="conversation_message_deleted"`/`"conversation_cleared"`，`AuditContext.ActorUserId = actorUserId`
+  - **C. 其他折中**（如仅 `ClearConversationAsync` 写审计，单条 `DeleteMessageAsync` 不写，理由是"清空"影响范围更大）
+
+### Q&A-B："最近使用时间" / "我使用过"数据是否需要区分"当前查看者视角"与"全局最后活动"
+
+- **背景**：[ui-spec.md UI-003](../../01-requirements/ui-spec.md) 卡片列表"最近使用时间"在"我的" tab（查看者=Agent Owner）与"团队共享" tab（查看者≠Agent Owner）两种场景下语义可能不同——是"查看者本人与该 Agent 的最后一次对话时间"（本 HD 当前默认实现，[GetLastActivityByAgentsAsync](#35-conversationsiconversationservicecs) 的 `viewerUserId` 参数），还是"该 Agent 被任意用户使用的全局最后活动时间"，[requirements.md](../../01-requirements/requirements.md) / [ui-spec.md](../../01-requirements/ui-spec.md) 均未明确区分。
+- **候选**：
+  - **A.（本 HD 默认实现）查看者视角**——`GetLastActivityByAgentsAsync(agentIds, viewerUserId)` 只统计 `viewerUserId` 自己参与的会话，与 [AC-012](../../01-requirements/acceptance-criteria.md)"我使用过"的判定口径保持一致
+  - **B. 全局视角**——统计该 Agent 被**任意**用户使用的最后活动时间（不区分查看者），需要改签名去掉 `viewerUserId` 参数
+  - **C. 两档并存**——"我的"/"我使用过" tab 用查看者视角，"团队共享" tab 用全局视角，需要 `Inkwell.WebApi` 按 tab 分别调用不同查询
+
+### Q&A-C：`ConversationOptions.MaxMessagesPerConversation` 超限时的具体行为
+
+- **背景**：[requirements.md §6](../../01-requirements/requirements.md)"单 Agent 单次对话最大轮数：默认不限，但提供配置项可设上限"仅给出配置项存在性，未定义超限后的行为——是拒绝继续发送新消息（阻断式）、静默丢弃 / 归档最早的消息（滑动窗口）、还是仅在 `GetHistoryMessagesAsync` 检索时截断最近 N 条（历史窗口截断，不影响写入）。
+- **候选**：
+  - **A. 阻塞写入**——`AppendMessageAsync` 达到上限后抛 `InvalidOperationException`，前端提示用户"当前对话已达最大消息数，请新建会话"
+  - **B. 历史窗口截断（读时限制）**——`GetHistoryMessagesAsync` 只返回最近 N 条，`AppendMessageAsync` 不限制写入，历史全量永久保留但对话上下文只取最近窗口（token 成本优化）
+  - **C. 两者都不做**——v1 保持当前设计（`MaxMessagesPerConversation` 字段存在但未被任何代码路径消费），留待真实出现性能/成本问题时再实现（同 [OQ-002 closed](../../01-requirements/open-questions.md) 性能问题"待优化不算缺陷"精神）
+
+### Q&A-D：`agui_run_events` 表归属占位是否需要更新
+
+- **背景**：[database-design.md](../database-design.md) 顶层表清单当前把 `agui_run_events` 标注为 `Inkwell.Conversations` 归属（引用 [ADR-011](../03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md) + [ADR-012](../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md)），但已 reviewed 的 [HD-006 §1.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#12-范围) 明确把"AG-UI 事件到 `AgentRunEvent` 的具体映射代码"归 `Inkwell.WebApi`（未起草），本 HD [§1.2"不在内"](#12-范围) 判断该表可能是 H2 早期占位、晚于后续模块拆分细化，本 HD 未实现该表。
+- **候选**：
+  - **A. 该表确实归 `Inkwell.Conversations`**——本 HD 需要补充设计（存储 AG-UI 流式事件用于调试回放），需要另行起草
+  - **B. 该表实为占位过期，实际应归 `Inkwell.Core.Traces`**（[REQ-014](../../01-requirements/requirements.md) 调试/trace 全链路）——需要在 `Inkwell.Core.Traces` HD 起草时更新 database-design.md 该行归属，本 HD 维持不实现
+  - **C. 该表本身不再需要**（AG-UI 事件仅用于实时转发，不做二次落盘存储）——需要更新 database-design.md 移除该行或标注"已废弃"
+
+## 9. 消费关系纠正与 HD-006 措辞精确化建议（供总结确认，非本次擅自修改）
+
+本 HD 起草期发现两处需要用户确认是否进一步处理的事项，均**未**擅自修改已 reviewed 的上游 HD 正文：
+
+1. **HD-006 §3.2 措辞建议**：`AgentRunRequest.Messages` 字段说明"（本轮 + 历史消息，`Inkwell.Conversations` 组装）"容易被误读为"`Inkwell.Conversations` 直接产出 `AgentRunRequest` 或直接调用 `IAgentInvocationService`"，实际真正的组装 / 调用方是未起草的 `Inkwell.WebApi`（详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）。是否需要发起 errata 精确化该措辞，请确认。
+2. **HD-006 §3.5 `AgentMessageContentPart` 序列化缺口**：该类型缺少 `[JsonPolymorphic]`/`[JsonDerivedType]` 特性标注，本 HD `ConversationMessage.ContentJson` 的序列化 / 反序列化在 H5 实现期会遇到真实的多态反序列化失败（详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）。是否需要发起 errata 为 HD-006 补齐该特性标注，请确认。
