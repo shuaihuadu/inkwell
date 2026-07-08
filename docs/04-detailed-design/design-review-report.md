@@ -2899,3 +2899,75 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 完备性判定对照 REQ-007 验收标准逐条核实，未机械套用端口层三段式模板
 - ✅ 报告路径仍走 H3 规范默认 [docs/04-detailed-design/design-review-report.md](design-review-report.md)（追加 §24 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 25. HD-016 Inkwell.Core.Tools 聚焦复审（2026-07-08）
+
+> 本轮**不**重新执行 §24.1/§24.2/§24.3 全量扫描，仅聚焦核对 §24.6 前置条件清单声称的三轮修复（commit `5cc1c9a`/`9be4a6e`/`aa06392`，含工作区未提交的 frontmatter `status: draft → reviewed` + `reviewers: [] → [Inkwell]`）是否真实、自洽，并检查是否引入新的不一致。评审对象：[HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 当前工作区文本（含未提交的 frontmatter 改动）。
+
+### 25.1 检查项 1：B-1（DI 生命周期反模式）是否真的修复——PASS
+
+- 原缺陷根因：`ToolExecutorRegistry` 注册为 `AddSingleton`，其构造函数依赖 `IEnumerable<IToolExecutor>`，而唯一实现 `CurrentDateTimeToolExecutor` 注册为 `AddScoped`，构成 Singleton 消费 Scoped 依赖的 DI 反模式。
+- 核实结果：`IToolExecutor` 接口与 `ToolExecutorRegistry` 类已在 2026-07-07 第三轮改动中**整节删除**（原 §3.8/§3.9 两节不复存在，[§3 标题](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#3-程序文件设计10-字段--10-文件2026-07-07-简化删除原-38-itoolexecutorcs--39-toolexecutorregistrycs-两节节号保留原状不重排以维持既有锚点)已如实注明"删除原 §3.8/§3.9 两节"）。
+- `CurrentDateTimeToolExecutor` 现状核实：[§3.12](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#312-inkwellcoretoolscurrentdatetimetoolexecutorcs) 对外接口已改为 `internal sealed class CurrentDateTimeToolExecutor { ... }`——**不实现任何接口**，不再是可被 DI 独立注册/解析的服务类型。
+- [§3.11 `ToolsBuilderExtensions`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#311-inkwellcoretoolstoolsbuilderextensionscs) 内部函数或类字段逐字核对：`builder.Services.AddScoped<IToolCatalogService, ToolCatalogService>()` + `AddScoped<IToolBindingResolver, ToolBindingResolver>()` + `AddSingleton<IReadOnlyDictionary<Guid, Func<string, CancellationToken, Task<string>>>>(sp => { var currentDateTime = new CurrentDateTimeToolExecutor(sp.GetRequiredService<TimeProvider>()); return new Dictionary<...> { [CurrentDateTimeToolExecutor.ToolId] = currentDateTime.InvokeAsync }; })`——`CurrentDateTimeToolExecutor` 是在 `AddSingleton` 工厂委托内部**手工 `new` 出来的普通对象**，从未作为独立服务类型出现在任何 `AddScoped`/`AddSingleton` 注册调用里，因此不存在"注册生命周期不匹配"的可能性：整个缺陷赖以成立的前提（两个独立 DI 注册、生命周期不同）已随第三轮 YAGNI 简化被连根拔除，而不只是把生命周期改成一致。
+- 全文 grep `AddScoped|AddSingleton` 交叉核对 §3.11 唯一出现处，未发现任何遗留的 `IToolExecutor`/`ToolExecutorRegistry` 注册残留。
+- **结论**：B-1 不仅"修复"，其成立条件本身已被移除，判定 **PASS**。
+
+### 25.2 检查项 2：`AgentToolDefinition` → `AIFunction` 重构后的内部一致性——PASS
+
+- [§3.4 `IToolBindingResolver`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#34-toolsitoolbindingresolvercs) 对外接口：`Task<IReadOnlyList<AIFunction>> ResolveAsync(IReadOnlyList<AgentToolBinding> bindings, CancellationToken ct = default)`——返回类型已是 `AIFunction`，非旧类型。
+- [§3.10 `ToolBindingResolver`](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#310-inkwellcoretoolstoolbindingresolvercs) 实现细节：内部逻辑 (4) 步"构造 `new JsonDelegateAIFunction(tool.Name, tool.Description, tool.ParametersJsonSchema, mergedInvokeDelegate)`"、依赖模块字段列出 `Inkwell.Abstractions.AgentRuntime.JsonDelegateAIFunction` + `Microsoft.Extensions.AI.AIFunction`——与 §3.4 接口签名一致，无漂移。
+- 全文 grep `AgentToolDefinition`（HD-016 范围内）命中 4 处，逐一核实均为**历史说明性文字**（"2026-07-07 errata，替代原 `AgentToolDefinition` 组装"/"不再依赖 `IToolExecutor`/`ToolExecutorRegistry`"一类表述已删除类型的对比说明），未发现任何"当前有效类型引用"意义上的残留。
+- **结论**：AIFunction 重构在 HD-016 内部自洽，无遗留的旧类型有效引用，判定 **PASS**。
+
+### 25.3 检查项 3：`IToolExecutor`/`ToolExecutorRegistry` 移除是否彻底——PASS
+
+- [§2 文件结构](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#2-文件结构)：`Inkwell.Core/Tools/` 仅列 4 个文件（`ToolCatalogService.cs`/`ToolBindingResolver.cs`/`ToolsBuilderExtensions.cs`/`CurrentDateTimeToolExecutor.cs`），无 `IToolExecutor.cs`/`ToolExecutorRegistry.cs`；文件计数脚注"`Inkwell.Core.csproj` 在 `Tools/` 新增 4 个（2026-07-07 简化：删除 `IToolExecutor.cs`/`ToolExecutorRegistry.cs`……）"如实注明删除。
+- [§3 标题](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#3-程序文件设计10-字段--10-文件2026-07-07-简化删除原-38-itoolexecutorcs--39-toolexecutorregistrycs-两节节号保留原状不重排以维持既有锚点)已是"10 字段 × 10 文件"，与实际章节数（§3.1~§3.7 共 7 + §3.10~§3.12 共 3 = 10）核对一致。
+- [§7 文件结构增量](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#7-文件结构增量追加至-file-structuremd)代码块同样只列 4 个 `Inkwell.Core/Tools/` 文件，无残留。
+- [file-structure.md §486~501](file-structure.md#inkwellabstractionstools) 交叉核对：`## Inkwell.Abstractions.Tools` 一级章节 + 追加小节均只列与 HD-016 §2/§7 一致的文件清单，`Abstractions` 累计 74、`Inkwell.Core` 累计 12（5+3+4）与 HD-016 §2 自述数字完全一致。
+- [database-design.md §74/§208~222](database-design.md#inkwellcoretools) 交叉核对：`tools` 表清单行 `TBD→HD-016`，无 `IToolExecutor`/`ToolExecutorRegistry` 相关残留内容（该文件本就不涉及执行委托机制）。
+- **结论**：移除彻底，`Inkwell.Core.Tools` 相关 4 处文档（HD-016 本体 §2/§3/§7 + file-structure.md + database-design.md）互相一致，判定 **PASS**。
+
+### 25.4 检查项 4：依赖 HD-015 的部分是否仍然一致——PASS（但发现 1 项 HD-015 侧遗留的陈旧表述，非 HD-016 缺陷）
+
+- [§3.4 依赖模块](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#34-toolsitoolbindingresolvercs)"消费方为 `Inkwell.Core.Agents.AgentInvocationService`"——核对已提交的 [HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)，`AgentInvocationService` 构造函数确已注入 `IToolBindingResolver toolBindingResolver` 并调用 `ResolveAsync(agent.ToolBindings)` 得到 `IReadOnlyList<AIFunction> tools`，双方类型（`AgentToolBinding` 输入 / `AIFunction` 输出）签名完全匹配，判定 **PASS**。
+- HD-016 本身**不需要**感知 HD-015（93370b0）新增的 `agent_tool_bindings_changed`/`agent_skill_bindings_changed` 两个 `ActionType`——该审计写入触点在 `Inkwell.Core.Agents.AgentService.UpdateAgentAsync`（HD-015 侧），HD-016 全文未提及、也不应提及这两个 `ActionType`；[§1.3 Q1](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要)"本 HD 不写审计日志"的论证对象是"工具目录查询/绑定解析"这两个只读操作，与"Agent 的 `ToolBindings`/`SkillBindings` 集合变化"是两个不同层面的事件，两者不矛盾，判定 **PASS**（无冲突陈述）。
+- **发现的 HD-015 侧遗留问题（非本轮任务范围，仅如实报告，不修改 HD-015 正文）**：[HD-015 顶部"2026-07-07 errata（消费 HD-006）"callout](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 与 [HD-015 §3.4 内部逻辑描述 (3)](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs) 均仍写"**已知跨 HD 不一致**：HD-016 `IToolBindingResolver.ResolveAsync` 不在本次任务范围内，其返回类型仍为 `IReadOnlyList<AgentToolDefinition>`（已删除类型），需后续对 HD-016 单独发起 errata 修复"——但本轮核实（[§25.2](#252-检查项-2agenttooldefinition--aifunction-重构后的内部一致性pass)）确认 HD-016 §3.4 当前返回类型**已经是** `Task<IReadOnlyList<AIFunction>>`，与 HD-015 该处所需类型完全匹配，这条"已知跨 HD 不一致"的陈述**已经是陈旧信息**（很可能是 commit `5cc1c9a` 写入、`9be4a6e` 修复 HD-016 后未同步回填 HD-015 的遗留措辞）。该陈述本身不影响任何编译期/运行期正确性（因为实际代码层面两侧已一致），纯属文档叙述滞后，不构成 HD-016 的缺陷，但会误导读者以为当前仍存在类型不匹配——建议 HD-015 后续 errata 一并更正（本报告不越权修改 HD-015 正文）。
+
+### 25.5 检查项 5：4 项 non-blocking（C-4/C-5/C-6）现状核实
+
+> 用户 prompt 提及"4 项 non-blocking"，但核对 [§24.4](#244-一致性表) 原文实际仅列出 **C-4/C-5/C-6 三项**（该节小结文字"4 项 non-blocking"与实际列举数量不一致，是 §24 报告自身的计数笔误，非本轮引入，此处如实指出）。
+
+- **C-4（HD-015 §3.10 `AgentInvocationService.cs` 测试要求遗留"Tools 恒为 null"字样）——仍未修复**：核对 [HD-015 §3.10 测试要求](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#310-inkwellcoreagentsagentinvocationservicecs)第 (1) 条，现文本仍为"`BuildRunRequest` 字段映射正确性（`Instructions`/`ModelId`/`ModelParameters` 1:1 透传，`Tools`恒为 `null`）"——与同一 HD 的 §3.4 已更新表述矛盾依旧存在，且与 §24.4 C-4 记录的问题现状完全一致，未见改动。此为 HD-015 侧遗留，非 HD-016 缺陷。
+- **C-5（OTel span `tools.<verb>` 命名单复数不一致）——仍未修复**：[§3.3/§3.4/§3.7](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#33-toolsitoolcatalogservicecs) 仍为 `tools.list_available`/`tools.get`/`tools.validate_binding`/`tools.resolve_bindings`，未改为单数 `tool.<verb>`，与 §24.4 C-5 现状一致，未见改动。
+- **C-6（`ToolOptions.MaxToolsPerAgent`/`EnableSensitiveDataLogging` 声明但未消费）——仍未修复**：全文 grep 两字段，仅在 [§3.5](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#35-toolsstooloptionscs)（声明）+ §2/§7（文件结构注释）+ [file-structure.md §497](file-structure.md#inkwellabstractionstools) 出现，未见任何 `ValidateToolBindingAsync`/`CurrentDateTimeToolExecutor`/`ToolBindingResolver` 逻辑描述中消费或门控这两个字段，与 §24.4 C-6 现状一致，未见改动。
+- **结论**：三项 non-blocking 均**原样遗留**，本轮三轮改动（`5cc1c9a`/`9be4a6e`/`aa06392`）均未涉及。这三项此前已被评审判定为"不阻塞签字"，本次复审维持该判断不变。
+
+### 25.6 检查项 6：本轮改动是否引入新的"Owner 已确认"编造性表述
+
+- 全文 grep `Owner|picker|拍板|确认|真实`（HD-016 范围）命中 30 处，逐条核对后未发现任何**指向本轮（第二/第三轮改动）新增决策点**的确认表述——三处主要"Owner 确认"来源均是本轮任务背景中已明确列为"本次会话真实发生"的既定结论：
+  1. 顶部"2026-07-07 更新·第二轮"callout——HD-006 errata 记录的"直接产出 `AIFunction`，消除重复类型"决策，措辞明确标注"记录于 HD-006 errata"，未在 HD-016 自身重新声称一次独立确认。
+  2. 顶部"2026-07-07 更新·第三轮"callout + [§1.3 Q6](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要)——`IToolExecutor`/`ToolExecutorRegistry` 简化的 YAGNI 决策，措辞为"Owner 在本次对话中直接明确确认"，与 `/memories/repo/inkwell-h3-workflow.md` HD-016 条目"2026-07-07 第三轮简化"记录的会话内容一致（该决策已在会话记忆中被独立确认为真实发生，非本轮新增编造）。
+  3. §8 Q&A-A/B/C 三项"已解决"标注——均为 2026-07-07 首轮评审后已处理并记录在案的既有确认，非本次聚焦复审新引入。
+- 未发现任何**新的**、未曾在既有会话记忆/评审记录中出现过的"Owner 已确认"表述。
+- **结论**：本轮改动（第二轮/第三轮 + 未提交的 frontmatter 修改）未引入任何新的编造性确认表述，判定 **PASS**。
+
+### 25.7 复审结论
+
+- **复审结论**：**PASS**——B-1（DI 生命周期反模式）已通过 YAGNI 简化从根源消除；`AgentToolDefinition → AIFunction` 重构在 HD-016 内部完全自洽；`IToolExecutor`/`ToolExecutorRegistry` 移除彻底，四处关联文档（HD-016 本体 + file-structure.md + database-design.md）互相一致；依赖 HD-015 的部分（`IToolBindingResolver` 消费方、类型匹配）核实一致，HD-016 本身无需感知 HD-015 新增的两个审计 `ActionType`；未发现本轮引入的新编造性"Owner 确认"表述。
+- **发现 1 项新问题（non-blocking，归属 HD-015 而非 HD-016）**：HD-015 顶部 errata callout + §3.4 内部逻辑描述仍保留"已知跨 HD 不一致：HD-016 返回类型仍为 `AgentToolDefinition`"的陈述，该陈述已随 HD-016 本轮修复而**过时失实**（当前两侧类型实际已一致），建议 HD-015 后续 errata 一并更正措辞（不影响 HD-016 本身评审结论，本报告未修改 HD-015 正文）。
+- **C-4/C-5/C-6 现状**：三项 non-blocking 均原样遗留（未处理），维持"不阻塞签字"的既有判断；另指出 §24.4 小结文字"4 项 non-blocking"与实际列举的 3 项数量不一致，属 §24 自身笔误。
+- **HD-016 `status` 是否可翻 `reviewed`——独立判断：可以**。理由：①原 2 项 blocking（B-1 DI 反模式、B-2 审计分类缺口）均有充分证据证明已在 HD-016/HD-015 两侧分别真实修复，且修复内容与本轮复审逐字核实一致；②剩余 3 项 non-blocking 属文档/命名/死配置类问题，不影响 `TestCaseAuthor`/`CodingExecutor` 起步，与 HD-009/HD-010/HD-014/HD-015 等已 reviewed HD 遗留 non-blocking 不阻塞签字的既定惯例一致；③本轮未发现新的 blocking 级问题。**本结论是基于内容质量的独立评估，不因工作区 frontmatter 当前已经手动改为 `status: reviewed` 而放宽或收紧判断标准**——若 frontmatter 改动早于本次复审发生，属于提前操作但结论恰好吻合；`reviewers: [Inkwell]` 字段的真实性由 Owner 自行确认，本报告不代为核实签字人身份。
+- 本报告不代 Owner 翻转/维持 frontmatter `status`/`reviewers` 字段，最终决定仍需人工确认。
+
+### 25.8 自检
+
+- ✅ 每条结论都附了文件路径 + 章节锚点证据
+- ✅ 未使用"看起来"/"似乎"等主观词汇
+- ✅ 未凭文件名臆测——`AgentToolDefinition`/`IToolExecutor`/`ToolExecutorRegistry`/`AddScoped`/`AddSingleton` 均逐字 grep + 打开原文核实，HD-015 交叉引用逐字段核对
+- ✅ 未运行任何 git 命令
+- ✅ 未修改 HD-016 或 HD-015 正文，仅追加本节评审报告
+- ✅ 未擅自判定 frontmatter `status`/`reviewers` 应保留的当前值，仅给出"内容是否支持翻 reviewed"的独立判断
+- ✅ 未编造任何新的"Owner 已确认"表述，§25.6 逐条核实本轮改动未引入新的可疑确认表述
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
