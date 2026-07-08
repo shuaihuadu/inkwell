@@ -599,6 +599,34 @@ src/core/Inkwell.Core/
 
 > `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）由本 HD 起草并落地；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**已解决（2026-07-08）**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现的 HD-007 `AuditLoggerOptions.MaxPageSize` 默认值 `200` 与 HD-001 `Pagination.MaxPageSize=100` 不一致（101~1000 区间不可达）问题，已由 Owner 真实确认的 HD-007 2026-07-08 errata 修复——`MaxPageSize` 收紧为默认 `100`，与 `Pagination.MaxPageSize` 对齐，死区已消除。
 
+## Inkwell.Abstractions.Models
+
+> 由 [HD-019 §2 / §3](Inkwell.Core/HD-019-Inkwell.Core.Models.md) 锁定。**本 HD 是 H3 第六张业务命名空间 HD**——`IModelCatalogService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Models/` 子目录。**本 HD 不新增任何 `Persistence/Models/` 业务 Model / 具名 Repository / 数据库表**——[HD-019 §0](Inkwell.Core/HD-019-Inkwell.Core.Models.md#0-范围核实模型是否为持久化实体req-005--req-006-归属边界) 已核实模型清单 v1 是配置文件驱动，非持久化实体（`database-design.md` 顶层表清单不追加 `models` 行）。
+
+```text
+src/core/Inkwell.Abstractions/
+  Models/                                  # 新增子目录（HD-019）
+    IModelCatalogService.cs                 # 顶层业务门面（2 方法：ListModelsAsync / GetModelAsync）
+    ModelSummary.cs                          # 模型目录条目 DTO + ModelProviderKind 枚举
+    ModelCatalogOptions.cs                   # 模型清单配置（含 ModelEntryOptions 嵌套 DTO）
+    ModelCatalogOptionsValidator.cs          # IValidateOptions<ModelCatalogOptions>
+```
+
+**文件计数**：HD-019 在 `Models/` 新增 4 个 `*.cs`；Abstractions csproj 累计 86（HD-001~HD-018，见 [HD-018 §Inkwell.Abstractions.AuditLogs 小节文件计数](#inkwellabstractionsauditlogs)）+ 4（HD-019）= **90** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Models` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) / [HD-017](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 单实现拓扑）：
+
+```text
+src/core/Inkwell.Core/
+  Models/
+    ModelCatalogService.cs                  # 唯一 IModelCatalogService 实现（AddSingleton，无 Scoped 依赖）
+    ModelsBuilderExtensions.cs              # AddDefaultModelCatalog()
+```
+
+`Inkwell.Core.csproj` 累计 19（HD-014~HD-018）+ 2（HD-019）= **21** 个 `*.cs` + 1 个 `.csproj`。
+
+> `Inkwell.Core.Agents`（HD-015）**不得**直接依赖本 HD——[AGENTS.md §3.2](../../AGENTS.md)"业务命名空间只能依赖 Inkwell.Abstractions + BCL"约束下，`ModelId` 合法性校验须发生在未起草的 `Inkwell.WebApi` 层（先调 `IModelCatalogService.GetModelAsync` 校验，再调 `IAgentService`），详见 [HD-019 §0 跨业务命名空间依赖边界](Inkwell.Core/HD-019-Inkwell.Core.Models.md#0-范围核实模型是否为持久化实体req-005--req-006-归属边界)。
+
 ## providers/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
