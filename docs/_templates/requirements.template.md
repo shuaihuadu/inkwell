@@ -17,7 +17,7 @@ resolved-questions: []
 
 > 本文件是需求阶段（H1）产出。`REQ-NNN` / `NFR-NNN` / `EX-NNN` 编号一旦发布即不可改变含义或重新分配给别的条目——需求变化只能新增编号或将旧编号标记 `deprecated`，不得覆盖复用。
 >
-> 待澄清问题统一记录在 [`open-questions.md`](./open-questions.md)（`OQ-NNN` 编号），由人工决策后回写本文件对应章节并引用 `OQ-NNN` 出处。
+> 待澄清问题统一记录在同目录的 `open-questions.md`（`OQ-NNN` 编号），由人工决策后回写本文件对应章节并引用 `OQ-NNN` 出处。
 >
 > 本文件 `status: draft` 进入 `reviewed` 之前，所有 `blocking` 级 OQ 必须被解答或经 Owner 显式接受为已知风险。`status` / `reviewers` 字段由 Owner 本人翻转，任何工具或 Agent 不得代签。
 
@@ -92,7 +92,7 @@ resolved-questions: []
 
 ## 9. 异常场景
 
-<用表格列出：`EX-NNN` | 场景 | 期望行为。每条异常场景都应给出可验证的期望行为（不是"应该妥善处理"这种模�0糊表述），复杂的异常处理细节留给 H3，这里只锁定行为边界。>
+<用表格列出：`EX-NNN` | 场景 | 期望行为。每条异常场景都应给出可验证的期望行为（不是"应该妥善处理"这种模糊表述），复杂的异常处理细节留给 H3，这里只锁定行为边界。>
 
 | 编号   | 场景 | 期望行为 |
 | ------ | ---- | -------- |
@@ -124,4 +124,4 @@ resolved-questions: []
 
 ## 14. 待澄清清单
 
-详见 [`open-questions.md`](./open-questions.md)。
+详见同目录的 `open-questions.md`。

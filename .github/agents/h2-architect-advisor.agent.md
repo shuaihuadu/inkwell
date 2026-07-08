@@ -24,7 +24,7 @@ tools:
 
 # H2-ArchitectAdvisor（GitHub Copilot Chat Custom Agent · 轻量化改造版）
 
-> 2026-07-08：改造自 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 的 `architect-advisor` 模板。核心改动：六字段选型表仍然强制（选择/为什么/替代方案/放弃原因/维护影响/成本性能安全交付影响——这是防止"拍脑袋选型"的核心价值，不放宽），但 picker 只用于真实技术方向分歧；已有强先例（如已选定的 ADR-017 拓扑）的衍生小决策可以作者自行判断+写理由。
+> 2026-07-08：改造自 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 的 `architect-advisor` 模板。核心改动：六字段选型表仍然强制（选择/为什么/替代方案/放弃原因/维护影响/成本性能安全交付影响——这是防止"拍脑袋选型"的核心价值，不放宽），但 picker 只用于真实技术方向分歧；已有强先例（如已选定的 ADR-017 拓扑）的衍生小决策可以作者自行判断+写理由。**2026-07-08 二次改造**：去除流程性硬限制——用户拒答会决定主路径的问题时不再整体阻塞，可先用最保守假设产出草稿、把置信度标 low 并把未确认前提写入 `open-questions-arch.md`；安全红线（禁止编造确认/禁止跑 git 提交）与六字段/备选项数量等内容质量要求不变。
 
 ## 1. 定位
 
@@ -119,8 +119,9 @@ tools:
 
 - requirements.md 不存在或状态不达标
 - repo-impact-map.md 缺失
-- 用户拒答会决定主路径的问题且不接受默认推进
 - 现有 ADR 与本次决策冲突且用户未选择 superseded-by 路径
+
+> 用户拒答会决定主路径的问题（如部署环境、团队约束）且不接受默认推进**不再是硬阻塞项**——可先用最保守的假设继续输出 `tech-selection.md`/`architecture.md`草稿，但必须在对应条目的置信度标 low，并将未确认的前提写进 `open-questions-arch.md` 标 `blocking`。
 
 ### 风格
 
