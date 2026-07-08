@@ -218,6 +218,17 @@ src/core/Inkwell.Abstractions/Persistence/
     IConversationMessageRepository.cs   # 具名 Repository（4 方法：AddMessage/ListMessagesByConversation/DeleteMessage/DeleteMessagesByConversation）
 ```
 
+### Persistence/AuditLogs（HD-018 落地，2026-07-08）
+
+> 由 [HD-018 §2 / §3.1 / §3.2](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md) 锁定。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  AuditLogs/                            # 新增子目录（HD-018）
+    AuditLog.cs                         # 业务 Model（审计日志持久化记录），IHasTimestamps only
+    IAuditLogRepository.cs              # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/RemoveAuditLogsOlderThan）
+```
+
 ## Inkwell.Abstractions.FileStorage
 
 > 由 [HD-003 §2 / §3](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 锁定。
@@ -387,6 +398,8 @@ src/core/Inkwell.Abstractions/
 
 **文件计数**：HD-007 新增 7 个 `*.cs`（Audit/ 7）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）= 51 个 `*.cs` + 1 个 `.csproj`。
 
+> **2026-07-08 HD-018 追加**（不修改上方 7 个 HD-007 文件本身）：`Audit/` 目录新增 2 个文件——`AuditLogWriterOptions.cs`（写入管道 / fallback / 清理调度实现级配置） + `AuditLogWriterOptionsValidator.cs`，详见 [HD-018 §2 / §3.3 / §3.4](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md)。累计影响见下方"## Inkwell.Abstractions.AuditLogs"章节的文件计数。
+
 **对接 `Inkwell.Core.AuditLogs` 的契约**（无独立 Provider csproj，[HD-007 §1.3 Q-implementation-topology](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md#13-关键决策摘要) 下 `Inkwell.AuditLogs` 合并进 `Inkwell.Core.AuditLogs` 命名空间）：
 
 ```text
@@ -395,7 +408,7 @@ src/core/Inkwell.Core/AuditLogs/
   AuditLoggerBuilderExtensions.cs                     # AddDefaultAuditLogger()
 ```
 
-> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，按 [HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由 `Inkwell.Core.AuditLogs` 业务 HD 起草；磁盘 fallback 文件格式 / 后台清理任务由该 HD 独立锁定，**严禁**回填到 `Inkwell.Abstractions/Audit/AuditLoggerOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。
+> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，按 [HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由 `Inkwell.Core.AuditLogs` 业务 HD 起草；磁盘 fallback 文件格式 / 后台清理任务由该 HD 独立锁定，**严禁**回填到 `Inkwell.Abstractions/Audit/AuditLoggerOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）。**2026-07-08 HD-018 已完成该契约的完整落地**（`Persistence/AuditLogs/` 2 文件 + `Inkwell.Core/AuditLogs/` 5 文件），详见下方 `## Inkwell.Abstractions.AuditLogs` 章节。
 
 ## Inkwell.Abstractions.VectorStore
 
@@ -557,6 +570,34 @@ src/core/Inkwell.Core/
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正同上）。
 
 > `Persistence/Conversations/Conversation.cs` + `ConversationMessage.cs` + `IConversationRepository.cs` + `IConversationMessageRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
+
+## Inkwell.Abstractions.AuditLogs
+
+> 由 [HD-018 §2 / §3](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md) 锁定。**本 HD 是 H3 第五张业务命名空间 HD**——本 HD 完整实现 [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) 已锁定的 `IAuditLogger` 唯一实现类，同时新增 `Persistence/AuditLogs/`（业务 Model + Repository）+ `Audit/` 追加 2 个实现级 Options 文件（不修改 HD-007 原有 7 个文件）。
+
+```text
+src/core/Inkwell.Abstractions/Audit/
+  AuditLogWriterOptions.cs               # 新增（HD-018）：写入管道 / fallback / 清理调度实现级配置
+  AuditLogWriterOptionsValidator.cs      # 新增（HD-018）：IValidateOptions<AuditLogWriterOptions>
+```
+
+**文件计数**：HD-018 在 `Persistence/AuditLogs/`（见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）新增 2 个 `*.cs` + 在 `Audit/` 新增 2 个 `*.cs`，合计 4 个；Abstractions csproj 累计 82（HD-001~HD-017，见 [HD-017 §Conversations 小节文件计数](#inkwellabstractionsconversations)）+ 4（HD-018）= **86** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.AuditLogs` 的完整实现**（file-structure.md 早在 HD-007 章节即已预锁 `DefaultAuditLogger.cs` / `AuditLoggerBuilderExtensions.cs` 文件名，本 HD 落地并补齐 3 个额外文件）：
+
+```text
+src/core/Inkwell.Core/
+  AuditLogs/
+    DefaultAuditLogger.cs                          # 唯一 IAuditLogger 实现（LogAsync 入队 + QueryAsync 查询）
+    AuditLogWriteBackgroundService.cs              # BackgroundService：消费 Channel + 重试 3 次 + 调度 fallback
+    AuditLogFallbackFileWriter.cs                  # 磁盘 fallback 文件写入辅助类（NDJSON 按天滚动）
+    AuditLogRetentionCleanupBackgroundService.cs   # BackgroundService：按 RetentionDays 周期清理
+    AuditLoggerBuilderExtensions.cs                # AddDefaultAuditLogger()
+```
+
+`Inkwell.Core.csproj` 累计 14（HD-014~HD-017）+ 5（HD-018）= **19** 个 `*.cs` + 1 个 `.csproj`。
+
+> `Persistence/AuditLogs/AuditLog.cs` + `IAuditLogRepository.cs`（业务 Model + 具名 Repository，见 [§Persistence/AuditLogs 小节](#persistenceauditlogshd-018-落地2026-07-08)）由本 HD 起草并落地；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**待 Owner 确认**：[HD-018 §8 Q&A-B](Inkwell.Core/HD-018-Inkwell.Core.AuditLogs.md#8-需要-owner-确认的问题) 发现 HD-007 `AuditLoggerOptions.MaxPageSize` 默认值 `200` 与 HD-001 `Pagination.MaxPageSize=100` 不一致（101~1000 区间不可达），本节仅记录不擅自修改 HD-007。
 
 ## providers/Inkwell.Persistence.EFCore
 
