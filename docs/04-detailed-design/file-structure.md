@@ -229,6 +229,17 @@ src/core/Inkwell.Abstractions/Persistence/
     IAuditLogRepository.cs              # 具名 Repository（3 方法：AddAuditLog/ListAuditLogs/DeleteAuditLogsOlderThan）
 ```
 
+### Persistence/Skills（HD-020 落地）
+
+> 由 [HD-020 §2 / §3.1 / §3.2](Inkwell.Core/HD-020-Inkwell.Core.Skills.md) 锁定。
+
+```text
+src/core/Inkwell.Abstractions/Persistence/
+  Skills/                              # 新增子目录（HD-020）
+    SkillDefinition.cs                 # 业务 Model（Skill 目录元数据）
+    ISkillRepository.cs                # 具名 Repository（3 方法：AddSkill/GetSkill/ListSkills）
+```
+
 ## Inkwell.Abstractions.FileStorage
 
 > 由 [HD-003 §2 / §3](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 锁定。
@@ -540,6 +551,39 @@ src/core/Inkwell.Core/
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）= **12** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正：`Tools/` 实际只有 4 个文件，此前误列 6 个，详见 design-review-report.md §26.2 N-1/C-3）。
 
 > `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
+
+## Inkwell.Abstractions.Skills
+
+> 由 [HD-020 §2 / §3](Inkwell.Core/HD-020-Inkwell.Core.Skills.md) 锁定。**本 HD 是 H3 第七张业务命名空间 HD**——`ISkillCatalogService` / `ISkillContentResolver` 均是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Skills/` 子目录（与 `Persistence/Skills/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Skills` / `Inkwell.Abstractions.Persistence.Skills`）。
+>
+> 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Skills/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-007](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
+
+```text
+src/core/Inkwell.Abstractions/
+  Skills/                                  # 新增子目录（HD-020）
+    ISkillCatalogService.cs                 # 顶层业务门面（只读查询 + 上传注册）
+    ISkillContentResolver.cs                # AgentSkillBinding → SkillContent 翻译（含 SkillResolutionResult 共置）
+    SkillUploadRequest.cs                   # 上传请求 DTO（含 SkillPackageEntry 共置）
+    SkillContent.cs                         # 解析结果内容 DTO
+    SkillOptions.cs                         # EnableSensitiveDataLogging
+    SkillOptionsValidator.cs                # IValidateOptions<SkillOptions>
+```
+
+**文件计数**：HD-020 在 `Skills/` 新增 6 个 `*.cs` + 在 `Persistence/Skills/`（见 [§Persistence/Skills 小节](#persistenceskillshd-020-落地)）新增 2 个 `*.cs`，合计 8 个；Abstractions csproj 累计 90（HD-001~HD-019，[HD-019 §2 文件计数](Inkwell.Core/HD-019-Inkwell.Core.Models.md#2-文件结构)）+ 8（HD-020）= **98** 个 `*.cs` + 1 个 `.csproj`。
+
+**对接 `Inkwell.Core.Skills` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
+
+```text
+src/core/Inkwell.Core/
+  Skills/
+    SkillCatalogService.cs                  # 唯一 ISkillCatalogService 实现
+    SkillContentResolver.cs                 # 唯一 ISkillContentResolver 实现
+    SkillsBuilderExtensions.cs              # UseDefaultSkillService()
+```
+
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）21（HD-014~HD-019）+ 3（HD-020）= **24** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+
+> `Persistence/Skills/SkillDefinition.cs` + `ISkillRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 §Persistence/Skills 小节，HD-020 落地）；`SkillEntity` / `SkillMappingExtensions` / `EfCoreSkillRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**跨 HD 已知缺口**（本 HD 不代为修改已 reviewed 文件）：`Inkwell.Core.Agents.AgentInvocationService`（[HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)）与 `Inkwell.Abstractions.AgentRuntime.AgentRunRequest`（[HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)）当前均**未**接入本 HD 的 `ISkillContentResolver`，详见 [HD-020 §7](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#7-跨-hd-已知缺口消费方尚无接线点)。
 
 ## Inkwell.Abstractions.Conversations
 

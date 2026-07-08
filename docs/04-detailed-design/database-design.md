@@ -70,7 +70,7 @@ downstream: []
 | `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md)                                                                      |
 | `agents`             | Inkwell.Core.Agents    | HD-015  | [REQ-002](../01-requirements/requirements.md) ~ [REQ-008](../01-requirements/requirements.md)                                                                      |
 | `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
-| `skills`             | Inkwell.Skills         | TBD     | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
+| `skills`             | Inkwell.Skills         | HD-020  | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
 | `tools`              | Inkwell.Tools          | HD-016  | [REQ-007](../01-requirements/requirements.md)                                                                                                                      |
 | `knowledge_bases`    | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `kb_documents`       | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
@@ -220,6 +220,24 @@ downstream: []
 **索引**：`Name` 唯一索引。**不**包含 `RowVersion`（[HD-016 §1.3 Q3](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#13-关键决策摘要)，v1 无运行期 Update 场景）；**不**包含 `OwnerUserId`（系统级目录，非用户私有资源）。
 
 **2026-07-07 已解决**：本表 v1 是否需要运行期管理 API（Admin CRUD）以及具体内置工具清单是否需要在 v1 落地，此前均未拍板；Owner 已在对话中直接明确确认——维持只读目录设计（不补 CRUD API），且 v1 需要至少一个真实可用的内置工具（已落地 `get_current_datetime`，详见 [HD-016 §3.12](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#312-inkwellcoretoolscurrentdatetimetoolexecutorcs) + [§6.1 Seed 数据](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#61-tools-表-seed-数据2026-07-07-新增)），详见 [HD-016 §8 Q&A-A / Q&A-C](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#8-需要-owner-确认的问题)。
+
+**Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
+
+## Inkwell.Core.Skills
+
+> 由 [HD-020 §6](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#6-数据库设计增量追加至-database-designmd) 锁定。本节是 H3 第七张业务命名空间贡献的表结构（此前"表清单"占位表中 `skills` 行为 `TBD`，现更新为 `HD-020`）。
+
+### 表 `skills`（[REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)）
+
+- `Id`：`Guid` v7，主键
+- `Name`：`string`，长度上限 100（作者判断，非 Owner 拍板，需求未指定具体上限），**不加唯一约束**（[HD-020 §1.3 Q4](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#13-关键决策摘要)，Skill 库允许多个成员各自上传同名 Skill）
+- `Description`：`string`，无长度上限
+- `ContentMarkdown`：`string`，无长度上限（SKILL.md 正文，frontmatter 之外的部分）
+- `ReferenceFileUrisJson`：`string`，默认 `"[]"`（`references/` 附件 `Uri` 集合序列化存储）
+- `AssetFileUrisJson`：`string`，默认 `"[]"`（`assets/` 附件 `Uri` 集合序列化存储）
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+
+**索引**：无。**不**包含 `RowVersion`（[HD-020 §1.3 Q2](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#13-关键决策摘要)，v1 无运行期 Update 场景）；**不**包含 `OwnerUserId`（Skill 库是全体成员共享的目录，非用户私有资源）。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
 
