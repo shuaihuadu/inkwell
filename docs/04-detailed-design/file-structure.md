@@ -519,14 +519,12 @@ src/core/Inkwell.Abstractions/
 src/core/Inkwell.Core/
   Tools/
     ToolCatalogService.cs                  # 唯一 IToolCatalogService 实现
-    IToolExecutor.cs                       # 内部执行委托接口（不暴露 Abstractions）
-    ToolExecutorRegistry.cs                # 内部执行器注册表
     ToolBindingResolver.cs                 # 唯一 IToolBindingResolver 实现
     ToolsBuilderExtensions.cs              # UseDefaultToolService()
-    CurrentDateTimeToolExecutor.cs         # v1 唯一内置工具：当前日期时间查询（2026-07-07 新增，HD-016 §8 Q&A-C 已解决）
+    CurrentDateTimeToolExecutor.cs         # v1 唯一内置工具：当前日期时间查询（2026-07-07 新增，HD-016 §8 Q&A-C 已解决；2026-07-08 订正：本代码块此前遗留列出已在 HD-016 2026-07-07 第三轮 YAGNI 简化中删除的 IToolExecutor.cs/ToolExecutorRegistry.cs 两个文件，现已移除，详见 design-review-report.md §26.2 N-1/C-3）
 ```
 
-`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 6（HD-016）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）= **12** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正：`Tools/` 实际只有 4 个文件，此前误列 6 个，详见 design-review-report.md §26.2 N-1/C-3）。
 
 > `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
 
@@ -556,7 +554,7 @@ src/core/Inkwell.Core/
     ConversationBuilderExtensions.cs       # UseDefaultConversationService()
 ```
 
-`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 6（HD-016）+ 2（HD-017）= **16** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
+`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正同上）。
 
 > `Persistence/Conversations/Conversation.cs` + `ConversationMessage.cs` + `IConversationRepository.cs` + `IConversationMessageRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
 

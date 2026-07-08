@@ -243,13 +243,13 @@ downstream: []
 - `Id`：`Guid` v7，主键
 - `ConversationId`：`Guid`，外键 → `conversations.Id`，非唯一索引
 - `Role`：`int`（[HD-006 `AgentChatRole`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 枚举持久化为整数）
-- `ContentJson`：`string`，无长度上限（[HD-006 `AgentMessageContentPart`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族序列化存储，**依赖 HD-006 补齐 `[JsonPolymorphic]` 特性标注，详见 [HD-017 §1.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 已知缺口**）
+- `ContentJson`：`string`，无长度上限（[HD-006 `AgentMessageContentPart`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族序列化存储，多态序列化契约（`[JsonPolymorphic]`/`[JsonDerivedType]`）已由 [HD-006 2026-07-08 errata](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#37-agentruntimejsondelegateaifunctioncs--agenttoolcallrecordcs) 补齐，无遗留缺口）
 - `AuthorName`：`string?`，可空
 - `SequenceNumber`：`int`，会话内严格递增
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
 
 **索引**：`(ConversationId, SequenceNumber)` 复合索引。**不**包含 `RowVersion` / `OwnerUserId`（消息一旦写入不可变，非用户直接拥有的独立资源，[HD-017 §1.3 Q7](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）。
 
-**2026-07-08 待确认**：本表是否需要为"删除消息 / 清空对话"写审计日志（[HD-017 §8 Q&A-A](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）、`ConversationOptions.MaxMessagesPerConversation` 超限行为（[HD-017 §8 Q&A-C](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）、`agui_run_events` 表归属（[HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）均未拍板，原样列入 HD-017 §8，本节不代答。
+**2026-07-08 已解决**（Owner 在本次会话中通过 `vscode_askQuestions` 真实确认，详见 [HD-017 §8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）：删除消息 / 清空对话**需要**写审计日志（`ActionType="conversation_message_deleted"`/`"conversation_cleared"`）；`ConversationOptions.MaxMessagesPerConversation` 超限行为 v1 **暂不实现**（字段存在但不消费）；`agui_run_events` 表归属判定为**占位过时，实际应归 `Inkwell.Core.Traces`**（未起草，待该 HD 起草时更新本表归属）。
 
 **Entity / Mapping / Repository 实现物理位置**：`providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定物理位置）——**本节仅记录契约缺口**，具体实现需通过 errata 追加到已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)，本次提交不改写 HD-009。
