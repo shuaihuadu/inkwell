@@ -3086,3 +3086,74 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 完备性判定遵循已确立口径（§22/§23/§24 先例），对照 REQ-010/NFR-005/REQ-002 验收标准核实，未机械套用端口层三段式模板
 - ✅ 报告路径仍走 H3 规范默认 design-review-report.md（追加 §26 而非新建文件）
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 27. HD-017 Inkwell.Core.Conversations 聚焦复审（2026-07-08）
+
+> 本轮**不**重新执行 §26.1/§26.2 全量扫描，仅聚焦核对 §26.4 前置条件清单声称的两次提交（`0c45e16` 修 HD-014/HD-016 同类 Pagination 缺陷 + `087e154` HD-017 自身修 B-1/B-2/N-1/N-2）是否真实落地、彼此自洽，并检查是否引入新的不一致。评审对象：[HD-017](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 当前工作区文本 + [database-design.md `## Inkwell.Core.Conversations`](database-design.md#inkwellcoreconversations) + [file-structure.md](file-structure.md) 对应章节。
+
+### 27.1 检查项 1：B-1（`GetHistoryMessagesAsync`/`ListConversationsAsync` 全量承诺与 `Pagination.MaxPageSize=100` 冲突 + `SequenceNumber` 静默出错）是否真的修复——PASS
+
+- **残留扫描**：全文 grep `Pagination(1,` 在 HD-017 内**零命中**；仓库全文 grep `Pagination(1, 1000)`/`Pagination(1, 100)` 仅命中 [HD-014 顶部 errata callout](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) 与 [HD-016 顶部 errata callout](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 各 1 处，逐一打开核实均为**描述历史缺陷的说明性文字**（"默认 Agent 复核发现原设计…以 `new Pagination(1, 1000)` 一次性大页拉取"），非当前仍生效的代码引用，与 `/memories/repo/inkwell-h3-workflow.md` HD-017 条目记录的"HD-014/HD-016 errata + HD-017 直接改，三处统一修复"一致。
+- **`GetHistoryMessagesAsync` 循环拉取逻辑核实**：[§3.9 `ConversationService.cs`](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) 现文本逐字核对——循环调用 `ListMessagesByConversation(conversationId, new Pagination(page, Pagination.MaxPageSize), ..., ct)`，`page` 从 1 起递增，每次把 `PagedResult.Items` 追加进本地累加列表，直至 `PagedResult.HasNextPage == false`，再按累加顺序整体映射为 `IReadOnlyList<AgentChatMessage>` 返回——该逻辑不依赖任何单页 `Items.Count` 做"总数"近似，能正确取到全部分页数据，不受 `Pagination.MaxPageSize=100` 上限影响。
+- **`ListConversationsAsync` 同款逻辑核实**：同一小节文本确认对 `ListConversationsByAgent` 采用相同循环拉取模式后再投影为 `ConversationSummary` 列表，逻辑一致。
+- **`SequenceNumber` 计算修复核实（本次最关键的核对点）**：`AppendMessageAsync` 内部原文明确写"`SequenceNumber` = 该会话已有消息总数——采用与 `GetHistoryMessagesAsync` 相同的循环拉取模式（对 `ListMessagesByConversation` 按 `Pagination.MaxPageSize` 分页循环直至 `PagedResult.HasNextPage == false`，累加各页 `Items.Count`），不再依赖单页 `Items.Count` 作为近似值"——原缺陷（会话消息数超过 100 后 `SequenceNumber` 从第 101 条起重复）的根因（单页近似）已被替换为"循环累加全部页 `Items.Count`"的确定性计数，逻辑上能正确取到全部数据，不会因循环中途出错而漏计（循环出口条件 `HasNextPage == false` 是分页协议标准语义，非自定义提前退出条件）。
+- **测试要求同步核实**：[§3.9 测试要求 (9)](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) 新增"`GetHistoryMessagesAsync`/`ListConversationsAsync`/`SequenceNumber` 计算在会话消息数 / Agent 会话数超过 `Pagination.MaxPageSize=100` 时仍返回完整结果且 `SequenceNumber` 不重复"验收边界，与修复内容对应。
+- **已知代价的一致性核实**：[§1.3 Q8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要) 理由列已如实披露"循环拉取模式本身的往返次数随会话规模增长，v1 规模可接受，属已知代价而非缺陷"——`AppendMessageAsync` 每次写入都重新循环拉取全部历史消息以计数（未采用原评审建议方向的"选项 2 count-only 方法"），是 $O(n)$ 每次追加、$O(n^2)$ 每会话的时间复杂度；该性能特征已被文档如实标注为"已知代价"而非隐瞒，与 Owner 确认的"选方案 A——循环拉取直到取尽"一致，不构成未披露的新问题。
+- **结论**：B-1 三处症状（`GetHistoryMessagesAsync`/`ListConversationsAsync` 全量承诺无法兑现、`SequenceNumber` 静默出错）均已修复，循环拉取逻辑本身可正确取全部数据，判定 **PASS**。
+
+### 27.2 检查项 2：B-2（HD-017 §1.4/§3.2/§6/§9 遗留"未解决"陈旧表述）是否真的修复——PASS
+
+- [§1.4 与消费方的边界声明](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 末段现文本：两处技术缺口分别标注"**该措辞已由 HD-006 2026-07-08 errata 精确化**"+"**该缺口已由 HD-006 2026-07-08 errata 修复**"，均附"现文本核实"字样，不再使用"在 HD-006 补齐…之前"这类悬而未决的表述。
+- [§3.2 `ConversationMessage.cs` 测试要求](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#32-persistenceconversationsconversationmessagecs)：现文本"该测试**已可正常通过**（HD-006 2026-07-08 errata 已补齐 `[JsonPolymorphic]`/`[JsonDerivedType]` 特性标注……），**不再标注 `[Ignore]`**"——全文 grep `Ignore` 仅此 1 处命中，且是"不再标注"的否定语境，非真实的 `[Ignore]` 测试标注。
+- [§6 数据库设计增量](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#6-数据库设计增量追加至-database-designmd)（经 [database-design.md `ContentJson` 行](database-design.md#inkwellcoreconversations)交叉核实）：现文本"多态序列化契约……已由 HD-006 2026-07-08 errata 补齐，**无遗留缺口**"。
+- [§9 消费关系纠正与 HD-006 措辞精确化建议](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#9-消费关系纠正与-hd-006-措辞精确化建议已解决2026-07-08)：小节标题本身已改为"（已解决，2026-07-08）"，正文两条均以"已实际修复"/"已修复"开头描述，不再是"供总结确认"的开放式提问。
+- [database-design.md 章节末尾提示行](database-design.md#inkwellcoreconversations)：现文本"**2026-07-08 已解决**（Owner 在本次会话中通过 `vscode_askQuestions` 真实确认……）"，不再是"待确认"。
+- **结论**：四处 + database-design.md 同步点全部核实为"已解决"措辞，无遗留"未解决"/"依赖 HD-006 补齐"字样，判定 **PASS**。
+
+### 27.3 检查项 3：N-1（`Inkwell.Core.csproj` 累计文件数三处不一致，应为 14）是否真的修复——PASS
+
+- [HD-017 §2 文件计数](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#2-文件结构)：现文本"5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14**（2026-07-08 修复 N-1 加法错误：5+3+4+2=14，非 16）"——算式与结果均正确（5+3+4+2=14）。
+- [file-structure.md `## Inkwell.Abstractions.Conversations` 章节文件计数](file-structure.md#inkwellabstractionsconversations)：现文本同为"5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14**（2026-07-08 订正同上）"，与 HD-017 §2 一致。
+- [file-structure.md `## Inkwell.Abstractions.Tools` 章节 `Inkwell.Core/Tools/` 代码块](file-structure.md#inkwellabstractionstools)：现文本已移除 `IToolExecutor.cs`/`ToolExecutorRegistry.cs` 两行，仅保留 `ToolCatalogService.cs`/`ToolBindingResolver.cs`/`ToolsBuilderExtensions.cs`/`CurrentDateTimeToolExecutor.cs` 4 个文件，脚注"2026-07-08 订正：`Tools/` 实际只有 4 个文件，此前误列 6 个"，累计数改为 **12**，与已 reviewed 的 [HD-016 §2 自述](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#2-文件结构)"5（HD-014）+3（HD-015）+4（HD-016）=12"一致。
+- **交叉验证**：HD-017 §2（14）= file-structure.md Conversations 章节（14）= HD-016 §2（12）+ HD-017 增量（2）；三处数字两两一致，无遗留矛盾。Abstractions csproj 累计总数（82 = 11+8+7+4+4+10+7+2+7+8+6+8）经逐项相加核实成立，未受 N-1 修复影响（该累计线走的是 Abstractions/Tools 4 个 + Persistence/Tools 2 个 = 6，与 Inkwell.Core.csproj 侧的 Tools 实现文件数是两个独立计数维度，未被混淆）。
+- **结论**：三处数字统一为 14（Inkwell.Core.csproj 侧）/ 12（HD-016 单独口径），无矛盾，判定 **PASS**。
+
+### 27.4 检查项 4：N-2（`GetLastActivityByAgentsAsync`/`FindLastActivityByAgents` 参数命名不一致）是否真的修复——PASS
+
+- [§3.3 `IConversationRepository.FindLastActivityByAgents`](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs)：对外接口签名第二参数已改为 `Guid viewerUserId`，职责行显式注明"2026-07-08 修复 N-2，由 `ownerUserId` 改名为 `viewerUserId`（与服务层 `GetLastActivityByAgentsAsync(agentIds, viewerUserId)` 命名对齐）"。
+- [§3.5 `IConversationService.GetLastActivityByAgentsAsync`](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs)：对外接口签名第二参数为 `Guid viewerUserId`，与 §3.3 一致。
+- 全文 grep `viewerUserId`（10 处）与 `ownerUserId`（21 处）逐一核对：`ownerUserId` 的全部残留出现在**语义不同的场景**（`Conversation.OwnerUserId` 字段本身、`StartConversationAsync`/`ListConversationsAsync`/`ListUsedAgentIdsAsync`/`FindUsedAgentIdsByOwner` 的"会话归属用户"参数），均是同一 `IHasOwner.OwnerUserId` mixin 语义的合理复用，与 `FindLastActivityByAgents`/`GetLastActivityByAgentsAsync` 这一对方法专属的"查看者"语义（`viewerUserId`）不冲突、不重名混用。
+- **结论**：N-2 涉及的一对方法（service 层 + repository 层）参数命名已统一为 `viewerUserId`，判定 **PASS**。
+
+### 27.5 检查项 5：本轮修复是否引入新的不一致或未披露问题
+
+- **新发现（NON-BLOCKING）——F-1：§3.5 输入数据行残留错误的 Q&A 交叉引用 + 陈旧的"待确认"状态**：[§3.5 `IConversationService.cs` "输入数据"行](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs)原文"`Guid viewerUserId`（[§8 Q&A-C](#8-需要-owner-确认的问题) 语义待确认）"存在两处问题：①交叉引用错误——`viewerUserId` 的语义分歧讨论实际在 **Q&A-B**（"查看者视角" vs "全局视角"），Q&A-C 讨论的是 `ConversationOptions.MaxMessagesPerConversation` 超限行为，与 `viewerUserId` 无关；②状态陈旧——Q&A-B 本身已在 [§8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题) 标注"已解决（2026-07-08）"，此处仍写"语义待确认"。核实该行未被 B-1/B-2/N-1/N-2 四项修复触及，本轮修复未引入此问题（很可能是起草期 §8 Q&A-B 从"待确认"改为"已解决"时遗漏同步这一处交叉引用），但属聚焦复审范围内应如实报告的遗留缺陷。**影响范围**：纯文档引用错误，不影响 `viewerUserId` 参数本身的语义或实现（§3.3/§3.5/§3.9/§8 Q&A-B 的实际技术内容已一致确认为"查看者视角"），不阻塞 `TestCaseAuthor`/`CodingExecutor` 起步。**建议方向**：`§8 Q&A-C` 改为 `§8 Q&A-B`，"语义待确认"改为"已解决（查看者视角，2026-07-08）"，机械修正、不需要 Owner picker。
+- **性能trade-off披露一致性核实**：`AppendMessageAsync` 引入的"每次追加消息都循环拉取全部历史消息计数"（$O(n)$ 每次/$O(n^2)$ 每会话）已在 [§1.3 Q8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要) 理由列如实披露为"已知代价"，且 §26 B-1 建议方向本身列出了"选项 2 count-only 方法"作为性能优化路径供 Owner 选择，Owner 确认选**方案 A**（未采纳选项 2）。该性能特征是 Owner 知情选择的结果，非本轮修复意外引入的隐藏问题，不单独判定为"新问题"。
+- **`DeleteMessagesByConversation`/`FindUsedAgentIdsByOwner`/`FindLastActivityByAgents` 三个不涉及 `Pagination` 的方法未受影响核实**：[§3.3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs)/[§3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#34-persistenceconversationsiconversationmessagerepositorycs) 现文本核对，`FindUsedAgentIdsByOwner(Guid ownerUserId, ...)`/`FindLastActivityByAgents(IReadOnlyList<Guid> agentIds, Guid viewerUserId, ...)`/`DeleteMessagesByConversation(Guid conversationId, ...)` 三方法签名均**不含** `Pagination` 参数（分别返回全量 `IReadOnlyList<Guid>`/`IReadOnlyDictionary<...>`/批量删除计数 `int`），不依赖循环拉取模式，未被 B-1 修复触及，也不存在同类越界风险——`ListUsedAgentIdsAsync`/`GetLastActivityByAgentsAsync` 这两个服务方法因此不需要、也未被要求做循环拉取改造，与 §3.9 现文本一致，不构成遗漏。
+- **未发现其他因循环拉取模式改动而受影响的下游依赖**：全文 grep `HasNextPage`/`PagedResult` 仅命中 §3.9 两处（`GetHistoryMessagesAsync`/`ListConversationsAsync`），无其他方法或调用点隐式依赖"单页即全量"的假设。
+- **结论**：本轮修复本身未引入新的技术缺陷；发现 1 项 non-blocking 遗留文档缺陷（F-1，交叉引用+状态陈旧），性质与影响范围均已如实评估，不影响签字建议。
+
+### 27.6 检查项 6：C-10（"Owner 已确认"表述真伪）本轮交叉核实
+
+- **本轮立场沿用 §26.2 C-10 的原则**：评审 Agent 本身不代为判定真伪。但本轮可结合 `/memories/repo/inkwell-h3-workflow.md`（本仓库跨会话维护的真实历史记录，记录的是此前会话中已发生的、经独立复核确认为真实的 Owner 交互，而非本次评审会话臆测）做交叉核实，这与 §26 原始评审时不具备该记录访问权限的情况不同。
+- **交叉核实结果**：`/memories/repo/inkwell-h3-workflow.md` HD-017 条目原文记录——"§8 四项开放问题（审计范围/最近使用时间视角/超限行为/agui_run_events归属）后续全部真实 vscode_askQuestions 确认：A=补写审计、A=查看者视角、C=v1暂不实现、B=agui_run_events实为占位过时归Traces"，与 HD-017 文档内 §8 Q&A-A/B/C/D 现文本的四个"已解决"结论逐一比对**完全一致**；同一条目另记录"Owner 真实确认修复方向：方案A循环拉取直到 `HasNextPage=false`（不改 MaxPageSize 语义）。已在 HD-014/HD-016（errata）+ HD-017（直接改）三处统一修复"，与 HD-017 §1.3 Q8/§3.9 现文本"2026-07-08 Owner 确认，选方案 A——循环拉取直到取尽"逐字一致。HD-006 顶部 2026-07-08 errata callout 声称的确认，本条目未直接覆盖，超出本次聚焦复审范围（HD-006 正文不在本轮评审对象内），不做进一步核实。
+- **重要限定**：以上交叉核实**不等同于本评审会话亲眼见证了 `vscode_askQuestions` 交互**，而是基于持久化会话记录（该记录本身是此前独立复核流程的产物，非本次编造）做的文档一致性比对；这与 §26 C-10 当时"无任何记录可查"的情况有实质差异，故本轮可以给出比 §26 更明确的结论，但仍建议 Owner 在最终签字前自行确认一次，尤其是 HD-006 侧的确认（本轮未覆盖）。
+- **结论**：HD-017 §8 四项"已解决"标注 + B-1 修复方向确认，与独立维护的会话记录逐字一致，可信度高于"格式合规但无佐证"的原始判定；HD-006 侧确认未在本轮核实范围内，维持"建议 Owner 自行核实"的立场。
+
+### 27.7 复审结论与签字建议
+
+- **复审结论**：**PASS**——B-1（`GetHistoryMessagesAsync`/`ListConversationsAsync`/`SequenceNumber` 三处 Pagination 越界与静默计数错误）已通过循环拉取模式根治，逻辑正确、测试要求同步更新、已知性能代价如实披露；B-2（HD-006 已解决问题在 HD-017 中仍写"未解决"）四处 + database-design.md 同步点全部核实为"已解决"措辞；N-1（文件计数 5+3+4+2 应为 14）三处数字（HD-017 §2 / file-structure.md Conversations 章节 / file-structure.md Tools 章节）已统一且互相一致；N-2（`viewerUserId`/`ownerUserId` 命名不一致）已统一为 `viewerUserId`，且未与其他方法的合理 `ownerUserId` 用法混淆。
+- **新发现 1 项 non-blocking 遗留（F-1）**：§3.5"输入数据"行残留错误的 `§8 Q&A-C` 交叉引用（应为 `Q&A-B`）+ 陈旧的"语义待确认"状态（应为"已解决"）——纯文档引用错误，不影响任何字段/类型/签名正确性，不阻塞签字，建议顺手机械修正。
+- **C-10 Owner 确认真伪**：本轮结合 `/memories/repo/inkwell-h3-workflow.md` 独立会话记录交叉核实，HD-017 §8 四项确认 + B-1 修复方向确认与该记录逐字一致，可信度较高；HD-006 侧确认未覆盖本轮核实范围，仍建议 Owner 签字前自行确认一次。
+- **HD-017 `status` 是否可翻 `reviewed`——独立判断：可以，建议先机械修正 F-1**。理由：①原 2 项 blocking（B-1 真实技术缺陷、B-2 跨文档状态不同步）均有充分证据证明已真实修复，且修复内容与本轮复审逐字核实一致，无遗留同类问题；②N-1/N-2 两项 non-blocking 已一并处理完毕；③本轮新发现的 F-1 是纯文档引用错误，性质与 HD-009/HD-010/HD-014/HD-015/HD-016 等已 reviewed HD 遗留的同级 non-blocking 问题一致，不阻塞 `TestCaseAuthor`/`CodingExecutor` 起步，可与签字流程并行处理或事后 errata 补丁；④C-10 的可信度已通过独立会话记录交叉核实提升，但 HD-006 侧确认建议 Owner 仍自行核实一次。本结论是基于内容质量的独立评估，不代 Owner 判定 frontmatter `status`/`reviewers` 的最终取值。
+
+### 27.8 自检
+
+- ✅ 每条结论都附了文件路径 + 章节锚点证据
+- ✅ 未使用"看起来"/"似乎"等主观词汇
+- ✅ 未凭文件名臆测——`Pagination.MaxPageSize`/`SequenceNumber`/`viewerUserId`/`ownerUserId`/文件计数算式均逐字打开核实，全文 grep 交叉验证残留项
+- ✅ 未运行任何 git 命令
+- ✅ 未修改 HD-017 或任何其他文件正文，仅追加本节评审报告
+- ✅ 未编造任何新的"Owner 已确认"表述；§27.6 明确区分"本轮亲眼见证"与"结合持久化会话记录交叉核实"两种不同置信度，未混淆
+- ✅ 未擅自判定 frontmatter `status`/`reviewers` 应保留的当前值，仅给出"内容是否支持翻 reviewed"的独立判断
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
