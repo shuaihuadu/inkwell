@@ -2971,3 +2971,118 @@ reviewer 在 chat 中列三路径 picker：
 - ✅ 未擅自判定 frontmatter `status`/`reviewers` 应保留的当前值，仅给出"内容是否支持翻 reviewed"的独立判断
 - ✅ 未编造任何新的"Owner 已确认"表述，§25.6 逐条核实本轮改动未引入新的可疑确认表述
 - ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）
+
+## 26. HD-017 Inkwell.Core.Conversations 首轮评审（2026-07-08）
+
+> 评审对象：[HD-017 Inkwell.Core.Conversations](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md)（status: draft，2026-07-08 起草，**H3 第四张业务命名空间 HD**）+ 联动的 [database-design.md `## Inkwell.Core.Conversations` 章节](database-design.md#inkwellcoreconversations) + [file-structure.md `## Persistence/Conversations` / `## Inkwell.Abstractions.Conversations` 章节](file-structure.md#persistenceconversationshd-017-落地2026-07-08)。报告主体 §1 ~ §25 的 `status`/`reviewers` 字段**不**因本节调整。完备性判定沿用 [§22](#22-hd-014-inkwellcoreauth-首轮评审2026-07-06) / [§23](#23-hd-015-inkwellcoreagents-首轮评审2026-07-07) / [§24](#24-hd-016-inkwellcoretools-首轮评审2026-07-07) 已确立的口径——对照 requirements.md / acceptance-criteria.md 验收标准逐条核实覆盖度，不机械套用端口层"§7/§8/§9"三段式模板。全程使用 bullet list 呈现（按 user-memory `markdown-lint.md` 已知陷阱，避免中英文混排表格触发 MD060）。
+
+### 26.0 评审范围与基线
+
+- **本轮评审对象**：HD-017 全文（§1 ~ §9）+ database-design.md `## Inkwell.Core.Conversations` 章节 + file-structure.md `### Persistence/Conversations` / `## Inkwell.Abstractions.Conversations` 两处追加
+- **不在本轮范围**：HD-001 ~ HD-016 正文本身的重新评审（已在前序评审中处理，本轮仅在发现跨引用缺陷时反查）；`IConversationRepository`/`IConversationMessageRepository` 的 EFCore 实现（HD-017 §3.3/§3.4 已声明留待 HD-009 errata，本轮不评审尚不存在的内容）
+- **前置闸门**：
+  - [requirements.md](../01-requirements/requirements.md) `status: reviewed` ✅
+  - [repo-impact-map.md](../01-requirements/repo-impact-map.md) `status: reviewed` ✅
+  - HD-017 frontmatter 完整，upstream 9 项均可定位：REQ-010 / NFR-004 / NFR-005 + ADR-017 / ADR-023 + HD-001 / HD-002 / HD-006 / HD-007 / HD-015 全部真实存在
+  - **不触发** io-contracts.md §5 阻塞返回——HD-017 是合理的业务命名空间第四张切片，目录未"严重偏离" h3-detailed-design.md
+
+### 26.1 完备性扫描（对照 REQ-010 / NFR-005 / REQ-002 相关验收标准）
+
+- **REQ-010"多轮对话"子能力（长期记忆已排除）**：`pass`——[requirements.md line 130](../01-requirements/requirements.md)"多轮上下文；长期记忆策略对用户呈现"确为两个并列子能力字面；[acceptance-criteria.md AC-036](../01-requirements/acceptance-criteria.md)（多轮上下文连续）对应本 HD，AC-037（长期记忆区段切换）不对应本 HD；[repo-impact-map.md §2.10](../01-requirements/repo-impact-map.md)"与对话历史表的关系推迟到 H3；本表不预设'衍生 vs 独立'"+ 明确把长期记忆策略分派到独立 `src/server/Inkwell.Memory/`，与 HD-017 排除结论一致。证据：[HD-017 顶部治理声明第 1 条](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) vs [requirements.md line 130](../01-requirements/requirements.md) + [acceptance-criteria.md line 98-99](../01-requirements/acceptance-criteria.md) + [repo-impact-map.md line 170-176](../01-requirements/repo-impact-map.md)
+- **NFR-005"对话历史持久化"**：`pass`——[requirements.md line 164](../01-requirements/requirements.md)"所有对话历史全量存储到后端，不依赖客户端本地保存；多端登录可看到一致历史"+ [requirements.md §8.2/§8.3/§8.4](../01-requirements/requirements.md)（存到后端 / 永久保留可删除 / 归属用户）三条共同支撑本 HD 数据模型；[repo-impact-map.md line 369](../01-requirements/repo-impact-map.md)"Inkwell.Conversations/ NFR-005"确认模块归属。证据：[HD-017 §1.1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#11-职责) vs [requirements.md line 164](../01-requirements/requirements.md)
+- **REQ-002"我使用过"/"最近使用时间"查询**：`pass`——[acceptance-criteria.md AC-012](../01-requirements/acceptance-criteria.md)"用户与 Agent 在 UI-005 有过任意对话"+ AC-013"最近使用时间"均对应本 HD 提供的查询能力；已 reviewed 的 [HD-015 §1.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#12-范围) 原文确实两处显式声明"本 HD 不实现该查询...留待 `Inkwell.WebApi` 结合未起草的 `Inkwell.Core.Conversations` 拼装"，核实 HD-017 转述准确，且 HD-017 未反向修改 HD-015（`AgentSummary` 无新增字段）。证据：[HD-017 顶部治理声明第 3 条](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) vs [acceptance-criteria.md line 50-51](../01-requirements/acceptance-criteria.md) vs HD-015 §1.2 原文
+- **`ConversationOptions.MaxMessagesPerConversation` 依据**：`pass`——[requirements.md line 172](../01-requirements/requirements.md)"单 Agent 单次对话最大轮数：默认不限，但提供配置项可设上限"字面与 §3.7 `MaxMessagesPerConversation` 默认 `null` 设计一致
+- **文件结构 / 每个程序文件职责**：`partial`——§3.1~§3.10 共 10 个文件小节、10 字段表格基本填写完整；但 §3.9 `ConversationService.cs`"内部函数或类"列**仅描述了 `StartConversationAsync`/`AppendMessageAsync`/`ClearConversationAsync`/`ExtractTitle` 四个成员的实现逻辑**，`IConversationService` 另外 4 个方法（`GetHistoryMessagesAsync`/`ListConversationsAsync`/`ListUsedAgentIdsAsync`/`GetLastActivityByAgentsAsync`，含本 HD §1.1 职责第 2 条列为"核心存在理由"的 `GetHistoryMessagesAsync`）**未被描述任何实现逻辑**。其中 `GetHistoryMessagesAsync` 缺失的实现逻辑经进一步核查发现与 `IConversationMessageRepository.ListMessagesByConversation` 的强制 `Pagination` 参数存在真实的可实现性冲突（详见 §26.2 C-1，判定 blocking）。证据：[HD-017 §3.9](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) "内部函数或类"列
+- **数据库设计**：`pass`——`conversations`/`messages` 两表字段/索引/约束齐全，已同步追加到 database-design.md 且顶层表清单行已从 `TBD` 更新为 `HD-017`；`agui_run_events` 表归属疑问（Q&A-D）如实保留 `TBD`，未越权修改。但 database-design.md 该章节末尾"2026-07-08 待确认"提示行与 HD-017 §8 四项 Q&A 均已标"已解决"的现状不同步（详见 §26.2 C-3，判定 blocking 的一部分）
+- **配置文件字段 / 默认值**：`pass`——`ConversationOptions` 2 字段（`MaxMessagesPerConversation`/`EnableSensitiveDataLogging`）+ `[Range]` + Validator，命名与既有 HD 风格一致
+
+**完备性结论**：对照 REQ-010（子能力排除有充分证据）/ NFR-005 / REQ-002 相关验收标准，覆盖度 `pass`；数据库设计 `pass`（附 1 项文档同步缺口）；文件结构 `partial`——`IConversationService` 8 个方法中 4 个（含最核心的 `GetHistoryMessagesAsync`）缺少实现逻辑描述，其中 1 个已核实存在真实的可实现性冲突。整体完备性**不足以直接推荐进入 H4/H5**，需先处理 §26.3 blocking 项。
+
+### 26.2 一致性扫描（HD-017 ↔ HD-002 / HD-006 / HD-007 / HD-015 / ADR-023 / AGENTS.md §3.2 / database-design.md / file-structure.md）
+
+- **C-1（BLOCKING）**——`GetHistoryMessagesAsync`（[§1.3 Q8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)"返回该会话**全部**消息，不做分页/截断"）与 `ListConversationsAsync`（[§3.5](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs) 返回 `IReadOnlyList<ConversationSummary>`，不分页）两个"承诺返回全量结果"的服务方法，其唯一可用的底层数据源 `IConversationMessageRepository.ListMessagesByConversation` / `IConversationRepository.ListConversationsByAgent`（[§3.3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs)/[§3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#34-persistenceconversationsiconversationmessagerepositorycs)）均强制要求 `Pagination` 参数，而 [HD-001 §3.6 `Pagination`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 构造期硬编码 `PageSize > 100 → ArgumentOutOfRangeException`（`MaxPageSize = 100`）。即：一旦会话消息数或某 Agent 名下会话数超过 100 条，`ConversationService` 无法用单次 `ListMessagesByConversation`/`ListConversationsByAgent` 调用取回"全部"结果——设计中未描述任何"多页循环拉取直至取尽"的实现方案（§3.9 对这两个方法压根未提供实现逻辑描述，见 §26.1 完备性扫描）。**该问题的另一处独立佐证**：[§3.9](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) `AppendMessageAsync` 内部计算 `SequenceNumber` 的方式明确写"`ListMessagesByConversation` **大页拉取后取 `Items.Count`**"——这一表述本身即隐含"用一次大 `PageSize` 拉到全部消息"的假设，但 `Pagination.MaxPageSize = 100` 使该假设在会话消息数超过 100 后失效：`Items.Count` 只会是 100（当前页大小上限），而非真实总消息数，导致 `SequenceNumber` 从第 101 条消息起持续计算错误（新消息会与已有消息发生 `SequenceNumber` 重复），是一个**静默的数据完整性缺陷**，不会在功能测试早期被发现（v1 大多数测试场景消息数远小于 100）。三处症状（`GetHistoryMessagesAsync` 无法实现"全量返回"承诺、`ListConversationsAsync` 同类问题、`SequenceNumber` 计算静默出错）根因相同：`IConversationService` 层的"不分页"承诺与 `IConversationRepository`/`IConversationMessageRepository` 层强制的 `Pagination`（硬上限 100）之间存在未被发现的架构断层。证据：[HD-017 §1.3 Q8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要) + [§3.5](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs) + [§3.9 `SequenceNumber` 描述](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) vs [HD-001 §3.6 `Pagination.MaxPageSize = 100`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)
+- **C-2（BLOCKING）**——[HD-006 2026-07-08 errata](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 已实际修复 HD-017 起草期发现的两处问题：(1) `AgentRunRequest.Messages` 字段说明已从"`Inkwell.Conversations` 组装"精确化为"由 `Inkwell.WebApi` 查询 [HD-017 `Inkwell.Core.Conversations`](../Inkwell.Core/HD-017-Inkwell.Core.Conversations.md)"（[HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 现文本核实）；(2) `AgentMessageContentPart` 已补齐 `[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]`/`[JsonDerivedType(...)]` 特性标注（[HD-006 §3.5](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 现文本核实）。但 HD-017 正文**至少 4 处**仍将这两点描述为"未解决的已知缺口"：①[§1.4 末段"已知技术缺口"callout](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)（"在 HD-006 补齐该特性标注之前，本设计在实现期（H5）会遇到反序列化失败"）；②[§3.2 测试要求](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#32-persistenceconversationsconversationmessagecs)（"该测试在 HD-006 §1.4 缺口修复前预期失败...标注 `[Ignore]`"）；③[§6 数据库设计增量](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#6-数据库设计增量追加至-database-designmd) `ContentJson` 字段说明（"依赖 HD-006 补齐 `[JsonPolymorphic]` 特性标注"）；④[§9 消费关系纠正与 HD-006 措辞精确化建议](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#9-消费关系纠正与-hd-006-措辞精确化建议供总结确认非本次擅自修改)整节以"供总结确认，非本次擅自修改"的口吻重复提出这两个已经被解决的问题。同样，[database-design.md `## Inkwell.Core.Conversations` 章节](database-design.md#inkwellcoreconversations)的 `ContentJson` 行与"2026-07-08 待确认"提示行也持有相同的过时表述。此为真实的跨文档状态不同步：读者（尤其是 H4 `TestCaseAuthor` / H5 `CodingExecutor`）若按 HD-017 字面执行，会把 `ConversationMessageTests.cs` 的序列化往返测试错误标注为 `[Ignore]`，并对已经解决的问题重复发起"总结确认"，造成不必要的返工与流程空转。证据：[HD-006 §3.2/§3.5 现文本](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) vs [HD-017 §1.4/§3.2/§6/§9](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 四处遗留表述 vs [database-design.md `## Inkwell.Core.Conversations`](database-design.md#inkwellcoreconversations) 末尾"2026-07-08 待确认"行
+- **C-3（NON-BLOCKING）**——`Inkwell.Core.csproj` 累计文件数算式错误：HD-017 自身"文件计数"段（[§2](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#2-文件结构)）写"5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= 16"，但 5+3+4+2 实际等于 **14**，非 16；已 reviewed 的 [HD-016 §2 自述](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#2-文件结构)明确"`Inkwell.Core.csproj` 在 `Tools/` 新增 4 个...累计（HD-014 起）5（HD-014）+ 3（HD-015）+ 4（HD-016）= **12**"，与 HD-017 自身援引的"4（HD-016）"输入值一致，但 HD-017 求和结果错误。另一侧，[file-structure.md line 559](file-structure.md#persistenceconversationshd-017-落地2026-07-08)"5（HD-014）+ 3（HD-015）+ 6（HD-016）+ 2（HD-017）= 16"用的是**已过期的"6（HD-016）"**（[file-structure.md line 520-528](file-structure.md#inkwellabstractionstools) 的 `Inkwell.Core/Tools/` 代码块仍列出 `IToolExecutor.cs`/`ToolExecutorRegistry.cs` 两个已在 HD-016 2026-07-07 第三轮 YAGNI 简化中删除的文件，该处 stale 内容在 [§25.3](#253-检查项-3itoolexecutortoolexecutorregistry-移除是否彻底pass) 复审 HD-016 时核对的是 HD-016 本体/database-design.md，未覆盖 file-structure.md 这处 `## Inkwell.Abstractions.Tools` 之后紧邻的 `Inkwell.Core.Tools` 实现代码块）。三处数字（HD-016 自述 12、HD-017 自述 16、file-structure.md 16）两两不一致，正确值应为 **14**。此为纯计数错误 + 一处遗留 stale 代码块，不影响任何字段/类型/签名的正确性，但会误导未来 HD 起草时的累计基线。证据：[HD-017 §2](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#2-文件结构) vs [HD-016 §2](Inkwell.Core/HD-016-Inkwell.Core.Tools.md#2-文件结构) vs [file-structure.md line 520-529](file-structure.md#inkwellabstractionstools) vs [file-structure.md line 548-559](file-structure.md#persistenceconversationshd-017-落地2026-07-08)
+- **C-4（PASS）**——依赖规则核查（[AGENTS.md §3.2](../../AGENTS.md)）：全文 grep `Microsoft\.Agents\.AI|StackExchange\.Redis|Npgsql|EntityFrameworkCore\.SqlServer|Minio|Azure\.Storage|using` 仅命中顶部"依赖规则遵循"声明句本身（描述"不得引用"的文字），全文**不存在**任何 Provider 包或 `Microsoft.Agents.AI.*` 的真实引用；持久化经 `IPersistenceProvider.GetRepository<IConversationRepository>()`/`GetRepository<IConversationMessageRepository>()`（事务外读）/ `IUnitOfWork.GetRepository<...>()`（事务内写）双入口模式，与 [HD-002 §13.3 Q1=A2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) 已锁定的模式一致。证据：全文 grep 仅 1 处命中，非代码引用
+- **C-5（PASS）**——`ConversationMessage.Role`/`AgentChatRole`/`AgentMessageContentPart` 类型引用核实：[HD-006 §3.4](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) `AgentChatRole` 枚举（`System`/`User`/`Assistant`/`Tool`）与 HD-017 §3.2 引用一致；`ConversationMessage.ContentJson` 序列化目标类型 `AgentMessageContentPart` 封闭子类型族（`TextPart`/`ImagePart`/`DocumentPart`）字段名核对一致。证据：[HD-017 §3.2](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#32-persistenceconversationsconversationmessagecs) vs [HD-006 §3.4/§3.5](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)
+- **C-6（PASS）**——`IAgentRepository.GetAgent`（[HD-015 §3.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#32-persistenceagentsiagentrepositorycs)）在 HD-017 §3.9 `StartConversationAsync` 内部逻辑中的调用签名核对一致（`GetAgent(agentId)` 找不到抛 `KeyNotFoundException`）；`AgentDefinition`/`User` 的 `Id: Guid` 主键类型核对与 `Conversation.AgentId`/`OwnerUserId: Guid` 字段类型一致，无隐式类型转换风险。证据：[HD-017 §3.9](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) vs [HD-015 §3.2](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#32-persistenceagentsiagentrepositorycs)
+- **C-7（PASS）**——`IConversationRepository`/`IConversationMessageRepository` 方法命名（`AddConversation`/`GetConversation`/`UpdateConversation`/`ListConversationsByAgent`/`FindUsedAgentIdsByOwner`/`FindLastActivityByAgents` + `AddMessage`/`ListMessagesByConversation`/`DeleteMessage`/`DeleteMessagesByConversation`）逐一核对 [HD-002 §4.1.3 动词白名单](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#413-repository-方法动词白名单2026-05-11-errataf6--adr-022)：全部以 `Add`/`Get`/`Update`/`List`/`Find`/`Delete` 之一开头，无 `Async` 后缀，均合规。证据：[HD-017 §3.3/§3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs)
+- **C-8（PASS）**——`IAuditLogger.LogAsync`/`AuditContext(Guid ActorUserId, string ActionType, ...)` 签名核对：[HD-007 §3.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) `AuditLogRequest(AuditContext Context, ...)` + [HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) `AuditContext` 字段名（`ActorUserId`/`ActionType`）与 HD-017 §3.9 引用一致（`ActionType="conversation_message_deleted"`/`"conversation_cleared"`，`ActorUserId`=调用方传入的 `actorUserId`）；该处对 `ResourceType`/`ResourceId`（`AuditContext` 另两个必填字段）未显式提及，但核对已 reviewed 的 [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) 审计调用描述同样省略这两个字段的显式说明，属本仓库业务命名空间层已确立的文档抽象层级（非 HD-017 独有缺陷），不单独判定为不一致。证据：[HD-017 §3.9](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#39-inkwellcoreconversationsconversationservicecs) vs [HD-007 §3.1](Inkwell.Abstractions/HD-007-Inkwell.Abstractions-audit-logger-port.md) vs [HD-001 §3.7](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)
+- **C-9（NON-BLOCKING）**——参数命名不一致：[§3.5 `IConversationService.GetLastActivityByAgentsAsync`](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs) 第二参数命名为 `viewerUserId`，而其底层 [§3.3 `IConversationRepository.FindLastActivityByAgents`](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs) 同一语义位置参数命名为 `ownerUserId`——两者指代同一个"查看者/参与用户"概念（[§1.3 Q1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要) 已明确 `OwnerUserId` 语义 = 会话参与用户），命名差异容易让实现者误以为两层存在语义区分。不影响功能正确性（纯命名一致性问题）。证据：[HD-017 §3.3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#33-persistenceconversationsiconversationrepositorycs) vs [§3.5](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#35-conversationsiconversationservicecs)
+- **C-10（信息性，非技术一致性判据）**——文件顶部"2026-07-08 Owner 确认（§8 四项，`vscode_askQuestions` 真实交互）"总结段 + §8 Q&A-A/B/C/D 四处"已解决"标注 + [HD-006 §顶部 2026-07-08 errata callout](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)本身，均声称"Owner 在本次会话中通过 `vscode_askQuestions` 真实确认"。**按任务要求，本项不由评审 Agent 代为判定真伪**：本次评审会话未见证任何 `vscode_askQuestions` 交互记录支撑这五处表述（HD-017 四项 Q&A + HD-006 一项 errata，且从时间戳与叙事上看像是同一次会话的产物）。格式本身符合本仓库已建立的"治理修正说明"标准写法，但格式合规不等于内容真实——按 `/memories/repo/inkwell-h3-workflow.md` 已记录的"第 1~6 次复发"处理模式，请 Owner 在签字前自行核实这五处确认是否确实发生。
+
+**一致性结论**：10 项检查中 2 项 `BLOCKING`（C-1/C-2）、2 项 `NON-BLOCKING`（C-3/C-9）、1 项信息性记录（C-10，非 pass/fail 判据）、其余 5 项 `PASS`。
+
+### 26.3 反问清单
+
+#### Blocking
+
+##### B-1：`GetHistoryMessagesAsync`/`ListConversationsAsync` 的"全量不分页"承诺与 `Pagination.MaxPageSize=100` 硬约束冲突，且 `SequenceNumber` 计算方式在会话消息数超过 100 后静默出错（C-1）
+
+- **问题**：`IConversationService.GetHistoryMessagesAsync`（[§1.3 Q8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）与 `ListConversationsAsync`（§3.5）均设计为返回"全部"结果、不分页，但唯一可用的底层 Repository 方法（`ListMessagesByConversation`/`ListConversationsByAgent`）强制要求 `Pagination` 参数，而 [`Pagination.MaxPageSize` 硬编码为 100](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)（越界抛 `ArgumentOutOfRangeException`）。设计中未提供任何"循环多页拉取直至取尽"的实现方案（§3.9 对这两个方法完全没有实现逻辑描述）。更严重的是，`AppendMessageAsync` 内部计算 `SequenceNumber` 时依赖同一个"大页拉取取 `Items.Count`"的假设——一旦会话消息数超过 100，该假设失效，`SequenceNumber` 会从第 101 条消息起持续计算错误（新旧消息序号重复），属于**静默的数据完整性缺陷**，在 v1 早期测试场景（消息数普遍 < 100）中不会被察觉
+- **影响范围**：`TestCaseAuthor` 若不知晓这一冲突，设计的用例大概率只覆盖"少量消息"场景，遗漏"消息数 > 100"这一真实会触发数据错误的边界；`CodingExecutor` 若照单实现"返回全部消息、不分页"的字面要求，要么会在超过 100 条消息时抛出未处理的 `ArgumentOutOfRangeException`（如果直接把无限大 `PageSize` 传给 `Pagination` 构造函数），要么会静默返回不完整的历史（如果固定用 `PageSize=100` 单页拉取），两种结果都不满足 [AC-036](../../01-requirements/acceptance-criteria.md) 多轮上下文连续的验收要求；`SequenceNumber` 重复还可能破坏 `(ConversationId, SequenceNumber)` 复合索引的排序语义
+- **建议方向**（不替设计师下结论，仅给方向）：
+  - 选项 1：`ConversationService` 内部对 `ListMessagesByConversation`/`ListConversationsByAgent` 做多页循环拉取（`do...while` 直至 `PagedResult.HasNextPage == false`），在 §3.9 补充该实现逻辑，并同步补充 `SequenceNumber` 计算改为基于循环拉取后的真实累计数，而非单页 `Items.Count`
+  - 选项 2：在 `IConversationRepository`/`IConversationMessageRepository` 新增一个不受 `Pagination` 约束的"count-only"方法（如 `CountMessagesByConversation`），供 `SequenceNumber` 计算与 `GetHistoryMessagesAsync` 判断是否需要多页拉取时使用，避免每次都要拉取完整数据只为计数
+  - 选项 3：若 Owner 认为 v1 单会话消息数 / 单 Agent 会话数超过 100 是可接受的极端场景（概率评估留 Owner 判断），可显式在 `ConversationOptions`/§1.3 Q8 补充"本设计假设单会话消息数 < 100，超过部分行为未定义"的声明，并将其列入已知限制而非留待运行期暴露
+  - reviewer 倾向选项 1 + 2 组合（`SequenceNumber` 独立走 count-only 方法性能更好，`GetHistoryMessagesAsync` 走循环拉取保证正确性），但选择权在 Owner
+- **卡点等级**：**blocking**
+- **追溯**：C-1
+
+##### B-2：HD-017 §1.4/§3.2/§6/§9 四处仍将已被 HD-006 2026-07-08 errata 实际修复的两个问题描述为"未解决"（C-2）
+
+- **问题**：HD-006 已在 2026-07-08 errata 中修复"`AgentRunRequest.Messages` 消费方措辞"与"`AgentMessageContentPart` 补齐 `[JsonPolymorphic]`/`[JsonDerivedType]`"两处问题（经打开 HD-006 §3.2/§3.5 现文本核实），但 HD-017 正文 §1.4 末段"已知技术缺口"callout、§3.2 测试要求（"标注 `[Ignore]`"）、§6 数据库设计增量 `ContentJson` 行、§9 整节，仍将这两个问题描述为悬而未决、需要"总结确认"；database-design.md 对应章节末尾"2026-07-08 待确认"提示行同样过时
+- **影响范围**：`H4`/`H5` 读者若按 HD-017 字面执行，会把 `ConversationMessageTests.cs` 的序列化往返测试错误标注为 `[Ignore]`（实际已可正常通过），并对已解决的问题重复发起确认，造成不必要的返工
+- **建议方向**：
+  - 移除或改写 §1.4"已知技术缺口"段为"已解决"说明（引用 HD-006 2026-07-08 errata）
+  - §3.2 测试要求中"标注 `[Ignore]`"的指导需相应移除，改为正常要求该测试必须通过
+  - §6 `ContentJson` 行"依赖 HD-006 补齐...特性标注"的措辞需更新为"已由 HD-006 2026-07-08 errata 补齐"
+  - §9 整节内容已无需再向用户"总结确认"（问题已解决），可整节改写为"已解决说明"或移除
+  - database-design.md 对应"2026-07-08 待确认"提示行需同步更新
+  - 这是纯粹的文档状态同步，不涉及新的技术决策，**不需要 Owner picker**，可直接由 author 子代理机械修正
+- **卡点等级**：**blocking**
+- **追溯**：C-2
+
+#### Non-blocking
+
+##### N-1：`Inkwell.Core.csproj` 累计文件数三处不一致，正确值应为 14（C-3）
+
+- **问题**：HD-017 自身"文件计数"段算式"5+3+4+2=16"存在加法错误（实际=14）；file-structure.md 使用了 HD-016 YAGNI 简化前的过时值"6（HD-016）"（该处 `Inkwell.Core/Tools/` 代码块仍列出已删除的 `IToolExecutor.cs`/`ToolExecutorRegistry.cs`）；已 reviewed 的 HD-016 §2 自述累计到 HD-016 为止是 12。三处数字互相矛盾
+- **影响范围**：不影响本 HD 任何字段/类型/签名正确性，但会误导未来 `Inkwell.Core.Models`/`.Skills` 等剩余业务 HD 起草时援引的累计文件数基线
+- **建议方向**：HD-017 §2 算式改为"5+3+4+2=14"；file-structure.md line 520-528 `Inkwell.Core/Tools/` 代码块移除 `IToolExecutor.cs`/`ToolExecutorRegistry.cs` 两行（与 HD-016 §2/§7 保持一致），line 529/559 累计数改为 12/14
+- **卡点等级**：non-blocking
+- **追溯**：C-3
+
+##### N-2：`GetLastActivityByAgentsAsync` 与 `FindLastActivityByAgents` 同一参数使用不同命名（`viewerUserId` vs `ownerUserId`）（C-9）
+
+- **问题**：service 层与 repository 层对同一语义参数（会话参与用户）使用了不同的参数名，容易让实现者误以为两层存在语义差异
+- **影响范围**：不影响功能正确性，纯代码可读性/一致性问题
+- **建议方向**：统一命名（建议均采用 `viewerUserId`，与 [§8 Q&A-B](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题) 讨论的"查看者视角"措辞对齐）
+- **卡点等级**：non-blocking
+- **追溯**：C-9
+
+### 26.4 评审结论与下一步
+
+- **整体评审决议**：**REJECT**——HD-017 对 REQ-010（多轮对话子能力排除有充分证据）/ NFR-005 / REQ-002 相关验收标准的范围切分证据链扎实，依赖规则遵守核查通过（全文无 Provider 包/`Microsoft.Agents.AI.*` 引用），Repository 动词命名 / 类型引用（HD-002/HD-006/HD-007/HD-015）核对准确；但发现 **2 项 blocking**：B-1 是真实的技术可实现性缺陷（`GetHistoryMessagesAsync`/`ListConversationsAsync` 的"全量不分页"承诺无法用现有 Repository 契约兑现，且 `SequenceNumber` 计算方式在会话消息数超过 100 后会静默产生数据完整性错误），B-2 是跨文档状态不同步（HD-006 已修复的问题在 HD-017 中仍被描述为未解决，会误导 H4/H5 按过时指导行事）。两项均需先修复才能推荐进入下一轮
+- **HD-017 翻 `reviewed` 前置条件**：
+  1. ⬜ 修复 B-1——需要 Owner 在三个技术方向（循环分页拉取 / 新增 count-only Repository 方法 / 显式声明消息数上限假设）中做选择，**建议走 Owner picker**（这是真实的技术方案分歧，不是纯机械修正）
+  2. ⬜ 修复 B-2——**纯机械性文档同步修正，不需要 Owner picker**，可直接由 author 子代理处理（同步 HD-017 §1.4/§3.2/§6/§9 + database-design.md 对应行）
+  3. ⬜ Owner 在 HD-017 frontmatter 翻 `status: draft → reviewed` + 填 `reviewers: [Inkwell]`（人工签字位，AI 不代签）——修复 B-1/B-2 并经聚焦复审后再进行
+- **需要人类核实的问题（不由本评审 Agent 代为判定真伪）**：HD-017 顶部"2026-07-08 Owner 确认（§8 四项）"+ §8 Q&A-A/B/C/D 四处"已解决"标注 + HD-006 顶部"2026-07-08 errata"callout，均声称经由 `vscode_askQuestions` 真实确认（详 §26.2 C-10）。本次评审会话未见证任何相关交互记录，请 Owner 在签字 `reviewed` 前自行核实这五处确认（Q&A-A 补写审计 / Q&A-B 查看者视角 / Q&A-C v1 暂不实现超限行为 / Q&A-D `agui_run_events` 归属 `.Traces` / HD-006 措辞精确化+序列化特性补齐）是否确实发生过
+- **HD-017 是否可推荐翻 `reviewed`**：**不推荐**——B-1（真实技术缺陷）与 B-2（跨文档状态不同步）均需先处理；处理后建议做一次聚焦复审（仅核对 B-1/B-2/N-1/N-2 四项修复点），聚焦复审通过后，仍需 Owner 自行核实上述"需要人类核实的问题"方可签字
+- **后续路径建议**：B-1 走 Owner picker 定技术方向 → B-2 机械修正 → N-1/N-2 视 Owner 意愿一并处理 → 聚焦复审 → Owner 自行核实 C-10 五处确认 → Owner 签字 `reviewed`
+
+### 26.5 自检
+
+- ✅ 每条 `pass`/`partial`/`blocking`/`non-blocking` 结论都附了文件路径 + 章节锚点证据
+- ✅ `blocking` 反问（B-1/B-2）均能映射到具体一致性冲突（C-1/C-2）+ 影响范围 + 可执行的选项化建议方向，未替设计师下结论
+- ✅ 未使用"看起来"/"似乎"/"感觉"等主观词汇
+- ✅ 未凭文件名臆测——`Pagination.MaxPageSize`/`AuditContext` 字段名/HD-006 现文本/HD-015 现文本/HD-016 §2 自述/file-structure.md 代码块均逐字打开核实
+- ✅ 未尝试用部分数据写"半个报告"——前置闸门已确认通过
+- ✅ 未运行任何 git 命令
+- ✅ 未修改 HD-017 或任何其他 HD 正文，仅追加本节评审报告
+- ✅ 未给越界建议
+- ✅ 按任务明确要求，对"2026-07-08 Owner 确认"类表述**未自行判定真伪**，已在 §26.2 C-10 + §26.4 单独列为"需要人类核实的问题"
+- ✅ 完备性判定遵循已确立口径（§22/§23/§24 先例），对照 REQ-010/NFR-005/REQ-002 验收标准核实，未机械套用端口层三段式模板
+- ✅ 报告路径仍走 H3 规范默认 design-review-report.md（追加 §26 而非新建文件）
+- ✅ 全程使用 bullet list 呈现（避免中英文混排表格触发 MD060）

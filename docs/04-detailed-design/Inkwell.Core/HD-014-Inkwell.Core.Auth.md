@@ -44,6 +44,8 @@ upstream:
 > - 密码哈希算法 = **PBKDF2（`Rfc2898DeriveBytes`，BCL 内置）**——不引入 `BCrypt.Net-Next` / `Konscious.Security.Cryptography.Argon2` 等第三方包，符合业务命名空间零外部依赖原则
 >
 > 详见 [§7 决策记录](#7-决策记录)。
+>
+> **2026-07-08 errata（跨 HD 缺陷修复：`ListAccountsAsync` 分页越界）**：默认 Agent 复核发现原设计 `ListAccountsAsync`（[§4.1](#41-authservice-核心流程)）以 `new Pagination(1, 1000)` 一次性大页拉取，但 [HD-001 §3.x `Pagination`](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 构造期强制校验 `PageSize in [1, MaxPageSize]`（`MaxPageSize = 100`），`PageSize = 1000` 越界会在构造 `Pagination` 实例本身时直接抛出 `ArgumentOutOfRangeException`，运行期必然失败，与 [HD-016](HD-016-Inkwell.Core.Tools.md) `ListAvailableToolsAsync` 属同类缺陷。Owner 于 2026-07-08 本次会话真实确认修复方向：**采用方案 A——调用点改为循环拉取直至取尽**（每页 `PageSize = Pagination.MaxPageSize`，不提高 `MaxPageSize` 本身、不改写 [HD-001](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md) 定义），详见 [§4.1](#41-authservice-核心流程) 更新后的 `ListAccountsAsync` 描述。
 
 ## 1. 模块概述
 
@@ -350,7 +352,7 @@ src/core/Inkwell.Core/
 - **`ValidateSessionAsync`**：纯 Cache 读路径，不触达 `IPersistenceProvider`（性能优先，[HD-004 §1.3](../Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md#13-关键决策摘要) TTL 到期自动失效，无需业务侧二次校验 `IsLocked`——[§1.2](#12-范围) 已声明"已激活会话在锁定瞬间不主动失效"为已知边界）。
 - **`VerifyPasswordForUnlockAsync`**（[UF-002](../../01-requirements/user-flow.md#uf-002-自动锁定与解锁)）：密码正确 → `FailedUnlockAttempts` 重置为 0；密码错误 → 计数 +1，达 `AuthOptions.MaxFailedUnlockAttempts` 则同时置 `IsLocked=true`，两种错误路径均通过同一次 `ExecuteInTransactionAsync` 写回，避免竞态窗口。
 - **`UnlockAccountAsync`**（[UF-012](../../01-requirements/user-flow.md#uf-012-admin-解封账号) + [AC-067](../../01-requirements/acceptance-criteria.md)）：`IsLocked=false` + `FailedUnlockAttempts=0` 同一事务写回；`actorUserId` 的 `IsSuper` 校验**不**在本方法内重复（[§1.2](#12-范围) 已声明为 WebApi 授权中间件职责）。
-- **`ListAccountsAsync`**：`isLocked=null` 时以 `Pagination(1, 1000)`（覆盖 [requirements.md §6](../../01-requirements/requirements.md) ~100 用户软目标上限的 10 倍冗余）调用 `IUserRepository.ListUsers` 后映射；`isLocked` 非 null 时改调 `FindUsersByLockedStatus`。
+- **`ListAccountsAsync`**（2026-07-08 errata，修复原 `Pagination(1, 1000)` 越界缺陷）：`isLocked=null` 时**循环分页拉取直至取尽**——`page` 从 `1` 起，每次以 `new Pagination(page, Pagination.MaxPageSize)`（[HD-001 `MaxPageSize=100`](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）调用 `IUserRepository.ListUsers`，把每次返回的 `PagedResult<User>.Items` 累加进结果列表后 `page` 自增，直至 `PagedResult<User>.HasNextPage`（[HD-002 §3.4](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#34-persistencepagedresultcs)）为 `false` 停止循环，最终整体映射为 `IReadOnlyList<AuthAccountSummary>`；该循环模式不依赖任何硬编码的用户规模假设，即使未来用户数超过 [requirements.md §6](../../01-requirements/requirements.md) ~100 软目标，依然正确产出全量结果。`isLocked` 非 null 时改调 `FindUsersByLockedStatus`（该方法本身不分页，返回裸 `Task<IReadOnlyList<User>>`，不受本次修复影响）。
 
 ## 5. 数据库设计增量（追加至 [database-design.md](../database-design.md)）
 
