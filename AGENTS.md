@@ -1,9 +1,10 @@
 # Inkwell
 
 > AI 协作单一事实源——遵循 [AGENTS.md 跨工具开放约定](https://agents.md/)。
-> 本仓库采用 [Harness Engineering](.he/HANDBOOK.md) 作为工程骨架。
 >
-> **本文件状态**：本草稿由 AI 基于 H1 [requirements.md](docs/01-requirements/requirements.md) + H2 [architecture.md](docs/03-architecture/architecture.md) / [tech-selection.md](docs/03-architecture/tech-selection.md) / 16 ADR + [repo-impact-map.md §3.1](docs/01-requirements/repo-impact-map.md) 起草。**§1 / §3 是项目负责人签字位**——AI 不替签：Owner 评审后直接修改本文件并在评审记录中登记。
+> **2026-07-08 流程调整**：本仓库此前采用 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 工程骨架（H1–H6 阶段门 + Custom Agent 流水线）起草了 `docs/` 下全部需求 / 架构 / 详细设计文档；这些文档本身继续作为项目的单一事实源保留和维护。经评估，该流程对当前敏捷开发节奏而言过重，已卸载 Harness Engineering 工具链（`.he/` + 配套 `.github/agents|instructions|skills|templates`），后续迭代改用更轻量的协作方式，具体约定见下方 §5。
+>
+> **本文件状态**：本文件历史内容由 AI 基于 H1 [requirements.md](docs/01-requirements/requirements.md) + H2 [architecture.md](docs/03-architecture/architecture.md) / [tech-selection.md](docs/03-architecture/tech-selection.md) / 16 ADR + [repo-impact-map.md §3.1](docs/01-requirements/repo-impact-map.md) 起草。**§1 / §3 是项目负责人签字位**——AI 不替签：Owner 评审后直接修改本文件并在评审记录中登记。
 >
 > **2026-05-10 增量更新**：H2 评审接受 [ADR-017 Ports & Adapters 后端拓扑](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-018 IQueueProvider 双 Provider](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) + [OQ-A008 closed §B](docs/03-architecture/open-questions-arch.md)；§3.1 / §3.2 / §3.3 / §3.4 / §4 由 AI 在 Owner 一次性授权下同步应用，请在 [docs/07-reviews/2026-05-10-h2-architecture-retrofit.md] 评审记录中复核。
 >
@@ -19,8 +20,8 @@
 
 ## 1. 项目身份
 
-> Inkwell 是一个 dogfooding 项目——完整采用 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 工程规范，基于 Microsoft Agent Framework 打造一个可工作的“智能体工厂”。
-> 项目目标是用真实落地的代码与文档，端到端验证这套规范 + 配套工具链的有效性。
+> Inkwell 基于 Microsoft Agent Framework 打造一个可工作的“智能体工厂”，供团队成员自助创建 / 配置 / 使用 / 共享 LLM Agent。
+> 项目早期（H1–H3 设计阶段）采用 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 工程规范起草了 `docs/` 下的需求、架构与详细设计文档；2026-07-08 起改用更轻量的协作流程（见 §5），`docs/` 产出物本身不受此次流程调整影响，继续作为单一事实源。
 
 **当前阶段**：H2（已 Approved，详见 [docs/07-reviews/2026-05-10-h2-architecture-review.md](docs/07-reviews/2026-05-10-h2-architecture-review.md)）；准备进入 H3 详细设计。
 
@@ -186,20 +187,17 @@
 
 ## 4. 文档入口
 
-- 操作手册：[`.he/HANDBOOK.md`](.he/HANDBOOK.md)
-- 阶段细则（H1–H6）：[`.he/docs/stages/`](.he/docs/stages/)
 - 需求 / 原型 / 架构 / 详细设计 / 测试 / 任务 / 评审 / 发布：`docs/01-requirements/` … `docs/08-releases/`
 - 仓库影响图（H1 ↔ H3 衔接）：[`docs/01-requirements/repo-impact-map.md`](docs/01-requirements/repo-impact-map.md)
 - ADR 目录：[`docs/03-architecture/adr/`](docs/03-architecture/adr/)（22 条均 accepted）
-- 模板与 Skill：`.github/templates/` 与 `.github/skills/`
-- 多语言代码风格：[`.he/docs/instructions-layout.md`](.he/docs/instructions-layout.md)
-- Copilot 实施细节：[`.github/copilot-instructions.md`](.github/copilot-instructions.md)
-- 提交规范：[`.github/instructions/commit-format.instructions.md`](.github/instructions/commit-format.instructions.md)
+- H3 详细设计评审记录：[`docs/04-detailed-design/design-review-report.md`](docs/04-detailed-design/design-review-report.md)
 
 ## 5. 给 AI 工具的通用指令
 
-- **修改前先读**：上方 §3 模块边界 / 禁区、对应任务的 `docs/06-tasks/T-NNN-*.md`、相关详细设计章节、相关 ADR
-- **代码 / 提交 / 文档约束**：见 [`.github/instructions/`](.github/instructions/)（按 `applyTo` 自动加载）
-- **签字位**：`status: draft → reviewed`、`reviewers: []`、本文件 §1 / §3 一律由人工填，AI / Custom Agent / 安装脚本不替签
-- **风格与禁区违反**：阻塞返回，不要尝试绕路（参见 [`.github/copilot-instructions.md` §5 "反模式"](.github/copilot-instructions.md) + [`.he/agents/_shared/io-contracts.md` §5 "阻塞返回"](.he/agents/_shared/io-contracts.md)）
-- **追溯链**：所有变更必须能映射到 `REQ-NNN`（需求）+ `HD-NNN` / `API-NNN` / `DB-NNN`（设计）+ `TC-NNN`（测试）+ `TASK-NNN`（任务），缺一律先补 docs 再写代码
+> 2026-07-08 起不再使用 Harness Engineering 的 Custom Agent / Skill / Instructions 自动加载机制，以下为轻量化后的通用约定。
+
+- **修改前先读**：上方 §3 模块边界 / 禁区、相关详细设计章节（`docs/04-detailed-design/`）、相关 ADR（`docs/03-architecture/adr/`）
+- **提交信息**：建议保留六字段格式（Design / Tests / Verify / Docs / Risk / Task），便于追溯改动对应的需求 / 设计 / 任务编号；不再强制通过 instructions 文件自动校验
+- **签字位**：`status: draft → reviewed`、`reviewers: []`、本文件 §1 / §3 一律由人工填，AI 不替签
+- **风格与禁区违反**：阻塞返回，不要尝试绕路，直接向 Owner 反馈冲突点
+- **追溯链**：变更尽量能映射到 `REQ-NNN`（需求）+ `HD-NNN` / `API-NNN` / `DB-NNN`（设计），缺失时提醒 Owner 但不强制阻塞轻量迭代
