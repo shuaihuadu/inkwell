@@ -133,6 +133,8 @@ downstream: []
 - **卡点等级**：closed 2026-05-08
 - **回写**：requirements.md §11 REQ-013 验收标准补充（单 Token）、§9 上游决策第 20 条。
 
+> **2026-07-08 决策更新（本条决策已被取代）**：Owner 提出 REQ-013 改为"独立的 API Key 管理功能"，取代本条选项 A 的"单 Token、新建即作废"机制，并新增支持 OpenAI ChatCompletion API / OpenAI Responses API / AG-UI / A2A 四种协议格式的服务端兼容调用（REQ-018）。Key 的撤销 / 轮换策略、单 Agent 可绑定 Key 数量上限等具体细节推迟到 H3 详细设计决定。完整决策记录见 `requirements.md` §13 第 27 条、§4.8～4.9 场景 S8/S9。本条历史记录保留不删，仅作废其结论。
+
 ---
 
 ## OQ-005 v1 账号开通方式：管理员后台创建的具体形态
