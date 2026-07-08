@@ -25,9 +25,11 @@ resolved-questions:
 
 # Inkwell Agent 平台 · 需求说明（v1）
 
-> 本文件是 H1 阶段产出，由 `H1-RequirementsInterviewer` 经四轮访谈后起草。任何 `REQ-NNN` 一旦发布即不可改编号，仅可通过新增 / 标 deprecated 演进。
+> 本文件是 H1 阶段产出，由 `H1-RequirementsInterviewer` 经四轮访谈后起草。`REQ-NNN` / `NFR-NNN` / `EX-NNN` 编号一旦发布即不可改变含义或重新分配给别的条目——需求变化只能新增编号或将旧编号标记 deprecated，不得覆盖复用。
 >
-> 待澄清问题、未答清的合规 / 安全 / 模型路由细节，统一记录在 [`open-questions.md`](./open-questions.md)，由人工决策后回写。
+> 待澄清问题统一记录在 [`open-questions.md`](./open-questions.md)（`OQ-NNN` 编号），由人工决策后回写本文件对应章节并引用 `OQ-NNN` 出处。
+>
+> 本文件 `status: draft` 进入 `reviewed` 之前，所有 `blocking` 级 OQ 必须被解答或经 Owner 显式接受为已知风险（见 §13）。`status` / `reviewers` 字段由 Owner 本人翻转，任何工具或 Agent 不得代签。
 
 ## 1. 项目背景
 
