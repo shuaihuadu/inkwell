@@ -123,9 +123,6 @@ src/core/Inkwell.Abstractions/
 >   Skills/
 >     SkillDefinition.cs               # 与 ADR-010 静态加载 Skill 区分
 >     ISkillRepository.cs
->   Triggers/
->     TriggerDefinition.cs             # 与 运行时 Trigger 区分
->     ITriggerRepository.cs
 >   Conversations/
 >     Conversation.cs                  # 默认无后缀
 >     IConversationRepository.cs
@@ -143,11 +140,6 @@ src/core/Inkwell.Abstractions/
 >   Memory/
 >     MemoryItem.cs
 >     IMemoryItemRepository.cs
->   Orchestrations/
->     Orchestration.cs
->     IOrchestrationRepository.cs
->     OrchestrationRun.cs
->     IOrchestrationRunRepository.cs
 >   Traces/
 >     Trace.cs
 >     ITraceRepository.cs

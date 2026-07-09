@@ -63,7 +63,7 @@ downstream: []
 
 ### 表清单（占位，由 HD-009 + 业务 HD 锁定）
 
-> 以下表清单来自 [architecture.md §4 关键表](../03-architecture/architecture.md)，是 H2 锁定的**业务范围**。每张表的具体字段 / 索引 / 约束由对应业务命名空间 HD 起草，本节仅占位。
+> 以下表清单来自 [architecture.md §4 关键表](../03-architecture/architecture.md)，是 H2 锁定的**业务范围**。每张表的具体字段 / 索引 / 约束由对应业务命名空间 HD 起草，本节仅占位。`triggers` / `orchestrations` / `orchestration_runs` 三张表随触发器（REQ-011）/ 多 Agent 协作编排（REQ-012）于 2026-07-09 推迟至下一期 v2，已从本表移除，详见 [requirements.md §13 第 28 条](../01-requirements/requirements.md)。
 
 | 表名                 | 业务模块               | 锁定 HD | 说明                                                                                                                                                               |
 | -------------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -76,9 +76,6 @@ downstream: []
 | `kb_documents`       | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `kb_chunks`          | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `memory_items`       | Inkwell.Memory         | TBD     | [REQ-010](../01-requirements/requirements.md)                                                                                                                      |
-| `triggers`           | Inkwell.Triggers       | TBD     | [REQ-011](../01-requirements/requirements.md)                                                                                                                      |
-| `orchestrations`     | Inkwell.Orchestrations | TBD     | [REQ-012](../01-requirements/requirements.md)                                                                                                                      |
-| `orchestration_runs` | Inkwell.Orchestrations | TBD     | [REQ-012](../01-requirements/requirements.md)                                                                                                                      |
 | `conversations`      | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
 | `messages`           | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
 | `traces`             | Inkwell.Traces         | TBD     | [REQ-014](../01-requirements/requirements.md)                                                                                                                      |

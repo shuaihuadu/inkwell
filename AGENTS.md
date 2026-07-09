@@ -21,6 +21,8 @@
 > **2026-07-08 增量更新·第七轮**：Owner 决定移除 EF Core **InMemory 关系型数据库** Provider（不支持外键约束，本地开发/测试价值有限）——**注意**：`Inkwell.Core.InMemoryVectorStore` / `Inkwell.Core.InMemoryCacheProvider` 是不同子系统，不受影响。持久化收敛为两 Provider（SQL Server 2025 / PostgreSQL 17），dev / 测试改用 [Testcontainers](https://testcontainers.com/) 起真实 SqlServer / Postgres 实例；EFCore family 由 4 csproj（1 base + 3 final adapter）回落为 3 csproj（1 base + 2 final adapter），providers/ 9 → 8，csproj 总数 13 → 12；[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 已直接就地修订（未走新 ADR）；H3 detailed design `HD-010`（InMemory adapter）文件已删除。§2.2 / §3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用。
 >
 > **2026-07-09 增量更新·第八轮**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](docs/01-requirements/requirements.md)）。`NFR-004`（审计日志）/ `IAuditLogger` 端口 / `Inkwell.Core.AuditLogs` 业务实现 / `ADR-008`（审计日志存储与查询）均已移除；`REQ-017` Admin 管理页收窄为两项能力（解封账号、撤销共享），不再含"查看全量审计日志"；`REQ-013` API Key 调用不再提及审计记录。§3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用（移除 `IAuditLogger` 接口引用与 `.AuditLogs` 命名空间；6 大基础设施端口收窄为 5 个）。
+>
+> **2026-07-09 增量更新·第九轮**：Owner 决定 v1 不做触发器（REQ-011）与多 Agent 协作 / 编排（REQ-012）功能，推迟至下一期 v2（详见 [requirements.md §13 第 28 条](docs/01-requirements/requirements.md)）。`Inkwell.Core.Triggers` / `Inkwell.Core.Orchestrations` 两个业务命名空间（均未起草 HD）从 §3.1 模块拓扑列表移除；[UI-006 编排视图](docs/01-requirements/ui-spec.md) / [UF-008 配置编排与触发器](docs/01-requirements/user-flow.md) / `triggers` `orchestrations` `orchestration_runs` 数据表 / [ADR-006 编排画布](docs/03-architecture/adr/ADR-006-orchestration-canvas-react-flow.md) 均标注推迟至 v2，设计内容保留不删。§3.1 由 AI 在 Owner 一次性授权下同步应用。
 
 ## 1. 项目身份
 
@@ -95,7 +97,7 @@
 **`src/core/Inkwell.Core/`**（适配器默认实现 + 业务层 / 1 csproj）
 
 - 抽象的进程内默认实现：`InMemoryCacheProvider` / `LocalFileSystemFileStorageProvider` / `ChannelsQueueProvider`（[ADR-018](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) dev / unit test 默认） / `InMemoryVectorStore`（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) dev / unit test 默认，基于 [`Microsoft.Extensions.VectorData.InMemory`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)）
-- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.Triggers` / `.Orchestrations` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`
+- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`（`.Triggers` / `.Orchestrations` 已于 2026-07-09 随触发器（REQ-011）/ 多 Agent 协作编排（REQ-012）推迟至 v2 从本列表移除，详见 [requirements.md §13 第 28 条](docs/01-requirements/requirements.md)）
 - `Inkwell.Core.AgentRuntime` 命名空间——**唯一**允许 `using Microsoft.Agents.AI.*` 的位置（[ADR-017 §依赖规则](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](docs/03-architecture/risk-analysis.md)）
 
 **`src/core/providers/`**（多 Provider 适配器 / 8 csproj）
@@ -183,7 +185,7 @@
 - **RISK-007 主进程长 SSE 跨锁屏可靠性**：H4 必须有恢复性用例（macOS / Windows 锁屏 30 min × 多次 sleep/resume）
 - **RISK-011 文件存储三 Provider contract 漏出**：H3 必须建立 `tests/core/Inkwell.Providers.Contract` 公共用例包，CI 跑 LocalFileSystem / Azurite / MinIO 三套 matrix（[ADR-017 §联动提示](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)路径名调整）
 - **RISK-014 RedisStreamQueueProvider 运维代价**（[OQ-A008 closed §B](docs/03-architecture/open-questions-arch.md) v1 同期交付）：observability 五项补齐项（`queue_consume_latency_p95` / `queue_dlq_count` / `queue_consumer_lag` / `queue_redelivery_count` / `queue_consumer_active`）进 prod ProdReady checklist；H4 必须补三类用例（crash recovery / fairness / DLQ）。
-- **RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 新增）：(1) Helm Chart 单 `image.tag` + `helm upgrade --atomic` 单 release 同时滚；(2) OTel `service.name = inkwell-webapi` / `inkwell-worker` 双 source，Grafana Dashboard 加 Worker 面板；(3) **H4 必须补 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例**（覆盖 [Inkwell.Triggers REQ-011](docs/01-requirements/requirements.md) / KB ingest [REQ-009](docs/01-requirements/requirements.md) / DurableTask）；(4) `MessageEnvelope` 必含 `traceparent` 字段以保 [REQ-014 trace 全链路](docs/01-requirements/requirements.md) 跨服务不断链。
+- **RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 新增）：(1) Helm Chart 单 `image.tag` + `helm upgrade --atomic` 单 release 同时滚；(2) OTel `service.name = inkwell-webapi` / `inkwell-worker` 双 source，Grafana Dashboard 加 Worker 面板；(3) **H4 必须补 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例**（覆盖 KB ingest [REQ-009](docs/01-requirements/requirements.md) / DurableTask；原触发器 REQ-011 场景已于 2026-07-09 推迟至 v2）；(4) `MessageEnvelope` 必含 `traceparent` 字段以保 [REQ-014 trace 全链路](docs/01-requirements/requirements.md) 跨服务不断链。
 
 ## 4. 文档入口
 

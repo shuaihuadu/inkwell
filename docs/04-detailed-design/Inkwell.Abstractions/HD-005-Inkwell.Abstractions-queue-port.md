@@ -6,7 +6,6 @@ status: reviewed
 reviewers: [Inkwell]
 upstream:
   - REQ-009
-  - REQ-011
   - REQ-014
   - ADR-002
   - ADR-018

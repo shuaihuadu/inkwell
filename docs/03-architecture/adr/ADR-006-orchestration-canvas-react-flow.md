@@ -19,6 +19,8 @@ downstream: []
 
 # ADR-006 编排画布：React Flow + Microsoft Agent Framework Workflows
 
+> **2026-07-09 决策更新（v1 推迟至下一期 v2）**：Owner 决定 v1 不做触发器（REQ-011）与多 Agent 协作 / 编排（REQ-012）功能（详见 [requirements.md §13 第 28 条](../../01-requirements/requirements.md)）。本 ADR 的选型结论（React Flow + MAF Workflows + DurableTask）保留不删，作为 v2 重新立项时的候选输入；v1 不实施本 ADR 描述的任何设计。
+
 ## 上下文
 
 [REQ-012 多 Agent 协作 / 编排](../../01-requirements/requirements.md) + [UI-006 编排画布](../../01-requirements/ui-spec.md) 要求：

@@ -35,7 +35,7 @@ downstream:
 | Agent 引擎      | Microsoft Agent Framework                                              | [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md)             | high   |
 | 关系 + 向量数据 | IPersistenceProvider 抽象（SqlServer / PostgreSQL）+ Qdrant + InMemoryVectorStore | [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | high   |
 | 部署形态        | Compose (dev) / AKS (prod)                                             | [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md)                      | high   |
-| 编排画布        | React Flow + MAF Workflows                                             | [ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)                    | high   |
+| 编排画布        | ~~React Flow + MAF Workflows~~（推迟 v2）                               | [ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)                    | —      |
 | 公开 API 鉴权   | 单 Token + Bearer                                                      | [ADR-007](./adr/ADR-007-public-api-token-auth.md)                              | high   |
 | 多模态          | Azure Speech + 模型 vision                                             | [ADR-009](./adr/ADR-009-multimodal-azure-speech.md)                            | high   |
 | Skill 加载      | v1 仅静态                                                              | [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md)                       | high   |
@@ -52,7 +52,7 @@ downstream:
 | 后端进程拓扑    | Inkwell.WebApi + Inkwell.Worker 双进程（独立 Pod / 独立 HPA）           | [ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) | high   |
 | Entity ↔ Model mapper | 手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `SelectAsModel`），禁 AutoMapper / Mapperly / Mapster | [ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md) | high   |
 
-> 置信度统计：high 17 / medium 5 / low 0；low 占比 0%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 要求 ≤ 30%，达标）。
+> 置信度统计：high 16 / medium 5 / low 0（编排画币已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 要求 ≤ 30%，达标）。
 
 ## 1. 客户端运行时（ADR-001）
 
@@ -99,14 +99,9 @@ downstream:
 - **团队维护影响**：Helm / AKS 是 Azure 上的主流栈，运维资料丰富。
 - **成本/性能/安全/交付**：成本中；性能高；安全中（单 region 不具备跨区高可用）；交付高。
 
-## 6. 编排画布（ADR-006）
+## 6. ~~编排画布（ADR-006）~~（已推迟至下一期 v2）
 
-- **选择**：React Flow（`@xyflow/react` 12+）+ Microsoft Agent Framework Workflows + DurableTask。
-- **为什么**：与 [OQ-013 closed §A](../01-requirements/open-questions.md) 一致；前端只做画布交互，后端只做 DAG 执行，IR 是清晰契约边界；DurableTask 提供跨 Pod 重启续作。
-- **替代方案**：自研 SVG / DSL-only / BPMN.js / LangGraph。
-- **放弃理由**：详见 [ADR-006 §备选项](./adr/ADR-006-orchestration-canvas-react-flow.md)。
-- **团队维护影响**：React Flow + dagre 自动布局是社区标准；MAF Workflows 是新学习项。
-- **成本/性能/安全/交付**：成本低；性能中（300+ 节点流畅）；安全中；交付高。
+> **2026-07-09 决策更新**：Owner 决定 v1 不做触发器与多 Agent 协作 / 编排功能（详见 [requirements.md §13 第 28 条](../01-requirements/requirements.md)）。本节选型内容（React Flow + MAF Workflows + DurableTask）保留作为历史记录与 v2 重新立项参考，[ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md) 本身不删除，不在本节重复展开，不重排后续章节编号。
 
 ## 7. 公开 API 鉴权（ADR-007）
 
@@ -338,6 +333,6 @@ downstream:
 ## 22. 自检
 
 - 22 项选型× 6 字段 = 132 字段，全部填写（凭据存储 / 测试与 CI 为无独立 ADR 选型，仅依附 OQ）。ADR-020 / ADR-021 / ADR-022 作为 ADR-004 谱系的精化 refinement，不重复打分但计在 ADR 总数中。
-- 置信度统计：high 18 / medium 4 / low 0；low 占比 0% ≤ 30%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 阈值通过）。
+- 置信度统计：high 17 / medium 4 / low 0（编排画布已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0% ≤ 30%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 阈值通过）。
 - 与 [open-questions-arch.md](./open-questions-arch.md) 关联完整：OQ-A001 ~ OQ-A008 均 closed。
 - 与 22 ADR 一一对应（ADR-001 ~ ADR-022）。
