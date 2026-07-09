@@ -30,7 +30,7 @@ downstream: []
 >
 > 全文术语锁定 = Entity ↔ Model；具名 Repository 动词白名单 = Add / Update / Get / Delete / List / Find（不带 `Async` 后缀）；mapper 走手写 `XxxMappingExtensions` 三方法（`ToModel` / `ToEntity` / `SelectAsModel`）；全部签名走裸 `Task<T>` + BCL 异常（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)）。
 
-## 1. 模块职责
+## 1. 模块概述
 
 - **Entity 集中地**（[ADR-021 D1 = A](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：全部业务 `XxxEntity` 类、`IEntityTypeConfiguration<TEntity>` 配置 ~30 套
 - **DbContext 共享 base**：`InkwellDbContext`（virtual `OnModelCreating` / `OnConfiguring`），final adapter 通过继承调整 Provider-specific 行为
@@ -41,7 +41,7 @@ downstream: []
 - **Seed + Migration runner**：`InkwellSeeder`（幂等 `if-not-exists` 模式） + `MigrationRunner`（[ADR-021 D2 = B](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) `AutoSeedOnStartup` 开关）
 - **CI 强制 banlist**：`BannedSymbols.txt` 锁定 Repository 动词白名单 + Repository 后缀禁用 + Mapping 库零依赖
 
-## 2. 文件清单
+## 2. 文件结构
 
 | #   | 文件                                                                         | 类别   | 详见  |
 | --- | ---------------------------------------------------------------------------- | ------ | ----- |
@@ -61,7 +61,7 @@ downstream: []
 
 物理布局参 [file-structure.md §providers/Inkwell.Persistence.EFCore](../file-structure.md)。
 
-## 3. 各文件 10 字段
+## 3. 程序文件设计（10 字段 × 13 文件）
 
 ### 3.0 Inkwell.Persistence.EFCore.csproj
 

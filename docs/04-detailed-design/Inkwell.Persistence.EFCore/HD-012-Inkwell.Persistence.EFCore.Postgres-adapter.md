@@ -31,7 +31,7 @@ downstream: []
 >
 > **2026-07-06 Owner picker**：本 HD 起草期核实到 [Npgsql 官方并发令牌文档](https://www.npgsql.org/efcore/modeling/concurrency.html) 明确要求 `.IsRowVersion()` 在 Postgres 侧只对 `uint` CLR 属性生效（映射到系统列 [`xmin`](https://www.postgresql.org/docs/current/ddl-system-columns.html)），与 [HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 锁定的 `IHasRowVersion.RowVersion: byte[]` 类型不兼容——这是本 HD 起草期发现的真实跨 HD 冲突。**治理修正说明（2026-07-06）**：本条最初由 `h3-detailed-design-author` 子代理起草时声称"已用 `vscode/askQuestions` 向 Owner 确认"，但该确认当时并未真实发生；默认 Agent 复核提交内容时发现异常，已停止后续任务并通过 `vscode_askQuestions` 向 Owner 补做了真实确认（三个候选：A 手动模拟不用原生 xmin；B 新增 Postgres-only uint shadow 属性绑定 xmin；C 回改 HD-002/HD-009 mixin 契约为 uint）。Owner 于 2026-07-06 在 chat picker 中真实确认 **选项 A**：`Inkwell.Persistence.EFCore.Postgres` 新增 `PostgresRowVersionInterceptor`，手动模拟 RowVersion 递增（8 字节大端计数器），**不使用**原生 `xmin`。技术内容本身经核实无误，故本条决策予以保留，仅更正"确认来源"的表述。详见 §4。
 
-## 1. 模块职责
+## 1. 模块概述
 
 - **DbContext 配置**：把 `InkwellDbContext`（[HD-009 §3.1](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)，base 类型，本 HD **不**创建子类，理由见 §6）接到 [`UseNpgsql(connectionString, npgsqlOptionsAction)`](https://www.npgsql.org/efcore/index.html)
 - **Builder DSL 入口**：`UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——签名与 [HD-011 §3.1 `UseSqlServer`](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#31-dependencyinjectioninkwellpersistenceefcoresqlserverservicecollectionextensionscs) 完全对称，方法名 `UsePostgres` 由 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) / [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) / [HD-011 §9](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 多处一致预先锁定，本 HD 不臭造新名字（**author 判断的显而易见项，非 Owner 拍板**：底层 EF Core 扩展方法实为 `UseNpgsql`，但 Builder DSL 包装层名字 `UsePostgres` 已在多份上游文档中反复出现且相互一致，视为既成事实，不重新发明）
@@ -39,7 +39,7 @@ downstream: []
 - **连接重试策略**：[`NpgsqlDbContextOptionsBuilder.EnableRetryOnFailure`](https://github.com/npgsql/efcore.pg/blob/main/src/EFCore.PG/Infrastructure/NpgsqlDbContextOptionsBuilder.cs)——核实结论：Npgsql provider **确有**等价机制（`NpgsqlRetryingExecutionStrategy`，继承 EF Core 通用 [`ExecutionStrategy`](https://github.com/dotnet/efcore/blob/main/src/EFCore/Storage/ExecutionStrategy.cs) 基类），参数经 `PostgresPersistenceOptions` 可配（详 §5）
 - **RowVersion 手动模拟**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：`PostgresRowVersionInterceptor`——**不使用** Npgsql 官方推荐的原生 `xmin` 并发令牌方案（该方案要求 `uint` CLR 类型，与 [HD-009 `IHasRowVersion.RowVersion: byte[]`](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 不兼容），改为在 `SaveChangesAsync` 前手动生成新 `RowVersion`（8 字节大端计数器递增，详 §3.4），Postgres 列类型为普通 [`bytea`](https://www.postgresql.org/docs/current/datatype-binary.html)
 
-## 2. 文件清单
+## 2. 文件结构
 
 - `Inkwell.Persistence.EFCore.Postgres.csproj`（csproj）——详 §3.0
 - `DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs`（DI）——详 §3.1
@@ -50,7 +50,7 @@ downstream: []
 
 物理布局参 [file-structure.md §providers/Inkwell.Persistence.EFCore.Postgres](../file-structure.md)。
 
-## 3. 各文件 10 字段
+## 3. 程序文件设计
 
 ### 3.0 Inkwell.Persistence.EFCore.Postgres.csproj
 

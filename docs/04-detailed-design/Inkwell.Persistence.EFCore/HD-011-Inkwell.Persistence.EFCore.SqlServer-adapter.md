@@ -34,7 +34,7 @@ downstream: []
 >
 > **2026-07-06 errata·第二轮（design-review-report.md §20 首轮评审 B18/C103 + B19/C104 + N31/C107 + N32，Owner picker 选项 1 / 顺手处理）**：(1) §8 修订为"SqlServer 启动代码只调 `MigrationRunner.SeedAsync(ct)`，不调 `MigrationRunner.MigrateAsync(ct)`"的准确描述（原 §8 遗留"Seed 仍在 WebApi 启动时运行"的无条件表述与"不再自动执行 Migration"直接矛盾，详 [HD-009 §13.9](HD-009-Inkwell.Persistence.EFCore-base.md)）；(2) §3.3 两处 `MigrationRunner.RunAsync` 引用同步改为 `MigrationRunner.MigrateAsync`；(3) §3.1 补一条"appsettings.json 设置 `CommandTimeoutSeconds` 后生效"测试要求（详 [HD-009 §13.10](HD-009-Inkwell.Persistence.EFCore-base.md)）；(4) §3.0 依赖 [HD-009 §3.0 新增 `InternalsVisibleTo` 声明](HD-009-Inkwell.Persistence.EFCore-base.md)（N31，无需本 HD 自身改动）；(5) §12 补一句可观测性 deferral 措辞（N32）。
 
-## 1. 模块职责
+## 1. 模块概述
 
 - **DbContext 配置**：把 `InkwellDbContext`（[HD-009 §3.1](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)，base 类型，本 HD **不**创建子类，理由见 §6）接到 [`UseSqlServer(connectionString, sqlServerOptionsAction)`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.sqlserverdbcontextoptionsextensions.usesqlserver)
 - **Builder DSL 入口**：`UseSqlServer(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)`——签名由 [HD-002 §6](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#6-builder-dsl-衔接hd-001-63) 与 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 两处预先锁定，本 HD 只落地实现
@@ -42,7 +42,7 @@ downstream: []
 - **连接重试策略**：[`EnableRetryOnFailure`](https://learn.microsoft.com/ef/core/miscellaneous/connection-resiliency)——应对 SQL Server 瞬时故障（网络抖动 / 主从切换 / 限流），参数经 `SqlServerPersistenceOptions` 可配（详 §5）
 - **RowVersion 原生支持**：SqlServer 对 `.IsRowVersion()`（[HD-009 §3.1 `ApplyRowVersion`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）提供**原生数据库自动生成**的并发令牌（[EF Core 官方「Native database-generated concurrency tokens」](https://learn.microsoft.com/ef/core/saving/concurrency#native-database-generated-concurrency-tokens)）——本 HD **不需要**任何 `SaveChangesInterceptor` 手动模拟 RowVersion 递增（详 §4）
 
-## 2. 文件清单
+## 2. 文件结构
 
 - `Inkwell.Persistence.EFCore.SqlServer.csproj`（csproj）——详 §3.0
 - `DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs`（DI）——详 §3.1
@@ -52,7 +52,7 @@ downstream: []
 
 物理布局参 [file-structure.md §providers/Inkwell.Persistence.EFCore.SqlServer](../file-structure.md)。
 
-## 3. 各文件 10 字段
+## 3. 程序文件设计
 
 ### 3.0 Inkwell.Persistence.EFCore.SqlServer.csproj
 
