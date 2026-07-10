@@ -41,6 +41,23 @@ Inkwell is a production-ready "agent factory" built on the [Microsoft Agent Fram
 - **详细设计（H3）**：`Inkwell.Abstractions` 全部端口已评审通过；`Inkwell.Core` 业务模块多数已评审通过，少数仍在草稿阶段。
 - **客户端 / 部署栈**：Electron 客户端尚未开工；Docker Compose / Helm 部署配置尚未搭建。
 
+## Roadmap
+
+- ✅ H1 需求（reviewed）/ H2 架构（approved）
+- ✅ H3 端口层详细设计（`Inkwell.Abstractions` 全部 7 份 HD 已 reviewed）
+- ✅ H5 后端核心实现：`Inkwell.Abstractions` / `Inkwell.Core` / 12 个 Provider 适配器 / `Inkwell.WebApi` / `Inkwell.Worker` / `Inkwell.Migrator`，Postgres / Redis / MinIO / AzureBlob / Qdrant 均有真实容器集成测试
+- 🚧 H3 剩余业务模块详细设计：`Models` / `Skills` 已起草待评审；`KnowledgeBase` / `Memory` / `PublicApi` / `Traces` / `Versioning` / `Multimodal` / `Health` 尚未起草
+- 🚧 H4 测试用例设计（尚未开始）
+- 🚧 `Inkwell.WebApi` ↔ `Inkwell.Worker` 跨服务集成用例（enqueue → consume → ack，覆盖知识库入库、DurableTask 场景）
+- ⬜ Electron + React 客户端（尚未开工）
+- ⬜ Docker Compose（dev）/ Helm Chart（prod）部署栈（尚未搭建）
+
+明确推迟到 v2、v1 不做（详见 [AGENTS.md §3.3](AGENTS.md#33-禁区v1-显式不做--不引入)）：
+
+- 触发器（Triggers）与多 Agent 协作编排（Orchestrations）+ 编排画布
+- 客户端 i18n / RBAC / 多租户 / OAuth2 / SSO / 自助注册
+- Azure Key Vault、Redis Cluster / Sentinel HA、跨 region active-passive
+
 ## 许可证
 
 [MIT License](LICENSE)
