@@ -36,74 +36,40 @@ downstream: []
 
 ## 1. 总体架构图
 
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│ Electron 客户端 src/app/  (ADR-001)                                   │
-│  ┌──────────────────────────────────┐  ┌─────────────────────────┐   │
-│  │ src/app/web/  (React + Vite)     │  │ src/app/electron/       │   │
-│  │  · UI-001~010 (Pro Layout)       │  │  · idle / lock 调度     │   │
-│  │  · AG-UI 客户端 SDK (ADR-012)    │  │  · 主进程长 SSE 持有    │   │
-│  │  · MediaRecorder 麦克风录音      │  │  · 自动更新             │   │
-│  └──────────────┬───────────────────┘  └─────────┬───────────────┘   │
-└──────────────────┼──────────── IPC contextBridge ┼────────────────────┘
-                   │ HTTPS REST + SSE              │
-                   ▼                               │
-┌──────────────────────────────────────────────────┴────────────────────┐
-│ ASP.NET Core 后端 src/core/  (ADR-002 .NET 10 / ADR-017 P&A / ADR-019) │
-│                                                                       │
-│  ┌─────────────────────────────────┐  ┌─────────────────────────────┐ │
-│  │ Inkwell.WebApi  (REST + AGUI    │  │ Inkwell.Worker (.NET Generic│ │
-│  │ + Public 入口；enqueue 侧)      │  │ Host + BackgroundService；  │ │
-│  │ HPA: CPU 70% / min 2 / max 10   │  │ Channels/Redis consumer +   │ │
-│  │                                 │  │ DurableTask runner)         │ │
-│  │                                 │  │ HPA: queue_depth ≥ 100      │ │
-│  │                                 │  │ / min 1 / max 5             │ │
-│  └──────────────┬──────────────────┘  └──────────────┬──────────────┘ │
-│                 │  共享 DI 装配 AddInkwell()...      │                 │
-│                 ▼                                    ▼                │
-│  ┌──────────────────────▼───────────────────────────────────────┐    │
-│  │ Inkwell.Core  (业务实现 + AgentRuntime，不含默认 Provider)       │    │
-│  │ ┌────────────┬────────────┬─────────────┬──────────────────┐ │    │
-│  │ │ .Auth      │ .Agents    │ .Skills     │ .KnowledgeBase   │ │    │
-│  │ .Memory    │ .Multimodal│ .Traces     │ .Versioning      │ │    │
-│  │ .Conversations │ .Health │             │                  │ │    │
-│  │ │ .AgentRuntime  ←唯一接 Microsoft.Agents.AI.*               │ │    │
-│  │ └────────────────────────────────────────────────────────────┘ │    │
-│  └──────────────────────┬───────────────────────────────────────┘    │
-│                         │ 仅依赖接口                                  │
-│  ┌──────────────────────▼───────────────────────────────────────┐    │
-│  │ Inkwell.Abstractions  (接口 + Model + Options + Builder DSL) │    │
-│  │   IPersistenceProvider · IFileStorageProvider                │    │
-│  │   ICacheProvider · IQueueProvider · IAgentRuntime            │    │
-│  │   VectorStore (Microsoft.Extensions.VectorData)              │    │
-│  └──────────────────────┬───────────────────────────────────────┘    │
-│                         │ 仅实现接口                                  │
-│  ┌──────────────────────▼───────────────────────────────────────┐    │
-│  │ src/core/providers/  (各 Provider 独立 csproj，按需引入)      │    │
-│  │   Inkwell.Persistence.EFCore (base, ADR-021)                 │    │
-│  │   Inkwell.Persistence.EFCore.{SqlServer,Postgres}          │    │
-│  │   Inkwell.FileStorage.{Local,MinIO,AzureBlob}                │    │
-│  │   Inkwell.Cache.{InMemory,Redis} · Inkwell.Queue.{Channels,Redis} │ │
-│  │   Inkwell.VectorStore.{InMemory,Qdrant}                      │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-└───────────────┬─────────────────────────┬─────────────────────────────┘
-                │                         │
-                ▼                         ▼
-        ┌──────────────┐          ┌────────────────┐
-        │ EF Provider  │          │  Qdrant        │
-        │  · SQL Server│          │  (向量库)       │
-        │  · PostgreSQL│          └────────────────┘
-        └──────────────┘
+```mermaid
+flowchart TB
+    subgraph Client["Electron 客户端 src/app/（ADR-001）"]
+        Web["src/app/web/（React + Vite）<br/>UI-001~010（Pro Layout）<br/>AG-UI 客户端 SDK（ADR-012）<br/>MediaRecorder 麦克风录音"]
+        Main["src/app/electron/<br/>idle / lock 调度<br/>主进程长 SSE 持有<br/>自动更新"]
+        Web <-->|IPC contextBridge| Main
+    end
 
-        ┌──────────────────────────────────────────────────┐
-        │ 横切：OTel + Grafana 栈 (ADR-013)                │
-        │  Tempo (trace) / Loki (log) / Prometheus (metric)│
-        └──────────────────────────────────────────────────┘
+    subgraph Backend["ASP.NET Core 后端 src/core/（ADR-002 .NET 10 / ADR-017 P&A / ADR-019）"]
+        WebApi["Inkwell.WebApi<br/>REST + AGUI + Public 入口；enqueue 侧<br/>HPA：CPU 70% / min 2 / max 10"]
+        Worker["Inkwell.Worker<br/>.NET Generic Host + BackgroundService<br/>Channels/Redis consumer + DurableTask runner<br/>HPA：queue_depth ≥ 100 / min 1 / max 5"]
+        Core["Inkwell.Core<br/>业务实现 + AgentRuntime，不含默认 Provider<br/>.Auth .Agents .Skills .KnowledgeBase .Memory<br/>.Multimodal .Traces .Versioning .Conversations .Health<br/>.AgentRuntime ← 唯一接 Microsoft.Agents.AI.*"]
+        Abstractions["Inkwell.Abstractions<br/>接口 + Model + Options + Builder DSL<br/>IPersistenceProvider · IFileStorageProvider<br/>ICacheProvider · IQueueProvider · IAgentRuntime<br/>VectorStore（Microsoft.Extensions.VectorData）"]
+        Providers["src/core/providers/<br/>各 Provider 独立 csproj，按需引入<br/>Persistence.EFCore(base)/.SqlServer/.Postgres<br/>FileStorage.{Local,MinIO,AzureBlob}<br/>Cache.{InMemory,Redis} · Queue.{Channels,Redis}<br/>VectorStore.{InMemory,Qdrant}"]
 
-        ┌──────────────────────────────────────────────────┐
-        │ Azure 依赖：Speech (ADR-009) · Blob (ADR-015)     │
-        │   凭据走 K8s Secret + .env (OQ-A006 §B)           │
-        └──────────────────────────────────────────────────┘
+        WebApi -->|共享 DI 装配 AddInkwell...| Core
+        Worker -->|共享 DI 装配 AddInkwell...| Core
+        Core -->|仅依赖接口| Abstractions
+        Abstractions -->|仅实现接口| Providers
+    end
+
+    Web -->|HTTPS REST + SSE| WebApi
+
+    EF["EF Provider<br/>SQL Server · PostgreSQL"]
+    Qdrant["Qdrant<br/>向量库"]
+    Providers --> EF
+    Providers --> Qdrant
+
+    OTel["横切：OTel + Grafana 栈（ADR-013）<br/>Tempo（trace）/ Loki（log）/ Prometheus（metric）"]
+    Azure["Azure 依赖：Speech（ADR-009）· Blob（ADR-015）<br/>凭据走 K8s Secret + .env（OQ-A006 §B）"]
+
+    WebApi -.->|遥测| OTel
+    Worker -.->|遥测| OTel
+    Core -.->|调用| Azure
 ```
 
 图说：

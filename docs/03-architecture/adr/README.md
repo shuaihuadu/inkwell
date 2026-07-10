@@ -55,40 +55,61 @@ downstream: []
 
 ## ADR 之间的依赖关系
 
-```text
-ADR-002 (.NET 10 + ASP.NET Core)
-  ├── ADR-003 (Microsoft Agent Framework, 必须 .NET)
-  │     ├── ADR-006 (React Flow + Workflows 后端)
-  │     ├── ADR-010 (Skill 静态加载, 与 MAF Skill 接口对齐)
-  │     └── ADR-012 (AG-UI 协议, 后端 hosting 包)
-  ├── ADR-004 (IPersistenceProvider 抽象, EF Core)
-  ├── ADR-007 (Public API, ASP.NET Core middleware)
-  ├── ADR-011 (自动锁定后端态, 主进程长 SSE)
-  ├── ADR-013 (OpenTelemetry .NET SDK)
-  └── ADR-016 (ICacheProvider 抽象, StackExchange.Redis)
+```mermaid
+flowchart TD
+    ADR001["ADR-001<br/>Electron + React + Vite"]
+    ADR002["ADR-002<br/>.NET 10 + ASP.NET Core"]
+    ADR003["ADR-003<br/>Microsoft Agent Framework"]
+    ADR004["ADR-004<br/>IPersistenceProvider 抽象"]
+    ADR005["ADR-005<br/>Docker Compose / AKS"]
+    ADR006["ADR-006<br/>React Flow + Workflows"]
+    ADR007["ADR-007<br/>Public API"]
+    ADR009["ADR-009<br/>Azure Speech"]
+    ADR010["ADR-010<br/>Skill 静态加载"]
+    ADR011["ADR-011<br/>自动锁定 + 主进程长 SSE"]
+    ADR012["ADR-012<br/>AG-UI 协议"]
+    ADR013["ADR-013<br/>OpenTelemetry .NET SDK"]
+    ADR014["ADR-014<br/>i18n 范围声明"]
+    ADR015["ADR-015<br/>文件存储 Provider"]
+    ADR016["ADR-016<br/>ICacheProvider 抽象"]
+    ADR017["ADR-017<br/>后端模块拓扑 P&A"]
+    ADR018["ADR-018<br/>队列抽象 IQueueProvider"]
+    ADR019["ADR-019<br/>进程拓扑双进程"]
+    ADR020["ADR-020<br/>向量存储抽象"]
+    ADR021["ADR-021<br/>EFCore Persistence 布局"]
+    ADR022["ADR-022<br/>Entity ↔ Model mapper"]
 
-ADR-001 (Electron + React + Vite)
-  ├── ADR-006 (React Flow 客户端组件)
-  ├── ADR-011 (Electron `app.on('blur')` + `powerMonitor` API + 主进程环形缓冲)
-  ├── ADR-012 (AG-UI 客户端 SDK)
-  └── ADR-014 (i18n 范围声明)
+    ADR002 --> ADR003
+    ADR003 --> ADR006
+    ADR003 --> ADR010
+    ADR003 --> ADR012
+    ADR002 --> ADR004
+    ADR002 --> ADR007
+    ADR002 --> ADR011
+    ADR002 --> ADR013
+    ADR002 --> ADR016
+    ADR002 --> ADR017
 
-ADR-005 (Docker Compose / AKS)
-  ├── ADR-004 (PostgreSQL Compose service / AKS StatefulSet)
-  ├── ADR-009 (Azure Speech 凭据走 K8s Secret)
-  ├── ADR-013 (Grafana 栈 Compose / Helm)
-  ├── ADR-015 (文件存储 Provider: dev MinIO / prod AzureBlob | MinIO)
-  │     └── ADR-009 (多模态文件上传走 IFileStorageProvider)
-  └── ADR-016 (缓存层 Provider: dev local Redis / prod Azure Cache for Redis | self-hosted)
+    ADR001 --> ADR006
+    ADR001 --> ADR011
+    ADR001 --> ADR012
+    ADR001 --> ADR014
 
-ADR-002 (.NET 10 + ASP.NET Core)
-  └── ADR-017 (后端模块拓扑 Ports & Adapters)
-        ├── ADR-004 / ADR-015 / ADR-016 （providers/* 抽象使用同一拓扑变体）
-        │     ├── ADR-020 (向量存储 providers/Inkwell.VectorStore.Qdrant + Inkwell.Core/InMemoryVectorStore，精化 ADR-004 向量库表述)
-        │     └── ADR-021 (EFCore Persistence base + 3 final adapter，精化 ADR-004 三 Provider csproj 拓扑)
-        │           └── ADR-022 (Entity ↔ Model mapper 手写扩展方法，填 HD-002 §11 待补)
-        ├── ADR-018 (队列抽象 IQueueProvider + ChannelsQueueProvider 默认)
-        └── ADR-019 (进程拓扑：Inkwell.WebApi + Inkwell.Worker 双进程)
+    ADR005 --> ADR004
+    ADR005 --> ADR009
+    ADR005 --> ADR013
+    ADR005 --> ADR015
+    ADR015 --> ADR009
+    ADR005 --> ADR016
+
+    ADR017 --> ADR004
+    ADR017 --> ADR015
+    ADR017 --> ADR016
+    ADR004 --> ADR020
+    ADR004 --> ADR021
+    ADR021 --> ADR022
+    ADR017 --> ADR018
+    ADR017 --> ADR019
 ```
 
 ## 维护规则
