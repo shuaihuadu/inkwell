@@ -49,6 +49,7 @@ downstream: []
 | [ADR-020](./ADR-020-vector-store-microsoft-extensions-vectordata.md)     | 向量存储抽象：复用 Microsoft.Extensions.VectorData + Qdrant / InMemory 双 Provider                                  | accepted | ADR-004 / ADR-017           | csproj 11 → 12；providers/Inkwell.VectorStore.Qdrant + Inkwell.Core/InMemoryVectorStore           |
 | [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)     | EFCore Persistence 共享层 + 两 Provider 多层 csproj 布局                                  | accepted | ADR-004 / ADR-017           | csproj 12 → 13 →（2026-07-08）回落 12；providers/Inkwell.Persistence.EFCore base + 2 final adapter（SqlServer/Postgres）           |
 | [ADR-022](./ADR-022-entity-domain-mapper-selection.md)     | Entity ↔ Model Mapper 选型：手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()`）                                  | accepted | ADR-002 / ADR-004 / ADR-017 / ADR-021 | csproj 数不变 13；providers/Inkwell.Persistence.EFCore/Mapping + Repositories；H3 下游在 HD-002 / HD-009           |
+| [ADR-024](./ADR-024-database-migration-seed-standalone-job.md) | 数据库 Migration + Seed 执行方式：独立一次性 Migrator 项目/镜像 | accepted | ADR-004 / ADR-005 / ADR-017 / ADR-019 / ADR-021 | csproj 12 → 13；新增 `Inkwell.Migrator`；取代 ADR-021 「Migration 走裸 CI/CD CLI + Seed 留 WebApi 启动」的现状 |
 
 <!-- markdownlint-enable MD060 -->
 

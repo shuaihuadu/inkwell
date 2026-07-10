@@ -51,8 +51,9 @@ downstream:
 | 后端队列抽象    | IQueueProvider + ChannelsQueueProvider（dev） + RedisStreamQueueProvider（integration / prod）双 Provider | [ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) / [OQ-A008 closed §B](./open-questions-arch.md) | high   |
 | 后端进程拓扑    | Inkwell.WebApi + Inkwell.Worker 双进程（独立 Pod / 独立 HPA）           | [ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) | high   |
 | Entity ↔ Model mapper | 手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `SelectAsModel`），禁 AutoMapper / Mapperly / Mapster | [ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md) | high   |
+| 数据库 Migration + Seed 执行方式 | 独立一次性 `Inkwell.Migrator` 项目/镜像（Helm hook Job / Compose 一次性 service） | [ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) | high   |
 
-> 置信度统计：high 16 / medium 5 / low 0（编排画币已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 要求 ≤ 30%，达标）。
+> 置信度统计：high 17 / medium 5 / low 0（编排画布已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 要求 ≤ 30%，达标）。
 
 ## 1. 客户端运行时（ADR-001）
 
@@ -330,9 +331,18 @@ downstream:
 | v1 交付代价        | ⚠（+1 csproj +1 Deployment）    | ✅                    | ⚠（双拓扑）     | ❌（+多 Deployment）  |
 | Helm 同 image tag | ✅                              | N/A                   | ❌              | ⚠                  |
 
+### 21.12 数据库 Migration + Seed 执行方式（ADR-024）
+
+- **选择**：新增独立 `Inkwell.Migrator` 控制台项目，作为一次性 Job（不常驻）将 Migration 与 Seed 合并执行，dev 走 Compose 一次性 service + `depends_on.condition`，prod 走 Helm `pre-install,pre-upgrade` hook Job。
+- **为什么**：[Microsoft EF Core 官方文档](https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying) 明确不建议应用运行时执行 Migration；risk-analysis.md 已记录的 Seed 多副本竞态风险需要从架构上消除。
+- **替代方案**：维持现状（Migration 走 CI/CD 裸 CLI + Seed 留 WebApi 启动）/ 仅挑 Migration 进 Job、Seed 留启动 / EF Core Migration Bundle。
+- **放弃理由**：详见 [ADR-024 §备选项](./adr/ADR-024-database-migration-seed-standalone-job.md)。
+- **团队维护影响**：新增 csproj 12 → 13；Helm hook 失败需新增 runbook；RISK-015 从双产物扩展为三产物同镜像 tag 同步。
+- **成本/性能/安全/交付**：成本低（仅新增 1 个轻量控制台项目，不引入新依赖）；性能无影响（一次性 Job，不占用常驻资源）；安全高（为 schema 迁移用户/应用读写用户权限分离铺路）；交付中（需新增 Helm hook + Compose depends_on 部署胶水，幂等性加固记录在 [RISK-015](./risk-analysis.md)）。
+
 ## 22. 自检
 
-- 22 项选型× 6 字段 = 132 字段，全部填写（凭据存储 / 测试与 CI 为无独立 ADR 选型，仅依附 OQ）。ADR-020 / ADR-021 / ADR-022 作为 ADR-004 谱系的精化 refinement，不重复打分但计在 ADR 总数中。
+- 23 项选型× 6 字段 = 138 字段，全部填写（凭据存储 / 测试与 CI 为无独立 ADR 选型，仅依附 OQ）。ADR-020 / ADR-021 / ADR-022 作为 ADR-004 谱系的精化 refinement，不重复打分但计在 ADR 总数中；ADR-024 作为 ADR-021 谱系的精化 refinement，同样不重复打分但计入 ADR 总数。
 - 置信度统计：high 17 / medium 4 / low 0（编排画布已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0% ≤ 30%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 阈值通过）。
 - 与 [open-questions-arch.md](./open-questions-arch.md) 关联完整：OQ-A001 ~ OQ-A008 均 closed。
-- 与 22 ADR 一一对应（ADR-001 ~ ADR-022）。
+- 与 23 ADR 一一对应（ADR-001 ~ ADR-022 + ADR-024，ADR-008/ADR-023 均未计入本表自检范围，ADR-008 已于 2026-07-09 随审计日志功能移除而删除，ADR-023 为软件类型接口签名约定不计入技术选型）。

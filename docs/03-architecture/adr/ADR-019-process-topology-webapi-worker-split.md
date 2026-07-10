@@ -107,6 +107,8 @@ host.Run();
 具体的 hosted service 注册扩展方法 `AddInkwellWorker()` 由 [Inkwell.Core](./ADR-017-backend-module-topology-ports-and-adapters.md) 提供（属业务编排域，不属端口层）。
 
 > **2026-07-06 errata（关联 [ADR-021 2026-07-06 errata](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）**：本 ADR 仅锁定进程拓扑（`Inkwell.WebApi` 承载 HTTP 入口，`Inkwell.Worker` 承载队列 consumer + DurableTask runner），**不**对 Migration 执行时机作决策。[ADR-021 §「Migration / DataSeed 启动行为」](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 曾把「仅 `Inkwell.WebApi` 启动时跑 Migration」表述为本 ADR「锁定」的推论——该表述已随 ADR-021 2026-07-06 errata 一并修订：**应用启动不再自动执行 Migration**，Migration 改由 CI/CD pipeline 独立步骤执行；本 ADR 的 WebApi / Worker 双进程拓扑本身不变。触发原因：H3 HD-011 起草期发现的生产安全考量，Owner 拍板。
+>
+> **2026-07-09 errata（[ADR-024](./ADR-024-database-migration-seed-standalone-job.md) 新增第三入口）**：本 ADR 锁定的「WebApi + Worker 双进程」是**常驻进程**拓扑，[ADR-024](./ADR-024-database-migration-seed-standalone-job.md) 新增的 `Inkwell.Migrator` 是**一次性 Job**（Migration + Seed 跑完即退出，不常驻、不开任何监听端口），二者不是同一类实体——`Inkwell.Migrator` 不计入本 ADR「进程拓扑」的范畴，但部署时与 WebApi / Worker 共用同一镜像 tag（详见 ADR-024 §决策·部署形态）。本 ADR 的双进程决策本身不变。
 
 ### 可观测性（[ADR-013](./ADR-013-observability-otel-self-hosted-grafana.md) 增量）
 

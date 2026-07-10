@@ -1,46 +1,20 @@
 # Inkwell
 
-> AI 协作单一事实源——遵循 [AGENTS.md 跨工具开放约定](https://agents.md/)。
+> 单一事实源，遵循 [AGENTS.md 跨工具开放约定](https://agents.md/)；只反映当前状态，不记录变更历史。
 >
-> **2026-07-08 流程调整**：本仓库此前采用 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 工程骨架（H1–H6 阶段门 + Custom Agent 流水线）起草了 `docs/` 下全部需求 / 架构 / 详细设计文档；这些文档本身继续作为项目的单一事实源保留和维护。经评估，该流程对当前敏捷开发节奏而言过重，已卸载 Harness Engineering 工具链（`.he/` + 配套 `.github/agents|instructions|skills|templates`），后续迭代改用更轻量的协作方式，具体约定见下方 §5。
+> `docs/` 下的需求 / 架构 / 详细设计文档是权威依据；决策细节见对应 ADR 的 `status` / errata 段落（[docs/03-architecture/adr/](docs/03-architecture/adr/)）或 [docs/07-reviews/](docs/07-reviews/) 评审记录。
 >
-> **本文件状态**：本文件历史内容由 AI 基于 H1 [requirements.md](docs/01-requirements/requirements.md) + H2 [architecture.md](docs/03-architecture/architecture.md) / [tech-selection.md](docs/03-architecture/tech-selection.md) / 16 ADR + [repo-impact-map.md §3.1](docs/01-requirements/repo-impact-map.md) 起草。**§1 / §3 是项目负责人签字位**——AI 不替签：Owner 评审后直接修改本文件并在评审记录中登记。
->
-> **2026-05-10 增量更新**：H2 评审接受 [ADR-017 Ports & Adapters 后端拓扑](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-018 IQueueProvider 双 Provider](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) + [OQ-A008 closed §B](docs/03-architecture/open-questions-arch.md)；§3.1 / §3.2 / §3.3 / §3.4 / §4 由 AI 在 Owner 一次性授权下同步应用，请在 [docs/07-reviews/2026-05-10-h2-architecture-retrofit.md] 评审记录中复核。
->
-> **2026-05-10 增量更新·第二轮**：H2 评审接受 [ADR-019 后端进程拓扑](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)：`Inkwell.Host` 拆为 `Inkwell.WebApi` + `Inkwell.Worker` 双进程，csproj 10 → 11。§3.1 / §3.2 / §3.4 / §4 由 AI 在 Owner 一次性授权下同步应用，请在评审记录中复核。
->
-> **2026-05-10 增量更新·第三轮**：H2 评审接受 [ADR-020 向量存储抽象](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象；v1 = `providers/Inkwell.VectorStore.Qdrant/` + `Inkwell.Core/InMemoryVectorStore` 双 Provider，csproj 11 → 12。§3.1 / §4 由 AI 在 Owner 一次性授权下同步应用，请在评审记录中复核。
->
-> **2026-05-10 增量更新·第四轮**：H2 评审接受 [ADR-021 EFCore Persistence 共享层 + 三 Provider 多层 csproj 布局](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)：EFCore family = 4 csproj（1 共享 base + 3 final adapter）；Entity / `OnModelCreating` / 唯一实现 `EfCorePersistenceProvider` / `InkwellSeeder` 集中在 `providers/Inkwell.Persistence.EFCore/` shared base；SqlServer / Postgres final adapter 各自 `Migrations/`；InMemory 不支持 Migration，仅走 [`EnsureCreated`](https://learn.microsoft.com/ef/core/managing-schemas/ensure-created)。csproj 12 → 13（providers/ 8 → 9）。§3.1 / §3.2 / §4 由 AI 在 Owner 一次性授权下同步应用，请在评审记录中复核。
->
-> **2026-05-11 增量更新·第五轮**：H2 评审接受 [ADR-022 Entity ↔ Model Mapper 选型](docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)：锁手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`），禁 AutoMapper / Mapperly / Mapster；`providers/Inkwell.Persistence.EFCore/` shared base 新增 `Mapping/` + `Repositories/` 子目录；业务命名空间只见 Model、不见 Entity，Model 默认无后缀，撞名降级 `XxxDefinition`。csproj 数不变 13。§3.1 由 AI 在 Owner 一次性授权下同步应用，请在 [docs/07-reviews/2026-05-10-h2-architecture-review.md §11](docs/07-reviews/2026-05-10-h2-architecture-review.md) 评审记录中复核。
->
-> **2026-05-18 增量更新·第六轮（H3 层）**：[HD-002 / HD-009 设计层 picker 回审](docs/04-detailed-design/design-review-report.md) Q1=A2 决议：`IPersistenceProvider` 增 `GetRepository<TRepository>()` 泛型工厂入口（业务命名空间通过 `provider.GetRepository<IXxxRepository>()` / `uow.GetRepository<IXxxRepository>()` 取具名 Repo，不直接 inject 具名 `IXxxRepository`）。§3.1 / §3.2 由默认 Agent 在 Owner 授权下同步应用（[design-review-report.md §13.3 E7/E8](docs/04-detailed-design/design-review-report.md)），请在该评审记录 §13.4 签字位复核。
->
-> **2026-07-08 增量更新·第七轮**：Owner 决定移除 EF Core **InMemory 关系型数据库** Provider（不支持外键约束，本地开发/测试价值有限）——**注意**：`Inkwell.Core.InMemoryVectorStore` / `Inkwell.Core.InMemoryCacheProvider` 是不同子系统，不受影响。持久化收敛为两 Provider（SQL Server 2025 / PostgreSQL 17），dev / 测试改用 [Testcontainers](https://testcontainers.com/) 起真实 SqlServer / Postgres 实例；EFCore family 由 4 csproj（1 base + 3 final adapter）回落为 3 csproj（1 base + 2 final adapter），providers/ 9 → 8，csproj 总数 13 → 12；[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 已直接就地修订（未走新 ADR）；H3 detailed design `HD-010`（InMemory adapter）文件已删除。§2.2 / §3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用。
->
-> **2026-07-09 增量更新·第八轮**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](docs/01-requirements/requirements.md)）。`NFR-004`（审计日志）/ `IAuditLogger` 端口 / `Inkwell.Core.AuditLogs` 业务实现 / `ADR-008`（审计日志存储与查询）均已移除；`REQ-017` Admin 管理页收窄为两项能力（解封账号、撤销共享），不再含"查看全量审计日志"；`REQ-013` API Key 调用不再提及审计记录。§3.1 / §3.2 由 AI 在 Owner 一次性授权下同步应用（移除 `IAuditLogger` 接口引用与 `.AuditLogs` 命名空间；6 大基础设施端口收窄为 5 个）。
->
-> **2026-07-09 增量更新·第九轮**：Owner 决定 v1 不做触发器（REQ-011）与多 Agent 协作 / 编排（REQ-012）功能，推迟至下一期 v2（详见 [requirements.md §13 第 28 条](docs/01-requirements/requirements.md)）。`Inkwell.Core.Triggers` / `Inkwell.Core.Orchestrations` 两个业务命名空间（均未起草 HD）从 §3.1 模块拓扑列表移除；[UI-006 编排视图](docs/01-requirements/ui-spec.md) / [UF-008 配置编排与触发器](docs/01-requirements/user-flow.md) / `triggers` `orchestrations` `orchestration_runs` 数据表 / [ADR-006 编排画布](docs/03-architecture/adr/ADR-006-orchestration-canvas-react-flow.md) 均标注推迟至 v2，设计内容保留不删。§3.1 由 AI 在 Owner 一次性授权下同步应用。
+> **§1 / §3 的签字状态由 Owner 人工翻转，AI 不替签**；其余内容由 AI 直接维护为最新状态。
 
 ## 1. 项目身份
 
-> Inkwell 基于 Microsoft Agent Framework 打造一个可工作的“智能体工厂”，供团队成员自助创建 / 配置 / 使用 / 共享 LLM Agent。
-> 项目早期（H1–H3 设计阶段）采用 [Harness Engineering](https://github.com/shuaihuadu/harness-engineering) 工程规范起草了 `docs/` 下的需求、架构与详细设计文档；2026-07-08 起改用更轻量的协作流程（见 §5），`docs/` 产出物本身不受此次流程调整影响，继续作为单一事实源。
+> Inkwell 基于 Microsoft Agent Framework 打造一个可直接投产、长期演进的“智能体工厂”：团队可部署给内部成员协作使用，个人以及 OPC（One Person Company）也可以独立部署给自己使用；核心能力都是自助创建 / 配置 / 使用 / 共享 LLM Agent（详见 [requirements.md §1](docs/01-requirements/requirements.md)）。
 
 **当前阶段**：H2（已 Approved，详见 [docs/07-reviews/2026-05-10-h2-architecture-review.md](docs/07-reviews/2026-05-10-h2-architecture-review.md)）；准备进入 H3 详细设计。
 
-**双重定位（来自 [requirements.md §1](docs/01-requirements/requirements.md)）**：
-
-- **业务定位**：满足"团队成员能自助创建 / 配置 / 使用 / 共享 LLM Agent"的内部生产力工具
-- **作者定位**：Owner 想从 0 到 1 实现一个 Agent 平台的学习项目
-
-> 草稿由 AI 起草，Owner 请确认或改写为最终一句话。改写后请在 commit message 中登记。
+> 以下几项尚未逐一重审：v1 性能/可用性不设兜底、个人自部署初始化流程、部署形态是否需要更轻量选项。
 
 ## 2. 技术栈
-
-> 自动可探：根目录 `Directory.Build.props` / `package.json` / `*.sln` 在 H5 起步任务建立后才会出现，本节先以 H2 决策为权威源。
 
 ### 2.1 客户端（[ADR-001](docs/03-architecture/adr/ADR-001-client-runtime-electron-react.md)）
 
@@ -54,7 +28,7 @@
 
 - **运行时**：.NET 10 + ASP.NET Core 10 + C# 14
 - **Agent 引擎**：Microsoft Agent Framework（MAF）— `Microsoft.Agents.AI` / `.AGUI` / `.Workflows` / `.DurableTask`
-- **数据访问**：EF Core 10 Code-First + Migrations，两 Provider（SQL Server 2025 / PostgreSQL 17）通过 `IPersistenceProvider` 抽象（[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）；dev / 测试用 [Testcontainers](https://testcontainers.com/) 起真实实例（2026-07-08 移除 InMemory 关系型 Provider）
+- **数据访问**：EF Core 10 Code-First + Migrations，两 Provider（SQL Server 2025 / PostgreSQL 17）通过 `IPersistenceProvider` 抽象（[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）；dev / 测试用 [Testcontainers](https://testcontainers.com/) 起真实实例
 - **向量库**：Qdrant 1.x，gRPC SDK
 - **缓存**：Redis 8（dev 容器 / prod Azure Cache for Redis 或自建 StatefulSet），通过 `ICacheProvider` 抽象（[ADR-016](docs/03-architecture/adr/ADR-016-cache-provider-redis.md)）
 - **文件存储**：`IFileStorageProvider` 抽象 + 三 Provider（LocalFileSystem / AzureBlob / MinIO）（[ADR-015](docs/03-architecture/adr/ADR-015-object-storage-provider-switchable.md)）
@@ -80,11 +54,11 @@
 
 ## 3. 模块边界 / 禁区
 
-> 本节由 H2 ADR 群锁定（详见 [docs/03-architecture/adr/](docs/03-architecture/adr/) **22 条 ADR（ADR-001 ~ ADR-022，均 accepted）** + [open-questions-arch.md](docs/03-architecture/open-questions-arch.md) **8 条 closed OQ（OQ-A001 ~ OQ-A008）**）。后端拓扑由 [ADR-017 Ports & Adapters](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-019 进程拓扑](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 锁定（不再遵循 [repo-impact-map.md](docs/01-requirements/repo-impact-map.md) 的“建议拓扑”，后者是 H1 偏调查提示、不再是加锁实体）。
+> 本节由 H2 ADR 群锁定（详见 [docs/03-architecture/adr/](docs/03-architecture/adr/) **23 条 ADR（ADR-001 ~ ADR-024，均 accepted；ADR-008 审计日志相关内容已随该功能整体移除而删除）** + [open-questions-arch.md](docs/03-architecture/open-questions-arch.md) **8 条 closed OQ（OQ-A001 ~ OQ-A008）**）。后端拓扑由 [ADR-017 Ports & Adapters](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-019 进程拓扑](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) + [ADR-024 Migrator](docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md) 锁定（不再遵循 [repo-impact-map.md](docs/01-requirements/repo-impact-map.md) 的“建议拓扑”，后者是 H1 偏调查提示、不再是加锁实体）。
 
-### 3.1 模块拓扑（[ADR-017](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）
+### 3.1 模块拓扑（[ADR-017](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) + [ADR-024](docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md)）
 
-后端按 Ports & Adapters 三层组织，物理上 12 个 csproj（[`src/core/`](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）：
+后端按 Ports & Adapters 三层组织，物理上 17 个 csproj（[`src/core/`](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)）：
 
 **`src/core/Inkwell.Abstractions/`**（端口层 / 1 csproj）
 
@@ -94,22 +68,26 @@
 - DTO / Model / Options
 - Builder DSL（`IInkwellBuilder` / `AddInkwell()`、参考 MAF `AgentApplicationBuilder` 模式）
 
-**`src/core/Inkwell.Core/`**（适配器默认实现 + 业务层 / 1 csproj）
+**`src/core/Inkwell.Core/`**（业务层 + AgentRuntime / 1 csproj）
 
-- 抽象的进程内默认实现：`InMemoryCacheProvider` / `LocalFileSystemFileStorageProvider` / `ChannelsQueueProvider`（[ADR-018](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) dev / unit test 默认） / `InMemoryVectorStore`（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) dev / unit test 默认，基于 [`Microsoft.Extensions.VectorData.InMemory`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)）
-- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`（`.Triggers` / `.Orchestrations` 已于 2026-07-09 随触发器（REQ-011）/ 多 Agent 协作编排（REQ-012）推迟至 v2 从本列表移除，详见 [requirements.md §13 第 28 条](docs/01-requirements/requirements.md)）
+- 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`（触发器 / 多 Agent 编排推迟至 v2，`.Triggers` / `.Orchestrations` 不在 v1 列表内）
 - `Inkwell.Core.AgentRuntime` 命名空间——**唯一**允许 `using Microsoft.Agents.AI.*` 的位置（[ADR-017 §依赖规则](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](docs/03-architecture/risk-analysis.md)）
+- 不含任何 `ICacheProvider`/`IQueueProvider`/`IFileStorageProvider`/Vector Store 的默认实现——默认实现均在 `providers/*`
 
-**`src/core/providers/`**（多 Provider 适配器 / 8 csproj）
+**`src/core/providers/`**（多 Provider 适配器 / 12 csproj）
 
-- `Inkwell.Persistence.EFCore/`——EFCore family **共享 base**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）：Entity / `OnModelCreating` / 唯一 [`IPersistenceProvider`](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) 实现 `EfCorePersistenceProvider` / `InkwellSeeder`（幂等） / `MigrationRunner`；新增 `Mapping/` 子目录存放 per-entity `<TypeName>MappingExtensions.cs`（手写扩展方法 `Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`）+ `Repositories/` 子目录存放 `<XxxRepository>` 实现（动词白名单限定 `Get*` / `Find*` / `Add*` / `Update*` / `Remove*` / `Count*` / `List*` / `Exists*` / `Iterate*`）；业务接口只见 Model 不见 Entity
+- `Inkwell.Persistence.EFCore/`——EFCore family **共享 base**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [ADR-022](docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）：Entity / `OnModelCreating` / 唯一 [`IPersistenceProvider`](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) 实现 `EfCorePersistenceProvider` / `InkwellSeeder`（幂等） / `MigrationRunner`；`Mapping/` 子目录存放 per-entity `<TypeName>MappingExtensions.cs`（手写扩展方法 `Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`）+ `Repositories/` 子目录存放 `<XxxRepository>` 实现（动词白名单限定 `Get*` / `Find*` / `Add*` / `Update*` / `Remove*` / `Count*` / `List*` / `Exists*` / `Iterate*`）；业务接口只见 Model 不见 Entity
 - `Inkwell.Persistence.EFCore.SqlServer/`——`UseSqlServer` + 自有 `Migrations/`
 - `Inkwell.Persistence.EFCore.Postgres/`——`UseNpgsql` + 自有 `Migrations/`
 - `Inkwell.FileStorage.MinIO/`
 - `Inkwell.FileStorage.AzureBlob/`
+- `Inkwell.FileStorage.Local/`——本地磁盘 + sidecar 元数据文件（dev / unit test 默认）
 - `Inkwell.Cache.Redis/`
+- `Inkwell.Cache.InMemory/`——进程内 `ConcurrentDictionary`（dev / unit test 默认）
 - `Inkwell.Queue.Redis/`——`RedisStreamQueueProvider`（[ADR-018](docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) integration test / prod 默认）
+- `Inkwell.Queue.Channels/`——基于 `System.Threading.Channels`（dev / unit test 默认）
 - `Inkwell.VectorStore.Qdrant/`——基于 [`Microsoft.Extensions.VectorData.Qdrant`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) connector（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) integration test / prod 默认）
+- `Inkwell.VectorStore.InMemory/`——基于 [`Microsoft.Extensions.VectorData.InMemory`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)（dev / unit test 默认）
 
 **`src/core/Inkwell.WebApi/`**（HTTP 入口 / 1 csproj，[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）
 
@@ -130,6 +108,13 @@
 - HPA：自定义 metric `queue_depth` ≥ 100, min 1 / max 5；fallback CPU 70%
 - WebApi 与 Worker **必须同 image tag 单 Helm release 同步滚**（[RISK-015](docs/03-architecture/risk-analysis.md)）
 
+**`src/core/Inkwell.Migrator/`**（一次性 Migration + Seed 入口 / 1 csproj，[ADR-024](docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md)）
+
+- 控制台项目，运行完 `MigrationRunner.MigrateAsync()` + `SeedAsync()` 即退出，不常驻、不开任何监听端口
+- 只依赖 `Inkwell.Abstractions` + `Inkwell.Persistence.EFCore`（含 SqlServer / Postgres 两 final adapter，运行时按 `Inkwell:Persistence:Provider` 配置二选一），**不依赖** `Inkwell.Core`
+- dev：Docker Compose 一次性 service，`Inkwell.WebApi`/`Inkwell.Worker` 通过 `depends_on.condition: service_completed_successfully` 等待其退出码 0
+- prod：Helm `pre-install,pre-upgrade` hook Job，与 WebApi/Worker 共用同一镜像 tag（[RISK-015](docs/03-architecture/risk-analysis.md) 三产物同步）
+
 **客户端 `src/app/desktop/`**（路径由原 `apps/desktop/` 收敛到 `src/app/`）
 
 - `electron/` — 主进程 + 预加载 + 自动更新；持有跨锁屏长 SSE（[ADR-011](docs/03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md)）
@@ -147,6 +132,7 @@
 - **`Inkwell.Core.AgentRuntime` 命名空间例外**：是**唯一**允许 `using Microsoft.Agents.AI.*` 的位置；对外暴露 `IAgentRuntime` 接口（在 `Inkwell.Abstractions`），禁止把 MAF type 泄漏到接口签名。
 - **providers/\* → 端口层**：`src/core/providers/Inkwell.*` 只能引用 `Inkwell.Abstractions` + 该 Provider 自身的 SDK（如 `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `StackExchange.Redis`）；**禁止**引用 `Inkwell.Core`。**EFCore family 例外**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`providers/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` **允许**引用同 providers/ 下的 `Inkwell.Persistence.EFCore` shared base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。其他 family（FileStorage / Cache / Queue / VectorStore）**不享受此例外**——如需同样拓扑必须以独立 ADR 为入口（[RISK-017](docs/03-architecture/risk-analysis.md)）。
 - **`Inkwell.WebApi` / `Inkwell.Worker` → 全部**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）：DI 装配是唯一允许同时 `using` 多个 providers + Inkwell.Core 的位置。`Inkwell.WebApi` 仅注册 enqueue 侧，`Inkwell.Worker` 跑 consumer + DurableTask runner。
+- **`Inkwell.Migrator` → 仅 Persistence**（[ADR-024](docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md)）：只引用 `Inkwell.Abstractions` + `Inkwell.Persistence.EFCore`（含 SqlServer / Postgres 两 final adapter），**不引用** `Inkwell.Core`；不做业务逻辑，只跑 Migration + Seed。
 
 - **prototypes/**：原型仅用于 H1 评审，**不进 main 分支的产品代码**——若产品代码引用了 `prototypes/*` 视为违规。
 
@@ -185,18 +171,16 @@
 - **RISK-007 主进程长 SSE 跨锁屏可靠性**：H4 必须有恢复性用例（macOS / Windows 锁屏 30 min × 多次 sleep/resume）
 - **RISK-011 文件存储三 Provider contract 漏出**：H3 必须建立 `tests/core/Inkwell.Providers.Contract` 公共用例包，CI 跑 LocalFileSystem / Azurite / MinIO 三套 matrix（[ADR-017 §联动提示](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md)路径名调整）
 - **RISK-014 RedisStreamQueueProvider 运维代价**（[OQ-A008 closed §B](docs/03-architecture/open-questions-arch.md) v1 同期交付）：observability 五项补齐项（`queue_consume_latency_p95` / `queue_dlq_count` / `queue_consumer_lag` / `queue_redelivery_count` / `queue_consumer_active`）进 prod ProdReady checklist；H4 必须补三类用例（crash recovery / fairness / DLQ）。
-- **RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 新增）：(1) Helm Chart 单 `image.tag` + `helm upgrade --atomic` 单 release 同时滚；(2) OTel `service.name = inkwell-webapi` / `inkwell-worker` 双 source，Grafana Dashboard 加 Worker 面板；(3) **H4 必须补 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例**（覆盖 KB ingest [REQ-009](docs/01-requirements/requirements.md) / DurableTask；原触发器 REQ-011 场景已于 2026-07-09 推迟至 v2）；(4) `MessageEnvelope` 必含 `traceparent` 字段以保 [REQ-014 trace 全链路](docs/01-requirements/requirements.md) 跨服务不断链。
+- **RISK-015 WebApi / Worker 双进程版本漂移与 OTel 双 source**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）：(1) Helm Chart 单 `image.tag` + `helm upgrade --atomic` 单 release 同时涩；(2) OTel `service.name = inkwell-webapi` / `inkwell-worker` 双 source，Grafana Dashboard 加 Worker 面板；(3) **H4 必须补 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例**（覆盖 KB ingest [REQ-009](docs/01-requirements/requirements.md) / DurableTask，触发器 REQ-011 场景推迟至 v2 不在此列）；(4) `MessageEnvelope` 必含 `traceparent` 字段以保 [REQ-014 trace 全链路](docs/01-requirements/requirements.md) 跨服务不断链。
 
 ## 4. 文档入口
 
 - 需求 / 原型 / 架构 / 详细设计 / 测试 / 任务 / 评审 / 发布：`docs/01-requirements/` … `docs/08-releases/`
 - 仓库影响图（H1 ↔ H3 衔接）：[`docs/01-requirements/repo-impact-map.md`](docs/01-requirements/repo-impact-map.md)
-- ADR 目录：[`docs/03-architecture/adr/`](docs/03-architecture/adr/)（22 条均 accepted）
+- ADR 目录：[`docs/03-architecture/adr/`](docs/03-architecture/adr/)（23 条均 accepted，ADR-008 已删除）
 - H3 详细设计评审记录：[`docs/04-detailed-design/design-review-report.md`](docs/04-detailed-design/design-review-report.md)
 
 ## 5. 给 AI 工具的通用指令
-
-> 2026-07-08 起不再使用 Harness Engineering 的 Custom Agent / Skill / Instructions 自动加载机制，以下为轻量化后的通用约定。
 
 - **修改前先读**：上方 §3 模块边界 / 禁区、相关详细设计章节（`docs/04-detailed-design/`）、相关 ADR（`docs/03-architecture/adr/`）
 - **提交信息**：建议保留六字段格式（Design / Tests / Verify / Docs / Risk / Task），便于追溯改动对应的需求 / 设计 / 任务编号；不再强制通过 instructions 文件自动校验

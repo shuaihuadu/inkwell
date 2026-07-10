@@ -243,6 +243,17 @@ grep -rn "Inkwell\.\(Auth\|Agents\|Skills\|KnowledgeBase\|Memory\|Triggers\|Orch
 
 `accepted` — 2026-05-10。同期 [ADR-018 IQueueProvider 双 Provider](./ADR-018-queue-abstraction-channels-default.md) + [OQ-A008 closed §B](../open-questions-arch.md) 加补 `Inkwell.Queue.Redis` csproj（providers/ 6 → 7）；同期 [ADR-019 进程拓扑](./ADR-019-process-topology-webapi-worker-split.md) 重命名 `Inkwell.Host` → `Inkwell.WebApi` + 新增 `Inkwell.Worker`；同期 [ADR-020 向量存储抽象](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 加补 `Inkwell.VectorStore.Qdrant` csproj（providers/ 7 → 8）；同期 [ADR-021 EFCore Persistence 共享层](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 加补 `Inkwell.Persistence.EFCore` base csproj（providers/ 8 → 9）。后端总 csproj 从 9 上调为 13。
 
+> **2026-07-09 errata（Owner 决定 dev 默认实现也拆进 providers/，取代本节及 §模块映射表「`InMemoryCacheProvider`/`ChannelsQueueProvider`/`LocalFileSystemProvider` 默认 → `Inkwell.Core`」的表述）**：`Inkwell.Core` 业务代码量持续增长后，Owner 判断"零外部依赖 ≠ 必须放 Core"，之前放 Core 是为了让 `UseDefaults()` 免装 provider csproj 就能跑，但这个便利性收益不足以抵消 Core 与 providers/* 拓扑不对称带来的持续解释成本（[ADR-020 备选 C](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 当年就已经因为这个不对称被放弃，只是 VectorStore 一个用了对称拓扑、Cache/Queue/FileStorage 三个仍留 Core）。新状态：四个 dev 默认实现全部拆成独立 `providers/*` csproj，与 Redis/MinIO/AzureBlob/Qdrant 完全对称：
+>
+> | 端口 | 默认实现新位置 |
+> | --- | --- |
+> | `ICacheProvider` | `providers/Inkwell.Cache.InMemory/` |
+> | `IQueueProvider` | `providers/Inkwell.Queue.Channels/` |
+> | `IFileStorageProvider` | `providers/Inkwell.FileStorage.Local/` |
+> | Vector Store | `providers/Inkwell.VectorStore.InMemory/`（同步取代 [ADR-020](./ADR-020-vector-store-microsoft-extensions-vectordata.md) D2=C 的决定） |
+>
+> `Inkwell.Core` 只留业务命名空间（Auth/Agents/Models/Tools/Skills/KnowledgeBase/Memory/PublicApi/Traces/Versioning/Multimodal/Conversations/Health）+ `AgentRuntime/`；不再含任何 `ICacheProvider`/`IQueueProvider`/`IFileStorageProvider`/Vector Store 的默认实现。代价：`Inkwell.WebApi`/`Inkwell.Worker`/`Inkwell.Migrator` 即便只想跑最简单的 dev 默认组合，也需要显式引用这四个新 csproj（不再有"零额外引用"的 `UseDefaults()` 捷径）。后端总 csproj 13 → 17（providers/ 8 → 12）。
+
 ## 置信度
 
 `high` — 重构幅度大，但 MAF Builder DSL 风格借鉴有据，四 Provider 抽象家族（[`ADR-004`](./ADR-004-data-store-provider-switchable-ef-core.md) / [`ADR-015`](./ADR-015-object-storage-provider-switchable.md) / [`ADR-016`](./ADR-016-cache-provider-redis.md) / [`ADR-018`](./ADR-018-queue-abstraction-channels-default.md)）均遵 ports & adapters 态势，本 ADR 是补齐物理拓扑层。`Inkwell.Core.AgentRuntime` 合并代价由软边界（lint）补偿——见后果·负面。进程拓扑拆分交 [ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 锁定。

@@ -143,7 +143,8 @@ src/core/
 │   ├── Inkwell.Queue.Redis/
 │   └── Inkwell.VectorStore.Qdrant/
 ├── Inkwell.WebApi/              ← ASP.NET Core HTTP / REST / AGUI / Public API 入口（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 重命名自 Inkwell.Host）
-└── Inkwell.Worker/              ← 队列 consumer + DurableTask runner 入口（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增）
+├── Inkwell.Worker/              ← 队列 consumer + DurableTask runner 入口（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增）
+└── Inkwell.Migrator/            ← 一次性 Migration + Seed 入口（[ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) 新增，不常驻）
 ```
 
 ### 3.2 模块说明
@@ -162,6 +163,8 @@ src/core/
 - **向量存储**（[ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)）：复用 [`Microsoft.Extensions.VectorData`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象（`VectorStore` / `VectorStoreCollection<TKey, TRecord>` + `[VectorStoreKey]` / `[VectorStoreData]` / `[VectorStoreVector]` attribute model）；prod 走 `providers/Inkwell.VectorStore.Qdrant/`，dev / unit test 走 `Inkwell.Core/VectorStore/InMemoryVectorStore`；KB / Memory 业务语义（chunking / retention）在各自 Service 层包，**不**进 `Inkwell.Abstractions`。embedding 生成通过 [`Microsoft.Extensions.AI.IEmbeddingGenerator`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.ai.iembeddinggenerator-2)（Builder DSL `UseAzureOpenAIEmbeddings(...)`）解耦。
 
 > **2026-07-06 errata（同步 [ADR-021 2026-07-06 errata](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）**：上方「DataSeed」一条中「[`Inkwell.WebApi` 启动时](./adr/ADR-019-process-topology-webapi-worker-split.md) 由 `MigrationRunner` 在 Migration 完成后调 `InkwellSeeder.SeedAsync()`」的表述已被修订——**Migration 不再随 `Inkwell.WebApi` 启动自动执行**，改由 CI/CD pipeline（GitHub Actions）独立步骤在部署前完成；`MigrationRunner` 在 `Inkwell.WebApi` 启动时仅负责（在确认 schema 已就绪的前提下）触发 `InkwellSeeder.SeedAsync()`，不再调用 `Database.MigrateAsync()`。触发原因：H3 HD-011 起草期发现的生产安全考量，Owner 拍板；详见 [ADR-021 §「Migration / DataSeed 启动行为」errata](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)。
+>
+> **2026-07-09 errata（[ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) 取代上方两条）**：上方「DataSeed」一条本身、以及 2026-07-06 errata 描述的「Migration 走 CI/CD 裸 CLI」，均已被 [ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) 取代。新状态：Migration **与** Seed 合并进独立一次性 `Inkwell.Migrator` 入口（dev Compose 一次性 service + `depends_on.condition: service_completed_successfully`；prod Helm `pre-install,pre-upgrade` hook Job），`Inkwell.WebApi` 启动代码不再调用 `MigrationRunner` 的任何分支。触发原因：risk-analysis.md 已记录的 Seed 多副本竞态风险 + Microsoft EF Core 官方文档不建议应用运行时执行 Migration；Owner picker 拍板确认。
 
 ### 3.4 Builder DSL（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) 双进程增量）
 
@@ -191,7 +194,7 @@ var host = builder.Build();
 host.Run();
 ```
 
-未引用的 Provider csproj 对应的 `Use*()` extension method 不可见，天然裁剪。WebApi / Worker 必须使用同一 image tag、单 Helm release 同时滚（避免 [RISK-015](./risk-analysis.md) 版本漂移）。
+未引用的 Provider csproj 对应的 `Use*()` extension method 不可见，天然裁剪。WebApi / Worker / Migrator 必须使用同一 image tag，Migrator 以 Helm hook Job / Compose 一次性 service 形态运行且必须先于 WebApi / Worker 完成（[ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md)），避免 [RISK-015](./risk-analysis.md) 版本漂移。
 
 ## 4. 数据库选型
 
@@ -294,6 +297,7 @@ docker compose up -d
 helm install inkwell ./charts/inkwell --namespace inkwell-prod
   ├─ Deployment: inkwell-webapi (HPA: CPU 70%, min 2, max 10)
   ├─ Deployment: inkwell-worker (HPA: queue_depth≥100, min 1, max 5；ADR-019)
+  ├─ Job (hook: pre-install,pre-upgrade): inkwell-migrator (一次性 Migration + Seed；ADR-024)
   ├─ StatefulSet: postgres (Azure Disk Premium, 100GiB)
   ├─ StatefulSet: qdrant (Azure Disk Premium, 50GiB)
   ├─ Cache: Azure Cache for Redis Standard (默认) 或 StatefulSet: redis (自建场景, ADR-016)
@@ -304,7 +308,7 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
   └─ Secrets: Kubernetes Secret + RBAC + at-rest 加密（OQ-A006 §B，未引入 Key Vault，残余风险 RISK-013）
 ```
 
-> webapi 与 worker **必须使用同一 image tag**，单 Helm release 同时滚（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) / [RISK-015](./risk-analysis.md)）。`entrypoint`：image 内置两份，Helm 通过 `command:` / `args:` 区分（`dotnet Inkwell.WebApi.dll` vs `dotnet Inkwell.Worker.dll`）。
+> webapi 、 worker 与 migrator **必须使用同一 image tag**，单 Helm release 同时滚（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) / [ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) / [RISK-015](./risk-analysis.md)）。`entrypoint`：image 内置三份，Helm 通过 `command:` / `args:` 区分（`dotnet Inkwell.WebApi.dll` vs `dotnet Inkwell.Worker.dll` vs `dotnet Inkwell.Migrator.dll`）。migrator 以 hook Job 形态跑完即退，不常驻。
 
 - **CI/CD**：GitHub Actions（[OQ-A007 closed §A](./open-questions-arch.md)）→ build → ACR push → Helm deploy。后端仓库走 [MSTest.Sdk 4.x](https://github.com/microsoft/testfx)（最新稳定 4.2.2，默认使用 [Microsoft.Testing.Platform](https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-intro) / MTP runner）；前端 Vitest；E2E Playwright。
 - **region**：v1 单 region；多 region 列入 v2（[RISK-004](./risk-analysis.md)）。
@@ -374,7 +378,7 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
 - [RISK-012](./risk-analysis.md#risk-012-redis-单点与缓存-invalidation-一致性) Redis 单点与缓存 invalidation 一致性
 - [RISK-013](./risk-analysis.md#risk-013-v1-未引入-key-vault-的凭据轮换与隔离弱化) v1 未引入 Key Vault 的凭据轮换与隔离弱化
 - RISK-014（已激活，随 [OQ-A008 closed §B](./open-questions-arch.md) v1 同期交付 `RedisStreamQueueProvider`） `RedisStreamQueueProvider` 运维代价：observability 五项指标补齐 / Redis 实例双职能 / DLQ 人工处理 UI v2 backlog
-- RISK-015（随 [ADR-019 进程拓扑](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增） `Inkwell.WebApi` / `Inkwell.Worker` 双进程版本漂移与 OTel 双 source
+- RISK-015（随 [ADR-019 进程拓扑](./adr/ADR-019-process-topology-webapi-worker-split.md) 新增，2026-07-09 随 [ADR-024 Migrator](./adr/ADR-024-database-migration-seed-standalone-job.md) 扩展） `Inkwell.WebApi` / `Inkwell.Worker` / `Inkwell.Migrator` 三产物版本漂移与 OTel 双 source
 
 ## 15. 替代方案比较
 

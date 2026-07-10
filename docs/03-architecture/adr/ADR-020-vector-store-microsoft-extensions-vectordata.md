@@ -171,6 +171,8 @@ grep -rn "Inkwell.VectorStore 模块" docs/
 
 `accepted` — 2026-05-10。Owner 在本 ADR 起草会话中通过 4 个 picker 拍板：D1 = A（M.E.VectorData 复用）；D2 = C（providers/* + Inkwell.Core/ InMemory）；D3 = B（Qdrant + InMemory 双 Provider）；D4 = A（单一抽象 + KB/Memory Service 层）。本 ADR 是 [ADR-004 §决策 line 43](./ADR-004-data-store-provider-switchable-ef-core.md) "`Inkwell.VectorStore` 模块封装" 表述的精化（refinement），**不 supersede** ADR-004。
 
+> **2026-07-09 errata（D2 = C 被 [ADR-017 2026-07-09 errata](./ADR-017-backend-module-topology-ports-and-adapters.md) 取代）**：上方"D2 = C（providers/\* + Inkwell.Core/ 加 InMemoryVectorStore）"表述已被取代——`InMemoryVectorStore` 的默认实现挪出 `Inkwell.Core/`，改为独立 `providers/Inkwell.VectorStore.InMemory/` csproj，与 `Inkwell.VectorStore.Qdrant` 完全对称（不再是"Qdrant 在 providers/、InMemory 在 Core"的不对称拓扑）。详见 [ADR-017 §状态 2026-07-09 errata](./ADR-017-backend-module-topology-ports-and-adapters.md)。
+
 ## 置信度
 
 `high`。
