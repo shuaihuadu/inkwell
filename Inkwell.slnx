@@ -110,6 +110,7 @@
     <Folder Name="/Solution Items/">
         <File Path=".dockerignore" />
         <File Path=".editorconfig" />
+        <File Path=".gitattributes" />
         <File Path=".gitignore" />
         <File Path="AGENTS.md" />
         <File Path="Directory.Build.props" />
