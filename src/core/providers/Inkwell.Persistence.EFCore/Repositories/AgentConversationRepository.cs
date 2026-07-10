@@ -1,4 +1,5 @@
-using Inkwell;
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Mapping;
 
@@ -6,7 +7,7 @@ namespace Inkwell.Persistence.EFCore.Repositories;
 
 internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentConversationRepository
 {
-    public async Task<AgentConversation> AddConversation(AgentConversation conversation, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> AddConversation(AgentSessionDefinition conversation, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(conversation);
 
@@ -18,7 +19,7 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         return entity.ToModel();
     }
 
-    public async Task<AgentConversation> GetConversation(Guid id, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> GetConversation(Guid id, CancellationToken ct = default)
     {
         // AsNoTracking：同 AgentRepository.GetAgent 的说明，避免与 UpdateConversation 产生重复追踪冲突。
         AgentConversationEntity? entity = await db.Set<AgentConversationEntity>().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
@@ -26,7 +27,7 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         return entity?.ToModel() ?? throw new KeyNotFoundException($"Conversation not found: id={id}");
     }
 
-    public async Task<AgentConversation> UpdateConversation(AgentConversation conversation, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> UpdateConversation(AgentSessionDefinition conversation, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(conversation);
 
@@ -45,16 +46,16 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         }
     }
 
-    public async Task<PagedResult<AgentConversation>> ListConversationsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
+    public async Task<PagedResult<AgentSessionDefinition>> ListConversationsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
     {
         IOrderedQueryable<AgentConversationEntity> query = db.Set<AgentConversationEntity>().AsNoTracking()
             .Where(x => x.AgentId == agentId && x.OwnerUserId == ownerUserId)
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentConversation> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        List<AgentSessionDefinition> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
 
-        return new PagedResult<AgentConversation>(items, total, pagination);
+        return new PagedResult<AgentSessionDefinition>(items, total, pagination);
     }
 
     public async Task<IReadOnlyList<Guid>> FindUsedAgentIdsByOwner(Guid ownerUserId, CancellationToken ct = default) =>

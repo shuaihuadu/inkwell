@@ -1,4 +1,5 @@
-using Inkwell;
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Mapping;
 
@@ -6,7 +7,7 @@ namespace Inkwell.Persistence.EFCore.Repositories;
 
 internal sealed class AgentConversationMessageRepository(InkwellDbContext db) : IAgentConversationMessageRepository
 {
-    public async Task<AgentConversationMessage> AddMessage(AgentConversationMessage message, CancellationToken ct = default)
+    public async Task<AgentChatMessage> AddMessage(AgentChatMessage message, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -18,16 +19,16 @@ internal sealed class AgentConversationMessageRepository(InkwellDbContext db) : 
         return entity.ToModel();
     }
 
-    public async Task<PagedResult<AgentConversationMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
+    public async Task<PagedResult<AgentChatMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
     {
         IOrderedQueryable<AgentConversationMessageEntity> query = db.Set<AgentConversationMessageEntity>().AsNoTracking()
             .Where(x => x.ConversationId == conversationId)
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentConversationMessage> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        List<AgentChatMessage> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
 
-        return new PagedResult<AgentConversationMessage>(items, total, pagination);
+        return new PagedResult<AgentChatMessage>(items, total, pagination);
     }
 
     public async Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default)

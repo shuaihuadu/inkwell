@@ -1,3 +1,4 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
 
 namespace Inkwell;
 
@@ -11,6 +12,4 @@ public sealed record class PagedResult<T>(IReadOnlyList<T> Items, long TotalCoun
     public bool HasNextPage => this.Pagination.Page < this.TotalPages;
 
     public bool HasPreviousPage => this.Pagination.Page > 1;
-
-    public static PagedResult<T> Empty(Pagination pagination) => new([], 0, pagination);
 }

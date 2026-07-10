@@ -1,9 +1,10 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
+using Inkwell.Persistence.EFCore.Interceptors;
+using Inkwell.Persistence.EFCore.Repositories;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Inkwell;
-using Inkwell.Persistence.EFCore.Interceptors;
-using Inkwell.Persistence.EFCore.Repositories;
 
 namespace Inkwell.Persistence.EFCore.DependencyInjection;
 

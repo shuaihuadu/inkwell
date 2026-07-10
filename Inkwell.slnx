@@ -1,31 +1,149 @@
 <Solution>
-
-    <Folder Name="/core/">
+    <Folder Name="/.github/">
+        <File Path=".github/copilot-instructions.md" />
+    </Folder>
+    <Folder Name="/.github/agents/">
+        <File Path=".github/agents/doc-gardener.agent.md" />
+        <File Path=".github/agents/h1-prototype-author.agent.md" />
+        <File Path=".github/agents/h1-prototype-reviewer.agent.md" />
+        <File Path=".github/agents/h1-repo-impact-mapper.agent.md" />
+        <File Path=".github/agents/h1-requirements-interviewer.agent.md" />
+        <File Path=".github/agents/h1-ui-spec-author.agent.md" />
+        <File Path=".github/agents/h2-architect-advisor.agent.md" />
+        <File Path=".github/agents/h3-detailed-design-author.agent.md" />
+        <File Path=".github/agents/h3-detailed-design-reviewer.agent.md" />
+        <File Path=".github/agents/h4-test-case-author.agent.md" />
+        <File Path=".github/agents/h5-coding-executor.agent.md" />
+        <File Path=".github/agents/h5-commit-auditor.agent.md" />
+        <File Path=".github/agents/h6-release-note-writer.agent.md" />
+    </Folder>
+    <Folder Name="/.github/workflows/" />
+    <Folder Name="/deploy/" />
+    <Folder Name="/docs/" />
+    <Folder Name="/docs/_templates/">
+        <File Path="docs/_templates/architecture.template.md" />
+        <File Path="docs/_templates/database-design.template.md" />
+        <File Path="docs/_templates/detailed-design.template.md" />
+        <File Path="docs/_templates/prototype-review.template.md" />
+        <File Path="docs/_templates/requirements.template.md" />
+    </Folder>
+    <Folder Name="/docs/01-requirements/">
+        <File Path="docs/01-requirements/acceptance-criteria.md" />
+        <File Path="docs/01-requirements/open-questions.md" />
+        <File Path="docs/01-requirements/repo-impact-map.md" />
+        <File Path="docs/01-requirements/requirements.md" />
+        <File Path="docs/01-requirements/ui-spec.md" />
+        <File Path="docs/01-requirements/user-flow.md" />
+    </Folder>
+    <Folder Name="/docs/02-prototype/">
+        <File Path="docs/02-prototype/prototype-review.md" />
+    </Folder>
+    <Folder Name="/docs/03-architecture/">
+        <File Path="docs/03-architecture/architecture.md" />
+        <File Path="docs/03-architecture/open-questions-arch.md" />
+        <File Path="docs/03-architecture/risk-analysis.md" />
+        <File Path="docs/03-architecture/tech-selection.md" />
+    </Folder>
+    <Folder Name="/docs/03-architecture/adr/">
+        <File Path="docs/03-architecture/adr/ADR-001-client-runtime-electron-react.md" />
+        <File Path="docs/03-architecture/adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md" />
+        <File Path="docs/03-architecture/adr/ADR-003-agent-engine-microsoft-agent-framework.md" />
+        <File Path="docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md" />
+        <File Path="docs/03-architecture/adr/ADR-005-deployment-docker-compose-aks.md" />
+        <File Path="docs/03-architecture/adr/ADR-006-orchestration-canvas-react-flow.md" />
+        <File Path="docs/03-architecture/adr/ADR-007-public-api-token-auth.md" />
+        <File Path="docs/03-architecture/adr/ADR-009-multimodal-azure-speech.md" />
+        <File Path="docs/03-architecture/adr/ADR-010-skill-loading-static-only-v1.md" />
+        <File Path="docs/03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md" />
+        <File Path="docs/03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md" />
+        <File Path="docs/03-architecture/adr/ADR-013-observability-otel-self-hosted-grafana.md" />
+        <File Path="docs/03-architecture/adr/ADR-014-i18n-out-of-scope-v1.md" />
+        <File Path="docs/03-architecture/adr/ADR-015-object-storage-provider-switchable.md" />
+        <File Path="docs/03-architecture/adr/ADR-016-cache-provider-redis.md" />
+        <File Path="docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md" />
+        <File Path="docs/03-architecture/adr/ADR-018-queue-abstraction-channels-default.md" />
+        <File Path="docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md" />
+        <File Path="docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md" />
+        <File Path="docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md" />
+        <File Path="docs/03-architecture/adr/ADR-022-entity-domain-mapper-selection.md" />
+        <File Path="docs/03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md" />
+        <File Path="docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md" />
+        <File Path="docs/03-architecture/adr/README.md" />
+    </Folder>
+    <Folder Name="/docs/04-detailed-design/">
+        <File Path="docs/04-detailed-design/database-design.md" />
+        <File Path="docs/04-detailed-design/design-review-report.md" />
+        <File Path="docs/04-detailed-design/file-structure.md" />
+    </Folder>
+    <Folder Name="/docs/04-detailed-design/Inkwell.Abstractions/">
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-004-Inkwell.Abstractions-cache-port.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-005-Inkwell.Abstractions-queue-port.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md" />
+    </Folder>
+    <Folder Name="/docs/04-detailed-design/Inkwell.Core/">
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-014-Inkwell.Core.Auth.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-015-Inkwell.Core.Agents.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-016-Inkwell.Core.Tools.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-017-Inkwell.Core.Conversations.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-019-Inkwell.Core.Models.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Core/HD-020-Inkwell.Core.Skills.md" />
+    </Folder>
+    <Folder Name="/docs/04-detailed-design/Inkwell.Persistence.EFCore/">
+        <File Path="docs/04-detailed-design/Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md" />
+        <File Path="docs/04-detailed-design/Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md" />
+    </Folder>
+    <Folder Name="/docs/04-detailed-design/Inkwell.WebApi/">
+        <File Path="docs/04-detailed-design/Inkwell.WebApi/HD-021-Inkwell.WebApi-authentication-and-agent-routing.md" />
+    </Folder>
+    <Folder Name="/docs/07-reviews/">
+        <File Path="docs/07-reviews/2026-05-08-openquestion-discussion.md" />
+        <File Path="docs/07-reviews/2026-05-09-h1-prototype-review.md" />
+        <File Path="docs/07-reviews/2026-05-10-h2-architecture-review.md" />
+    </Folder>
+    <Folder Name="/prototypes/" />
+    <Folder Name="/prototypes/inkwell-agent-platform/" />
+    <Folder Name="/Solution Items/">
+        <File Path=".dockerignore" />
+        <File Path=".editorconfig" />
+        <File Path=".gitignore" />
+        <File Path="AGENTS.md" />
+        <File Path="Directory.Build.props" />
+        <File Path="Directory.Packages.props" />
+        <File Path="global.json" />
+        <File Path="LICENSE" />
+        <File Path="nuget.config" />
+        <File Path="README.md" />
+    </Folder>
+    <Folder Name="/src/" />
+    <Folder Name="/src/core/">
         <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
         <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
+        <Project Path="src/core/Inkwell.Migrator/Inkwell.Migrator.csproj" />
         <Project Path="src/core/Inkwell.WebApi/Inkwell.WebApi.csproj" />
         <Project Path="src/core/Inkwell.Worker/Inkwell.Worker.csproj" />
-        <Project Path="src/core/Inkwell.Migrator/Inkwell.Migrator.csproj" />
     </Folder>
-
-    <Folder Name="/core/providers/">
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore/Inkwell.Persistence.EFCore.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.Local/Inkwell.FileStorage.Local.csproj" />
-        <Project Path="src/core/providers/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
+    <Folder Name="/src/core/providers/">
         <Project Path="src/core/providers/Inkwell.Cache.InMemory/Inkwell.Cache.InMemory.csproj" />
-        <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
+        <Project Path="src/core/providers/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore/Inkwell.Persistence.EFCore.csproj" />
         <Project Path="src/core/providers/Inkwell.Queue.Channels/Inkwell.Queue.Channels.csproj" />
-        <Project Path="src/core/providers/Inkwell.VectorStore.Qdrant/Inkwell.VectorStore.Qdrant.csproj" />
+        <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
         <Project Path="src/core/providers/Inkwell.VectorStore.InMemory/Inkwell.VectorStore.InMemory.csproj" />
+        <Project Path="src/core/providers/Inkwell.VectorStore.Qdrant/Inkwell.VectorStore.Qdrant.csproj" />
     </Folder>
 
     <Folder Name="/tests/">
-        <Project Path="src/tests/core/Inkwell.Abstractions.Tests/Inkwell.Abstractions.Tests.csproj" />
-        <Project Path="src/tests/core/Inkwell.Core.Tests/Inkwell.Core.Tests.csproj" />
-        <Project Path="src/tests/core/Inkwell.Providers.Contract/Inkwell.Providers.Contract.csproj" />
+        <Project Path="tests/Inkwell.Abstractions.Tests/Inkwell.Abstractions.Tests.csproj" />
+        <Project Path="tests/Inkwell.Core.Tests/Inkwell.Core.Tests.csproj" />
+        <Project Path="tests/Inkwell.Providers.Contract/Inkwell.Providers.Contract.csproj" />
     </Folder>
 </Solution>

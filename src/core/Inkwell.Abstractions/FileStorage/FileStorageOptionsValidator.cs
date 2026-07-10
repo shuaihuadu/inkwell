@@ -1,5 +1,6 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.Options;
 
 namespace Inkwell;
 
@@ -7,8 +8,8 @@ internal sealed class FileStorageOptionsValidator : IValidateOptions<FileStorage
 {
     public ValidateOptionsResult Validate(string? name, FileStorageOptions options)
     {
-        ValidationContext context = new ValidationContext(options);
-        List<ValidationResult> results = new List<ValidationResult>();
+        ValidationContext context = new(options);
+        List<ValidationResult> results = [];
 
         if (!Validator.TryValidateObject(options, context, results, validateAllProperties: true))
         {

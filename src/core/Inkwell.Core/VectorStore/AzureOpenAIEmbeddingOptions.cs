@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.ComponentModel.DataAnnotations;
 
 namespace Inkwell;
@@ -6,12 +8,7 @@ namespace Inkwell;
 public sealed class AzureOpenAIEmbeddingOptions
 {
     [Required]
-    public string Endpoint { get; init; } = string.Empty;
-
-    public string? ApiKey { get; init; }
-
-    [Required]
-    public string DeploymentName { get; init; } = string.Empty;
+    public required AzureOpenAICredential Credential { get; set; }
 
     [Range(1, 4096)]
     public int? Dimensions { get; init; }

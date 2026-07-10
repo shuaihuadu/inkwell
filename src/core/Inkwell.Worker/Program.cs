@@ -1,9 +1,10 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell;
 using Inkwell.Cache.InMemory;
-using Inkwell.Queue.Channels;
-using Inkwell.FileStorage.Local;
-using Inkwell.VectorStore.InMemory;
 using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
+using Inkwell.Queue.Channels;
+using Inkwell.VectorStore.InMemory;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
@@ -13,13 +14,13 @@ builder.Services.AddInkwell(builder.Configuration)
     .UsePostgres(builder.Configuration.GetConnectionString("Inkwell") ?? throw new InvalidOperationException("Missing ConnectionStrings:Inkwell."))
     .UseInMemoryCache()
     .UseChannelsQueue()
-    .UseLocalFileSystemFileStorage()
+    //.UseLocalFileSystemFileStorage()
     .UseInMemoryVectorStore()
-    .UseAzureOpenAIAgentRuntime()
+    //.UseAzureOpenAIAgentRuntime()
     .UseDefaultAuthService()
-    .UseDefaultAgentService()
+    //.UseDefaultAgentService()
     .UseDefaultToolService()
-    .UseDefaultConversationService()
+    //.UseDefaultConversationService()
     .UseDefaultSkillService()
     .AddDefaultModelCatalog()
     .Build();

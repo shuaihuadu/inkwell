@@ -1,4 +1,5 @@
-using Inkwell;
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;

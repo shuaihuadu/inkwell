@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Minio;
-using Inkwell;
 
 namespace Inkwell.FileStorage.MinIO;
 

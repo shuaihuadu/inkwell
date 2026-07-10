@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell;
 
 /// <summary>登录鉴权业务对外接口。</summary>

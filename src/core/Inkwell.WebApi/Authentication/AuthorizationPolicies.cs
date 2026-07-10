@@ -1,3 +1,5 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell.WebApi;
 
 /// <summary>Inkwell 授权策略名称的常量集中定义。</summary>

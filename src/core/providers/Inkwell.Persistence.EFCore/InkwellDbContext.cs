@@ -1,10 +1,11 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Reflection;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.Logging;
-using Inkwell;
 using Inkwell.Persistence.EFCore.Entities;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Persistence.EFCore;
 

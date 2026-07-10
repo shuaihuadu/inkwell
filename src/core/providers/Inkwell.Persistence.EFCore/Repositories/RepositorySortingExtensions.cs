@@ -1,5 +1,6 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Linq.Expressions;
-using Inkwell;
 
 namespace Inkwell.Persistence.EFCore.Repositories;
 

@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -24,14 +26,14 @@ public static class AzureOpenAIEmbeddingBuilderExtensions
         {
             AzureOpenAIEmbeddingOptions options = sp.GetRequiredService<IOptions<AzureOpenAIEmbeddingOptions>>().Value;
 
-            if (string.IsNullOrEmpty(options.ApiKey))
+            if (string.IsNullOrEmpty(options.Credential.ApiKey))
             {
                 throw new InvalidOperationException("AzureOpenAIEmbeddingOptions.ApiKey is required (v1 supports API key auth only).");
             }
 
-            AzureOpenAIClient client = new AzureOpenAIClient(new Uri(options.Endpoint), new AzureKeyCredential(options.ApiKey));
+            AzureOpenAIClient client = new(new Uri(options.Credential.Endpoint), new AzureKeyCredential(options.Credential.ApiKey));
 
-            return client.GetEmbeddingClient(options.DeploymentName).AsIEmbeddingGenerator(options.Dimensions);
+            return client.GetEmbeddingClient(options.Credential.DeploymentName).AsIEmbeddingGenerator(options.Dimensions);
         });
 
         return builder;

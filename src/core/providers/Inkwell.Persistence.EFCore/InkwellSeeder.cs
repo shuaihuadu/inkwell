@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Inkwell.Persistence.EFCore.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Persistence.EFCore;
 
@@ -31,7 +32,7 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
     /// <summary>Seed 段：默认管理员账号（幂等，按 Username 唯一键判定，非 Id 判定）。</summary>
     private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)
     {
-        const string segmentName = "DefaultAdmin";
+        const string SegmentName = "DefaultAdmin";
 
         try
         {
@@ -39,7 +40,7 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
 
             if (exists)
             {
-                logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 0);
+                logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", SegmentName, 0);
 
                 return 0;
             }
@@ -59,7 +60,7 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
             });
             await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-            logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 1);
+            logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", SegmentName, 1);
 
             return 1;
         }
@@ -67,15 +68,15 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
         {
             // 并发场景下两个实例都可能通过上方预检查后尝试插入；数据库 Username 唯一索引拦下重复数据，
             // 这里将唯一约束冲突当作已被其他实例种过的正常幂等结果处理，不向上抛异常（ADR-024 §幂等性保证）。
-            logger.LogInformation(dbEx, "Seed {SegmentName} skipped: already seeded by another instance (unique constraint conflict)", segmentName);
+            logger.LogInformation(dbEx, "Seed {SegmentName} skipped: already seeded by another instance (unique constraint conflict)", SegmentName);
 
             return 0;
         }
         catch (Exception inner) when (inner is not OperationCanceledException)
         {
-            logger.LogError(inner, "Seed {SegmentName} failed", segmentName);
+            logger.LogError(inner, "Seed {SegmentName} failed", SegmentName);
             Activity.Current?.AddException(inner);
-            throw new InvalidOperationException($"Seeder segment '{segmentName}' failed", inner);
+            throw new InvalidOperationException($"Seeder segment '{SegmentName}' failed", inner);
         }
     }
 }

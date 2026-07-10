@@ -1,14 +1,15 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using Inkwell;
 
 namespace Inkwell.Cache.Redis;
 
 /// <summary>基于 <see cref="StackExchange.Redis"/> 的 <see cref="ICacheProvider"/> 实现（ADR-016，prod 默认）。</summary>
 internal sealed class RedisCacheProvider(IConnectionMultiplexer connection, IOptions<CacheOptions> options) : ICacheProvider
 {
-    private static readonly RedisValue LockValue = "locked";
+    private static readonly RedisValue lockValue = "locked";
 
     /// <summary>获取当前连接对应的 Redis 逻辑数据库。</summary>
     private IDatabase Database => connection.GetDatabase();
@@ -53,11 +54,11 @@ internal sealed class RedisCacheProvider(IConnectionMultiplexer connection, IOpt
     /// 与 <c>InMemoryCacheProvider</c> 的简化程度一致）。
     /// </remarks>
     public async Task<bool> TryAcquireLockAsync(string key, TimeSpan ttl, CancellationToken ct = default) =>
-        await this.Database.LockTakeAsync(key, LockValue, ttl).ConfigureAwait(false);
+        await this.Database.LockTakeAsync(key, lockValue, ttl).ConfigureAwait(false);
 
     /// <inheritdoc />
     public async Task ReleaseLockAsync(string key, CancellationToken ct = default) =>
-        await this.Database.LockReleaseAsync(key, LockValue).ConfigureAwait(false);
+        await this.Database.LockReleaseAsync(key, lockValue).ConfigureAwait(false);
 
     /// <summary>
     /// 将请求的 TTL 夹紧到 <paramref name="cacheOptions"/> 配置的 <c>MinTtlSeconds</c>/<c>MaxTtlSeconds</c> 区间内。

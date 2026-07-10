@@ -1,5 +1,6 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Collections.Concurrent;
-using Inkwell;
 
 namespace Inkwell.Cache.InMemory;
 

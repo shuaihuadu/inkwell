@@ -1,5 +1,6 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.Options;
 
 namespace Inkwell;
 
@@ -7,20 +8,20 @@ internal sealed class ModelCatalogOptionsValidator : IValidateOptions<ModelCatal
 {
     public ValidateOptionsResult Validate(string? name, ModelCatalogOptions options)
     {
-        List<ValidationResult> results = new List<ValidationResult>();
-        ValidationContext context = new ValidationContext(options);
+        List<ValidationResult> results = [];
+        ValidationContext context = new(options);
 
         if (!Validator.TryValidateObject(options, context, results, validateAllProperties: true))
         {
             return ValidateOptionsResult.Fail(results.Select(r => r.ErrorMessage ?? "Invalid ModelCatalogOptions."));
         }
 
-        List<string> errors = new List<string>();
+        List<string> errors = [];
 
         foreach (ModelEntryOptions entry in options.Models)
         {
-            ValidationContext entryContext = new ValidationContext(entry);
-            List<ValidationResult> entryResults = new List<ValidationResult>();
+            ValidationContext entryContext = new(entry);
+            List<ValidationResult> entryResults = [];
 
             if (!Validator.TryValidateObject(entry, entryContext, entryResults, validateAllProperties: true))
             {

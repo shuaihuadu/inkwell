@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell;
 
 /// <summary><see cref="IAgentSkillCatalogService.UploadSkillAsync"/> 的请求 DTO。</summary>

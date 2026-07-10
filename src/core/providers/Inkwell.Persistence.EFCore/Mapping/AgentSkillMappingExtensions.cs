@@ -1,5 +1,6 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Text.Json;
-using Inkwell;
 using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
@@ -15,7 +16,7 @@ internal static class AgentSkillMappingExtensions
             Id = entity.Id,
             Name = entity.Name,
             Description = entity.Description,
-            ContentMarkdown = entity.ContentMarkdown,
+            Content = entity.ContentMarkdown,
             ReferenceFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ReferenceFileUrisJson) ?? [],
             AssetFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.AssetFileUrisJson) ?? [],
             CreatedTime = entity.CreatedTime,
@@ -32,7 +33,7 @@ internal static class AgentSkillMappingExtensions
             Id = model.Id,
             Name = model.Name,
             Description = model.Description,
-            ContentMarkdown = model.ContentMarkdown,
+            ContentMarkdown = model.Content,
             ReferenceFileUrisJson = JsonSerializer.Serialize(model.ReferenceFileUris),
             AssetFileUrisJson = JsonSerializer.Serialize(model.AssetFileUris),
             CreatedTime = model.CreatedTime,

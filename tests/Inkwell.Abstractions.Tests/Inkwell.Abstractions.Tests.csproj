@@ -1,0 +1,11 @@
+<Project Sdk="MSTest.Sdk/4.3.0">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.Abstractions.Tests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+    </ItemGroup>
+
+</Project>

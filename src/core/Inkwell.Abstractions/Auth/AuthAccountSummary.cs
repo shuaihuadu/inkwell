@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell;
 
 /// <summary>账号列表投影 DTO；不含 <c>PasswordHash</c>（防御性设计）。</summary>

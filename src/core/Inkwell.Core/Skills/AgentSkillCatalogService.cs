@@ -1,4 +1,7 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Text.RegularExpressions;
+using Inkwell.Persistence;
 
 namespace Inkwell;
 
@@ -34,7 +37,7 @@ internal sealed partial class AgentSkillCatalogService(IAgentSkillRepository ski
             Id = Guid.CreateVersion7(),
             Name = name,
             Description = description,
-            ContentMarkdown = contentMarkdown,
+            Content = contentMarkdown,
             ReferenceFileUris = referenceUris,
             AssetFileUris = assetUris,
             CreatedTime = now,

@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using Inkwell;
 
 namespace Inkwell.Queue.Channels;
 

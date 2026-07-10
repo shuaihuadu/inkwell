@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
 
     <PropertyGroup>
         <RootNamespace>Inkwell.Worker</RootNamespace>
@@ -17,7 +17,6 @@
         <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
         <ProjectReference Include="..\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
         <ProjectReference Include="..\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
-        <ProjectReference Include="..\providers\Inkwell.FileStorage.Local\Inkwell.FileStorage.Local.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Cache.Redis\Inkwell.Cache.Redis.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Cache.InMemory\Inkwell.Cache.InMemory.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Queue.Redis\Inkwell.Queue.Redis.csproj" />

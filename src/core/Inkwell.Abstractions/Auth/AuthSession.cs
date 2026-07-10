@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell;
 
 /// <summary>登录 / 会话校验成功后返回给调用方的会话信息 DTO。</summary>

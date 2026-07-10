@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Buffers.Binary;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Inkwell;
 
 namespace Inkwell.Persistence.EFCore.Postgres.Interceptors;
 

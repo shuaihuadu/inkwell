@@ -1,5 +1,6 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Microsoft.Extensions.DependencyInjection;
-using Inkwell;
 
 namespace Inkwell.Queue.Channels;
 

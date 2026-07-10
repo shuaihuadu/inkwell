@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Inkwell;
-using System.Diagnostics;
 
 namespace Inkwell.Persistence.EFCore;
 

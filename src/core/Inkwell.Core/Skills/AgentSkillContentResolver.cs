@@ -1,3 +1,7 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
+
+using Inkwell.Persistence;
 
 namespace Inkwell;
 
@@ -32,5 +36,5 @@ internal sealed class AgentSkillContentResolver(IAgentSkillRepository skills) : 
     }
 
     private static AgentSkillContent ToSkillContent(AgentSkillDefinition skill) =>
-        new(skill.Id, skill.Name, skill.Description, skill.ContentMarkdown, skill.ReferenceFileUris, skill.AssetFileUris);
+        new(skill.Id, skill.Name, skill.Description, skill.Content, skill.ReferenceFileUris, skill.AssetFileUris);
 }

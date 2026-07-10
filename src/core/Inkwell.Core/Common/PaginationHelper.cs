@@ -1,3 +1,5 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 
 namespace Inkwell;
 

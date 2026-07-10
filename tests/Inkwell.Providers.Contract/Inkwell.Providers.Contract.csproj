@@ -1,0 +1,27 @@
+<Project Sdk="MSTest.Sdk/4.3.0">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.Providers.Contract</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.Cache.Redis\Inkwell.Cache.Redis.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.Queue.Redis\Inkwell.Queue.Redis.csproj" />
+    <ProjectReference Include="..\..\src\core\providers\Inkwell.VectorStore.Qdrant\Inkwell.VectorStore.Qdrant.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="Testcontainers.Minio" />
+    <PackageReference Include="Testcontainers.Azurite" />
+    <PackageReference Include="Testcontainers.Qdrant" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+  </ItemGroup>
+
+</Project>

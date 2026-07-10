@@ -1,8 +1,9 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Inkwell;
 
 namespace Inkwell.Persistence.EFCore.Interceptors;
 
@@ -58,7 +59,7 @@ internal sealed class AuditingSaveChangesInterceptor(TimeProvider clock, ILogger
 
         if (owner.OwnerUserId == Guid.Empty)
         {
-            ArgumentException ex = new ArgumentException("OwnerUserId cannot be Guid.Empty", nameof(IHasOwner.OwnerUserId));
+            ArgumentException ex = new("OwnerUserId cannot be Guid.Empty", nameof(IHasOwner.OwnerUserId));
 
             logger.LogError(ex, "Audit failed: OwnerUserId is empty for {EntityType} Id={EntityId}", entry.Entity.GetType().Name, entry.Property("Id").CurrentValue);
             Activity.Current?.AddException(ex);

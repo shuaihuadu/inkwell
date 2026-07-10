@@ -1,11 +1,13 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell;
 using Inkwell.Persistence.EFCore;
 using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 using Inkwell.Persistence.EFCore.SqlServer.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 HostApplicationBuilder hostBuilder = Host.CreateApplicationBuilder(args);
 

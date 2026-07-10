@@ -1,12 +1,12 @@
-using Microsoft.Extensions.Options;
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell;
-using Inkwell.WebApi;
 using Inkwell.Cache.InMemory;
-using Inkwell.Queue.Channels;
-using Inkwell.FileStorage.Local;
-using Inkwell.VectorStore.InMemory;
-using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 using Inkwell.Persistence.EFCore;
+using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
+using Inkwell.Queue.Channels;
+using Inkwell.VectorStore.InMemory;
+using Inkwell.WebApi;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -17,19 +17,19 @@ builder.Services.AddInkwell(builder.Configuration)
     .UsePostgres(builder.Configuration.GetConnectionString("Inkwell") ?? throw new InvalidOperationException("Missing ConnectionStrings:Inkwell."))
     .UseInMemoryCache()
     .UseChannelsQueue()
-    .UseLocalFileSystemFileStorage()
+    //.UseLocalFileSystemFileStorage()
     .UseInMemoryVectorStore()
-    .UseAzureOpenAIAgentRuntime()
+    //.UseAzureOpenAIAgentRuntime()
     .UseDefaultAuthService()
-    .UseDefaultAgentService()
+    //.UseDefaultAgentService()
     .UseDefaultToolService()
-    .UseDefaultConversationService()
+    //.UseDefaultConversationService()
     .UseDefaultSkillService()
     .AddDefaultModelCatalog()
     .Build();
 
 builder.Services.AddSessionAuthentication();
-builder.Services.AddRoutingAgent();
+//builder.Services.AddRoutingAgent();
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();
@@ -51,9 +51,5 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "healthy" }));
-
-app.UseAgentEndpoints("/api/agents/{agentId}/conversations/{conversationId?}/agui").RequireAuthorization();
-
-// REST CRUD / Public API 端点：Inkwell.WebApi 尚无独立 HD，端点设计留待后续任务补齐。
 
 app.Run();

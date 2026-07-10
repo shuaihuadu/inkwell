@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Minio;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
-using Inkwell;
 
 namespace Inkwell.FileStorage.MinIO;
 
@@ -152,7 +153,7 @@ internal sealed class MinIOFileStorageProvider(IMinioClient client) : IFileStora
     /// <summary>从对象的原始响应头中提取 <c>x-amz-meta-*</c> 自定义元数据，还原为不带前缀的键值对。</summary>
     /// <param name="metaData">MinIO SDK 返回的原始响应头字典。</param>
     /// <returns>还原后的自定义元数据；无自定义元数据时为 <see langword="null"/>。</returns>
-    private static IReadOnlyDictionary<string, string>? ToCustomMetadata(IDictionary<string, string>? metaData)
+    private static Dictionary<string, string>? ToCustomMetadata(Dictionary<string, string>? metaData)
     {
         if (metaData is null || metaData.Count == 0)
         {

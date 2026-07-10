@@ -1,15 +1,16 @@
-using Inkwell;
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
 
 internal static class AgentConversationMappingExtensions
 {
-    public static AgentConversation ToModel(this AgentConversationEntity entity)
+    public static AgentSessionDefinition ToModel(this AgentConversationEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        return new AgentConversation
+        return new AgentSessionDefinition
         {
             Id = entity.Id,
             AgentId = entity.AgentId,
@@ -21,7 +22,7 @@ internal static class AgentConversationMappingExtensions
         };
     }
 
-    public static AgentConversationEntity ToEntity(this AgentConversation model)
+    public static AgentConversationEntity ToEntity(this AgentSessionDefinition model)
     {
         ArgumentNullException.ThrowIfNull(model);
 
@@ -37,11 +38,11 @@ internal static class AgentConversationMappingExtensions
         };
     }
 
-    public static IQueryable<AgentConversation> SelectAsModel(this IQueryable<AgentConversationEntity> source)
+    public static IQueryable<AgentSessionDefinition> SelectAsModel(this IQueryable<AgentConversationEntity> source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return source.Select(entity => new AgentConversation
+        return source.Select(entity => new AgentSessionDefinition
         {
             Id = entity.Id,
             AgentId = entity.AgentId,

@@ -1,29 +1,17 @@
-using Microsoft.Extensions.Options;
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
 
 namespace Inkwell;
 
 /// <summary><see cref="IAgentService"/> 唯一实现；CRUD / 共享 / 克隆的完整业务逻辑。</summary>
-internal sealed class AgentService(IAgentRepository agents, IPersistenceProvider persistence, IOptions<AgentOptions> options) : IAgentService
+internal sealed class AgentService(IAgentRepository agents, IPersistenceProvider persistence) : IAgentService
 {
     public async Task<AgentDefinition> CreateAgentAsync(AgentUpsertRequest request, Guid ownerUserId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateBasicFields(request);
 
-        int? maxAgentsPerOwner = options.Value.MaxAgentsPerOwner;
-
-        if (maxAgentsPerOwner is not null)
-        {
-            IReadOnlyList<AgentDefinition> existing = await agents.FindAgentsByOwner(ownerUserId, ct).ConfigureAwait(false);
-
-            if (existing.Count >= maxAgentsPerOwner.Value)
-            {
-                throw new InvalidOperationException($"Agent quota exceeded for owner '{ownerUserId}'.");
-            }
-        }
-
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        AgentDefinition agent = new AgentDefinition
+        AgentDefinition agent = new()
         {
             Id = Guid.CreateVersion7(),
             OwnerUserId = ownerUserId,

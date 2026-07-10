@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.Connectors.Qdrant;
 using Qdrant.Client;
-using Inkwell;
 
 namespace Inkwell.VectorStore.Qdrant;
 
@@ -9,7 +10,7 @@ namespace Inkwell.VectorStore.Qdrant;
 public static class InkwellVectorStoreQdrantServiceCollectionExtensions
 {
     /// <summary>
-    /// 注册基于 <see cref="Qdrant.Client.QdrantClient"/> 的 <see cref="Microsoft.Extensions.VectorData.VectorStore"/> 实现。
+    /// 注册基于 <c>Qdrant.Client.QdrantClient</c> 的 <see cref="Microsoft.Extensions.VectorData.VectorStore"/> 实现。
     /// </summary>
     /// <param name="builder">Inkwell Builder DSL 入口。</param>
     /// <param name="host">Qdrant 服务主机名。</param>

@@ -1,8 +1,9 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
+using Inkwell.Persistence.EFCore.DependencyInjection;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Inkwell;
-using Inkwell.Persistence.EFCore.DependencyInjection;
 
 namespace Inkwell.Persistence.EFCore.SqlServer.DependencyInjection;
 

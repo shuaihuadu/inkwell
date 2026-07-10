@@ -1,3 +1,5 @@
+﻿// Copyright (c) ShuaiHua Du. All rights reserved.
+
 namespace Inkwell;
 
 /// <summary>模型目录条目投影 DTO；UI 下拉展示 + Agent 侧 ModelId 校验共用同一形状。</summary>

@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
-using Inkwell;
 
 namespace Inkwell.Persistence.EFCore;
 
@@ -11,7 +12,7 @@ namespace Inkwell.Persistence.EFCore;
 /// </summary>
 internal sealed class EfCorePersistenceProvider(InkwellDbContext db, ILogger<EfCorePersistenceProvider> logger) : IPersistenceProvider
 {
-    private static readonly ActivitySource ActivitySource = new("Inkwell.Persistence.EFCore");
+    private static readonly ActivitySource activitySource = new("Inkwell.Persistence.EFCore");
 
     public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
         this.ExecuteInTransactionAsync(async innerCt =>
@@ -27,7 +28,7 @@ internal sealed class EfCorePersistenceProvider(InkwellDbContext db, ILogger<EfC
 
         return await strategy.ExecuteAsync(async () =>
         {
-            using Activity? activity = ActivitySource.StartActivity("db.transaction");
+            using Activity? activity = activitySource.StartActivity("db.transaction");
             Stopwatch sw = Stopwatch.StartNew();
 
             await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);

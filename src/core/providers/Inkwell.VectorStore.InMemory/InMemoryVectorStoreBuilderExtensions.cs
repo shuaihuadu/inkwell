@@ -1,6 +1,7 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.Connectors.InMemory;
-using Inkwell;
 
 namespace Inkwell.VectorStore.InMemory;
 

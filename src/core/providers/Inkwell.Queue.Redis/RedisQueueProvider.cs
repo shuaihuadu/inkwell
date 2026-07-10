@@ -1,7 +1,8 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using Inkwell;
 
 namespace Inkwell.Queue.Redis;
 
@@ -20,7 +21,7 @@ internal sealed class RedisQueueProvider(IConnectionMultiplexer connection, IOpt
 {
     private const string ConsumerGroup = "inkwell-consumers";
 
-    private static readonly string ConsumerName = $"{Environment.MachineName}:{Environment.ProcessId}";
+    private static readonly string consumerName = $"{Environment.MachineName}:{Environment.ProcessId}";
 
     /// <summary>获取当前连接对应的 Redis 逻辑数据库。</summary>
     private IDatabase Database => connection.GetDatabase();
@@ -41,7 +42,7 @@ internal sealed class RedisQueueProvider(IConnectionMultiplexer connection, IOpt
         while (!ct.IsCancellationRequested)
         {
             StreamEntry[] entries = await this.Database.StreamReadGroupAsync(
-                queueName, ConsumerGroup, ConsumerName, ">", count: 10).ConfigureAwait(false);
+                queueName, ConsumerGroup, consumerName, ">", count: 10).ConfigureAwait(false);
 
             if (entries.Length == 0)
             {

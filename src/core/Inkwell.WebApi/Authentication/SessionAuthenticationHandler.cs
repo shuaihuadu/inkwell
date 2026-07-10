@@ -1,3 +1,5 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;

@@ -1,8 +1,9 @@
+// Copyright (c) ShuaiHua Du. All rights reserved.
+
 using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
-using Inkwell;
 
 namespace Inkwell.FileStorage.AzureBlob;
 

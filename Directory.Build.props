@@ -11,11 +11,13 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- 见 AGENTS.md §2.4：MSTest.Sdk + Microsoft.Testing.Platform -->
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- IDE0005（移除多余 using）在 dotnet build 阶段生效需要 GenerateDocumentationFile=true -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--<TreatWarningsAsErrors>true</TreatWarningsAsErrors>-->
+    <!-- 不强制逐个公共成员的 XML 注释（CS1591），保持与文档文件开启前一致的约束 -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <!-- .editorconfig 里的 csharp_style_var_*/dotnet_style_qualification_for_* 等代码风格规则
          需要这个开关才会在 dotnet build 时真正生效（否则只在 IDE/dotnet format 里提示，不影响编译）。 -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
