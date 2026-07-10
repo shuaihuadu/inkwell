@@ -1,0 +1,21 @@
+<Project Sdk="MSTest.Sdk/4.3.0">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.Providers.Contract</RootNamespace>
+    <!-- RISK-002 / RISK-011 / RISK-012 缓解地：跨 Provider 公共契约测试包，CI 对每个 Provider 矩阵各跑一遍。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
+    <ProjectReference Include="..\..\..\core\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+  </ItemGroup>
+
+</Project>
