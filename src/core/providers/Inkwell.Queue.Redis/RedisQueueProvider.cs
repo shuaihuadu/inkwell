@@ -102,7 +102,11 @@ internal sealed class RedisQueueProvider(IConnectionMultiplexer connection, IOpt
     {
         try
         {
-            await this.Database.StreamCreateConsumerGroupAsync(queueName, ConsumerGroup, StreamPosition.NewMessages, createStream: true).ConfigureAwait(false);
+            // 用 StreamPosition.Beginning（"0"）而非 NewMessages（"$"）创建消费组：后者只投递消费组创建
+            // 之后新写入的条目，如果生产者先于消费组创建就已经往流里写了消息（例如 WebApi 先起、Worker 后起），
+            // 这些消息会被永久跳过、永远不会投递给任何消费者。从头开始能保证消费组创建时刻流里已有的全部未消费
+            // 条目都会被投递，符合"至少投递一次"的队列语义。
+            await this.Database.StreamCreateConsumerGroupAsync(queueName, ConsumerGroup, StreamPosition.Beginning, createStream: true).ConfigureAwait(false);
         }
         catch (RedisServerException ex) when (ex.Message.Contains("BUSYGROUP", StringComparison.OrdinalIgnoreCase))
         {

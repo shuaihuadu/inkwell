@@ -44,6 +44,10 @@
 
         <!-- Testcontainers（RISK-002/011/012 跨 Provider spike 验证专用，仅 Inkwell.Providers.Contract 引用） -->
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+        <PackageVersion Include="Testcontainers.Redis" Version="4.13.0" />
+        <PackageVersion Include="Testcontainers.Minio" Version="4.13.0" />
+        <PackageVersion Include="Testcontainers.Azurite" Version="4.13.0" />
+        <PackageVersion Include="Testcontainers.Qdrant" Version="4.13.0" />
 
         <!-- Cache / Queue -->
         <PackageVersion Include="StackExchange.Redis" Version="3.0.11" />

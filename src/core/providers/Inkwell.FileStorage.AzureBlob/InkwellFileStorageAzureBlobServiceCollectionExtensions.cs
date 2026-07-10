@@ -30,7 +30,12 @@ public static class InkwellFileStorageAzureBlobServiceCollectionExtensions
             optionsBuilder.Configure(configure);
         }
 
-        builder.Services.AddSingleton(_ => new BlobServiceClient(connectionString));
+        // 显式锁定一个 Azure Storage REST API 版本（而非 SDK 默认的最新版本）：Azurite 模拟器的 API
+        // 版本支持通常滞后于 Azure.Storage.Blobs SDK 的最新版本，锁定较早但仍受官方支持的稳定版本
+        // 可以同时兼容 Azurite（dev / unit test）与真实 Azure Storage（prod）。
+        BlobClientOptions options = new(BlobClientOptions.ServiceVersion.V2025_01_05);
+
+        builder.Services.AddSingleton(_ => new BlobServiceClient(connectionString, options));
         builder.Services.AddSingleton<IFileStorageProvider, AzureBlobFileStorageProvider>();
 
         return builder;

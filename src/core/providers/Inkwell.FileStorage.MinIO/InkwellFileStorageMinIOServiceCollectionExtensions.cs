@@ -39,7 +39,8 @@ public static class InkwellFileStorageMinIOServiceCollectionExtensions
             new MinioClient()
                 .WithEndpoint(endpoint)
                 .WithCredentials(accessKey, secretKey)
-                .WithSSL(useSsl));
+                .WithSSL(useSsl)
+                .Build());
         builder.Services.AddSingleton<IFileStorageProvider, MinIOFileStorageProvider>();
 
         return builder;
