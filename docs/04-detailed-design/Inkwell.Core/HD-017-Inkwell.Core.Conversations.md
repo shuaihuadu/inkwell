@@ -32,6 +32,8 @@ upstream:
 > **依赖规则遵循**（[AGENTS.md §3.2](../../../AGENTS.md)）：`Inkwell.Core.Conversations` 只依赖 `Inkwell.Abstractions` + BCL；**不** `using` 任何 Provider 包，**不** `using Microsoft.Agents.AI.*`；持久化经 `IPersistenceProvider.GetRepository<IConversationRepository>()` / `GetRepository<IConversationMessageRepository>()`（事务外读）/ `IUnitOfWork.GetRepository<...>()`（事务内写，[HD-002 §13.3 Q1=A2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）；`ConversationMessage.Role` / 消息内容复用 [HD-006 `AgentChatRole` / `AgentChatMessage` / `AgentMessageContentPart`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族（同项目内类型引用，不新增依赖，不重新发明），详见 [§1.3 Q2](#13-关键决策摘要) + [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015) 的一处已知序列化缺口。
 >
 > **2026-07-08 Owner 确认（§8 四项，`vscode_askQuestions` 真实交互）**：Owner 在本次会话中通过 `vscode_askQuestions` 逐条真实确认 [§8](#8-需要-owner-确认的问题) 全部四项：**Q&A-A** 选方案 B——补写审计（**2026-07-09 更新**：随审计日志功能整体取消，本项已作废，详见 [§8 Q&A-A](#8-需要-owner-确认的问题)）；**Q&A-B** 选方案 A——查看者视角（本 HD 现有默认实现不变，仅将确认状态由“待确认”更新为“已解决”）；**Q&A-C** 选方案 C——v1 暂不实现超限行为（本 HD 现有默认实现不变，仅标注已解决）；**Q&A-D** 选方案 B——`agui_run_events` 归属判给未起草的 `Inkwell.Core.Traces`（本 HD 维持不实现该表，`database-design.md` 该行归属更新留待 `Inkwell.Core.Traces` 起草时处理，本次不越权修改该文件）。
+>
+> **2026-07-10 errata（H5 落地：采用 MAF `ChatHistoryProvider` 惯用法，§1.4 消费链路描述过期）**：H5 编码阶段实现 [HD-006 `IAgentRuntime`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 时，Owner 决定改用 MAF `ChatHistoryProvider` 惯用法，本 HD §1.4 原描述的"`Inkwell.WebApi` 预先调 `GetHistoryMessagesAsync` 拼装历史、再调 `IAgentInvocationService.RunAsync`"五步流程已过期。新流程：`Inkwell.WebApi` 只需把本轮新消息作为 `messages` 传给 `IAgentInvocationService.RunAsync`，历史读取 + 用户/助手消息落库均由新增的 `Inkwell.Core.AgentRuntime.DatabaseChatHistoryProvider`（`ChatHistoryProvider` 子类，委托本 HD `IAgentConversationService`）在 MAF 执行管线内自动完成。`IAgentConversationService.GetHistoryMessagesAsync` 依旧保留（仍供 `Inkwell.WebApi` 用于渲染历史列表等展示场景），但不再是 Run 链路中的必经步骤。本次已就地修订 §1.1 / §1.4，不新增独立文档。
 
 ## 1. 模块概述
 
@@ -40,7 +42,7 @@ upstream:
 `Inkwell.Core.Conversations` 承担：
 
 - 会话（Conversation）的创建与列表查询——按 `(AgentId, OwnerUserId)` 二元组组织，支撑 [UI-005 §5.1](../../01-requirements/ui-spec.md)"历史会话侧栏"（"+新建会话"+ 按时间倒序列出该 Agent 下当前用户参与的会话）
-- 会话消息（ConversationMessage）的持久化与检索——[NFR-005](../../01-requirements/requirements.md) 全量存储到后端；供未起草的 `Inkwell.WebApi` 组装 [HD-006 `AgentRunRequest.Messages`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)（详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)）
+- 会话消息（ConversationMessage）的持久化与检索——[NFR-005](../../01-requirements/requirements.md) 全量存储到后端；`GetHistoryMessagesAsync`/`AppendMessageAsync` 现由 `Inkwell.Core.AgentRuntime.DatabaseChatHistoryProvider` 在 Run 执行期自动调用拼装 [HD-006 `AgentRunRequest.Messages`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)（2026-07-10 errata H5 落地，详见 [§1.4](#14-与消费方的边界声明inkwellwebapi-是真正的调用方而非-hd-015)），`GetHistoryMessagesAsync` 仍可供 `Inkwell.WebApi` 用于渲染历史展示
 - 消息删除 / 整段对话清空——[ui-spec.md UI-005 §5.4](../../01-requirements/ui-spec.md)"删除消息"/"清空对话"，权限校验依据 [requirements.md §8.4](../../01-requirements/requirements.md)"对话历史归对应**用户**所有"
 - "我使用过" tab 数据来源查询（[AC-012](../../01-requirements/acceptance-criteria.md)）+ "最近使用时间"批量查询（[AC-013](../../01-requirements/acceptance-criteria.md)）——供未起草的 `Inkwell.WebApi` 组合 [HD-015 `IAgentService`](HD-015-Inkwell.Core.Agents.md) 的结果使用
 
@@ -98,13 +100,15 @@ upstream:
 Task<AgentTurnResult> RunAsync(Guid agentId, Guid callerUserId, Guid? conversationId, IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default);
 ```
 
-`messages` 由**调用方**在调用前组装好传入，`AgentInvocationService` 内部**不**反查历史、**不**依赖 `IPersistenceProvider.GetRepository<IConversationRepository>()`。因此本 HD 的真实消费链路是：
+`messages` 参数本身仍由**调用方**在调用前传入，`AgentInvocationService` 内部**不**反查历史、**不**依赖 `IPersistenceProvider.GetRepository<IConversationRepository>()`。但 2026-07-10 errata（H5 落地）后，该 `messages` 的预期内容已与 HD-006 同步变化——**仅本轮新增消息**，不再需要包含历史。本 HD 真实的消费链路（H5 落地后）：
 
 1. 未起草的 `Inkwell.WebApi` 收到用户发送消息的 HTTP 请求
-2. `Inkwell.WebApi` 调用本 HD `IConversationService.GetHistoryMessagesAsync(conversationId)` 取出历史消息
-3. `Inkwell.WebApi` 调用本 HD `IConversationService.AppendMessageAsync(conversationId, 新的用户消息)` 持久化用户本轮输入
-4. `Inkwell.WebApi` 把"历史 + 本轮用户消息"拼成 `messages` 列表，调用 [HD-015 `IAgentInvocationService.RunAsync(agentId, callerUserId, conversationId, messages, ct)`](HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)
-5. `Inkwell.WebApi` 拿到 `AgentTurnResult.Message`（或流式路径拼出的最终消息）后，再次调用本 HD `IConversationService.AppendMessageAsync(conversationId, Agent 回复消息)` 持久化
+2. `Inkwell.WebApi` 把用户本轮输入直接当作 `messages` 传入 [HD-015 `IAgentInvocationService.RunAsync(agentId, callerUserId, conversationId, messages, ct)`](HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)，**不再需要预先调本 HD `GetHistoryMessagesAsync` 查历史、不再需要预先调 `AppendMessageAsync` 持久化用户消息**（这两步现已下沉进 `Inkwell.Core.AgentRuntime.DatabaseChatHistoryProvider`）
+3. `IAgentInvocationService.RunAsync` 内部把 `messages` 原样传给 `AgentRunRequest.Messages`，调用 [HD-006 `IAgentRuntime.RunAsync`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)
+4. `Inkwell.Core.AgentRuntime.DatabaseChatHistoryProvider`（MAF `ChatHistoryProvider` 子类，通过 `AgentSession.StateBag` 携带 `ConversationId`）在 Run 执行管线内部自动：(a) Run 开始前调本 HD `GetHistoryMessagesAsync` 拉取历史并拼在 `messages` 前面；(b) Run 结束后调本 HD `AppendMessageAsync` 依序持久化用户消息 + Agent 回复消息
+5. `Inkwell.WebApi` 拿到 `AgentTurnResult.Message`（或流式路径拼出的最终消息）直接返回给前端，不再需要自己调本 HD `AppendMessageAsync`
+
+`GetHistoryMessagesAsync` 方法本身**仍保留**，用于 `Inkwell.WebApi` 其他展示场景（如历史列表页面 GET 接口），不受影响。
 
 本 HD **不**、也不应该反向依赖 [HD-015 `IAgentInvocationService`](HD-015-Inkwell.Core.Agents.md) 或 [HD-006 `IAgentRuntime`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)——[HD-006 §3.2](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs) 此前原文"`Messages`（本轮 + 历史消息，`Inkwell.Conversations` 组装）"曾容易被误读为"`Inkwell.Conversations` 直接产出 `AgentRunRequest` 或直接调用 `IAgentInvocationService`"，实际应理解为"最终由 `Inkwell.Conversations` 提供数据源、由 `Inkwell.WebApi` 完成实际组装动作"。**该措辞已由 HD-006 2026-07-08 errata 精确化**（现文本已明确"由 `Inkwell.WebApi` 查询 [HD-017 `Inkwell.Core.Conversations`](../Inkwell.Core/HD-017-Inkwell.Core.Conversations.md)"），本次不修改已 reviewed 的 HD-006 正文（该修复已在 HD-006 侧完成），详见 [§9](#9-消费关系纠正与-hd-006-措辞精确化建议已解决2026-07-08)。
 

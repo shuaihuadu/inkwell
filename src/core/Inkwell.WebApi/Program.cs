@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Inkwell;
+using Inkwell.WebApi;
 using Inkwell.Cache.InMemory;
 using Inkwell.Queue.Channels;
 using Inkwell.FileStorage.Local;
@@ -27,6 +28,8 @@ builder.Services.AddInkwell(builder.Configuration)
     .AddDefaultModelCatalog()
     .Build();
 
+builder.Services.AddSessionAuthentication();
+builder.Services.AddRoutingAgent();
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();
@@ -35,6 +38,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Migration 由 CI/CD 独立步骤执行（ADR-021 2026-07-06 errata），启动期只跑 Seed。
 using (IServiceScope scope = app.Services.CreateScope())
@@ -46,6 +52,8 @@ using (IServiceScope scope = app.Services.CreateScope())
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "healthy" }));
 
-// REST CRUD / AG-UI SSE / Public API 端点：Inkwell.WebApi 尚无独立 HD，端点设计留待后续任务补齐。
+app.UseAgentEndpoints("/api/agents/{agentId}/conversations/{conversationId?}/agui").RequireAuthorization();
+
+// REST CRUD / Public API 端点：Inkwell.WebApi 尚无独立 HD，端点设计留待后续任务补齐。
 
 app.Run();

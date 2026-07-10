@@ -15,7 +15,7 @@ internal sealed class AgentConversationService(
         _ = await agents.GetAgent(agentId, ct).ConfigureAwait(false);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        AgentConversation conversation = new AgentConversation
+        AgentConversation conversation = new()
         {
             Id = Guid.CreateVersion7(),
             AgentId = agentId,
@@ -61,7 +61,7 @@ internal sealed class AgentConversationService(
 
             int existingCount = await this.CountMessagesAsync(conversationId, innerCt).ConfigureAwait(false);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            AgentConversationMessage newMessage = new AgentConversationMessage
+            AgentConversationMessage newMessage = new()
             {
                 Id = Guid.CreateVersion7(),
                 ConversationId = conversationId,

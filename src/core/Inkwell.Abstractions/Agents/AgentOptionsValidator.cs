@@ -7,8 +7,8 @@ internal sealed class AgentOptionsValidator : IValidateOptions<AgentOptions>
 {
     public ValidateOptionsResult Validate(string? name, AgentOptions options)
     {
-        ValidationContext context = new ValidationContext(options);
-        List<ValidationResult> results = new List<ValidationResult>();
+        ValidationContext context = new(options);
+        List<ValidationResult> results = [];
 
         if (!Validator.TryValidateObject(options, context, results, validateAllProperties: true))
         {

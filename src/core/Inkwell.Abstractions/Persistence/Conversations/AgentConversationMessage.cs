@@ -15,6 +15,8 @@ public sealed record class AgentConversationMessage : IHasTimestamps
     /// <summary><see cref="AIContent"/> 列表的序列化存储。</summary>
     public required string ContentJson { get; init; }
 
+    public string? MessageText { get; set; }
+
     public string? AuthorName { get; init; }
 
     /// <summary>会话内严格递增，用于确定性排序（不仅依赖 CreatedTime）。</summary>

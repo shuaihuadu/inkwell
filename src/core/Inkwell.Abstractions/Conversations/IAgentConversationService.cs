@@ -10,7 +10,8 @@ public interface IAgentConversationService
 
     Task<IReadOnlyList<AgentConversationSummary>> ListConversationsAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default);
 
-    /// <summary>供调用方（Inkwell.WebApi）直接拼进 AgentRunRequest.Messages。</summary>
+    /// <summary>供 Agent 执行运行时（<c>Inkwell.Core.AgentRuntime</c> 内的 ChatHistoryProvider 实现）自动拉取历史，
+    /// 也可供 <c>Inkwell.WebApi</c> 用于渲染对话历史列表等展示场景。</summary>
     Task<IReadOnlyList<AgentChatMessage>> GetHistoryMessagesAsync(Guid conversationId, CancellationToken ct = default);
 
     Task<Guid> AppendMessageAsync(Guid conversationId, AgentChatMessage message, CancellationToken ct = default);

@@ -1,28 +1,42 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <RootNamespace>Inkwell</RootNamespace>
-        <AssemblyName>Inkwell.Core</AssemblyName>
-        <!--
+  <PropertyGroup>
+    <RootNamespace>Inkwell</RootNamespace>
+    <AssemblyName>Inkwell.Core</AssemblyName>
+    <!--
       依赖白名单（AGENTS.md §3.2）：Inkwell.Core 程序集（命名空间统一为 Inkwell）只能依赖 Inkwell.Abstractions 程序集 + BCL；
       不得直接 using Microsoft.Agents.AI.* / StackExchange.Redis / Azure.Storage.Blobs / EFCore 等 Provider 包。
       唯一例外：本程序集 AgentRuntime/ 目录下的文件——唯一允许 using Microsoft.Agents.AI.* 的位置。
     -->
-    </PropertyGroup>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <!--
+  <ItemGroup>
+    <InternalsVisibleTo Include="Inkwell.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       Microsoft.Agents.AI.* 仅供 AgentRuntime/ 目录下的文件使用（ADR-017 §依赖规则第 3 条）。
       经 NuGet.org 正式包引入（MAF 已发布稳定版 1.13.0），不再 ProjectReference 同级仓库源码。
     -->
-        <PackageReference Include="Microsoft.Agents.AI" />
-        <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
-        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-        <PackageReference Include="Azure.AI.OpenAI" />
-    </ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      仅供 AgentRuntime/ 目录下的多协议路由壳（RoutingAgent + 端点注册扩展）使用：
+      需要 IHttpContextAccessor（解析 agentId / callerUserId）+ IEndpointRouteBuilder（挂 MapAGUI 等）。
+      2026-07-10 errata（ADR-017 §依赖规则第 3 条扩展，详见 docs/03-architecture/adr/ADR-017 对应条目）。
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
 </Project>

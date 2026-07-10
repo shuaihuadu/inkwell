@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Agents.AI;
 using OpenAI.Chat;
@@ -19,13 +20,15 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
     private readonly AzureOpenAIClient _client;
     private readonly AzureOpenAIAgentRuntimeOptions _runtimeOptions;
     private readonly AgentRuntimeOptions _defaults;
+    private readonly ChatHistoryProvider _chatHistoryProvider;
     private readonly ConcurrentDictionary<string, AIAgent> _agentsByDeployment = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeRuns = new();
 
-    public AzureOpenAIAgentRuntime(IOptions<AzureOpenAIAgentRuntimeOptions> runtimeOptions, IOptions<AgentRuntimeOptions> defaults)
+    public AzureOpenAIAgentRuntime(IOptions<AzureOpenAIAgentRuntimeOptions> runtimeOptions, IOptions<AgentRuntimeOptions> defaults, IServiceScopeFactory scopeFactory)
     {
         this._runtimeOptions = runtimeOptions.Value;
         this._defaults = defaults.Value;
+        this._chatHistoryProvider = new DatabaseChatHistoryProvider(scopeFactory);
 
         this._client = string.IsNullOrEmpty(this._runtimeOptions.ApiKey)
             ? throw new InvalidOperationException("AzureOpenAIAgentRuntimeOptions.ApiKey is required (v1 supports API key auth only).")
@@ -41,7 +44,9 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
 
         try
         {
-            AgentResponse response = await agent.RunAsync(ToChatMessages(request.Messages), session: null, options, linkedToken).ConfigureAwait(false);
+            AgentSession session = await this.CreateSessionAsync(agent, request.ConversationId, linkedToken).ConfigureAwait(false);
+
+            AgentResponse response = await agent.RunAsync(ToChatMessages(request.Messages), session, options, linkedToken).ConfigureAwait(false);
 
             return ToTurnResult(request, response);
         }
@@ -62,12 +67,14 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
         (AIAgent? agent, ChatClientAgentRunOptions? options) = this.PrepareRun(request);
         (CancellationTokenSource _, CancellationToken linkedToken) = this.RegisterRun(request.RunId, ct);
 
+        AgentSession session = await this.CreateSessionAsync(agent, request.ConversationId, linkedToken).ConfigureAwait(false);
+
         List<AgentResponseUpdate> updates = [];
         Exception? failure = null;
 
         try
         {
-            await foreach (AgentResponseUpdate? update in agent.RunStreamingAsync(ToChatMessages(request.Messages), session: null, options, linkedToken).ConfigureAwait(false))
+            await foreach (AgentResponseUpdate? update in agent.RunStreamingAsync(ToChatMessages(request.Messages), session, options, linkedToken).ConfigureAwait(false))
             {
                 updates.Add(update);
 
@@ -108,10 +115,13 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
     private (AIAgent Agent, ChatClientAgentRunOptions Options) PrepareRun(AgentRunRequest request)
     {
         string deploymentName = string.IsNullOrEmpty(request.ModelId) ? this._runtimeOptions.DeploymentName : request.ModelId;
-        AIAgent agent = this._agentsByDeployment.GetOrAdd(deploymentName, name => this._client.GetChatClient(name).AsAIAgent());
+        AIAgent agent = this._agentsByDeployment.GetOrAdd(deploymentName, name => this._client.GetChatClient(name).AsAIAgent(new ChatClientAgentOptions
+        {
+            ChatHistoryProvider = this._chatHistoryProvider,
+        }));
 
         AgentModelParameters? modelParameters = request.ModelParameters;
-        ChatOptions chatOptions = new ChatOptions
+        ChatOptions chatOptions = new()
         {
             Instructions = request.Instructions,
             Temperature = (float?)(modelParameters?.Temperature ?? this._defaults.DefaultTemperature),
@@ -144,31 +154,24 @@ internal sealed class AzureOpenAIAgentRuntime : IAgentRuntime
         }
     }
 
-    private static IEnumerable<ChatMessage> ToChatMessages(IReadOnlyList<AgentChatMessage> messages) => messages.Select(ToChatMessage);
-
-    private static ChatMessage ToChatMessage(AgentChatMessage message)
+    private async Task<AgentSession> CreateSessionAsync(AIAgent agent, Guid? conversationId, CancellationToken ct)
     {
-        ChatMessage chatMessage = new ChatMessage(message.Role, [.. message.Content]);
+        AgentSession session = await agent.CreateSessionAsync(ct).ConfigureAwait(false);
 
-        if (message.AuthorName is not null)
+        if (conversationId is { } id)
         {
-            chatMessage.AuthorName = message.AuthorName;
+            session.StateBag.SetValue(DatabaseChatHistoryProvider.ConversationIdStateKey, id.ToString());
         }
 
-        return chatMessage;
+        return session;
     }
 
-    private static AgentChatMessage ToAgentChatMessage(ChatMessage message) => new()
-    {
-        Role = message.Role,
-        Content = [.. message.Contents.Where(c => c is TextContent or UriContent or DataContent)],
-        AuthorName = message.AuthorName,
-    };
+    private static IEnumerable<ChatMessage> ToChatMessages(IReadOnlyList<AgentChatMessage> messages) => messages.Select(AgentChatMessageMapper.ToChatMessage);
 
     private static AgentTurnResult ToTurnResult(AgentRunRequest request, AgentResponse response)
     {
         ChatMessage? lastMessage = response.Messages.LastOrDefault();
-        AgentChatMessage message = lastMessage is null ? new AgentChatMessage { Role = ChatRole.Assistant, Content = [] } : ToAgentChatMessage(lastMessage);
+        AgentChatMessage message = lastMessage is null ? new AgentChatMessage { Role = ChatRole.Assistant, Content = [] } : AgentChatMessageMapper.ToAgentChatMessage(lastMessage);
 
         return new AgentTurnResult
         {
