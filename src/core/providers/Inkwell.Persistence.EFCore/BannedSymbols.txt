@@ -1,0 +1,22 @@
+# Inkwell.Persistence.EFCore — BannedSymbols.txt
+# 详见 docs/04-detailed-design/Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md §3.12
+# 语法：https://github.com/dotnet/roslyn-analyzers/blob/main/src/Microsoft.CodeAnalysis.BannedApiAnalyzers/BannedApiAnalyzers.Help.md
+# 注：本文件当前为规则清单载体；Microsoft.CodeAnalysis.BannedApiAnalyzers 包引入 + CI 强制执行为后续任务（见 repo memory）。
+
+# 1. 映射库零依赖（ADR-022 §备选 B/C 放弃理由）
+N:AutoMapper; AutoMapper 是商业 license 库，违反 v1 dogfood 零商务依赖原则
+N:Mapster; Mapster 与本仓库「显式 > 隐式」立场冲突
+N:Riok.Mapperly; Mapperly source-gen 与「源码即真相」立场冲突
+
+# 2. Repository 命名后缀禁用（HD-002 §4.1.5 F7）
+T:Inkwell.Persistence.Agents.IAgentStore; 禁用 Store 后缀，使用 IAgentRepository
+T:Inkwell.Persistence.Agents.IAgentDao; 禁用 Dao 后缀，使用 IAgentRepository
+T:Inkwell.Persistence.Agents.IAgentGateway; 禁用 Gateway 后缀，使用 IAgentRepository
+
+# 3. Model 后缀装饰禁用（ADR-022 §决策 + HD-002 §4.1.2）
+# 占位规则：业务 Model 默认无后缀；与外部库撞名时降级 <TypeName>Definition
+# 禁止统一加 Model / Domain / DTO 后缀
+
+# 4. Microsoft.Agents.AI 命名空间隔离（AGENTS.md §3.2 + ADR-017 §3.2）
+# providers/* csproj 禁止 using Microsoft.Agents.AI.*
+# 由 .editorconfig + analyzer 规则在 providers/* 各 csproj 强制

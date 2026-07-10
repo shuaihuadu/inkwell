@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.Queue.Channels</RootNamespace>
+    <AssemblyName>Inkwell.Queue.Channels</AssemblyName>
+    <!--
+      dev / unit test 默认 IQueueProvider 实现，基于 System.Threading.Channels，零外部依赖（ADR-018）。
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

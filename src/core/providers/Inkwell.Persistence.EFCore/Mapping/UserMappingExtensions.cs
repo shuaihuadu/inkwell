@@ -1,0 +1,64 @@
+using Inkwell;
+using Inkwell.Persistence.EFCore.Entities;
+
+namespace Inkwell.Persistence.EFCore.Mapping;
+
+internal static class UserMappingExtensions
+{
+    public static User ToModel(this UserEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        return new User
+        {
+            Id = entity.Id,
+            Username = entity.Username,
+            PasswordHash = entity.PasswordHash,
+            IsSuper = entity.IsSuper,
+            IsLocked = entity.IsLocked,
+            FailedUnlockAttempts = entity.FailedUnlockAttempts,
+            LastLoginTime = entity.LastLoginTime,
+            CreatedTime = entity.CreatedTime,
+            UpdatedTime = entity.UpdatedTime,
+            RowVersion = entity.RowVersion,
+        };
+    }
+
+    public static UserEntity ToEntity(this User model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        return new UserEntity
+        {
+            Id = model.Id,
+            Username = model.Username,
+            PasswordHash = model.PasswordHash,
+            IsSuper = model.IsSuper,
+            IsLocked = model.IsLocked,
+            FailedUnlockAttempts = model.FailedUnlockAttempts,
+            LastLoginTime = model.LastLoginTime,
+            CreatedTime = model.CreatedTime,
+            UpdatedTime = model.UpdatedTime,
+            RowVersion = model.RowVersion,
+        };
+    }
+
+    public static IQueryable<User> SelectAsModel(this IQueryable<UserEntity> source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        return source.Select(entity => new User
+        {
+            Id = entity.Id,
+            Username = entity.Username,
+            PasswordHash = entity.PasswordHash,
+            IsSuper = entity.IsSuper,
+            IsLocked = entity.IsLocked,
+            FailedUnlockAttempts = entity.FailedUnlockAttempts,
+            LastLoginTime = entity.LastLoginTime,
+            CreatedTime = entity.CreatedTime,
+            UpdatedTime = entity.UpdatedTime,
+            RowVersion = entity.RowVersion,
+        });
+    }
+}

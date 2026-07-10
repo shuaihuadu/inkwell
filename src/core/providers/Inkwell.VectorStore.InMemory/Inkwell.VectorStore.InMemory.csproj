@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.VectorStore.InMemory</RootNamespace>
+    <AssemblyName>Inkwell.VectorStore.InMemory</AssemblyName>
+    <!--
+      dev / unit test 默认 VectorStore 实现，复用 Microsoft.SemanticKernel.Connectors.InMemory（ADR-020）。
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" />
+  </ItemGroup>
+
+</Project>

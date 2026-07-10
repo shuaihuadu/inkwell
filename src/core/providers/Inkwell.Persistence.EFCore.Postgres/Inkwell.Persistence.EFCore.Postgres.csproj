@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.Persistence.EFCore.Postgres</RootNamespace>
+        <AssemblyName>Inkwell.Persistence.EFCore.Postgres</AssemblyName>
+        <!-- HD-012（draft）：Postgres final adapter，允许引用同位 EFCore family base（ADR-021 例外） -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+        <ProjectReference Include="..\Inkwell.Persistence.EFCore\Inkwell.Persistence.EFCore.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    </ItemGroup>
+
+</Project>

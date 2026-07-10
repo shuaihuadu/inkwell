@@ -1,0 +1,50 @@
+using System.Text.Json;
+using Inkwell;
+using Inkwell.Persistence.EFCore.Entities;
+
+namespace Inkwell.Persistence.EFCore.Mapping;
+
+internal static class AgentSkillMappingExtensions
+{
+    public static AgentSkillDefinition ToModel(this AgentSkillEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        return new AgentSkillDefinition
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Description = entity.Description,
+            ContentMarkdown = entity.ContentMarkdown,
+            ReferenceFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ReferenceFileUrisJson) ?? [],
+            AssetFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.AssetFileUrisJson) ?? [],
+            CreatedTime = entity.CreatedTime,
+            UpdatedTime = entity.UpdatedTime,
+        };
+    }
+
+    public static AgentSkillEntity ToEntity(this AgentSkillDefinition model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        return new AgentSkillEntity
+        {
+            Id = model.Id,
+            Name = model.Name,
+            Description = model.Description,
+            ContentMarkdown = model.ContentMarkdown,
+            ReferenceFileUrisJson = JsonSerializer.Serialize(model.ReferenceFileUris),
+            AssetFileUrisJson = JsonSerializer.Serialize(model.AssetFileUris),
+            CreatedTime = model.CreatedTime,
+            UpdatedTime = model.UpdatedTime,
+        };
+    }
+
+    /// <summary>因含 JSON 序列化列，反序列化无法翻译为 SQL；先拉取整行再于客户端投影（同 <see cref="AgentMappingExtensions"/>）。</summary>
+    public static IQueryable<AgentSkillDefinition> SelectAsModel(this IQueryable<AgentSkillEntity> source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        return source.AsEnumerable().Select(ToModel).AsQueryable();
+    }
+}
