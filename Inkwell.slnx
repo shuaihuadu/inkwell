@@ -1,0 +1,31 @@
+<Solution>
+
+    <Folder Name="/core/">
+        <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
+        <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
+        <Project Path="src/core/Inkwell.WebApi/Inkwell.WebApi.csproj" />
+        <Project Path="src/core/Inkwell.Worker/Inkwell.Worker.csproj" />
+        <Project Path="src/core/Inkwell.Migrator/Inkwell.Migrator.csproj" />
+    </Folder>
+
+    <Folder Name="/core/providers/">
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore/Inkwell.Persistence.EFCore.csproj" />
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.Local/Inkwell.FileStorage.Local.csproj" />
+        <Project Path="src/core/providers/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
+        <Project Path="src/core/providers/Inkwell.Cache.InMemory/Inkwell.Cache.InMemory.csproj" />
+        <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
+        <Project Path="src/core/providers/Inkwell.Queue.Channels/Inkwell.Queue.Channels.csproj" />
+        <Project Path="src/core/providers/Inkwell.VectorStore.Qdrant/Inkwell.VectorStore.Qdrant.csproj" />
+        <Project Path="src/core/providers/Inkwell.VectorStore.InMemory/Inkwell.VectorStore.InMemory.csproj" />
+    </Folder>
+
+    <Folder Name="/tests/">
+        <Project Path="src/tests/core/Inkwell.Abstractions.Tests/Inkwell.Abstractions.Tests.csproj" />
+        <Project Path="src/tests/core/Inkwell.Core.Tests/Inkwell.Core.Tests.csproj" />
+        <Project Path="src/tests/core/Inkwell.Providers.Contract/Inkwell.Providers.Contract.csproj" />
+    </Folder>
+</Solution>

@@ -1,0 +1,68 @@
+<Project>
+
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Microsoft.Extensions.* -->
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.VectorData.Abstractions" Version="10.7.0" />
+        <PackageVersion Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.74.0-preview" />
+        <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
+        <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
+        <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+        <!-- Azure OpenAI Agent Runtime（Inkwell.Core.AgentRuntime，与 microsoft/agent-framework 同版本对齐） -->
+        <PackageVersion Include="Azure.AI.OpenAI" Version="2.9.0-beta.1" />
+
+        <!-- Microsoft Agent Framework（MAF）—— NuGet.org 正式包，不再 ProjectReference 同级仓库源码 -->
+        <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
+        <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.13.0" />
+        <!-- 以下两个包 MAF 尚未发布稳定版，锁定 NuGet.org 当前最新 preview -->
+        <PackageVersion Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.13.0-preview.260703.1" />
+        <PackageVersion Include="Microsoft.Agents.AI.DurableTask" Version="1.13.0-preview.260703.1" />
+
+        <!-- ASP.NET Core / Hosting -->
+        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" /> <!-- 修补 Microsoft.AspNetCore.OpenApi 传递依赖的已知高危漏洞 GHSA-v5pm-xwqc-g5wc -->
+
+        <!-- Entity Framework Core -->
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+
+        <!-- Testcontainers（RISK-002/011/012 跨 Provider spike 验证专用，仅 Inkwell.Providers.Contract 引用） -->
+        <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+
+        <!-- Cache / Queue -->
+        <PackageVersion Include="StackExchange.Redis" Version="3.0.11" />
+
+        <!-- File storage -->
+        <PackageVersion Include="Minio" Version="7.0.0" />
+        <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.1" />
+
+        <!-- Vector store（Qdrant 连接器暂无 Microsoft.Extensions.VectorData.Qdrant 独立包，沿用 agent-framework 同款 SemanticKernel 连接器） -->
+        <PackageVersion Include="Microsoft.SemanticKernel.Connectors.Qdrant" Version="1.74.0-preview" />
+        <PackageVersion Include="OpenTelemetry" Version="1.16.0" />
+        <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+
+        <!-- Test -->
+        <PackageVersion Include="MSTest.Sdk" Version="4.3.0" />
+    </ItemGroup>
+
+</Project>
