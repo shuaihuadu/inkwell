@@ -1,0 +1,42 @@
+#!/bin/sh
+# 提交前编码守卫：确保所有暂存的文本文件为 UTF-8 无 BOM
+# 启用方式（每个克隆执行一次）：git config core.hooksPath .githooks
+
+# 需要校验的文本文件扩展名
+is_text_file() {
+    case "$1" in
+        *.cs | *.csx | *.vb | *.resx | *.csproj | *.vbproj | *.fsproj \
+            | *.sln | *.slnx | *.slnf | *.props | *.targets \
+            | *.json | *.xml | *.config | *.yml | *.yaml \
+            | *.md | *.txt | *.sql | *.sh | *.ps1 | *.psm1 | *.psd1 \
+            | .editorconfig | .gitattributes | .gitignore)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+stripped=0
+
+# 遍历本次新增/修改的暂存文件
+for file in $(git diff --cached --name-only --diff-filter=ACM); do
+    is_text_file "$file" || continue
+    [ -f "$file" ] || continue
+
+    # 检测开头 3 字节是否为 UTF-8 BOM (EF BB BF)
+    if [ "$(head -c 3 "$file" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+        # 仅删除首行行首的 BOM，内容与行尾不变
+        perl -i -pe 's/^\xef\xbb\xbf// if $. == 1' "$file"
+        git add "$file"
+        echo "pre-commit: 已去除 BOM 并重新暂存 -> $file"
+        stripped=1
+    fi
+done
+
+if [ "$stripped" = "1" ]; then
+    echo "pre-commit: 部分文件已规范化为 UTF-8 无 BOM，已重新加入本次提交。"
+fi
+
+exit 0

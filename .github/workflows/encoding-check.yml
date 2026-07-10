@@ -1,0 +1,44 @@
+name: encoding-check
+
+# 编码守卫：任何被跟踪的文本文件若带 UTF-8 BOM 或非 UTF-8，则流水线失败。
+# 这是与本地 .githooks/pre-commit 对应的服务端兜底，保证无论在什么环境提交，仓库里都是 UTF-8 无 BOM。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  encoding-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify UTF-8 without BOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          patterns='*.cs *.csx *.vb *.resx *.csproj *.vbproj *.fsproj *.sln *.slnx *.slnf *.props *.targets *.json *.xml *.config *.yml *.yaml *.md *.txt *.sql *.sh *.ps1 *.psm1 *.psd1'
+          failed=0
+          # shellcheck disable=SC2086
+          for file in $(git ls-files -- $patterns); do
+            [ -f "$file" ] || continue
+            # 检测 BOM (EF BB BF)
+            if [ "$(head -c 3 "$file" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+              echo "::error file=$file::文件带有 UTF-8 BOM，请保存为 UTF-8 无 BOM。"
+              failed=1
+              continue
+            fi
+            # 校验是否为合法 UTF-8（iconv 解码失败即非 UTF-8）
+            if ! iconv -f UTF-8 -t UTF-8 "$file" >/dev/null 2>&1; then
+              echo "::error file=$file::文件不是合法的 UTF-8 编码。"
+              failed=1
+            fi
+          done
+          if [ "$failed" != "0" ]; then
+            echo "编码校验失败：存在带 BOM 或非 UTF-8 的文件。"
+            exit 1
+          fi
+          echo "编码校验通过：所有文本文件均为 UTF-8 无 BOM。"
