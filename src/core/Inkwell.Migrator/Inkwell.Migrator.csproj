@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Inkwell.Migrator</RootNamespace>
+        <AssemblyName>Inkwell.Migrator</AssemblyName>
+        <!--
+      ADR-024：一次性 Migration + Seed 入口，运行完 MigrationRunner.MigrateAsync() + SeedAsync() 即退出，
+      不常驻、不开任何监听端口。只依赖 Inkwell.Abstractions + Inkwell.Persistence.EFCore（含 SqlServer /
+      Postgres 两 final adapter，运行时按 Inkwell:Persistence:Provider 配置二选一），不依赖 Inkwell.Core。
+    -->
+        <UserSecretsId>inkwell-migrator</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell</RootNamespace>
+        <AssemblyName>Inkwell.Core</AssemblyName>
+        <!--
+      依赖白名单（AGENTS.md §3.2）：Inkwell.Core 程序集（命名空间统一为 Inkwell）只能依赖 Inkwell.Abstractions 程序集 + BCL；
+      不得直接 using Microsoft.Agents.AI.* / StackExchange.Redis / Azure.Storage.Blobs / EFCore 等 Provider 包。
+      唯一例外：本程序集 AgentRuntime/ 目录下的文件——唯一允许 using Microsoft.Agents.AI.* 的位置。
+    -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!--
+      Microsoft.Agents.AI.* 仅供 AgentRuntime/ 目录下的文件使用（ADR-017 §依赖规则第 3 条）。
+      经 NuGet.org 正式包引入（MAF 已发布稳定版 1.13.0），不再 ProjectReference 同级仓库源码。
+    -->
+        <PackageReference Include="Microsoft.Agents.AI" />
+        <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+        <PackageReference Include="Azure.AI.OpenAI" />
+    </ItemGroup>
+
+</Project>

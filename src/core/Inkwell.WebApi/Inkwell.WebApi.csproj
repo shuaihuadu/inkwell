@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.WebApi</RootNamespace>
+        <AssemblyName>Inkwell.WebApi</AssemblyName>
+        <!--
+      ADR-019：HTTP 入口（REST + AGUI SSE + Public API）。仅注册 IQueueProvider enqueue 侧，不跑 consumer。
+      DI 装配层是唯一允许同时 using 多个 providers + Inkwell.Core 的位置（AGENTS.md §3.2）。
+    -->
+        <UserSecretsId>inkwell-webapi</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+        <ProjectReference Include="..\Inkwell.Core\Inkwell.Core.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.Local\Inkwell.FileStorage.Local.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Cache.Redis\Inkwell.Cache.Redis.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Cache.InMemory\Inkwell.Cache.InMemory.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Queue.Redis\Inkwell.Queue.Redis.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Queue.Channels\Inkwell.Queue.Channels.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.VectorStore.Qdrant\Inkwell.VectorStore.Qdrant.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.VectorStore.InMemory\Inkwell.VectorStore.InMemory.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    </ItemGroup>
+
+</Project>

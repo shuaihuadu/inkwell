@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.Worker</RootNamespace>
+        <AssemblyName>Inkwell.Worker</AssemblyName>
+        <!--
+      ADR-019：后台进程（RedisStream consumer + DurableTask runner + 后台慢任务）。
+      不开 HTTP 业务端口（仅 /healthz + Prometheus /metrics）。
+    -->
+        <UserSecretsId>inkwell-worker</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+        <ProjectReference Include="..\Inkwell.Core\Inkwell.Core.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.Local\Inkwell.FileStorage.Local.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Cache.Redis\Inkwell.Cache.Redis.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Cache.InMemory\Inkwell.Cache.InMemory.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Queue.Redis\Inkwell.Queue.Redis.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.Queue.Channels\Inkwell.Queue.Channels.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.VectorStore.Qdrant\Inkwell.VectorStore.Qdrant.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.VectorStore.InMemory\Inkwell.VectorStore.InMemory.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+        <PackageReference Include="Microsoft.Agents.AI.DurableTask" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    </ItemGroup>
+
+</Project>
