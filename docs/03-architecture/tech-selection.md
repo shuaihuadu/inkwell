@@ -84,7 +84,7 @@ downstream:
 
 ## 4. 数据存储（ADR-004 + ADR-020 + ADR-021）
 
-- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 17）采用 Code First + EF Migration；EFCore family 物理布局为 3 csproj（1 共享 base + 2 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `Inkwell.Core/VectorStore/InMemoryVectorStore`。
+- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 17）采用 Code First + EF Migration；EFCore family 物理布局为 3 csproj（1 共享 base + 2 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `providers/Inkwell.VectorStore.InMemory/`。
 - **为什么**：与 [Q-A4](./open-questions-arch.md) 决策一致；关系层与向量层解耦避免 Provider 切换时的“最小公倍数”约束放大；Qdrant 在 Compose / AKS 部署成熟；v1 两 Provider 抽象与 [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 一同形成 Provider 家族模式；ADR-020 复用 M.E.VectorData 与 [ADR-003 MAF](./adr/ADR-003-agent-engine-microsoft-agent-framework.md) 生态对齐，避免重复发明轮子；ADR-021 在不重费 Migration tooling 的前提下，Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在共享 base csproj，避免两 final adapter 各自依样实体带来的语义漂移。
 - **替代方案**：两引擎都做向量 / 仅 PostgreSQL + pgvector / Azure AI Search；Inkwell 自定义 IVectorStore / 仅 Qdrant 不交付 InMemoryVectorStore；EFCore family csproj 布局备选 A-E 共 5 种（详见 [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。
 - **放弃理由**：详见 [ADR-004 §备选项](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020 §备选项](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)。
@@ -339,6 +339,15 @@ downstream:
 - **放弃理由**：详见 [ADR-024 §备选项](./adr/ADR-024-database-migration-seed-standalone-job.md)。
 - **团队维护影响**：新增 csproj 12 → 13；Helm hook 失败需新增 runbook；RISK-015 从双产物扩展为三产物同镜像 tag 同步。
 - **成本/性能/安全/交付**：成本低（仅新增 1 个轻量控制台项目，不引入新依赖）；性能无影响（一次性 Job，不占用常驻资源）；安全高（为 schema 迁移用户/应用读写用户权限分离铺路）；交付中（需新增 Helm hook + Compose depends_on 部署胶水，幂等性加固记录在 [RISK-015](./risk-analysis.md)）。
+
+### 21.13 Provider 默认实现下沉 providers/\*（ADR-017 + ADR-020 errata）
+
+- **选择**：4 个 dev 默认 Provider 实现（`InMemoryCacheProvider` / `ChannelsQueueProvider` / `LocalFileSystemFileStorageProvider` / `InMemoryVectorStore`）从 `Inkwell.Core` 拆到独立 `providers/*` csproj（`Inkwell.Cache.InMemory` / `Inkwell.Queue.Channels` / `Inkwell.FileStorage.Local` / `Inkwell.VectorStore.InMemory`），与 SDK-bound 实现完全对称。
+- **为什么**：`Inkwell.Core` 业务代码量持续增长后，Owner 判断“零外部依赖 ≠ 必须放 Core”，与 Redis/MinIO/AzureBlob/Qdrant 等 SDK-bound Provider 保持拓扑一致性。
+- **替代方案**：维持原状（4 个默认实现留 `Inkwell.Core`，仅 SDK-bound 实现进 `providers/*`，即 ADR-017/ADR-020 原决策）。
+- **放弃理由**：`Inkwell.Core` 承载业务命名空间数量持续增长，混入基础设施默认实现会让单一 csproj 职责边界模糊；拆分后 `Inkwell.Core` 只剩业务编排 + AgentRuntime，`providers/*` 内部 8 个 SDK-bound + 4 个 dev 默认实现两两对称，便于按需引入。
+- **团队维护影响**：新增 csproj 13 → 17（`providers/` 8 → 12）；失去了不需引用任何 Provider 包即可编译的“零依赖便利”，新 joiner 需多认 4 个 csproj 才能找到默认实现。
+- **成本/性能/安全/交付**：成本低（纯目录拆分，不引入新依赖）；性能无影响；安全无影响；交付低（纯重命名空间/移动文件，无业务逻辑变更）。
 
 ## 22. 自检
 
