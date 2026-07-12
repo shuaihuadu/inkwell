@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Text.Json;
-
 namespace Inkwell;
 
 /// <summary>

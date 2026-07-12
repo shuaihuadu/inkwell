@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Inkwell;
 
-internal sealed class AgentRuntimeOptionsValidator : IValidateOptions<AgentRunOptions>
+internal sealed class AgentRunOptionsValidator : IValidateOptions<AgentRunOptions>
 {
     public ValidateOptionsResult Validate(string? name, AgentRunOptions options)
     {

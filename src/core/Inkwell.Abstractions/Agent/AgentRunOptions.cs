@@ -21,6 +21,4 @@ public sealed class AgentRunOptions
 
     [Range(1, 3600)]
     public int RunTimeoutSeconds { get; set; } = 300;
-
-    public bool EnableSensitiveDataLogging { get; set; }
 }
