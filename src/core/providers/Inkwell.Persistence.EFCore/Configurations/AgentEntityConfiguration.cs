@@ -11,10 +11,8 @@ internal sealed class AgentEntityConfiguration : IEntityTypeConfiguration<AgentE
     {
         b.ToTable("agents");
         b.HasKey(x => x.Id);
-        b.Property(x => x.Name).IsRequired().HasMaxLength(50);
-        b.Property(x => x.Description).HasMaxLength(500);
-        b.Property(x => x.ToolBindingsJson).IsRequired();
-        b.Property(x => x.SkillBindingsJson).IsRequired();
         b.HasIndex(x => x.IsShared);
+        b.HasIndex(x => x.CurrentPublishedVersionId);
+        b.HasIndex(x => x.DraftVersionId);
     }
 }

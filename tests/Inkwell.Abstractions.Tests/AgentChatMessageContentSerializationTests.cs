@@ -6,69 +6,61 @@ using Microsoft.Extensions.AI;
 namespace Inkwell.Abstractions.Tests;
 
 /// <summary>
-/// 验证 <see cref="AgentChatMessage.Content"/>（<see cref="IReadOnlyList{AIContent}"/>）用纯
-/// <see cref="System.Text.Json.JsonSerializer"/>（不带任何自定义 <see cref="JsonSerializerOptions"/>）
-/// 序列化 / 反序列化后，具体类型（<see cref="TextContent"/> / <see cref="UriContent"/>）是否被正确保留——
-/// 这是 <c>AgentConversationMessage.ContentJson</c> 持久化列的实际读写方式。
+/// 验证 <see cref="AgentChatMessage.Message"/> 用纯 <see cref="JsonSerializer"/> 序列化 / 反序列化后，
+/// 消息元数据与多态内容均被完整保留。
 /// </summary>
 [TestClass]
 public sealed class AgentChatMessageContentSerializationTests
 {
     [TestMethod]
-    public void TextContent_Roundtrips_Through_Plain_JsonSerializer()
+    public void ChatMessage_Roundtrips_Metadata_And_Polymorphic_Content()
     {
         // Arrange
-        IReadOnlyList<AIContent> original = [new TextContent("hello world")];
+        ChatMessage original = new(
+            ChatRole.Assistant,
+            [
+                new TextContent("checking weather"),
+                new FunctionCallContent("call-1", "get_weather", new Dictionary<string, object?> { ["city"] = "Seattle" }),
+            ])
+        {
+            MessageId = "message-1",
+            AuthorName = "weather-agent",
+        };
 
         // Act
         string json = JsonSerializer.Serialize(original);
-        IReadOnlyList<AIContent>? roundtripped = JsonSerializer.Deserialize<IReadOnlyList<AIContent>>(json);
+        ChatMessage? roundtripped = JsonSerializer.Deserialize<ChatMessage>(json);
 
         // Assert
         Assert.IsNotNull(roundtripped);
-        Assert.AreEqual(1, roundtripped.Count);
-        TextContent? text = roundtripped[0] as TextContent;
-        Assert.IsNotNull(text);
-        Assert.AreEqual("hello world", text.Text);
+        Assert.AreEqual(ChatRole.Assistant, roundtripped.Role);
+        Assert.AreEqual("message-1", roundtripped.MessageId);
+        Assert.AreEqual("weather-agent", roundtripped.AuthorName);
+        Assert.HasCount(2, roundtripped.Contents);
+        Assert.AreEqual("checking weather", ((TextContent)roundtripped.Contents[0]).Text);
+        FunctionCallContent functionCall = (FunctionCallContent)roundtripped.Contents[1];
+        Assert.AreEqual("call-1", functionCall.CallId);
+        Assert.AreEqual("get_weather", functionCall.Name);
+        Assert.AreEqual("Seattle", functionCall.Arguments?["city"]?.ToString());
     }
 
     [TestMethod]
-    public void UriContent_Roundtrips_Through_Plain_JsonSerializer()
+    public void ChatMessage_Roundtrips_UriContent()
     {
         // Arrange
-        IReadOnlyList<AIContent> original = [new UriContent(new Uri("https://example.com/a.png"), "image/png")];
+        ChatMessage original = new(
+            ChatRole.User,
+            [new UriContent(new Uri("https://example.com/doc.pdf"), "application/pdf")]);
 
         // Act
         string json = JsonSerializer.Serialize(original);
-        IReadOnlyList<AIContent>? roundtripped = JsonSerializer.Deserialize<IReadOnlyList<AIContent>>(json);
+        ChatMessage? roundtripped = JsonSerializer.Deserialize<ChatMessage>(json);
 
         // Assert
         Assert.IsNotNull(roundtripped);
-        Assert.AreEqual(1, roundtripped.Count);
-        UriContent? uri = roundtripped[0] as UriContent;
-        Assert.IsNotNull(uri);
-        Assert.AreEqual(new Uri("https://example.com/a.png"), uri.Uri);
-        Assert.AreEqual("image/png", uri.MediaType);
-    }
-
-    [TestMethod]
-    public void Mixed_Content_List_Preserves_Each_Concrete_Type()
-    {
-        // Arrange
-        IReadOnlyList<AIContent> original =
-        [
-            new TextContent("caption"),
-            new UriContent(new Uri("https://example.com/doc.pdf"), "application/pdf"),
-        ];
-
-        // Act
-        string json = JsonSerializer.Serialize(original);
-        IReadOnlyList<AIContent>? roundtripped = JsonSerializer.Deserialize<IReadOnlyList<AIContent>>(json);
-
-        // Assert
-        Assert.IsNotNull(roundtripped);
-        Assert.AreEqual(2, roundtripped.Count);
-        Assert.IsInstanceOfType<TextContent>(roundtripped[0]);
-        Assert.IsInstanceOfType<UriContent>(roundtripped[1]);
+        Assert.HasCount(1, roundtripped.Contents);
+        UriContent uriContent = (UriContent)roundtripped.Contents[0];
+        Assert.AreEqual(new Uri("https://example.com/doc.pdf"), uriContent.Uri);
+        Assert.AreEqual("application/pdf", uriContent.MediaType);
     }
 }

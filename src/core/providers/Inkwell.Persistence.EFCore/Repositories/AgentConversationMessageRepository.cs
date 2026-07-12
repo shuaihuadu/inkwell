@@ -26,9 +26,77 @@ internal sealed class AgentConversationMessageRepository(InkwellDbContext db) : 
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentChatMessage> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        List<AgentConversationMessageEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        List<AgentChatMessage> items = [.. entities.Select(entity => entity.ToModel())];
 
         return new PagedResult<AgentChatMessage>(items, total, pagination);
+    }
+
+    public async Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid conversationId, int? maxMessages = null, CancellationToken ct = default)
+    {
+        IQueryable<AgentConversationMessageEntity> query = db.Set<AgentConversationMessageEntity>()
+            .AsNoTracking()
+            .Where(entity => entity.ConversationId == conversationId)
+            .OrderByDescending(entity => entity.SequenceNumber);
+
+        if (maxMessages is > 0)
+        {
+            query = query.Take(maxMessages.Value);
+        }
+
+        List<AgentConversationMessageEntity> entities = await query.ToListAsync(ct).ConfigureAwait(false);
+        entities.Reverse();
+
+        return [.. entities.Select(entity => entity.ToModel().Message)];
+    }
+
+    public async Task<IReadOnlyList<AgentChatMessage>> AppendMessagesAsync(Guid conversationId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        if (messages.Count == 0)
+        {
+            return [];
+        }
+
+        bool conversationExists = await db.Set<AgentConversationEntity>()
+            .AsNoTracking()
+            .AnyAsync(entity => entity.Id == conversationId, ct)
+            .ConfigureAwait(false);
+
+        if (!conversationExists)
+        {
+            throw new KeyNotFoundException($"Conversation not found: id={conversationId}");
+        }
+
+        int lastSequenceNumber = await db.Set<AgentConversationMessageEntity>()
+            .Where(entity => entity.ConversationId == conversationId)
+            .MaxAsync(entity => (int?)entity.SequenceNumber, ct)
+            .ConfigureAwait(false) ?? 0;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        List<AgentConversationMessageEntity> entities = new(messages.Count);
+
+        for (int index = 0; index < messages.Count; index++)
+        {
+            AgentChatMessage message = new()
+            {
+                Id = Guid.CreateVersion7(),
+                SessionId = conversationId,
+                Message = messages[index],
+                SequenceNumber = checked(lastSequenceNumber + index + 1),
+                CreatedTime = now,
+                UpdatedTime = now,
+            };
+            entities.Add(message.ToEntity());
+        }
+
+        db.Set<AgentConversationMessageEntity>().AddRange(entities);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return [.. entities.Select(entity => entity.ToModel())];
     }
 
     public async Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default)

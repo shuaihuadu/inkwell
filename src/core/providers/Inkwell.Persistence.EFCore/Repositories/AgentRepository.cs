@@ -82,7 +82,6 @@ internal sealed class AgentRepository(InkwellDbContext db) : IAgentRepository
 
     private static System.Linq.Expressions.Expression<Func<AgentEntity, object?>> FieldSelector(string field) => field switch
     {
-        nameof(AgentEntity.Name) => x => x.Name,
         nameof(AgentEntity.UpdatedTime) => x => x.UpdatedTime,
         _ => x => x.CreatedTime,
     };

@@ -65,11 +65,13 @@ downstream: []
 
 > 以下表清单来自 [architecture.md §4 关键表](../03-architecture/architecture.md)，是 H2 锁定的**业务范围**。每张表的具体字段 / 索引 / 约束由对应业务命名空间 HD 起草，本节仅占位。`triggers` / `orchestrations` / `orchestration_runs` 三张表随触发器（REQ-011）/ 多 Agent 协作编排（REQ-012）于 2026-07-09 推迟至下一期 v2，已从本表移除，详见 [requirements.md §13 第 28 条](../01-requirements/requirements.md)。
 
+<!-- markdownlint-disable MD060 -->
+
 | 表名                 | 业务模块               | 锁定 HD | 说明                                                                                                                                                               |
 | -------------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `users`              | Inkwell.Core.Auth      | HD-014  | [REQ-001](../01-requirements/requirements.md) + [REQ-017](../01-requirements/requirements.md)                                                                      |
 | `agents`             | Inkwell.Core.Agents    | HD-015  | [REQ-002](../01-requirements/requirements.md) ~ [REQ-008](../01-requirements/requirements.md)                                                                      |
-| `agent_versions`     | Inkwell.Versioning     | TBD     | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
+| `agent_versions`     | Inkwell.Versioning     | HD-015  | [REQ-002 + REQ-015](../01-requirements/requirements.md)                                                                                                            |
 | `skills`             | Inkwell.Skills         | HD-020  | [REQ-008](../01-requirements/requirements.md) + [ADR-010](../03-architecture/adr/ADR-010-skill-loading-static-only-v1.md)                                          |
 | `tools`              | Inkwell.Tools          | HD-016  | [REQ-007](../01-requirements/requirements.md)                                                                                                                      |
 | `knowledge_bases`    | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
@@ -77,10 +79,12 @@ downstream: []
 | `kb_chunks`          | Inkwell.KnowledgeBase  | TBD     | [REQ-009](../01-requirements/requirements.md)                                                                                                                      |
 | `memory_items`       | Inkwell.Memory         | TBD     | [REQ-010](../01-requirements/requirements.md)                                                                                                                      |
 | `conversations`      | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
-| `messages`           | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
+| `conversation_messages` | Inkwell.Conversations  | HD-017  | [REQ-010 + NFR-005](../01-requirements/requirements.md)                                                                                                            |
 | `traces`             | Inkwell.Traces         | TBD     | [REQ-014](../01-requirements/requirements.md)                                                                                                                      |
 | `agui_run_events`    | Inkwell.Conversations  | TBD     | [ADR-011](../03-architecture/adr/ADR-011-auto-lock-with-inflight-task-survival.md) + [ADR-012](../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) |
 | `public_api_tokens`  | Inkwell.PublicApi      | TBD     | [ADR-007](../03-architecture/adr/ADR-007-public-api-token-auth.md)                                                                                                 |
+
+<!-- markdownlint-enable MD060 -->
 
 ### 错误处理（2026-05-12 errata · [ADR-023 errata·01](../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) 废 INK-PERSIST-NNN 错误码机制）
 
@@ -181,21 +185,32 @@ downstream: []
 
 - `Id`：`Guid` v7，主键
 - `OwnerUserId`：`Guid`（`IHasOwner`），非唯一索引
-- `Name`：`string`，长度上限 50（[requirements.md §5.1](../01-requirements/requirements.md)），不加唯一约束（多用户可同名）
-- `AvatarUri`：`string?`（`Uri` 序列化存储，指向 [HD-003 `IFileStorageProvider`](Inkwell.Abstractions/HD-003-Inkwell.Abstractions-file-storage-port.md) 已上传对象）
-- `Description`：`string?`，长度上限 500
-- `Instructions`：`string?`，无长度上限
-- `ModelId`：`string?`
-- `ModelParametersJson`：`string?`（[HD-006 `AgentModelParameters`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 序列化存储，JSON 列 + `JsonSerializer` value converter）
-- `ToolBindingsJson`：`string`，默认 `"[]"`（`AgentToolBinding` 集合序列化存储）
-- `SkillBindingsJson`：`string`，默认 `"[]"`（`AgentSkillBinding` 集合序列化存储）
 - `IsShared`：`bool`，默认 `false`
 - `SharedRevokedByAdminTime`：`DateTimeOffset?`，可空（[AC-068](../01-requirements/acceptance-criteria.md) Admin 撤销共享状态条触点）
-- `CurrentVersion`：`int`，默认 `1`（[REQ-015](../01-requirements/requirements.md) 版本号递增触点，快照存储归 `Inkwell.Core.Versioning`，未起草）
+- `CurrentPublishedVersionId`：`Guid?`，当前默认运行版本指针；首次发布前为空
+- `DraftVersionId`：`Guid?`，Owner 唯一可编辑草稿指针；无草稿时为空
+- `LatestPublishedVersionNumber`：`int`，首次发布前为 `0`，每次发布或回滚递增
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
 - `RowVersion`：`IHasRowVersion`（乐观并发）
 
-**索引**：`OwnerUserId` 非唯一索引（"我的" tab 查询路径）；`IsShared` 非唯一索引（"团队共享" tab 过滤路径）。
+**索引**：`OwnerUserId` 非唯一索引（"我的" tab 查询路径）；`IsShared` 非唯一索引（"团队共享" tab 过滤路径）；`CurrentPublishedVersionId` 与 `DraftVersionId` 非唯一索引（活动版本批量投影路径）。
+
+Agent 名称、头像、描述、Instructions、模型参数、工具与 Skill 绑定均属于可版本化运行配置，只存于 `agent_versions.SnapshotJson`，不得在 `agents` 重复存储形成双事实源。
+
+### 表 `agent_versions`（[REQ-002](../01-requirements/requirements.md) + [REQ-015](../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `AgentId`：`Guid`，外键指向 `agents.Id`；Agent 硬删除时级联删除
+- `VersionNumber`：`int`；同一 Agent 内单调递增
+- `Status`：`string`，仅 `Draft` / `Published`
+- `SnapshotJson`：`string`，完整序列化 `AgentSnapshot`，非空
+- `CreatedByUserId`：`Guid`，创建该版本的用户标识
+- `ChangeSummary`：`string?`，长度上限 500
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+- `PublishedTime`：`DateTimeOffset?`；Draft 为空，Published 非空
+- `RowVersion`：`IHasRowVersion`（乐观并发）
+
+**约束与索引**：`(AgentId, VersionNumber)` 唯一索引；`AgentId` 非唯一索引。服务层保证每个 Agent 至多一个 Draft，并在同一事务内更新版本与 `agents` 指针。Published 行一经发布不可修改；回滚通过复制历史 Snapshot 创建新的 Published 行完成。
 
 **2026-07-06 已解决**：本表**不**包含软删除字段，遵循已 reviewed 的 [HD-002 §1.3 Q5](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#13-关键决策摘要)"v1 不提供软删"。原与 [requirements.md §8.3](../01-requirements/requirements.md) / [ui-spec.md §3.5](../01-requirements/ui-spec.md)"30 天回收期可恢复"字面承诺冲突，Owner 已拍板维持硬删除，需求文档已同步 errata 修正，详见 [HD-015 §8](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题)。
 
@@ -245,24 +260,24 @@ downstream: []
 
 - `Id`：`Guid` v7，主键
 - `AgentId`：`Guid`，外键 → `agents.Id`，非唯一索引
+- `AgentVersionId`：`Guid`，外键 → `agent_versions.Id`，创建 Session 时锁定；版本删除受限
 - `OwnerUserId`：`Guid`（`IHasOwner`，[HD-017 §1.3 Q1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)，语义 = 会话参与用户，非 `agents.OwnerUserId`），非唯一索引
 - `Title`：`string?`，长度上限 30（[ui-spec.md UI-005 §5.1](../01-requirements/ui-spec.md)"首条用户消息前 30 字"）
+- `MafSessionStateJson`：`string?`，由对应版本 `AIAgent.SerializeSessionAsync` 生成；首次运行前可空
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`（`UpdatedTime` 兼作"最近使用时间"依据）
 - `RowVersion`：`IHasRowVersion`（乐观并发）
 
-**索引**：`(AgentId, OwnerUserId)` 复合索引（历史会话侧栏查询路径）；`OwnerUserId` 非唯一索引（"我使用过"聚合查询路径）。
+**索引**：`(AgentId, OwnerUserId)` 复合索引（历史会话侧栏查询路径）；`OwnerUserId` 非唯一索引（"我使用过"聚合查询路径）；`AgentVersionId` 非唯一索引。
 
-### 表 `messages`（[REQ-010 + NFR-005](../01-requirements/requirements.md)）
+### 表 `conversation_messages`（[REQ-010 + NFR-005](../01-requirements/requirements.md)）
 
 - `Id`：`Guid` v7，主键
 - `ConversationId`：`Guid`，外键 → `conversations.Id`，非唯一索引
-- `Role`：`int`（[HD-006 `AgentChatRole`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 枚举持久化为整数）
-- `ContentJson`：`string`，无长度上限（[HD-006 `AgentMessageContentPart`](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 封闭子类型族序列化存储，多态序列化契约（`[JsonPolymorphic]`/`[JsonDerivedType]`）已由 [HD-006 2026-07-08 errata](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#37-agentruntimejsondelegateaifunctioncs--agenttoolcallrecordcs) 补齐，无遗留缺口）
-- `AuthorName`：`string?`，可空
+- `MessageJson`：`string`，完整序列化 `Microsoft.Extensions.AI.ChatMessage`，非空
 - `SequenceNumber`：`int`，会话内严格递增
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
 
-**索引**：`(ConversationId, SequenceNumber)` 复合索引。**不**包含 `RowVersion` / `OwnerUserId`（消息一旦写入不可变，非用户直接拥有的独立资源，[HD-017 §1.3 Q7](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）。
+**索引**：`(ConversationId, SequenceNumber)` 唯一复合索引。批量追加在 Serializable 事务内读取最大序号并连续分配。**不**包含 `RowVersion` / `OwnerUserId`（消息一旦写入不可变，非用户直接拥有的独立资源，[HD-017 §1.3 Q7](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）。
 
 **2026-07-08 已解决**（Owner 在本次会话中通过 `vscode_askQuestions` 真实确认，详见 [HD-017 §8](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）：`ConversationOptions.MaxMessagesPerConversation` 超限行为 v1 **暂不实现**（字段存在但不消费）；`agui_run_events` 表归属判定为**占位过时，实际应归 `Inkwell.Core.Traces`**（未起草，待该 HD 起草时更新本表归属）。原决议另含"删除消息 / 清空对话需要写审计日志"一项，因 2026-07-09 v1 不做审计日志功能的决定已作废。
 

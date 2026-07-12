@@ -14,8 +14,10 @@ internal static class AgentConversationMappingExtensions
         {
             Id = entity.Id,
             AgentId = entity.AgentId,
+            AgentVersionId = entity.AgentVersionId,
             OwnerUserId = entity.OwnerUserId,
             Title = entity.Title,
+            MafSessionState = DeserializeSessionState(entity.MafSessionStateJson),
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
             RowVersion = entity.RowVersion,
@@ -30,27 +32,20 @@ internal static class AgentConversationMappingExtensions
         {
             Id = model.Id,
             AgentId = model.AgentId,
+            AgentVersionId = model.AgentVersionId,
             OwnerUserId = model.OwnerUserId,
             Title = model.Title,
+            MafSessionStateJson = model.MafSessionState is JsonElement state
+                ? state.GetRawText()
+                : null,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
             RowVersion = model.RowVersion,
         };
     }
 
-    public static IQueryable<AgentSessionDefinition> SelectAsModel(this IQueryable<AgentConversationEntity> source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-
-        return source.Select(entity => new AgentSessionDefinition
-        {
-            Id = entity.Id,
-            AgentId = entity.AgentId,
-            OwnerUserId = entity.OwnerUserId,
-            Title = entity.Title,
-            CreatedTime = entity.CreatedTime,
-            UpdatedTime = entity.UpdatedTime,
-            RowVersion = entity.RowVersion,
-        });
-    }
+    private static JsonElement? DeserializeSessionState(string? sessionStateJson) =>
+        sessionStateJson is null
+            ? null
+            : JsonSerializer.Deserialize<JsonElement>(sessionStateJson);
 }

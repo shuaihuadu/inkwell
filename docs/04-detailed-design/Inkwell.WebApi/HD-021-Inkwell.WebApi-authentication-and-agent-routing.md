@@ -19,6 +19,10 @@ upstream:
 > **本文档性质说明**：与其他 HD 不同，本文档是在 H5 编码阶段（AgentRuntime 重新设计会话）**代码已实现之后**补写的设计记录，不是先设计后编码。补写目的是把已落地的两个真实决策（会话鉴权方案、Agent 路由端点）记录下来，供后续复核与扩展参考；不倒填"事前评审通过"的既定印象。`status: draft` / `reviewers: []` 如实反映——本文档尚未经过 Owner 正式评审签字，签字仍需人工完成（[AGENTS.md §5](../../../AGENTS.md)）。
 >
 > **决策出处标注约定**：下文每条关键决策标注真实出处——`vscode_askQuestions 真实交互`（用户在对话中通过选项确认）或 `作者判断`（未经用户显式确认的工程推理），不混同。
+>
+> **2026-07-12 替代性 errata（移除 RoutingAgent）**：本文原 `RoutingAgent + IAgentInvocationService` 路由方案已被新 Agent Factory 主干取代，下方对应章节仅保留历史记录。现行方向是协议入口先完成 Bearer 鉴权与 Agent 版本授权，再加载不可变 `AgentVersion`，解析工具与 Session/History 组件，通过 `IAgentFactory.BuildAsync` 得到标准 MAF `AIAgent`，最后交给对应官方 Hosting。AG-UI 的 `thread_id` 作为 Session 连续性标识处理，不再把 `conversationId` 设计为可选 URL 段；`agentId` 或发布别名仍属于路由/endpoint 选择信息。
+>
+> **协议边界**：AG-UI、OpenAI Chat Completions、OpenAI Responses 与 A2A 各自保留标准请求/响应模型，禁止先映射成一套 Inkwell 自建通用 Run DTO 再反向映射。四种协议共享的是 Factory、授权、版本快照、工具解析、Session/History 与可观测性，而不是共享传输 DTO。
 
 ## 1. 模块概述
 

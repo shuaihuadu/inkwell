@@ -10,5 +10,5 @@ public sealed record class AgentSummary(
     string? DescriptionExcerpt,
     Guid OwnerUserId,
     bool IsShared,
-    int CurrentVersion,
+    int LatestPublishedVersionNumber,
     DateTimeOffset UpdatedTime);

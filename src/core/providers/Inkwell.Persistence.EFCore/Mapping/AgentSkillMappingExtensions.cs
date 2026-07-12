@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Text.Json;
 using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;

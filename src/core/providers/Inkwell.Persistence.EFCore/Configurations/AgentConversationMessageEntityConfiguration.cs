@@ -12,7 +12,6 @@ internal sealed class AgentConversationMessageEntityConfiguration : IEntityTypeC
         b.ToTable("conversation_messages");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.ConversationId, x.SequenceNumber }).IsUnique();
-        b.Property(x => x.ContentJson).IsRequired();
-        b.Property(x => x.Role).IsRequired().HasMaxLength(64);
+        b.Property(x => x.MessageJson).IsRequired();
     }
 }

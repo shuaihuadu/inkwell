@@ -1,5 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Data;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
@@ -15,14 +16,25 @@ internal sealed class EfCorePersistenceProvider(InkwellDbContext db, ILogger<EfC
     private static readonly ActivitySource activitySource = new("Inkwell.Persistence.EFCore");
 
     public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
-        this.ExecuteInTransactionAsync(async innerCt =>
+        this.ExecuteInTransactionAsync(IsolationLevel.Unspecified, async innerCt =>
         {
             await action(innerCt).ConfigureAwait(false);
 
             return true;
         }, ct);
 
-    public async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default)
+    public Task<TResult> ExecuteInTransactionAsync<TResult>(Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
+        this.ExecuteInTransactionAsync(IsolationLevel.Unspecified, action, ct);
+
+    public Task ExecuteInTransactionAsync(IsolationLevel isolationLevel, Func<CancellationToken, Task> action, CancellationToken ct = default) =>
+        this.ExecuteInTransactionAsync(isolationLevel, async innerCt =>
+        {
+            await action(innerCt).ConfigureAwait(false);
+
+            return true;
+        }, ct);
+
+    public async Task<TResult> ExecuteInTransactionAsync<TResult>(IsolationLevel isolationLevel, Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default)
     {
         IExecutionStrategy strategy = db.Database.CreateExecutionStrategy();
 
@@ -31,7 +43,9 @@ internal sealed class EfCorePersistenceProvider(InkwellDbContext db, ILogger<EfC
             using Activity? activity = activitySource.StartActivity("db.transaction");
             Stopwatch sw = Stopwatch.StartNew();
 
-            await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using IDbContextTransaction transaction = isolationLevel == IsolationLevel.Unspecified
+                ? await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : await db.Database.BeginTransactionAsync(isolationLevel, ct).ConfigureAwait(false);
             logger.LogDebug("Transaction begin {ScopeId}", transaction.TransactionId);
 
             try

@@ -8,11 +8,7 @@ internal sealed class AgentConversationMessageEntity : IHasTimestamps
 
     public Guid ConversationId { get; init; }
 
-    public string Role { get; init; } = string.Empty;
-
-    public string ContentJson { get; init; } = "[]";
-
-    public string? AuthorName { get; init; }
+    public string MessageJson { get; init; } = string.Empty;
 
     public int SequenceNumber { get; init; }
 

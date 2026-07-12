@@ -3,22 +3,22 @@
 namespace Inkwell;
 
 /// <summary>
-/// 聊天历史策略配置
+/// 聊天历史策略配置。
 /// </summary>
-public class AgentChatHistoryOptions
+public sealed record class AgentChatHistoryOptions
 {
     /// <summary>
-    /// 获取或设置最大消息数量
+    /// 获取最大消息数量。
     /// </summary>
-    public int? MaxMessages { get; set; }
+    public int? MaxMessages { get; init; }
 
     /// <summary>
-    /// 获取或设置消息缩减器类型
+    /// 获取消息缩减器类型。
     /// </summary>
-    public string? ReducerType { get; set; }
+    public string? ReducerType { get; init; }
 
     /// <summary>
-    /// 获取或设置单次取回消息的数量上限。
+    /// 获取单次取回消息的数量上限。
     /// </summary>
-    public int? MaxMessagesToRetrieve { get; set; }
+    public int? MaxMessagesToRetrieve { get; init; }
 }

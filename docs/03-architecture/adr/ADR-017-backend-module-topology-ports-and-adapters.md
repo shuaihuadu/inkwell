@@ -19,6 +19,8 @@ upstream:
 downstream: []
 ---
 
+<!-- markdownlint-disable MD060 -->
+
 # ADR-017 后端模块拓扑：Ports & Adapters（替换 capability-folder 拓扑）
 
 ## 上下文
@@ -100,7 +102,7 @@ inkwell/
 | `Inkwell.Cache`                                                                                                                                                 | 接口 → `Inkwell.Abstractions`；`InMemoryCacheProvider` 默认 → `Inkwell.Core`；`RedisCacheProvider` → `providers/Inkwell.Cache.Redis`                                     |
 | §队列（[ADR-018](./ADR-018-queue-abstraction-channels-default.md)）                                                                                            | 接口 `IQueueProvider` → `Inkwell.Abstractions`；`ChannelsQueueProvider` 默认 → `Inkwell.Core`；`RedisStreamQueueProvider` → `providers/Inkwell.Queue.Redis`（[OQ-A008 closed §B](../open-questions-arch.md)） |
 | `Inkwell.FileStorage`                                                                                                                                           | 接口 → `Inkwell.Abstractions`；`LocalFileSystemProvider` 默认 → `Inkwell.Core`；`MinIO` / `AzureBlob` → `providers/*`                                                    |
-| `Inkwell.AgentRuntime`                                                                                                                                          | **合进** `Inkwell.Core.AgentRuntime` 命名空间；对外接口 `IAgentRuntime` → `Inkwell.Abstractions`（[RISK-001](../risk-analysis.md) 缓解手段重写为 lint + 接口收敛软边界） |
+| `Inkwell.AgentRuntime`                                                                                                                                          | **不再设置自建 Runtime facade**；`Inkwell.Abstractions` 通过 `IAgentFactory` 直接产出 MAF `AIAgent`，协议 Hosting 与 Workflow 复用同一 Agent 实例 |
 | 业务模块（Auth / Agents / Skills / KnowledgeBase / Memory / Triggers / Orchestrations / Traces / Versioning / Multimodal / Conversations / Health）             | **合进** `Inkwell.Core.<Module>` 命名空间，namespace + folder 软隔离；不再每业务一 csproj                                                                                |
 | `Inkwell.PublicApi` / `Inkwell.Api` / `Inkwell.AGUI`                                                                                                            | 应用入口层；[ADR-019](./ADR-019-process-topology-webapi-worker-split.md) 锁定 `Inkwell.WebApi`（HTTP/REST/AGUI/Public） + `Inkwell.Worker`（队列 consumer + DurableTask runner）双进程                                                                                               |
 
@@ -134,10 +136,10 @@ inkwell/
 
 1. **业务代码**（`Inkwell.Core` 内业务命名空间 + `Inkwell.WebApi` + `Inkwell.Worker`）→ 只能依赖 `Inkwell.Abstractions` 中的接口；不允许直接 `using StackExchange.Redis` / `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `Minio`。
 2. **`providers/*`** → 只依赖 `Inkwell.Abstractions`，**不依赖** `Inkwell.Core`（避免循环 + 让 provider 可独立分发）。**EFCore family 例外**（[ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`Inkwell.Persistence.EFCore.{SqlServer,Postgres}` 允许引用同位于 `providers/` 下的 `Inkwell.Persistence.EFCore` base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。
-3. **`Inkwell.Core.AgentRuntime` 命名空间** → 唯一允许 `using Microsoft.Agents.AI.*` 的位置；对外暴露 `IAgentRuntime`。其他业务命名空间 lint 规则禁止 `using Microsoft.Agents.AI.*`（[RISK-001](../risk-analysis.md) 缓解手段从硬 csproj 边界降级为软 lint 边界）。
+3. **MAF 是 Inkwell 的核心运行时契约** → `Inkwell.Abstractions` 允许公开引用 `Microsoft.Agents.AI`，`IAgentFactory.BuildAsync` 直接返回 `AIAgent`。Inkwell 不再复制 `AgentRunRequest` / `AgentRunEvent` / `AgentTurnResult`，也不再维护 MAF 与自建 Runtime DTO 的双向 Mapper。具体模型客户端创建仍集中在 `Inkwell.Core.AgentRuntime`，业务模块不得直接构造 Azure/OpenAI SDK 客户端。
 
-   > **2026-07-10 errata（H5 落地：例外范围扩展到 `Microsoft.AspNetCore.Http`/`Microsoft.AspNetCore.Routing`）**：为支持 AG-UI（未来含 OpenAI ChatCompletions/Responses/A2A）多协议动态路由——`RoutingAgent`（`AIAgent` 子类，按 HTTP 请求路由值动态解析 `agentId`/`conversationId`，委托 `IAgentInvocationService`）+ `AgentEndpointRouteBuilderExtensions.UseAgentEndpoints(...)`（挂载 MAF 官方 `MapAGUI` 等托管端点）——`Inkwell.Core.AgentRuntime` 命名空间的例外范围从"仅 `Microsoft.Agents.AI.*`"扩展到同时允许 `Microsoft.AspNetCore.Http`（`IHttpContextAccessor`）与 `Microsoft.AspNetCore.Routing`（`IEndpointRouteBuilder`/`GetRouteValue`）。`Inkwell.Core.csproj` 相应新增 `<FrameworkReference Include="Microsoft.AspNetCore.App" />`；`Inkwell.Worker` 因 `ProjectReference` 到 `Inkwell.Core` 会连带获得该 FrameworkReference，但不会、也不需要调用 `UseAgentEndpoints`（该扩展方法只在 `Inkwell.WebApi` 侧调用）。`Inkwell.WebApi` 自身代码因此仍可保持零 `using Microsoft.Agents.AI.*`——只调用 `Inkwell.Core.AgentRuntime` 暴露的这一个扩展方法。参考实现细节详见 `src/core/Inkwell.Core/AgentRuntime/RoutingAgent.cs` 与 `AgentEndpointRouteBuilderExtensions.cs` 的 XML 文档注释。
-4. **`Inkwell.Abstractions`** → 零外部包依赖（除 `Microsoft.Extensions.DependencyInjection.Abstractions`、`Microsoft.Extensions.Configuration.Abstractions` 等 .NET 标准抽象包）；不依赖 EF Core / Redis / Azure / Minio 任何 Provider 包。
+    > **2026-07-12 errata（取代 2026-07-10 RoutingAgent 方案）**：`IAgentRuntime`、`IAgentInvocationService`、`RoutingAgent`、`AgentResponseMapper` 与 `DatabaseChatHistoryProvider` 的旧实现已移除。新主干以不可变 `AgentVersion.Snapshot` 作为构建输入，由 `IAgentFactory` 生成标准 MAF `AIAgent`；AG-UI、OpenAI Chat Completions、OpenAI Responses 与 A2A Hosting 直接消费该实例。会话连续性使用 MAF `AgentSession` / `ChatHistoryProvider`，协议层不再通过自定义 `RoutingAgent` 模拟动态 Agent。
+4. **`Inkwell.Abstractions`** → 允许依赖 `Microsoft.Extensions.*.Abstractions`、`Microsoft.Extensions.VectorData.Abstractions`、`Microsoft.Extensions.AI.Abstractions` 与核心契约 `Microsoft.Agents.AI`；仍禁止依赖 EF Core / Redis / Azure / Minio 等 Provider 实现包。
 5. **`Inkwell.WebApi` / `Inkwell.Worker` → 全部**：DI 装配是唯一允许同时 `using` 多个 providers + `Inkwell.Core` 的位置（[ADR-019](./ADR-019-process-topology-webapi-worker-split.md)）。
 6. **客户端 → 后端**：保持 [`AGENTS.md` §3.2](../../../AGENTS.md) 原有规则，路径名按本 ADR 调整（`apps/desktop/` → `src/app/`）。
 7. **`prototypes/`**：保持 §3.2 原规则，不进 main 分支产品代码。

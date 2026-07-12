@@ -53,7 +53,11 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentSessionDefinition> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        List<AgentConversationEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        List<AgentSessionDefinition> items = [.. entities.Select(entity => entity.ToModel())];
 
         return new PagedResult<AgentSessionDefinition>(items, total, pagination);
     }

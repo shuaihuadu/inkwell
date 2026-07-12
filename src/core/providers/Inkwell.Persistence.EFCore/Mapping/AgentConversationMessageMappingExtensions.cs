@@ -1,7 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.Persistence.EFCore.Entities;
-using Microsoft.Extensions.AI;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
 
@@ -15,9 +14,7 @@ internal static class AgentConversationMessageMappingExtensions
         {
             Id = entity.Id,
             SessionId = entity.ConversationId,
-            Role = new ChatRole(entity.Role),
-            ContentJson = entity.ContentJson,
-            AuthorName = entity.AuthorName,
+            Message = DeserializeMessage(entity.MessageJson),
             SequenceNumber = entity.SequenceNumber,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
@@ -32,29 +29,14 @@ internal static class AgentConversationMessageMappingExtensions
         {
             Id = model.Id,
             ConversationId = model.SessionId,
-            Role = model.Role.Value,
-            ContentJson = model.ContentJson,
-            AuthorName = model.AuthorName,
+            MessageJson = JsonSerializer.Serialize(model.Message),
             SequenceNumber = model.SequenceNumber,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
         };
     }
 
-    public static IQueryable<AgentChatMessage> SelectAsModel(this IQueryable<AgentConversationMessageEntity> source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-
-        return source.Select(entity => new AgentChatMessage
-        {
-            Id = entity.Id,
-            SessionId = entity.ConversationId,
-            Role = new ChatRole(entity.Role),
-            ContentJson = entity.ContentJson,
-            AuthorName = entity.AuthorName,
-            SequenceNumber = entity.SequenceNumber,
-            CreatedTime = entity.CreatedTime,
-            UpdatedTime = entity.UpdatedTime,
-        });
-    }
+    private static ChatMessage DeserializeMessage(string messageJson) =>
+        JsonSerializer.Deserialize<ChatMessage>(messageJson)
+        ?? throw new JsonException("The persisted chat message JSON deserialized to null.");
 }

@@ -8,9 +8,13 @@ internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner, IHasR
 
     public Guid AgentId { get; init; }
 
+    public Guid AgentVersionId { get; init; }
+
     public Guid OwnerUserId { get; init; }
 
     public string? Title { get; init; }
+
+    public string? MafSessionStateJson { get; init; }
 
     public DateTimeOffset CreatedTime { get; init; }
 

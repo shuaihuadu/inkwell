@@ -60,7 +60,6 @@ public sealed class PostgresRowVersionSpikeTests
             {
                 Id = agentId,
                 OwnerUserId = ownerUserId,
-                Name = "spike-agent",
                 CreatedTime = now,
                 UpdatedTime = now,
             });
@@ -78,7 +77,7 @@ public sealed class PostgresRowVersionSpikeTests
             Assert.IsNotNull(rowVersionAfterInsert);
             Assert.AreEqual(8, rowVersionAfterInsert.Length, "PostgresRowVersionInterceptor 约定 8 字节大端计数器。");
 
-            await agents.UpdateAgent(agent with { Name = "spike-agent-renamed" });
+            await agents.UpdateAgent(agent with { IsShared = true });
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -112,7 +111,6 @@ public sealed class PostgresRowVersionSpikeTests
             {
                 Id = agentId,
                 OwnerUserId = ownerUserId,
-                Name = "spike-agent-2",
                 CreatedTime = now,
                 UpdatedTime = now,
             });
@@ -129,11 +127,11 @@ public sealed class PostgresRowVersionSpikeTests
         AgentDefinition agentSeenByB = await agentsB.GetAgent(agentId);
 
         // A 先提交成功，RowVersion 在 DB 里递增。
-        await agentsA.UpdateAgent(agentSeenByA with { Name = "updated-by-a" });
+        await agentsA.UpdateAgent(agentSeenByA with { IsShared = true });
 
         // B 仍拿着旧的 RowVersion 提交，理论上应该被识别为并发冲突。
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(
-            () => agentsB.UpdateAgent(agentSeenByB with { Name = "updated-by-b" }));
+            () => agentsB.UpdateAgent(agentSeenByB with { SharedRevokedByAdminTime = DateTimeOffset.UtcNow }));
     }
 
     private static ServiceProvider BuildServiceProvider()

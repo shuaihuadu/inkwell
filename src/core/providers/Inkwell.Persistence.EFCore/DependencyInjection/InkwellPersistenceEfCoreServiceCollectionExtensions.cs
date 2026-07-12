@@ -25,6 +25,7 @@ internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
         services.AddScoped<MigrationRunner>();
 
         services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<IAgentVersionRepository, AgentVersionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAgentToolRepository, AgentToolRepository>();
         services.AddScoped<IAgentConversationRepository, AgentConversationRepository>();

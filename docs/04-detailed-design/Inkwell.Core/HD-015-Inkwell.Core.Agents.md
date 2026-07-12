@@ -25,6 +25,12 @@ upstream:
 <!-- markdownlint-disable MD060 -->
 <!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-014 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
 
+> **2026-07-12 替代性 errata（管理面与运行面重新分界）**：本 HD 原 `IAgentInvocationService -> IAgentRuntime` 数据面链路已移除；下方相关章节保留为历史依据，不再代表现行契约。`IAgentService` 只承担可编辑 `AgentDefinition` 的 CRUD、共享与克隆。发布/保存形成不可变 `AgentVersion` + `AgentSnapshot`，运行面由 `IAgentFactory` 直接构建 MAF `AIAgent`。协议入口负责完成调用者鉴权、加载目标版本和运行时附加项后调用 Factory，不再把 Agent 配置翻译为 Inkwell 自建 `AgentRunRequest`。
+>
+> **职责约束**：`AgentDefinition` 是管理态；`AgentVersion` 是版本身份与生命周期；`AgentSnapshot` 是该版本的完整运行配置。历史版本不得反向读取当前 `AgentDefinition` 的可变字段。工具绑定在 Snapshot 中保存声明，Factory 构建时由调用方通过 `AgentBuildOptions.Tools` 提供已经解析的 `AIFunction`，避免 Factory 依赖业务 Repository。读取 Agent 时仍必须校验 `requestingUserId == OwnerUserId || IsShared`。
+>
+> **2026-07-12 版本生命周期 errata**：原文“仅递增 `CurrentVersion`，版本存储 / 回滚归未来模块”的设计已失效。现行 `AgentDefinition` 仅保存 `CurrentPublishedVersionId`、`DraftVersionId` 和 `LatestPublishedVersionNumber`；运行配置全部进入 `AgentVersion.Snapshot`。每个 Agent 至多一个可编辑 Draft；发布把 Draft 固化为新的 Published 版本并原子更新当前指针；历史 Published 版本保持不可变；回滚复制历史 Snapshot 创建版本号递增的新 Published 版本，不反向修改或重新激活历史行。`IAgentVersionService` 负责草稿、发布、历史读取与回滚，`IAgentFactory.BuildAsync` 可按调用方权限构建 Draft 或 Published。下方仍引用 `CurrentVersion` 或“版本模块未起草”的段落均为被本 errata 替代的历史设计。
+>
 > **本 HD 是 H3 第二张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-014 `Inkwell.Core.Auth`](HD-014-Inkwell.Core.Auth.md) 之后。
 >
 > **范围核实结论（非臆造，逐条附证据）**：

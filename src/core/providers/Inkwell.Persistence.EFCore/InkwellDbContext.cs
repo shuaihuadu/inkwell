@@ -17,6 +17,8 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
 {
     internal DbSet<AgentEntity> Agents => this.Set<AgentEntity>();
 
+    internal DbSet<AgentVersionEntity> AgentVersions => this.Set<AgentVersionEntity>();
+
     internal DbSet<UserEntity> Users => this.Set<UserEntity>();
 
     internal DbSet<AgentToolEntity> Tools => this.Set<AgentToolEntity>();

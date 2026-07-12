@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Text.Json;
 using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
@@ -15,17 +14,11 @@ internal static class AgentMappingExtensions
         {
             Id = entity.Id,
             OwnerUserId = entity.OwnerUserId,
-            Name = entity.Name,
-            AvatarUri = entity.AvatarUri is null ? null : new Uri(entity.AvatarUri),
-            Description = entity.Description,
-            Instructions = entity.Instructions,
-            ModelId = entity.ModelId,
-            ModelParameters = entity.ModelParametersJson is null ? null : JsonSerializer.Deserialize<AgentModelParameters>(entity.ModelParametersJson),
-            ToolBindings = JsonSerializer.Deserialize<IReadOnlyList<AgentToolBinding>>(entity.ToolBindingsJson) ?? [],
-            SkillBindings = JsonSerializer.Deserialize<IReadOnlyList<AgentSkillBinding>>(entity.SkillBindingsJson) ?? [],
+            CurrentPublishedVersionId = entity.CurrentPublishedVersionId,
+            DraftVersionId = entity.DraftVersionId,
+            LatestPublishedVersionNumber = entity.LatestPublishedVersionNumber,
             IsShared = entity.IsShared,
             SharedRevokedByAdminTime = entity.SharedRevokedByAdminTime,
-            CurrentVersion = entity.CurrentVersion,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
             RowVersion = entity.RowVersion,
@@ -40,17 +33,11 @@ internal static class AgentMappingExtensions
         {
             Id = model.Id,
             OwnerUserId = model.OwnerUserId,
-            Name = model.Name,
-            AvatarUri = model.AvatarUri?.ToString(),
-            Description = model.Description,
-            Instructions = model.Instructions,
-            ModelId = model.ModelId,
-            ModelParametersJson = model.ModelParameters is null ? null : JsonSerializer.Serialize(model.ModelParameters),
-            ToolBindingsJson = JsonSerializer.Serialize(model.ToolBindings),
-            SkillBindingsJson = JsonSerializer.Serialize(model.SkillBindings),
+            CurrentPublishedVersionId = model.CurrentPublishedVersionId,
+            DraftVersionId = model.DraftVersionId,
+            LatestPublishedVersionNumber = model.LatestPublishedVersionNumber,
             IsShared = model.IsShared,
             SharedRevokedByAdminTime = model.SharedRevokedByAdminTime,
-            CurrentVersion = model.CurrentVersion,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
             RowVersion = model.RowVersion,
@@ -58,13 +45,24 @@ internal static class AgentMappingExtensions
     }
 
     /// <summary>
-    /// 因 <see cref="AgentEntity"/> 含多个 JSON 序列化列，反序列化无法翻译为 SQL；
-    /// 先由 SQL 侧拉取整行，再于客户端完成 <see cref="ToModel"/> 投影（已知的 EFCore JSON 列限制，非 client-eval 误用）。
+    /// 将 Agent Entity 投影为业务 Model。
     /// </summary>
     public static IQueryable<AgentDefinition> SelectAsModel(this IQueryable<AgentEntity> source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return source.AsEnumerable().Select(ToModel).AsQueryable();
+        return source.Select(entity => new AgentDefinition
+        {
+            Id = entity.Id,
+            OwnerUserId = entity.OwnerUserId,
+            CurrentPublishedVersionId = entity.CurrentPublishedVersionId,
+            DraftVersionId = entity.DraftVersionId,
+            LatestPublishedVersionNumber = entity.LatestPublishedVersionNumber,
+            IsShared = entity.IsShared,
+            SharedRevokedByAdminTime = entity.SharedRevokedByAdminTime,
+            CreatedTime = entity.CreatedTime,
+            UpdatedTime = entity.UpdatedTime,
+            RowVersion = entity.RowVersion,
+        });
     }
 }
