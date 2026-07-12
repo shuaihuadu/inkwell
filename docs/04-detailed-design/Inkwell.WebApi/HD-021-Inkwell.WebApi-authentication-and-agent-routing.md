@@ -22,7 +22,7 @@ upstream:
 >
 > **2026-07-12 替代性 errata（移除 RoutingAgent）**：本文原 `RoutingAgent + IAgentInvocationService` 路由方案已被新 Agent Factory 主干取代，下方对应章节仅保留历史记录。现行方向是协议入口先完成 Bearer 鉴权与 Agent 版本授权，再加载不可变 `AgentVersion`，解析工具与 Session/History 组件，通过 `IAgentFactory.BuildAsync` 得到标准 MAF `AIAgent`，最后交给对应官方 Hosting。AG-UI 的 `thread_id` 作为 Session 连续性标识处理，不再把 `conversationId` 设计为可选 URL 段；`agentId` 或发布别名仍属于路由/endpoint 选择信息。
 >
-> **协议边界**：AG-UI、OpenAI Chat Completions、OpenAI Responses 与 A2A 各自保留标准请求/响应模型，禁止先映射成一套 Inkwell 自建通用 Run DTO 再反向映射。四种协议共享的是 Factory、授权、版本快照、工具解析、Session/History 与可观测性，而不是共享传输 DTO。
+> **协议边界**：AG-UI、OpenAI Chat Completions、OpenAI Responses 与 OpenAI Conversations 各自保留标准请求/响应模型，禁止先映射成一套 Inkwell 自建通用 Run DTO 再反向映射。四种协议共享的是 Factory、授权、版本快照、工具解析、Session/History 与可观测性，而不是共享传输 DTO。
 
 ## 1. 模块概述
 
@@ -31,7 +31,7 @@ upstream:
 `Inkwell.WebApi` 是 [ADR-019](../../03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md) 锁定的 HTTP 入口进程。本文档覆盖 H5 编码阶段已落地的两块能力：
 
 - **会话鉴权**（`Authentication/` 子目录）：把 [HD-014 `IAuthService`](HD-014-Inkwell.Core.Auth.md) 签发的不透明 `SessionToken` 接入 ASP.NET Core 的 `AddAuthentication`/`[Authorize]` 体系，构造 `ClaimsPrincipal`。
-- **Agent 多协议路由端点**（挂载在 `Inkwell.Core.AgentRuntime` 内的 `RoutingAgent` + `UseAgentEndpoints(...)`，`Inkwell.WebApi` 侧仅调用这一个扩展方法）：把 AG-UI（未来含 OpenAI ChatCompletions/Responses/A2A）协议请求路由到 [HD-015 `IAgentInvocationService`](HD-015-Inkwell.Core.Agents.md)。
+- **Agent 多协议路由端点**（挂载在 `Inkwell.Core.AgentRuntime` 内的 `RoutingAgent` + `UseAgentEndpoints(...)`，`Inkwell.WebApi` 侧仅调用这一个扩展方法）：把 AG-UI（未来含 OpenAI ChatCompletions/Responses/Conversations）协议请求路由到 [HD-015 `IAgentInvocationService`](HD-015-Inkwell.Core.Agents.md)。
 
 ### 1.2 范围
 
@@ -42,7 +42,7 @@ upstream:
 
 **不在内**（明确排除）：
 
-- OpenAI ChatCompletions / Responses / A2A 协议端点的具体挂载——[ADR-012](../../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) 目前只锁定"REST + AG-UI"，本文档只搭好可扩展的壳子（`UseAgentEndpoints` 内部可追加对应 `Map*` 调用），不越权臆造尚未拍板的协议端点具体路由/鉴权细节
+- OpenAI ChatCompletions / Responses / Conversations 协议端点的具体挂载——[ADR-012](../../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) 目前只锁定"REST + AG-UI"，本文档只搭好可扩展的壳子（`UseAgentEndpoints` 内部可追加对应 `Map*` 调用），不越权臆造尚未拍板的协议端点具体路由/鉴权细节
 - REST CRUD 端点（Agent/会话/工具/技能管理等）——留待后续任务补齐，本文档不越权臆造
 - `Inkwell.Core.AgentRuntime.RoutingAgent`/`AgentResponseMapper`/`AgentEndpointRouteBuilderExtensions` 的内部实现细节——物理文件位于 `Inkwell.Core`，已在 [HD-006 2026-07-10 errata](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 提及，本文档只记录 `Inkwell.WebApi` 侧的消费方式（`UseAgentEndpoints(...)` 一行调用），不重复其内部设计
 
@@ -77,4 +77,4 @@ src/core/Inkwell.WebApi/
 ## 5. 待确认的问题
 
 - 本文档 `status: draft`，尚未经 Owner 正式评审；§3 决策记录中标注"作者判断"的条目（Q2 ~ Q5）未经 `vscode_askQuestions` 真实确认，如与产品实际预期不符，需要 Owner 明确指出后修订。
-- REST CRUD 端点、OpenAI ChatCompletions/Responses/A2A 端点的具体路由与鉴权细节完全未起草，留待后续任务。
+- REST CRUD 端点、OpenAI ChatCompletions/Responses/Conversations 端点的具体路由与鉴权细节完全未起草，留待后续任务。

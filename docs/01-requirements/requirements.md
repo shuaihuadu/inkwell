@@ -109,13 +109,16 @@ v1 仅一类主角色：**Member（已登录用户）**。
 
 ### 4.9 场景 S9：多协议兼容调用
 
-1. 外部系统持有效 API Key，可选择以下任一协议格式调用 Agent：
-   - **OpenAI ChatCompletion API** 兼容格式
-   - **OpenAI Responses API** 兼容格式
-   - **AG-UI 协议**（Agent-User Interaction Protocol）
-   - **A2A 协议**（Agent2Agent Protocol）
-2. inkwell 后端作为服务端，将四种协议格式的请求统一转译为内部 Agent 调用，再将 Agent 输出转译回对应协议的响应格式（含是否支持流式）。
-3. 四种协议各自的完整支持范围（如 A2A 的 AgentCard 发现与 Task 生命周期、AG-UI 的具体事件类型、两种 OpenAI 格式的字段兼容边界）由 H3 详细设计决定，本节仅锁定"v1 至少支持这四种协议的服务端兼容调用"这一范围。
+外部系统持有效 API Key，可选择以下任一协议格式调用 Agent：
+
+- **OpenAI ChatCompletion API** 兼容格式
+- **OpenAI Responses API** 兼容格式
+- **OpenAI Conversations API** 兼容格式
+- **AG-UI 协议**（Agent-User Interaction Protocol）
+
+inkwell 后端作为服务端，将四种协议格式的请求交给对应的 MAF 官方 Hosting 入口，再以该协议的响应格式返回 Agent 输出（含是否支持流式）。
+
+四种协议各自的完整支持范围（如 AG-UI 的具体事件类型、三种 OpenAI 格式的字段兼容边界）由 H3 详细设计决定，本节仅锁定"v1 至少支持这四种协议的服务端兼容调用"这一范围。
 
 ## 5. 功能范围
 
@@ -140,7 +143,7 @@ v1 仅一类主角色：**Member（已登录用户）**。
 | REQ-015 | 版本管理                            | 配置变更自动版本化；支持 diff 与回滚。                                                                                                                                 |
 | REQ-016 | 多模态输入                          | 同时支持图片 / 语音 / 文档输入。                                                                                                                                       |
 | REQ-017 | Admin 最小管理员页                  | v1 提供仅面向 `is_super=true` Member 的管理页，能力限定为：解封账号、撤销其他成员的共享（依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义)）。 |
-| REQ-018 | 多协议兼容调用                      | 支持 OpenAI ChatCompletion API、OpenAI Responses API、AG-UI 协议、A2A 协议四种格式的服务端兼容调用；具体支持范围由 H3 决定。                                           |
+| REQ-018 | 多协议兼容调用                      | 支持 OpenAI ChatCompletion API、OpenAI Responses API、OpenAI Conversations API、AG-UI 协议四种格式的服务端兼容调用；具体支持范围由 H3 决定。                           |
 
 > **REQ-016 实现说明**（H1 边界，仅写期望）：
 >
@@ -272,7 +275,7 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 | REQ-015 | 每次保存配置后产生新版本；用户能查看版本 diff 并回滚。                                                                                                                                          |
 | REQ-016 | 用户在对话中能输入图片 / 语音 / 文档；图片在支持视觉的模型上能被处理（不支持时按 EX-004）；语音上传后能被转写为文本注入对话；文档可被注入对话上下文或入知识库。               |
 | REQ-017 | 仅 `is_super=true` 的 Member 可访问管理页；管理页能完成两项动作：解封被锁账号、撤销他人的共享 Agent（只取消共享可见性，不删除 Owner 原件）；非 Admin 用户访问管理页被重定向。 |
-| REQ-018 | 外部系统能分别以 OpenAI ChatCompletion API、OpenAI Responses API、AG-UI、A2A 四种协议格式之一发起调用，均能成功完成一次 Agent 调用并获得该协议格式下合法的响应。              |
+| REQ-018 | 外部系统能分别以 OpenAI ChatCompletion API、OpenAI Responses API、OpenAI Conversations API、AG-UI 四种协议格式之一发起调用，均能成功完成一次 Agent 调用并获得合法响应。       |
 | NFR-001 | 关闭网络后客户端不可用，按 EX-001 提示。                                                                                                                                      |
 | NFR-002 | 同一份代码能在 **Windows 11** 与 **macOS 12+（Apple Silicon）** 上构建并启动到登录页；功能表现两端等价。Windows 10 / Intel Mac / macOS 11 及以下不作为测试矩阵。              |
 | NFR-003 | 客户端连续 5 分钟无操作或失焦后，再次回到前台必须输入密码解锁；解锁前任何对后端的写操作被拒绝。                                                                               |
@@ -314,7 +317,7 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 24. **长期记忆语义**（OQ-008 closed 2026-05-08）：用户原话——"选 C。该设计点推迟到 H3，由详细设计中的数据表设计决定。" 本 H1 仅保留 “开 / 关 / 摘要” UI 期望，后端与对话表的归属关系由 H3 决定后回填。
 25. **跨平台测试矩阵**（OQ-009 closed 2026-05-08）：用户原话——"Windows 11 + macOS 12+（仅 Apple Silicon）；功能完全等价。后果：矩阵 2 项；放弃 Intel mac 与老 Win10。"
 26. **Agent 列表资产架构**（OQ-010 closed 2026-05-08）：用户原话——"三档 tab：'我的' / '团队共享' / '我使用过'；以发现性为优先。后果：信息架构最复杂，需 H3 跟踪'使用过'语义（默认以'有过对话'为判定）。"
-27. **API Key 管理 + 多协议兼容调用**：用户原话——"场景S8需要调整一下，就是系统有一个独立的API KEY的管理功能，然后加个4.9，就是可以支持：OpenAI ChatCompletion API、Response API、AGUI、A2A的调用，先把需求写进去，后面我们再详细设计。"OpenAI ChatCompletion API / OpenAI Responses API / AG-UI / A2A 四种协议均为 inkwell **对外暴露的服务端兼容端点**，不要求 inkwell 反向作为客户端调用外部协议服务。Key 的撤销 / 轮换 / 数量上限等具体策略与四种协议各自的完整支持范围推迟到 H3 详细设计决定。
+27. **API Key 管理 + 多协议兼容调用**：Owner 要求系统提供独立的 API Key 管理功能；2026-07-12 参考 FourProtocols 实现，确认当前支持 OpenAI ChatCompletion API、OpenAI Responses API、OpenAI Conversations API 与 AG-UI 四种协议。四种协议均为 inkwell **对外暴露的服务端兼容端点**，不要求 inkwell 反向作为客户端调用外部协议服务。Key 的撤销 / 轮换 / 数量上限等具体策略与四种协议各自的完整支持范围推迟到 H3 详细设计决定。
 28. **触发器 / 多 Agent 编排推迟至 v2**（Owner 原话——"触发器去掉、多Agent协作编排去掉，这些放到下一期"）：**REQ-011（触发器）**与 **REQ-012（多 Agent 协作 / 编排）**整体移出 v1 必做范围，v1 不实现、不预留接口；§4.6 与 [EX-007](#9-异常场景) 同步标注推迟，编号保留占位不回收复用。v2 重新立项时需重新走 H1 需求澄清（含触发方式、编排 DAG 语义、超时兵底数值等），不直接复用本文件已写内容作为最终设计。受影响的下游文档（[ui-spec.md UI-006](./ui-spec.md) / [user-flow.md UF-008](./user-flow.md) / [architecture.md](../03-architecture/architecture.md) `.Triggers` `.Orchestrations` 模块 / [database-design.md](../04-detailed-design/database-design.md) `triggers` `orchestrations` `orchestration_runs` 表 / [ADR-006](../03-architecture/adr/ADR-006-orchestration-canvas-react-flow.md) 编排画布）均已同步标注推迟，具体设计内容保留供 v2 参考，不删除。
 
 > Owner 决定 v1 不做审计日志功能（第 14 条原话"审计日志是需要的"、第 23 条原话"查全量审计"的部分表述不再生效，其余部分继续有效）。已移除 NFR-004、REQ-013"审计"表述、REQ-017"查看全量审计日志"子能力、§3/§7/§8/§9 中的审计相关字样；ADR-008 / HD-007（`IAuditLogger` 端口）/ HD-018（`Inkwell.Core.AuditLogs`）三个下游文档已删除。

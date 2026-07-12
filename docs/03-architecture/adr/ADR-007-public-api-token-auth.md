@@ -21,8 +21,6 @@ downstream: []
 
 [REQ-013 公开 API](../../01-requirements/requirements.md) + [UI-010 / UF-010](../../01-requirements/ui-spec.md) 要求每个 Agent 可以"对外开放 HTTP 端点"，由 v1 用户使用浏览器以外的程序（脚本 / 工作流 / 第三方系统）调用。
 
-公开的Agent，需要符合A2A的标准
-
 [OQ-004 closed §A](../../01-requirements/open-questions.md) 已锁"v1 单 Token 鉴权 + 显式 rate limit"。[EX-005](../../01-requirements/requirements.md) 要求公开 API 异常 / 鉴权失败 / 触发限流都返回标准错误码。
 
 [Q-A4-followup](../open-questions-arch.md) 默认值 A 锁定缓存 / 限流由 ASP.NET Core 内置组件实现（不引入 Redis）。

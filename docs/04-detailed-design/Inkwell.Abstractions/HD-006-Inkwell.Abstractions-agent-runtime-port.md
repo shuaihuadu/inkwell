@@ -27,7 +27,7 @@ upstream:
 <!-- markdownlint-disable MD060 -->
 <!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
 
-> **2026-07-12 替代性 errata（MAF 原生 Agent Factory）**：本 HD 原 `IAgentRuntime` facade、Run DTO、流式事件 DTO、Mapper 与取消注册表设计已被实现阶段的新主干取代；下方旧章节保留为历史评审依据，不再代表当前代码契约。现行契约为 `IAgentFactory.BuildAsync(AgentVersion, AgentBuildOptions, CancellationToken) -> ValueTask<AIAgent>`：`AgentVersion` 持有不可变 `AgentSnapshot`，Snapshot 固化名称、Instructions、模型与参数、工具/Skill 绑定及聊天历史策略；`AgentBuildOptions` 承载每次构建的可执行工具与可选 `ChatHistoryProvider`。MAF `AIAgent` 是 Inkwell 的公开核心运行时类型，AG-UI / OpenAI Chat Completions / OpenAI Responses / A2A Hosting 与 Workflow 直接消费它，不再经过 Inkwell 自建消息/事件协议。模型 SDK 客户端创建仍由 `Inkwell.Core.AgentRuntime` 的 Factory 实现负责。
+> **2026-07-12 替代性 errata（MAF 原生 Agent Factory）**：本 HD 原 `IAgentRuntime` facade、Run DTO、流式事件 DTO、Mapper 与取消注册表设计已被实现阶段的新主干取代；下方旧章节保留为历史评审依据，不再代表当前代码契约。现行契约为 `IAgentFactory.BuildAsync(AgentVersion, AgentBuildOptions, CancellationToken) -> ValueTask<AIAgent>`：`AgentVersion` 持有不可变 `AgentSnapshot`，Snapshot 固化名称、Instructions、模型与参数、工具/Skill 绑定及聊天历史策略；`AgentBuildOptions` 承载每次构建的可执行工具与可选 `ChatHistoryProvider`。MAF `AIAgent` 是 Inkwell 的公开核心运行时类型，AG-UI / OpenAI Chat Completions / OpenAI Responses / OpenAI Conversations Hosting 与 Workflow 直接消费它，不再经过 Inkwell 自建消息/事件协议。模型 SDK 客户端创建仍由 `Inkwell.Core.AgentRuntime` 的 Factory 实现负责。
 >
 > **边界更新**：`Inkwell.Abstractions` 允许依赖 `Microsoft.Agents.AI`；这是一项明确的架构选择，不再以“未来可替换 Agent 引擎”为目标维护反腐 facade。持久化消息 Model `AgentChatMessage` 只服务数据库与查询投影，不再作为 Agent Run 输入输出 DTO。会话历史由 MAF `AgentSession` + `ChatHistoryProvider` 管理；协议 `thread_id` 到 Session 持久化键的映射属于后续 Session/History 实现，不由 Factory 反查数据库。
 >
