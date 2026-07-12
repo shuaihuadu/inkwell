@@ -121,6 +121,7 @@
         <File Path="README.md" />
     </Folder>
     <Folder Name="/src/" />
+    <Folder Name="/src/app/" />
     <Folder Name="/src/core/">
         <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
         <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
