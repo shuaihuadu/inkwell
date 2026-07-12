@@ -1,0 +1,8 @@
+<Project>
+
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').Contains('/tests/'))">
+    <!-- 测试代码不要求公共成员 XML 注释；生产代码由 CS1591 强制执行。 -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

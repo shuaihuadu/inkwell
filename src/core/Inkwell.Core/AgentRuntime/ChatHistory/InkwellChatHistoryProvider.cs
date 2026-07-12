@@ -13,7 +13,7 @@ namespace Inkwell;
 /// Provider 实例不保存任何会话特定状态；业务 Session 标识存储在 <see cref="AgentSession.StateBag"/> 中。
 /// </remarks>
 internal sealed class InkwellChatHistoryProvider(
-    IAgentConversationMessageRepository messages,
+    IAgentSessionMessageRepository messages,
     IPersistenceProvider persistence,
     int? maxMessagesToRetrieve = null) : ChatHistoryProvider
 {

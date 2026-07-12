@@ -9,6 +9,12 @@ namespace Inkwell;
 /// <summary>注册 <see cref="IAgentSkillCatalogService"/> / <see cref="IAgentSkillContentResolver"/> 默认实现。</summary>
 public static class AgentSkillsBuilderExtensions
 {
+    /// <summary>
+    /// 注册默认 Agent Skill 服务。
+    /// </summary>
+    /// <param name="builder">Inkwell 构建器。</param>
+    /// <param name="configure">Agent Skill 配置委托。</param>
+    /// <returns>当前 Inkwell 构建器。</returns>
     public static IInkwellBuilder UseDefaultSkillService(this IInkwellBuilder builder, Action<AgentSkillOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);

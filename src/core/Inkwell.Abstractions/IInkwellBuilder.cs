@@ -7,11 +7,26 @@ namespace Inkwell;
 /// </summary>
 public interface IInkwellBuilder
 {
+    /// <summary>
+    /// 获取服务集合。
+    /// </summary>
     IServiceCollection Services { get; }
 
+    /// <summary>
+    /// 获取应用配置。
+    /// </summary>
     IConfiguration Configuration { get; }
 
+    /// <summary>
+    /// 配置 Inkwell 根选项。
+    /// </summary>
+    /// <param name="configure">选项配置操作。</param>
+    /// <returns>当前 Builder。</returns>
     IInkwellBuilder ConfigureOptions(Action<InkwellOptions> configure);
 
+    /// <summary>
+    /// 完成装配并返回服务集合。
+    /// </summary>
+    /// <returns>已配置的服务集合。</returns>
     IServiceCollection Build();
 }

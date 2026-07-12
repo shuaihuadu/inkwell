@@ -10,21 +10,39 @@ namespace Inkwell;
 /// </summary>
 public sealed class InkwellProvidersOptions
 {
+    /// <summary>
+    /// 获取或设置持久化 Provider 名称。
+    /// </summary>
     [Required]
     public string Persistence { get; set; } = "PostgreSQL";
 
+    /// <summary>
+    /// 获取或设置文件存储 Provider 名称。
+    /// </summary>
     [Required]
     public string FileStorage { get; set; } = "LocalFileSystem";
 
+    /// <summary>
+    /// 获取或设置缓存 Provider 名称。
+    /// </summary>
     [Required]
     public string Cache { get; set; } = "InMemory";
 
+    /// <summary>
+    /// 获取或设置队列 Provider 名称。
+    /// </summary>
     [Required]
     public string Queue { get; set; } = "Channels";
 
+    /// <summary>
+    /// 获取或设置向量存储 Provider 名称。
+    /// </summary>
     [Required]
     public string VectorStore { get; set; } = "InMemory";
 
+    /// <summary>
+    /// 获取或设置 Agent Runtime Provider 名称。
+    /// </summary>
     [Required]
     public string AgentRuntime { get; set; } = "AzureOpenAI";
 }

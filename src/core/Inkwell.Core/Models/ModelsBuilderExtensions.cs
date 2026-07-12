@@ -9,6 +9,12 @@ namespace Inkwell;
 /// <summary>注册 <see cref="IModelCatalogService"/> 默认实现。</summary>
 public static class ModelsBuilderExtensions
 {
+    /// <summary>
+    /// 注册默认模型目录服务。
+    /// </summary>
+    /// <param name="builder">Inkwell 构建器。</param>
+    /// <param name="configure">模型目录配置委托。</param>
+    /// <returns>当前 Inkwell 构建器。</returns>
     public static IInkwellBuilder AddDefaultModelCatalog(this IInkwellBuilder builder, Action<ModelCatalogOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);

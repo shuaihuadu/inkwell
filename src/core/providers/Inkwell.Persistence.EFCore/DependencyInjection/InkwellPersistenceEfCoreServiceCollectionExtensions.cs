@@ -28,8 +28,8 @@ internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
         services.AddScoped<IAgentVersionRepository, AgentVersionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAgentToolRepository, AgentToolRepository>();
-        services.AddScoped<IAgentConversationRepository, AgentConversationRepository>();
-        services.AddScoped<IAgentConversationMessageRepository, AgentConversationMessageRepository>();
+        services.AddScoped<IAgentSessionRepository, AgentSessionRepository>();
+        services.AddScoped<IAgentSessionMessageRepository, AgentSessionMessageRepository>();
         services.AddScoped<IAgentSkillRepository, AgentSkillRepository>();
 
         return services;

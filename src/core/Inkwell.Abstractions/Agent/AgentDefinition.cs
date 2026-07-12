@@ -58,6 +58,15 @@ public sealed record class AgentDefinition : IHasOwner, IHasTimestamps, IHasRowV
     public byte[] RowVersion { get; init; } = [];
 }
 
+/// <summary>
+/// 表示 Agent 绑定的工具及其参数配置。
+/// </summary>
+/// <param name="ToolId">工具标识。</param>
+/// <param name="ParametersJson">工具参数的 JSON；未配置时为 <see langword="null"/>。</param>
 public sealed record class AgentToolBinding(Guid ToolId, string? ParametersJson);
 
+/// <summary>
+/// 表示 Agent 绑定的 Skill。
+/// </summary>
+/// <param name="SkillId">Skill 标识。</param>
 public sealed record class AgentSkillBinding(Guid SkillId);

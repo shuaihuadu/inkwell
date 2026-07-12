@@ -27,7 +27,7 @@ builder.Services.AddInkwell(builder.Configuration)
     .UseDefaultAuthService()
     //.UseDefaultAgentService()
     .UseDefaultToolService()
-    //.UseDefaultConversationService()
+    //.UseDefaultSessionService()
     .UseDefaultSkillService()
     .AddDefaultModelCatalog()
     .Build();
@@ -46,7 +46,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Migration 由 CI/CD 独立步骤执行（ADR-021 2026-07-06 errata），启动期只跑 Seed。
+// Migration 由 CI/CD 独立步骤执行（ADR-021），WebApi 启动时仅执行幂等 Seed。
 using (IServiceScope scope = app.Services.CreateScope())
 {
     MigrationRunner migrationRunner = scope.ServiceProvider.GetRequiredService<Inkwell.Persistence.EFCore.MigrationRunner>();

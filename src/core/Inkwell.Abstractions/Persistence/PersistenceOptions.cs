@@ -10,14 +10,23 @@ namespace Inkwell;
 /// </summary>
 public sealed class PersistenceOptions
 {
+    /// <summary>
+    /// 获取或设置数据库连接字符串。
+    /// </summary>
     [Required]
     public string ConnectionString { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 获取或设置数据库命令超时时间（秒）。
+    /// </summary>
     [Range(1, 300)]
     public int CommandTimeoutSeconds { get; set; } = 30;
 
     /// <summary>启动期是否自动执行 <c>InkwellSeeder.SeedAsync()</c>（ADR-021 D2）。</summary>
     public bool AutoSeedOnStartup { get; set; } = true;
 
+    /// <summary>
+    /// 获取或设置是否启用敏感数据日志记录。
+    /// </summary>
     public bool EnableSensitiveDataLogging { get; set; }
 }

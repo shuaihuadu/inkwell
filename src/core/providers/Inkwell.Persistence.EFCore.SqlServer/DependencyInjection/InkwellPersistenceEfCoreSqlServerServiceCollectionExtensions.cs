@@ -10,6 +10,11 @@ namespace Inkwell.Persistence.EFCore.SqlServer.DependencyInjection;
 /// <summary><see cref="IInkwellBuilder"/> 的 SqlServer Provider 唯一入口扩展。</summary>
 public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
 {
+    /// <summary>注册使用 SQL Server 的 EF Core 持久化服务。</summary>
+    /// <param name="builder">Inkwell Builder DSL 入口。</param>
+    /// <param name="connectionString">SQL Server 连接字符串。</param>
+    /// <param name="configure">可选的 <see cref="PersistenceOptions"/> 编程式追加配置。</param>
+    /// <returns>供链式调用的 <paramref name="builder"/>。</returns>
     public static IInkwellBuilder UseSqlServer(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);

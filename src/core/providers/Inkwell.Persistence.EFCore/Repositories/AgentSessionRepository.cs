@@ -5,13 +5,13 @@ using Inkwell.Persistence.EFCore.Mapping;
 
 namespace Inkwell.Persistence.EFCore.Repositories;
 
-internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentConversationRepository
+internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessionRepository
 {
-    public async Task<AgentSessionDefinition> AddConversation(AgentSessionDefinition conversation, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> AddSession(AgentSessionDefinition sessionDefinition, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(conversation);
+        ArgumentNullException.ThrowIfNull(sessionDefinition);
 
-        AgentConversationEntity entity = conversation.ToEntity();
+        AgentConversationEntity entity = sessionDefinition.ToEntity();
 
         db.Set<AgentConversationEntity>().Add(entity);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -19,21 +19,21 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         return entity.ToModel();
     }
 
-    public async Task<AgentSessionDefinition> GetConversation(Guid id, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> GetSession(Guid id, CancellationToken ct = default)
     {
-        // AsNoTracking：同 AgentRepository.GetAgent 的说明，避免与 UpdateConversation 产生重复追踪冲突。
+        // AsNoTracking：同 AgentRepository.GetAgent 的说明，避免与 UpdateSession 产生重复追踪冲突。
         AgentConversationEntity? entity = await db.Set<AgentConversationEntity>().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
 
-        return entity?.ToModel() ?? throw new KeyNotFoundException($"Conversation not found: id={id}");
+        return entity?.ToModel() ?? throw new KeyNotFoundException($"Agent session not found: id={id}");
     }
 
-    public async Task<AgentSessionDefinition> UpdateConversation(AgentSessionDefinition conversation, CancellationToken ct = default)
+    public async Task<AgentSessionDefinition> UpdateSession(AgentSessionDefinition sessionDefinition, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(conversation);
+        ArgumentNullException.ThrowIfNull(sessionDefinition);
 
         try
         {
-            AgentConversationEntity entity = conversation.ToEntity();
+            AgentConversationEntity entity = sessionDefinition.ToEntity();
 
             db.Set<AgentConversationEntity>().Update(entity);
             await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -42,11 +42,11 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            throw new InvalidOperationException($"Optimistic concurrency conflict: Conversation Id={conversation.Id}", ex);
+            throw new InvalidOperationException($"Optimistic concurrency conflict: AgentSessionDefinition Id={sessionDefinition.Id}", ex);
         }
     }
 
-    public async Task<PagedResult<AgentSessionDefinition>> ListConversationsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
+    public async Task<PagedResult<AgentSessionDefinition>> ListSessionsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
     {
         IOrderedQueryable<AgentConversationEntity> query = db.Set<AgentConversationEntity>().AsNoTracking()
             .Where(x => x.AgentId == agentId && x.OwnerUserId == ownerUserId)

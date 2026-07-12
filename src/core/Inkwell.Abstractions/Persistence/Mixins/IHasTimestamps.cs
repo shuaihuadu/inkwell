@@ -8,7 +8,13 @@ namespace Inkwell;
 /// </summary>
 public interface IHasTimestamps
 {
+    /// <summary>
+    /// 获取创建时间。
+    /// </summary>
     DateTimeOffset CreatedTime { get; init; }
 
+    /// <summary>
+    /// 获取更新时间。
+    /// </summary>
     DateTimeOffset UpdatedTime { get; init; }
 }

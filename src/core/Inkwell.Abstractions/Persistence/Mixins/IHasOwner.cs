@@ -8,5 +8,8 @@ namespace Inkwell;
 /// </summary>
 public interface IHasOwner
 {
+    /// <summary>
+    /// 获取所有者用户标识。
+    /// </summary>
     Guid OwnerUserId { get; init; }
 }

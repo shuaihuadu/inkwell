@@ -9,6 +9,12 @@ namespace Inkwell;
 /// <summary>注册 <see cref="IAgentToolCatalogService"/> / <see cref="IAgentToolBindingResolver"/> 默认实现 + 内置工具执行委托字典。</summary>
 public static class AgentToolsBuilderExtensions
 {
+    /// <summary>
+    /// 注册默认 Agent Tool 服务及内置工具执行委托。
+    /// </summary>
+    /// <param name="builder">Inkwell 构建器。</param>
+    /// <param name="configure">Agent Tool 配置委托。</param>
+    /// <returns>当前 Inkwell 构建器。</returns>
     public static IInkwellBuilder UseDefaultToolService(this IInkwellBuilder builder, Action<AgentToolOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);

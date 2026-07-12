@@ -43,8 +43,7 @@ internal sealed class AgentRepository(InkwellDbContext db) : IAgentRepository
 
     public async Task<AgentDefinition> GetAgent(Guid id, CancellationToken ct = default)
     {
-        // AsNoTracking：GetAgent 常用于读-改-写前置读取，若追踪会与 UpdateAgent 的 Update(newEntity)
-        // 产生同一主键重复追踪冲突（真实报错，2026-07-09 Testcontainers spike 验证坐实）。
+        // 读取结果不参与当前上下文跟踪，避免后续 Update(newEntity) 出现同一主键重复跟踪冲突。
         AgentEntity? entity = await db.Set<AgentEntity>().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
 
         return entity?.ToModel() ?? throw new KeyNotFoundException($"AgentDefinition not found: id={id}");

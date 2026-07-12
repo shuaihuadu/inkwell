@@ -7,5 +7,8 @@ namespace Inkwell;
 /// </summary>
 public interface IHasRowVersion
 {
+    /// <summary>
+    /// 获取用于乐观并发控制的行版本。
+    /// </summary>
     byte[] RowVersion { get; init; }
 }

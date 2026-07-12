@@ -11,6 +11,12 @@ namespace Inkwell;
 /// <summary>注册 <see cref="IEmbeddingGenerator{TInput,TEmbedding}"/> 的 Azure OpenAI 实现。</summary>
 public static class AzureOpenAIEmbeddingBuilderExtensions
 {
+    /// <summary>
+    /// 注册 Azure OpenAI 嵌入向量生成器。
+    /// </summary>
+    /// <param name="builder">Inkwell 构建器。</param>
+    /// <param name="configure">Azure OpenAI 嵌入向量配置委托。</param>
+    /// <returns>当前 Inkwell 构建器。</returns>
     public static IInkwellBuilder UseAzureOpenAIEmbeddings(this IInkwellBuilder builder, Action<AzureOpenAIEmbeddingOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);

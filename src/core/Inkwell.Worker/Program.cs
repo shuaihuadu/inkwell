@@ -20,7 +20,7 @@ builder.Services.AddInkwell(builder.Configuration)
     .UseDefaultAuthService()
     //.UseDefaultAgentService()
     .UseDefaultToolService()
-    //.UseDefaultConversationService()
+    //.UseDefaultSessionService()
     .UseDefaultSkillService()
     .AddDefaultModelCatalog()
     .Build();

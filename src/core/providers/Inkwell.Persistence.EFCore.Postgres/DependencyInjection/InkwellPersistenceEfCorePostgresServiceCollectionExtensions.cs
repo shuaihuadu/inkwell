@@ -11,6 +11,11 @@ namespace Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 /// <summary><see cref="IInkwellBuilder"/> 的 Postgres Provider 唯一入口扩展。</summary>
 public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 {
+    /// <summary>注册使用 Postgres 的 EF Core 持久化服务。</summary>
+    /// <param name="builder">Inkwell Builder DSL 入口。</param>
+    /// <param name="connectionString">Postgres 连接字符串。</param>
+    /// <param name="configure">可选的 <see cref="PersistenceOptions"/> 编程式追加配置。</param>
+    /// <returns>供链式调用的 <paramref name="builder"/>。</returns>
     public static IInkwellBuilder UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -31,7 +36,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
             builder.Services.PostConfigure(configure);
         }
 
-        // Owner picker（2026-07-06）：Postgres 走手动 RowVersion 模拟，不用原生 xmin（详 HD-012 §4）。
+        // Postgres 使用拦截器维护 byte[] RowVersion（HD-012 §4）。
         builder.Services.AddSingleton<ISaveChangesInterceptor, PostgresRowVersionInterceptor>();
 
         builder.Services.AddDbContext<InkwellDbContext>((sp, options) =>

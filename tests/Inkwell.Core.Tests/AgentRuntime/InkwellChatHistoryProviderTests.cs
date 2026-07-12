@@ -211,7 +211,7 @@ public sealed class InkwellChatHistoryProviderTests
         }
     }
 
-    private sealed class FakeMessageRepository(IReadOnlyList<ChatMessage> history) : IAgentConversationMessageRepository
+    private sealed class FakeMessageRepository(IReadOnlyList<ChatMessage> history) : IAgentSessionMessageRepository
     {
         public Guid? LastListedSessionId { get; private set; }
 
@@ -224,27 +224,27 @@ public sealed class InkwellChatHistoryProviderTests
         public Task<AgentChatMessage> AddMessage(AgentChatMessage message, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<PagedResult<AgentChatMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, SortOrder sort, CancellationToken ct = default) =>
+        public Task<PagedResult<AgentChatMessage>> ListMessagesBySession(Guid sessionId, Pagination pagination, SortOrder sort, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid conversationId, int? maxMessages = null, CancellationToken ct = default)
+        public Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid sessionId, int? maxMessages = null, CancellationToken ct = default)
         {
-            this.LastListedSessionId = conversationId;
+            this.LastListedSessionId = sessionId;
             this.LastMaxMessages = maxMessages;
             return Task.FromResult(history);
         }
 
-        public Task<IReadOnlyList<AgentChatMessage>> AppendMessagesAsync(Guid conversationId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
+        public Task<IReadOnlyList<AgentChatMessage>> AppendMessagesAsync(Guid sessionId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
         {
-            this.LastAppendedSessionId = conversationId;
+            this.LastAppendedSessionId = sessionId;
             this.AppendedMessages.AddRange(messages);
             return Task.FromResult<IReadOnlyList<AgentChatMessage>>([]);
         }
 
-        public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) =>
+        public Task<bool> DeleteMessage(Guid sessionId, Guid messageId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
+        public Task<int> DeleteMessagesBySession(Guid sessionId, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }
