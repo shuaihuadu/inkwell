@@ -132,6 +132,7 @@
         <Project Path="src/core/providers/Inkwell.Cache.InMemory/Inkwell.Cache.InMemory.csproj" />
         <Project Path="src/core/providers/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
         <Project Path="src/core/providers/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
+        <Project Path="src/core/providers/Inkwell.FileStorage.Local/Inkwell.FileStorage.Local.csproj" />
         <Project Path="src/core/providers/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
         <Project Path="src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
         <Project Path="src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
