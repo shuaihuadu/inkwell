@@ -28,11 +28,16 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Inkwell.WebApi.Tests" />
     </ItemGroup>
 
 </Project>

@@ -29,6 +29,7 @@ internal sealed class AgentToolBindingResolver(
             }
 
             Func<string, CancellationToken, Task<string>> mergedInvoke = BuildInvokeDelegate(invoke, binding.ParametersJson);
+            resolved.Add(new JsonDelegateAIFunction(tool.Name, tool.Description, tool.ParametersJsonSchema, mergedInvoke));
         }
 
         return resolved;

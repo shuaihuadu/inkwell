@@ -7,8 +7,12 @@ using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 using Inkwell.Queue.Channels;
 using Inkwell.VectorStore.InMemory;
 using Inkwell.WebApi;
+using Inkwell.WebApi.Protocols;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+AzureOpenAICredential azureOpenAICredential = builder.Configuration
+    .GetSection("Inkwell:AzureOpenAI")
+    .Get<AzureOpenAICredential>() ?? new AzureOpenAICredential();
 
 // ADR-019：Inkwell.WebApi 仅注册 IQueueProvider enqueue 侧，不跑 consumer（consumer 归 Inkwell.Worker）。
 // dev 默认 Provider 组合：Postgres（ADR-005 docker-compose 默认）+ 进程内 Cache/Queue/FileStorage/VectorStore。
@@ -19,7 +23,7 @@ builder.Services.AddInkwell(builder.Configuration)
     .UseChannelsQueue()
     //.UseLocalFileSystemFileStorage()
     .UseInMemoryVectorStore()
-    //.UseAzureOpenAIAgentRuntime()
+    .UseAzureOpenAIAgentFactory(azureOpenAICredential)
     .UseDefaultAuthService()
     //.UseDefaultAgentService()
     .UseDefaultToolService()
@@ -29,7 +33,7 @@ builder.Services.AddInkwell(builder.Configuration)
     .Build();
 
 builder.Services.AddSessionAuthentication();
-//builder.Services.AddRoutingAgent();
+builder.Services.AddAgentProtocols();
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();
@@ -51,5 +55,6 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "healthy" }));
+app.MapAgentProtocols();
 
 app.Run();

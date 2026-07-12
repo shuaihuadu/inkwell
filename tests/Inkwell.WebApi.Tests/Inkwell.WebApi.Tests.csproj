@@ -1,0 +1,15 @@
+<Project Sdk="MSTest.Sdk/4.3.0">
+
+    <PropertyGroup>
+        <RootNamespace>Inkwell.WebApi.Tests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\core\Inkwell.WebApi\Inkwell.WebApi.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+</Project>

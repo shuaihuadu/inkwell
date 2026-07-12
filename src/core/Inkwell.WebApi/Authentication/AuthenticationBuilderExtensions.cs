@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.AspNetCore.Authentication;
-
 namespace Inkwell.WebApi;
 
 /// <summary>Inkwell 会话鉴权方案 + 授权策略的 DI 注册入口。</summary>

@@ -25,8 +25,9 @@
     <!-- Microsoft Agent Framework（MAF）—— NuGet.org 正式包，不再 ProjectReference 同级仓库源码 -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.13.0" />
-    <!-- 以下两个包 MAF 尚未发布稳定版，锁定 NuGet.org 当前最新 preview -->
+    <!-- 以下 Hosting / DurableTask 包 MAF 尚未发布稳定版，锁定 NuGet.org 当前最新预发布版本 -->
     <PackageVersion Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.13.0-preview.260703.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.13.0-alpha.260703.1" />
     <PackageVersion Include="Microsoft.Agents.AI.DurableTask" Version="1.13.0-preview.260703.1" />
     <!-- ASP.NET Core / Hosting -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />

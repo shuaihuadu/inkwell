@@ -147,5 +147,6 @@
         <Project Path="tests/Inkwell.Abstractions.Tests/Inkwell.Abstractions.Tests.csproj" />
         <Project Path="tests/Inkwell.Core.Tests/Inkwell.Core.Tests.csproj" />
         <Project Path="tests/Inkwell.Providers.Contract/Inkwell.Providers.Contract.csproj" />
+        <Project Path="tests/Inkwell.WebApi.Tests/Inkwell.WebApi.Tests.csproj" />
     </Folder>
 </Solution>
