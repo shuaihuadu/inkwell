@@ -1,6 +1,6 @@
 ---
 id: HD-019
-title: Inkwell.Core.Models 详细设计 — 模型目录（IModelCatalogService，配置驱动只读查询）
+title: Inkwell.Core.Models 详细设计 — 多来源模型注册表（IModelRegistryService）
 stage: H3
 status: draft
 reviewers: []
@@ -10,6 +10,7 @@ upstream:
   - ADR-003
   - ADR-017
   - ADR-023
+  - ADR-026
   - HD-001
   - HD-006
   - HD-015
@@ -21,6 +22,17 @@ upstream:
 > **本 HD 是 H3 第六张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-017 `Inkwell.Core.Conversations`](HD-017-Inkwell.Core.Conversations.md) 之后起草（HD-018 `Inkwell.Core.AuditLogs` 原为第五张，因 2026-07-09 审计日志功能整体取消已删除，本 HD 直接接续 HD-017）。
 >
 > **治理声明**：本文件全文不包含任何"已用 `vscode_askQuestions` 向 Owner 真实确认"的表述——本次起草会话未发起任何 `vscode_askQuestions` 交互。全部标注"作者判断"的条目均为作者基于现有证据链的判断；存在真实产品 / 技术含义分歧、无法从现有文档判定的问题，原样列入 [§7](#7-需要-owner-确认的问题)，不代答、不假装已确认。
+>
+> **2026-07-13 替代性 errata（ADR-026 LiteLLM 模型网关）**：下方原设计中的 Catalog 命名、`ModelProviderKind`、单一配置来源和逐厂商 Agent Runtime 描述，已被 [ADR-026](../../03-architecture/adr/ADR-026-model-gateway-litellm.md) 取代；旧章节保留为历史审计依据，不再代表当前契约。当前契约如下：
+>
+> - **公共门面**改为 `IModelRegistryService`，DTO 改为 `ModelDefinition`。Agent `ModelId` / `AgentModelParameters`、模型可用性和能力元数据继续保留。
+> - **来源聚合**：`ConfigurationModelRegistrySource` 读取 `Inkwell:Models` 原生模型；`LiteLLMModelRegistrySource` 通过稳定的 `GET /v1/models` 自动发现当前凭据可调用的 LiteLLM `model_name`。聚合后 `Id` 按大小写不敏感全局唯一，跨来源重名直接失败。
+> - **身份维度分离**：删除 `ModelProviderKind`；`ModelDefinition` 分别记录 Publisher、Family、`SourceId`、`RuntimeId` 与 `RemoteModelId`。配置来源不等于运行时连接，用户可看到 OpenAI / Alibaba 与 GPT / Qwen 身份。
+> - **能力字段**为 `SupportsVision` / `SupportsTools` / `SupportsStructuredOutput` / `ContextWindowTokens?`。LiteLLM 自动发现但缺少 Publisher / Family / 能力元数据的模型仍返回给 UI，但 `IsAvailable=false`；补齐元数据并显式启用后才可选择。
+> - **运行时边界**：`ModelRoutingAgentFactory` 通过 Registry 解析业务 `ModelId`，按 `RuntimeId` 选择 LiteLLM 或显式原生连接器，再由 MAF 执行模型调用；不存在负责聊天调用的 `ILLMService`，也不在 LiteLLM 故障时自动旁路到原生连接。
+> - **装配与 API**：`AddModelRegistry()` 注册配置来源，`AddLiteLLMModelRegistrySource()` 同时注册 LiteLLM 发现来源和 MAF 运行时连接；`GET /api/models` / `GET /api/models/{modelId}` 向已认证客户端提供聚合模型定义。
+> - **启动期校验**：`ConfigurationModelRegistryOptionsValidator` 与 `LiteLLMModelRegistryOptionsValidator` 均通过 `ValidateOnStart()` 执行；列表项 DataAnnotations 与大小写不敏感重复 ID 在进程开始服务前失败，不推迟到首次模型查询。
+> - **文件结构**：Abstractions 使用 `IModelRegistryService.cs` / `ModelDefinition.cs` / `ConfigurationModelRegistryOptions*.cs`；Core 使用 `ModelRegistryService.cs`、`ConfigurationModelRegistrySource.cs`、`IModelRegistrySource.cs`、`Models/LiteLLM/*` 与 `AgentRuntime/ModelRoutingAgentFactory.cs`。下方 §0 以后出现的旧文件名与旧约束均由本 errata 覆盖。
 
 ## 0. 范围核实：模型是否为持久化实体？REQ-005 / REQ-006 归属边界
 

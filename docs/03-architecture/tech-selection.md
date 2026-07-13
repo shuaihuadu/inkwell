@@ -28,30 +28,31 @@ downstream:
 
 ## 0. 选型摘要表（与 ADR-NNN 一一对应）
 
-| 维度            | 选择                                                                   | 关联决策                                                                       | 置信度 |
-| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------ |
-| 客户端运行时    | Electron + React + Vite + TypeScript                                   | [ADR-001](./adr/ADR-001-client-runtime-electron-react.md)                      | high   |
-| 后端运行时      | .NET 10 + ASP.NET Core                                                 | [ADR-002](./adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md)                | high   |
-| Agent 引擎      | Microsoft Agent Framework                                              | [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md)             | high   |
-| 关系 + 向量数据 | IPersistenceProvider 抽象（SqlServer / PostgreSQL）+ Qdrant + InMemoryVectorStore | [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | high   |
-| 部署形态        | Compose (dev) / AKS (prod)                                             | [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md)                      | high   |
-| 编排画布        | ~~React Flow + MAF Workflows~~（推迟 v2）                               | [ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)                    | —      |
-| 公开 API 鉴权   | 单 Token + Bearer                                                      | [ADR-007](./adr/ADR-007-public-api-token-auth.md)                              | high   |
-| 多模态          | Azure Speech + 模型 vision                                             | [ADR-009](./adr/ADR-009-multimodal-azure-speech.md)                            | high   |
-| Skill 加载      | v1 仅静态                                                              | [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md)                       | high   |
-| 锁屏 + 在途任务 | 主进程长 SSE + 5 min idle                                              | [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)              | medium |
-| 客户端↔后端协议 | REST + AG-UI（无 cursor）                                              | [ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md)                   | high   |
-| 可观测性        | OTel + Grafana 自托管                                                  | [ADR-013](./adr/ADR-013-observability-otel-self-hosted-grafana.md)             | high   |
-| 国际化          | v1 仅 zh-CN                                                            | [ADR-014](./adr/ADR-014-i18n-out-of-scope-v1.md)                               | high   |
-| 文件存储        | IFileStorageProvider 抽象（LocalFileSystem / AzureBlob / MinIO）       | [ADR-015](./adr/ADR-015-object-storage-provider-switchable.md)                 | medium |
-| 缓存层          | ICacheProvider 抽象（Redis）                                           | [ADR-016](./adr/ADR-016-cache-provider-redis.md)                               | medium |
-| 凭据存储        | K8s Secret + .env（v1，不走 Key Vault）                                | [OQ-A006 closed §B](./open-questions-arch.md) + [RISK-013](./risk-analysis.md) | medium |
-| 测试与 CI       | MSTest.Sdk 4.x + Vitest + Playwright + GitHub Actions                       | [OQ-A007 closed §A](./open-questions-arch.md)                                  | high   |
-| 后端模块拓扑    | Ports & Adapters（Abstractions / Core / providers/* / WebApi / Worker）           | [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)         | high   |
-| 后端队列抽象    | IQueueProvider + ChannelsQueueProvider（dev） + RedisStreamQueueProvider（integration / prod）双 Provider | [ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) / [OQ-A008 closed §B](./open-questions-arch.md) | high   |
-| 后端进程拓扑    | Inkwell.WebApi + Inkwell.Worker 双进程（独立 Pod / 独立 HPA）           | [ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md) | high   |
-| Entity ↔ Model mapper | 手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `SelectAsModel`），禁 AutoMapper / Mapperly / Mapster | [ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md) | high   |
-| 数据库 Migration + Seed 执行方式 | 独立一次性 `Inkwell.Migrator` 项目/镜像（Helm hook Job / Compose 一次性 service） | [ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md) | high   |
+| 维度                             | 选择                                                                                                          | 关联决策                                                                                                                                                                                                                              | 置信度 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 客户端运行时                     | Electron + React + Vite + TypeScript                                                                          | [ADR-001](./adr/ADR-001-client-runtime-electron-react.md)                                                                                                                                                                             | high   |
+| 后端运行时                       | .NET 10 + ASP.NET Core                                                                                        | [ADR-002](./adr/ADR-002-backend-runtime-dotnet10-aspnetcore.md)                                                                                                                                                                       | high   |
+| Agent 引擎                       | Microsoft Agent Framework                                                                                     | [ADR-003](./adr/ADR-003-agent-engine-microsoft-agent-framework.md)                                                                                                                                                                    | high   |
+| 模型网关                         | LiteLLM Proxy + Inkwell 逻辑模型目录                                                                          | [ADR-026](./adr/ADR-026-model-gateway-litellm.md)                                                                                                                                                                                     | medium |
+| 关系 + 向量数据                  | IPersistenceProvider 抽象（SqlServer / PostgreSQL）+ Qdrant + InMemoryVectorStore                             | [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | high   |
+| 部署形态                         | Aspire AppHost (dev) / AKS + Helm (prod)                                                                      | [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md) + [ADR-025](./adr/ADR-025-local-orchestration-aspire.md)                                                                                                                    | high   |
+| 编排画布                         | ~~React Flow + MAF Workflows~~（推迟 v2）                                                                     | [ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)                                                                                                                                                                           | —      |
+| 公开 API 鉴权                    | 单 Token + Bearer                                                                                             | [ADR-007](./adr/ADR-007-public-api-token-auth.md)                                                                                                                                                                                     | high   |
+| 多模态                           | Azure Speech + 模型 vision                                                                                    | [ADR-009](./adr/ADR-009-multimodal-azure-speech.md)                                                                                                                                                                                   | high   |
+| Skill 加载                       | v1 仅静态                                                                                                     | [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md)                                                                                                                                                                              | high   |
+| 锁屏 + 在途任务                  | 主进程长 SSE + 5 min idle                                                                                     | [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)                                                                                                                                                                     | medium |
+| 客户端↔后端协议                  | REST + AG-UI（无 cursor）                                                                                     | [ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md)                                                                                                                                                                          | high   |
+| 可观测性                         | OTel + Grafana 自托管                                                                                         | [ADR-013](./adr/ADR-013-observability-otel-self-hosted-grafana.md)                                                                                                                                                                    | high   |
+| 国际化                           | v1 仅 zh-CN                                                                                                   | [ADR-014](./adr/ADR-014-i18n-out-of-scope-v1.md)                                                                                                                                                                                      | high   |
+| 文件存储                         | IFileStorageProvider 抽象（LocalFileSystem / AzureBlob / MinIO）                                              | [ADR-015](./adr/ADR-015-object-storage-provider-switchable.md)                                                                                                                                                                        | medium |
+| 缓存层                           | ICacheProvider 抽象（Redis）                                                                                  | [ADR-016](./adr/ADR-016-cache-provider-redis.md)                                                                                                                                                                                      | medium |
+| 凭据存储                         | K8s Secret + .env（v1，不走 Key Vault）                                                                       | [OQ-A006 closed §B](./open-questions-arch.md) + [RISK-013](./risk-analysis.md)                                                                                                                                                        | medium |
+| 测试与 CI                        | MSTest.Sdk 4.x + Vitest + Playwright + GitHub Actions                                                         | [OQ-A007 closed §A](./open-questions-arch.md)                                                                                                                                                                                         | high   |
+| 后端模块拓扑                     | Ports & Adapters（Abstractions / Core / providers/* / WebApi / Worker）                                       | [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)                                                                                                                                                                | high   |
+| 后端队列抽象                     | IQueueProvider + ChannelsQueueProvider（dev） + RedisStreamQueueProvider（integration / prod）双 Provider     | [ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) / [OQ-A008 closed §B](./open-questions-arch.md)                                                                                                                        | high   |
+| 后端进程拓扑                     | Inkwell.WebApi + Inkwell.Worker 双进程（独立 Pod / 独立 HPA）                                                 | [ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)                                                                                                                                                                      | high   |
+| Entity ↔ Model mapper            | 手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `SelectAsModel`），禁 AutoMapper / Mapperly / Mapster | [ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md)                                                                                                                                                                            | high   |
+| 数据库 Migration + Seed 执行方式 | 独立一次性 `Inkwell.Migrator` 项目/镜像（Helm hook Job / Compose 一次性 service）                             | [ADR-024](./adr/ADR-024-database-migration-seed-standalone-job.md)                                                                                                                                                                    | high   |
 
 > 置信度统计：high 17 / medium 5 / low 0（编排画布已于 2026-07-09 推迟至 v2，不计入置信度评级）；low 占比 0%（[architect-advisor/prompt.md §第六步](../../../.he/agents/architect-advisor/prompt.md) 要求 ≤ 30%，达标）。
 
@@ -93,7 +94,7 @@ downstream:
 
 ## 5. 部署形态（ADR-005）
 
-- **选择**：dev = Docker Compose / prod = AKS（Helm）。
+- **选择**：dev = Aspire AppHost（ADR-025）/ prod = AKS（Helm）；ADR-025 仅替代 ADR-005 的开发编排部分。
 - **为什么**：与 [Q-A5](./open-questions-arch.md) 决策一致；dev 启动快 + 全栈本地复现；prod 与 Azure 生态（Speech / KeyVault / Blob）同 region。
 - **替代方案**：dev 也用 AKS / prod 用 ACA / prod 用自建 K8s / Docker Swarm。
 - **放弃理由**：详见 [ADR-005 §备选项](./adr/ADR-005-deployment-docker-compose-aks.md)。
@@ -191,7 +192,7 @@ downstream:
 
 ## 17. 凭据存储（OQ-A006 closed §B，无独立 ADR）
 
-- **选择**：v1 仅 Kubernetes Secret（prod）+ Docker Compose `.env`（dev）；未引入 Azure Key Vault。
+- **选择**：v1 仅 Kubernetes Secret（prod）+ Aspire secret parameter / .NET User Secrets / `.env`（dev）；未引入 Azure Key Vault。
 - **为什么**：与 [OQ-A006 closed §B](./open-questions-arch.md) 一致；与 [OQ-006 v1 范围控制](../01-requirements/open-questions.md) 思路一致；减少一个外部依赖。
 - **替代方案**：Azure Key Vault + [Key Vault CSI driver](https://learn.microsoft.com/azure/aks/csi-secrets-store-driver)（§A） / HashiCorp Vault。
 - **放弃理由**：§A 引入 Azure-specific 依赖与运维复杂度的 trade-off 被 Owner 评估为“v1 不值”；不过残余风险能够被 K8s RBAC + at-rest 加密上手接住。
@@ -313,23 +314,23 @@ downstream:
 
 ### 21.10 后端队列抽象
 
-| 维度                | Channels（dev） + Redis Stream（prod）双 Provider（本决） | 不引入抽象（原§3.3） | 仅 Channels，Redis 推迟 OQ | 包装 DurableTask thin wrapper |
-| ------------------- | ----------------------------------------------- | ------------------- | ----------------------------- | ------------------------------ |
-| Owner 环境对称论据 | ✅                                              | ❌                  | ⚠（推迟）                       | ❌                             |
-| dev 零依赖           | ✅（Channels）                                  | ✅                  | ✅                            | ✅                             |
-| prod 多副本语义      | ✅（Redis Streams）                              | ⚠（DurableTask 仅覆盖工作流） | ⚠（升级后才有）                | ⚠                              |
-| ADR 六字段可填齐  | ✅                                              | ✅                  | ✅                            | ⚠                              |
-| H4 补鱼类用例      | crash recovery / fairness / DLQ                 | 无                  | 仅 in-process                  | 无                             |
+| 维度               | Channels（dev） + Redis Stream（prod）双 Provider（本决） | 不引入抽象（原§3.3）          | 仅 Channels，Redis 推迟 OQ | 包装 DurableTask thin wrapper |
+| ------------------ | --------------------------------------------------------- | ----------------------------- | -------------------------- | ----------------------------- |
+| Owner 环境对称论据 | ✅                                                         | ❌                             | ⚠（推迟）                  | ❌                             |
+| dev 零依赖         | ✅（Channels）                                             | ✅                             | ✅                          | ✅                             |
+| prod 多副本语义    | ✅（Redis Streams）                                        | ⚠（DurableTask 仅覆盖工作流） | ⚠（升级后才有）            | ⚠                             |
+| ADR 六字段可填齐   | ✅                                                         | ✅                             | ✅                          | ⚠                             |
+| H4 补鱼类用例      | crash recovery / fairness / DLQ                           | 无                            | 仅 in-process              | 无                            |
 
 ### 21.11 后端进程拓扑（ADR-019）
 
-| 维度              | WebApi + Worker 双进程（本决） | 同进程 IHostedService | dev B + prod A | 多 worker 类型拆分 |
-| ----------------- | ------------------------------- | --------------------- | -------------- | ------------------ |
-| 故障隔离           | ✅                              | ❌                    | ⚠              | ✅                  |
-| 独立扩缩（queue_depth vs CPU）| ✅                              | ❌                    | ⚠              | ✅                  |
-| 环境对称           | ✅                              | ✅                    | ❌              | ✅                  |
-| v1 交付代价        | ⚠（+1 csproj +1 Deployment）    | ✅                    | ⚠（双拓扑）     | ❌（+多 Deployment）  |
-| Helm 同 image tag | ✅                              | N/A                   | ❌              | ⚠                  |
+| 维度                           | WebApi + Worker 双进程（本决） | 同进程 IHostedService | dev B + prod A | 多 worker 类型拆分  |
+| ------------------------------ | ------------------------------ | --------------------- | -------------- | ------------------- |
+| 故障隔离                       | ✅                              | ❌                     | ⚠              | ✅                   |
+| 独立扩缩（queue_depth vs CPU） | ✅                              | ❌                     | ⚠              | ✅                   |
+| 环境对称                       | ✅                              | ✅                     | ❌              | ✅                   |
+| v1 交付代价                    | ⚠（+1 csproj +1 Deployment）   | ✅                     | ⚠（双拓扑）    | ❌（+多 Deployment） |
+| Helm 同 image tag              | ✅                              | N/A                   | ❌              | ⚠                   |
 
 ### 21.12 数据库 Migration + Seed 执行方式（ADR-024）
 
@@ -338,7 +339,7 @@ downstream:
 - **替代方案**：维持现状（Migration 走 CI/CD 裸 CLI + Seed 留 WebApi 启动）/ 仅挑 Migration 进 Job、Seed 留启动 / EF Core Migration Bundle。
 - **放弃理由**：详见 [ADR-024 §备选项](./adr/ADR-024-database-migration-seed-standalone-job.md)。
 - **团队维护影响**：新增 csproj 12 → 13；Helm hook 失败需新增 runbook；RISK-015 从双产物扩展为三产物同镜像 tag 同步。
-- **成本/性能/安全/交付**：成本低（仅新增 1 个轻量控制台项目，不引入新依赖）；性能无影响（一次性 Job，不占用常驻资源）；安全高（为 schema 迁移用户/应用读写用户权限分离铺路）；交付中（需新增 Helm hook + Compose depends_on 部署胶水，幂等性加固记录在 [RISK-015](./risk-analysis.md)）。
+- **成本/性能/安全/交付**：成本低（仅新增 1 个轻量控制台项目，不引入新依赖）；性能无影响（一次性 Job，不占用常驻资源）；安全高（为 schema 迁移用户/应用读写用户权限分离铺路）；交付中（需新增 Helm hook + Aspire `WaitForCompletion` 编排，幂等性加固记录在 [RISK-015](./risk-analysis.md)）。
 
 ### 21.13 Provider 默认实现下沉 providers/\*（ADR-017 + ADR-020 errata）
 
@@ -348,6 +349,15 @@ downstream:
 - **放弃理由**：`Inkwell.Core` 承载业务命名空间数量持续增长，混入基础设施默认实现会让单一 csproj 职责边界模糊；拆分后 `Inkwell.Core` 只剩业务编排 + AgentRuntime，`providers/*` 内部 8 个 SDK-bound + 4 个 dev 默认实现两两对称，便于按需引入。
 - **团队维护影响**：新增 csproj 13 → 17（`providers/` 8 → 12）；失去了不需引用任何 Provider 包即可编译的“零依赖便利”，新 joiner 需多认 4 个 csproj 才能找到默认实现。
 - **成本/性能/安全/交付**：成本低（纯目录拆分，不引入新依赖）；性能无影响；安全无影响；交付低（纯重命名空间/移动文件，无业务逻辑变更）。
+
+### 21.14 模型网关（ADR-026）
+
+- **选择**：自托管 LiteLLM Proxy 作为默认模型网关；Inkwell Model Registry 聚合 LiteLLM 自动发现与 appsettings 原生模型，Agent Runtime 按 `RuntimeId` 选择连接器。
+- **为什么**：把厂商 SDK、Endpoint、Deployment、API Key、重试、fallback、限流和预算从 Inkwell 核心代码中移出，同时保留 REQ-005 / REQ-006 所需的 UI 展示、能力校验、Agent 版本快照和 trace 语义。
+- **替代方案**：Inkwell 逐厂商直连 / Envoy AI Gateway / Bifrost / 直接把 LiteLLM 模型列表暴露给客户端。
+- **放弃理由**：逐厂商直连维护面最大；Envoy 更偏 Kubernetes 流量治理；Bifrost 当前采用度与运维经验需继续观察；LiteLLM 路由配置缺少 Inkwell 产品元数据，不能直接成为客户端契约。
+- **团队维护影响**：新增 LiteLLM 配置、部署和升级职责；必须维护 Registry `RemoteModelId` 与 LiteLLM `model_name` 的一致性检查和 OpenAI-compatible 协议契约测试。
+- **成本/性能/安全/交付**：成本中（新增关键服务和一次网络跳转）；性能影响需压测；厂商 Secret 暴露面缩小；交付中（streaming / tool calling / structured output / 取消 / 错误映射必须先通过端到端门禁）。
 
 ## 22. 自检
 

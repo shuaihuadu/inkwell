@@ -50,6 +50,8 @@ downstream: []
 | [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) | EFCore Persistence 共享层 + 两 Provider 多层 csproj 布局                                   | accepted | ADR-004 / ADR-017                               | csproj 12 → 13 →（2026-07-08）回落 12；providers/Inkwell.Persistence.EFCore base + 2 final adapter（SqlServer/Postgres） |
 | [ADR-022](./ADR-022-entity-domain-mapper-selection.md)                            | Entity ↔ Model Mapper 选型：手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()`）        | accepted | ADR-002 / ADR-004 / ADR-017 / ADR-021           | csproj 数不变 13；providers/Inkwell.Persistence.EFCore/Mapping + Repositories；H3 下游在 HD-002 / HD-009                 |
 | [ADR-024](./ADR-024-database-migration-seed-standalone-job.md)                    | 数据库 Migration + Seed 执行方式：独立一次性 Migrator 项目/镜像                            | accepted | ADR-004 / ADR-005 / ADR-017 / ADR-019 / ADR-021 | csproj 12 → 13；新增 `Inkwell.Migrator`；取代 ADR-021 「Migration 走裸 CI/CD CLI + Seed 留 WebApi 启动」的现状           |
+| [ADR-025](./ADR-025-local-orchestration-aspire.md)                                | 本地开发编排：Aspire AppHost                                                               | draft    | ADR-002 / ADR-005 / ADR-019 / ADR-024           | 仅取代 ADR-005 / ADR-024 的 dev Compose 部分；prod AKS + Helm 不变                                                       |
+| [ADR-026](./ADR-026-model-gateway-litellm.md)                                     | 模型网关：LiteLLM Proxy                                                                    | proposed | REQ-005 / REQ-006 / ADR-003 / ADR-025           | 保留 Inkwell 逻辑模型目录；厂商适配、凭据、路由、重试与 fallback 下沉 LiteLLM                                          |
 
 <!-- markdownlint-enable MD060 -->
 
@@ -78,6 +80,7 @@ flowchart TD
     ADR020["ADR-020<br/>向量存储抽象"]
     ADR021["ADR-021<br/>EFCore Persistence 布局"]
     ADR022["ADR-022<br/>Entity ↔ Model mapper"]
+    ADR026["ADR-026<br/>LiteLLM 模型网关"]
 
     ADR002 --> ADR003
     ADR003 --> ADR006
@@ -110,6 +113,8 @@ flowchart TD
     ADR021 --> ADR022
     ADR017 --> ADR018
     ADR017 --> ADR019
+    ADR003 --> ADR026
+    ADR005 --> ADR026
 ```
 
 ## 维护规则

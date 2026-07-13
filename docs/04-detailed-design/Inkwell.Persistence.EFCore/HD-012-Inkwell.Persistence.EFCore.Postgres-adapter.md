@@ -326,7 +326,7 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 
 - **`IHasTimestamps` 列类型无需覆写**：核实结论——[Npgsql 官方 date/time 文档](https://www.npgsql.org/doc/types/datetime.html) 确认：UTC `DateTimeOffset` 默认映射为 [`timestamp with time zone`](https://www.postgresql.org/docs/current/datatype-datetime.html)（`timestamptz`）；[HD-009 §3.3 `AuditingSaveChangesInterceptor`](HD-009-Inkwell.Persistence.EFCore-base.md#33-interceptorsauditingsavechangesinterceptorcs) 写入的 `CreatedTime` / `UpdatedTime` 来自 `TimeProvider`（UTC），与该默认映射天然一致，不需要 `HasColumnType("timestamptz")` 显式覆写
 - **`IHasRowVersion` 无需覆写**：见 §4——Owner 已拍板放弃原生 `xmin`，`RowVersion` 走应用层拦截器 + 普通 `bytea` 列，`.IsRowVersion()` 调用本身（[HD-009 §3.1 `ApplyRowVersion`](HD-009-Inkwell.Persistence.EFCore-base.md#31-inkwelldbcontextcs)）仍生效（标记为 concurrency token，触发 EF Core 通用冲突检测），只是"生成新值"这一步由拦截器而非数据库完成
-- **`Configuration` 等 JSON 字符串列不映射为 `jsonb`**（重申 ADR-021 约束，回应本 HD 起草期核实要求）：[ADR-021 §Provider-specific 字段映射策略](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定"schema 强制取最小公倍数，不用 Provider-specific 写法"；[HD-009 §3.7 `AgentEntity.Configuration`](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 是 `string` 类型（JSON 序列化后的纯文本），核实结论：Npgsql 默认把 `string` 映射为 [`text`](https://www.npgsql.org/efcore/mapping/general.html)，与 SqlServer 侧 `nvarchar(max)` 语义等价（均为无长度上限文本列）；本 HD **不**引入 `[Column(TypeName="jsonb")]` 或 Fluent API `.HasColumnType("jsonb")` 覆写——`jsonb` 是 Postgres-specific 能力（支持 JSON 路径查询），使用它会打破三 Provider schema 一致性且违反 ADR-021 约束，若后续确有 JSON 查询性能需求，须走独立 ADR 而非本 HD 顺手引入
+- **JSON 字符串属性映射为 `jsonb`**（[ADR-021 2026-07-13 errata](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md#provider-specific-字段映射策略)）：共享 Entity 和业务 Model 继续使用 `string` + `System.Text.Json`，PostgreSQL 物理列使用原生 `jsonb`。Provider-specific 类型只存在于 EF 模型与 Postgres migration，不泄漏到端口签名；从 `text` 升级时使用显式 `USING column::jsonb` 转换，非法 JSON 使 migration 失败。
 - 少一层子类 = 少一处可能漂移的重复注册面，与 HD-011 判断依据完全对称
 
 ## 7. Migrations/ 目录约定
@@ -436,9 +436,9 @@ grep -rn 'AddSingleton<.*ISaveChangesInterceptor, *PostgresRowVersionInterceptor
   "$ROOT/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs" \
   || { echo "MISSING or WRONG: PostgresRowVersionInterceptor must be registered as ISaveChangesInterceptor"; exit 1; }
 
-# C7：不引入 jsonb 列类型覆写（重申 ADR-021 schema 最小公倍数约束，详 §6）
-grep -rn 'jsonb' "$ROOT" \
-  && echo "BAD: Postgres adapter must not introduce jsonb column overrides (ADR-021)" && exit 1
+# C7：JSON 字段必须映射为 jsonb（ADR-021 2026-07-13 errata，详 §6）
+grep -rn 'jsonb' "$ROOT/Migrations" \
+  || { echo "MISSING: Postgres JSON columns must use jsonb"; exit 1; }
 
 echo "HD-012 automation checks passed."
 ```
@@ -455,7 +455,7 @@ echo "HD-012 automation checks passed."
 - **DbContext 子类化**：author 判断的显而易见项，非 Owner 拍板 = 不子类化，直接注册 base `InkwellDbContext`——理由见 §6，与 [HD-011 §6](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类) 判断依据对称
 - **Migration 执行策略**：复用 [HD-011 §8](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#8-migration-执行策略2026-07-06-errata由webapi-启动自动执行改为-cicd-独立步骤非本-hd-拍板) 已锁定的 Owner 决策（CI/CD 独立步骤），本 HD 不重新拍板
 - **RowVersion 验证路径（2026-07-06）**：**Owner picker（design-review-report.md §21 B20）** = 选项 3——H5 编码任务启动前先用 Testcontainers PostgreSQL 做一次 spike，实测 `PostgresRowVersionInterceptor` 手动赋值与 `.IsRowVersion()` / `ValueGeneratedOnAddOrUpdate` 语义组合的真实行为，根据 spike 结果再决定是否需要切到数据库触发器方案（选项 1'）或 Application-managed 覆写 `ValueGeneratedNever`（选项 2）；详 §4 spike 验证项与通过标准 + §16.0 硬性前置任务标注
-- **JSON 字符串列不映射 `jsonb`**：author 判断的显而易见项，非 Owner 拍板 = 重申 [ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) schema 最小公倍数约束，不引入 Provider-specific 列类型覆写；详 §6
+- **JSON 字符串属性映射 `jsonb`**：2026-07-13 Owner 明确修订 = 共享 CLR 契约保持 `string` + `System.Text.Json`，PostgreSQL 物理列使用 `jsonb`；详 [ADR-021 errata](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md#provider-specific-字段映射策略) 与本 HD §6
 
 ## 15. 待补 / 后续 HD 衔接
 

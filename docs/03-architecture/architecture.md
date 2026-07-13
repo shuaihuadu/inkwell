@@ -61,8 +61,12 @@ flowchart TB
 
     EF["EF Provider<br/>SQL Server · PostgreSQL"]
     Qdrant["Qdrant<br/>向量库"]
+    LiteLLM["LiteLLM Proxy（ADR-026）<br/>模型路由 · 重试 · fallback · 限流"]
+    LLM["模型厂商<br/>Azure OpenAI · OpenAI · Anthropic · 其他"]
     Providers --> EF
     Providers --> Qdrant
+    Core -->|OpenAI-compatible API| LiteLLM
+    LiteLLM --> LLM
 
     OTel["横切：OTel + Grafana 栈（ADR-013）<br/>Tempo（trace）/ Loki（log）/ Prometheus（metric）"]
     Azure["Azure 依赖：Speech（ADR-009）· Blob（ADR-015）<br/>凭据走 K8s Secret + .env（OQ-A006 §B）"]
@@ -118,7 +122,7 @@ src/core/
 ### 3.2 模块说明
 
 - **`Inkwell.Abstractions`**：包含基础设施端口、业务契约、Model、Options 与 Builder DSL；允许公开复用 `Microsoft.Extensions.*` 抽象、VectorData、Microsoft.Extensions.AI 以及 MAF 核心 `AIAgent` / `ChatHistoryProvider` 类型。Agent 执行入口是 `IAgentFactory`，不再维护自建 `IAgentRuntime` facade 与重复的 Run DTO。
-- **`Inkwell.Core`**：业务实现（按 namespace 隔离 Auth / Agents / Skills / KnowledgeBase / Memory / Multimodal / Traces / Versioning / Conversations / Health）+ Agent Factory 实现。Factory 以不可变 `AgentVersion.Snapshot` 构建标准 MAF `AIAgent`，模型 SDK 客户端创建集中在 Core；协议 Hosting、Workflow 与评估组件直接消费同一个 `AIAgent`。不含任何 Provider 默认实现（已拆到 `providers/*`，与 SDK-bound 实现对称）。
+- **`Inkwell.Core`**：业务实现（按 namespace 隔离 Auth / Agents / Models / Skills / KnowledgeBase / Memory / Multimodal / Traces / Versioning / Conversations / Health）+ Agent Factory 实现。Factory 以不可变 `AgentVersion.Snapshot` 构建标准 MAF `AIAgent`，默认通过 [ADR-026](./adr/ADR-026-model-gateway-litellm.md) 定义的 OpenAI-compatible 边界调用 LiteLLM；特定能力可显式注册 Azure OpenAI 等原生 Runtime。`Inkwell.Core.Models` 保留逻辑模型注册表、能力元数据与 Agent 配置校验，不保存厂商凭据或执行路由。协议 Hosting、Workflow 与评估组件直接消费同一个 `AIAgent`。不含任何 Provider 默认实现（已拆到 `providers/*`，与 SDK-bound 实现对称）。
 - **`providers/*`**：12 个 Provider 实现（含 1 个 EFCore family 共享 base + 2 EFCore final adapter + 4 个 dev 默认实现 + 5 个 SDK-bound 实现），每个独立 csproj；只依赖 `Inkwell.Abstractions`，**不依赖** `Inkwell.Core`（避免循环 + 让 Provider 可独立分发）。**EFCore family 例外**（[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：SqlServer / Postgres 两 final adapter 允许引用同位 `providers/Inkwell.Persistence.EFCore` base csproj（shared adapter base + final adapter 分层）。每个 final adapter Provider 提供对应的 `IInkwellBuilder` extension method（`UseSqlServer()` / `UsePostgres()` / `UseLocalFileSystemFileStorage()` / `UseMinIOFileStorage()` / `UseAzureBlobFileStorage()` / `UseInMemoryCache()` / `UseRedisCache()` / `UseChannelsQueue()` / `UseRedisQueue()` / `UseInMemoryVectorStore()` / `UseQdrantVectorStore()` 等）。
 - **`Inkwell.WebApi`**（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）：ASP.NET Core HTTP / REST / AGUI SSE / Public API 入口。`Microsoft.NET.Sdk.Web`。`Program.cs` 调用 `AddInkwell()...Build()`，然后 `MapInkwellEndpoints()`。**仅注册 IQueueProvider enqueue 侧**，不跑 consumer。HPA：CPU 70%，min 2 / max 10。
 - **`Inkwell.Worker`**（[ADR-019](./adr/ADR-019-process-topology-webapi-worker-split.md)）：队列 consumer + [`Microsoft.Agents.AI.DurableTask`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) runner + 后台慢任务入口。`Microsoft.NET.Sdk.Worker`（[.NET Generic Host](https://learn.microsoft.com/aspnet/core/fundamentals/host/generic-host) + [`BackgroundService`](https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services)）。`Program.cs` 调用 `AddInkwell()...Build()` + `AddInkwellWorker()`。不开 HTTP 业务端口（仅开 `/healthz` probe + Prometheus scrape `/metrics`）。HPA：自定义 metric `queue_depth` ≥ 100，min 1 / max 5，fallback CPU 70%。
@@ -221,7 +225,7 @@ host.Run();
 
 - **客户端会话**：v1 单用户 + 启动时密码登录 + cookie session（[NFR-003](../01-requirements/requirements.md) 锁屏共用同一会话）。
 - **公开 API**：单 Token + Bearer scheme（[ADR-007](./adr/ADR-007-public-api-token-auth.md)）；Rate limit token bucket 在 [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 上分布式均平。
-- **凭据保护**：Azure Speech / Azure OpenAI / SMTP / Redis / DB 等凭据都走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/)（prod）/ [Docker Compose `.env`](https://docs.docker.com/compose/environment-variables/set-environment-variables/)（dev）（[OQ-A006 closed §B](./open-questions-arch.md)）；**v1 不引入 Azure Key Vault**，该决策的残余风险走 [RISK-013](./risk-analysis.md)。
+- **凭据保护**：Azure Speech / SMTP / Redis / DB 等凭据走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/)（prod）/ `.env`（dev）；默认 LiteLLM 路径的模型厂商凭据只注入 LiteLLM Pod，WebApi / Worker 仅持有网关内部地址和网关访问凭据。显式原生 Runtime 的凭据只注入实际承载该 Runtime 的进程（[ADR-026](./adr/ADR-026-model-gateway-litellm.md)）。**v1 不引入 Azure Key Vault**，该决策的残余风险走 [RISK-013](./risk-analysis.md)。
 - **不在 v1 范围**：RBAC / 多租户 / OAuth2 / SSO。
 
 ## 8. 文件存储方案
@@ -242,22 +246,24 @@ host.Run();
 
 详见 [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md)。
 
-### 9.1 dev 部署（Docker Compose）
+### 9.1 dev 部署（Aspire AppHost）
 
 ```text
-docker compose up -d
-  ├─ webapi          (Inkwell.WebApi：REST + AGUI + Public)
-  ├─ worker          (Inkwell.Worker：RedisStream consumer + DurableTask runner; ADR-019)
-  ├─ postgres        (PostgreSQL 17, named volume)
-  ├─ qdrant          (Qdrant 1.x, named volume)
-  ├─ redis           (Redis 8，ICacheProvider + IQueueProvider 后端, ADR-016 + ADR-018)
-  ├─ minio           (S3 兼容文件存储 dev 默认 Provider, ADR-015)
-  ├─ otel-collector  (OTLP receiver 双 source: webapi + worker, ADR-013)
-  ├─ tempo
-  ├─ loki
-  ├─ prometheus
-  └─ grafana         (默认 dashboard 已加载)
+dotnet run --project src/core/Inkwell.AppHost
+  ├─ postgres / postgres-database       (PostgreSQL 17，当前业务主库)
+  ├─ sqlserver / sqlserver-database     (SQL Server 2025，双 Provider 验证)
+  ├─ pgAdmin                            (PostgreSQL 管理入口)
+  ├─ migrator-postgres                  (一次性 Migration + Seed)
+  ├─ migrator-sqlserver                 (一次性 Migration + Seed)
+  ├─ litellm                            (统一模型网关，ADR-026)
+  ├─ otel-collector                     (OTLP trace / log / metric 接收与分发)
+  ├─ tempo / loki / prometheus          (三类遥测后端)
+  ├─ grafana                            (预置 Tempo / Loki / Prometheus 数据源)
+  ├─ webapi                             (等待双 Migrator、LiteLLM 与 Collector)
+  └─ worker                             (等待双 Migrator、LiteLLM 与 Collector)
 ```
+
+Redis、Qdrant 与 MinIO 尚未加入首批 AppHost；当前 WebApi / Worker 分别使用 InMemory Cache、Channels Queue、Local FileStorage 与 InMemory VectorStore。启用对应外部 Provider 时再按真实依赖加入编排。Grafana 栈已经接入通用运行时遥测，业务自定义指标、Dashboard 与 SMTP 告警规则仍待后续任务落地。
 
 ### 9.2 prod 部署（AKS + Helm）
 
@@ -270,6 +276,7 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
   ├─ StatefulSet: qdrant (Azure Disk Premium, 50GiB)
   ├─ Cache: Azure Cache for Redis Standard (默认) 或 StatefulSet: redis (自建场景, ADR-016)
   ├─ FileStorage: AzureBlob (默认) 或 StatefulSet: minio (自建场景, ADR-015)
+  ├─ Deployment/Service: litellm (模型网关；厂商 Secret 仅挂载到该 Pod, ADR-026)
   ├─ Deployment: otel-collector (双 source: webapi + worker, ADR-013)
   ├─ Stack (Helm subchart): grafana / tempo / loki / prometheus
   ├─ Ingress: NGINX + cert-manager (Let's Encrypt) — 仅 webapi
@@ -315,14 +322,14 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
 - **可观测性扩展**：OTel Collector 可水平扩展；Loki / Tempo / Prometheus 启用 [Object Storage backend](https://grafana.com/docs/loki/latest/operations/storage/)（[RISK-006](./risk-analysis.md) 缓解 #2）。
 - **文件存储扩展**（[ADR-015](./adr/ADR-015-object-storage-provider-switchable.md)）：`AzureBlob` 天然水平扩展；`MinIO` v2 可平滑升级为 [分布式部署](https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html)；`LocalFileSystem` 仅推荐单实例 / 测试场景。
 - **缓存扩展**（[ADR-016](./adr/ADR-016-cache-provider-redis.md)）：prod 走 Azure Cache for Redis Standard 两节点复制 / Premium cluster；自建场景 v1 单节点 + PVC，v2 评估 Redis Sentinel / Cluster。
-- **模型扩展**（[REQ-005](../01-requirements/requirements.md)）：通过 MAF `IChatClient` 接口接入 Azure OpenAI / OpenAI / Anthropic / Qwen / 智谱（v1 真接 Azure OpenAI，其他 v2）。
+- **模型扩展**（[REQ-005](../01-requirements/requirements.md) / [ADR-026](./adr/ADR-026-model-gateway-litellm.md)）：Inkwell 默认通过厂商无关的 OpenAI-compatible 客户端调用 LiteLLM，也允许显式注册原生运行时连接。Model Registry 聚合 LiteLLM 自动发现与 appsettings 来源，管理逻辑 `ModelId`、展示、能力校验及 `SourceId` / `RuntimeId` / `RemoteModelId`，不暴露厂商凭据。
 
 ## 13. 安全设计
 
 详见 [NFR-006](../01-requirements/requirements.md) 与 [ADR-007](./adr/ADR-007-public-api-token-auth.md) / [ADR-009](./adr/ADR-009-multimodal-azure-speech.md) / [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md) / [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md) / [ADR-016](./adr/ADR-016-cache-provider-redis.md)。
 
 - **传输加密**：HTTPS / TLS 1.3（[NGINX Ingress + cert-manager](https://learn.microsoft.com/azure/aks/app-routing)）。
-- **凭据管理**（[OQ-A006 closed §B](./open-questions-arch.md)）：prod 走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/) + [静态加密](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) + RBAC；dev 走 [Docker Compose `.env`](https://docs.docker.com/compose/environment-variables/set-environment-variables/)（`.gitignore` 收敛）；Token / Skill 文件等敏感字段哈希存储。**v1 不引入 Azure Key Vault**，详见 [RISK-013](./risk-analysis.md)。
+- **凭据管理**（[OQ-A006 closed §B](./open-questions-arch.md)）：prod 走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/) + [静态加密](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) + RBAC；dev 走 Aspire secret parameter、.NET User Secrets 或不入仓的 `.env`；Token / Skill 文件等敏感字段哈希存储。**v1 不引入 Azure Key Vault**，详见 [RISK-013](./risk-analysis.md)。
 - **客户端锁屏**：5 min idle 自动锁定；主进程背后保持 SSE 订阅（[ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)）。
 - **Skill 执行边界**：v1 不执行任何脚本（[ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md)）。
 - **公开 API 限流**：60 req/min 默认（[ADR-007](./adr/ADR-007-public-api-token-auth.md)）；走 [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 后端保证多副本下额度一致。

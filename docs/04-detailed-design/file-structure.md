@@ -560,15 +560,17 @@ src/core/Inkwell.Core/
 
 ## Inkwell.Abstractions.Models
 
-> 由 [HD-019 §2 / §3](Inkwell.Core/HD-019-Inkwell.Core.Models.md) 锁定。**本 HD 是 H3 第六张业务命名空间 HD**——`IModelCatalogService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Models/` 子目录。**本 HD 不新增任何 `Persistence/Models/` 业务 Model / 具名 Repository / 数据库表**——[HD-019 §0](Inkwell.Core/HD-019-Inkwell.Core.Models.md#0-范围核实模型是否为持久化实体req-005--req-006-归属边界) 已核实模型清单 v1 是配置文件驱动，非持久化实体（`database-design.md` 顶层表清单不追加 `models` 行）。
+> 由 [HD-019 替代性 errata](Inkwell.Core/HD-019-Inkwell.Core.Models.md) 与 [ADR-026](../03-architecture/adr/ADR-026-model-gateway-litellm.md) 锁定。`IModelRegistryService` 是模型管理业务门面，独立落 `Models/` 子目录。模型注册表不是持久化实体，本模块不新增 `Persistence/Models/`、具名 Repository 或数据库表。
+>
+> **2026-07-13 ADR-026 更新**：删除 `ModelProviderKind`；`ModelDefinition` 分离 Publisher、Family、`SourceId`、`RuntimeId` 与 `RemoteModelId`，并保留 UI / Agent 校验所需的能力元数据。LiteLLM 厂商凭据与私有响应不进入公共契约。
 
 ```text
 src/core/Inkwell.Abstractions/
-  Models/                                  # 新增子目录（HD-019）
-    IModelCatalogService.cs                 # 顶层业务门面（2 方法：ListModelsAsync / GetModelAsync）
-    ModelSummary.cs                          # 模型目录条目 DTO + ModelProviderKind 枚举
-    ModelCatalogOptions.cs                   # 模型清单配置（含 ModelEntryOptions 嵌套 DTO）
-    ModelCatalogOptionsValidator.cs          # IValidateOptions<ModelCatalogOptions>
+  Models/
+    IModelRegistryService.cs                 # 多来源模型注册表门面
+    ModelDefinition.cs                       # 产品模型定义与运行时路由标识
+    ConfigurationModelRegistryOptions.cs     # appsettings 模型来源配置
+    ConfigurationModelRegistryOptionsValidator.cs
 ```
 
 **文件计数**：HD-019 在 `Models/` 新增 4 个 `*.cs`（累计基线不再含已删除的 `## Inkwell.Abstractions.AuditLogs` 章节贡献，具体累计值以各 HD 文档最终版为准，不在此处重算）。
@@ -578,13 +580,25 @@ src/core/Inkwell.Abstractions/
 ```text
 src/core/Inkwell.Core/
   Models/
-    ModelCatalogService.cs                  # 唯一 IModelCatalogService 实现（AddSingleton，无 Scoped 依赖）
-    ModelsBuilderExtensions.cs              # AddDefaultModelCatalog()
+    IModelRegistrySource.cs                 # 内部模型来源契约
+    ModelRegistryService.cs                 # 聚合来源并拒绝重复 ModelId
+    ConfigurationModelRegistrySource.cs     # appsettings 来源
+    ModelsBuilderExtensions.cs              # Registry / LiteLLM 装配
+    LiteLLM/
+      LiteLLMModelRegistrySource.cs          # GET /v1/models 自动发现
+      LiteLLMModelRegistryOptions.cs         # LiteLLM 连接与元数据配置
+      LiteLLMModelRegistryOptionsValidator.cs # 启动期递归校验与重复 ID 检查
+      LiteLLMModelMetadataOptions.cs         # 产品元数据覆盖
+      LiteLLMModelsResponse.cs               # 私有协议响应 DTO
+  AgentRuntime/
+    IModelRuntimeAgentBuilder.cs             # 运行时连接器契约
+    ModelRoutingAgentFactory.cs              # Registry 驱动的 MAF Agent Factory
+    LiteLLMModelRuntimeAgentBuilder.cs        # OpenAI-compatible LiteLLM 连接器
 ```
 
 `Inkwell.Core.csproj` 累计 19（HD-014~HD-018）+ 2（HD-019）= **21** 个 `*.cs` + 1 个 `.csproj`。
 
-> `Inkwell.Core.Agents`（HD-015）**不得**直接依赖本 HD——[AGENTS.md §3.2](../../AGENTS.md)"业务命名空间只能依赖 Inkwell.Abstractions + BCL"约束下，`ModelId` 合法性校验须发生在未起草的 `Inkwell.WebApi` 层（先调 `IModelCatalogService.GetModelAsync` 校验，再调 `IAgentService`），详见 [HD-019 §0 跨业务命名空间依赖边界](Inkwell.Core/HD-019-Inkwell.Core.Models.md#0-范围核实模型是否为持久化实体req-005--req-006-归属边界)。
+> `Inkwell.Core.Agents`（HD-015）不直接依赖 `Inkwell.Core.Models`。Agent 构建时由 `ModelRoutingAgentFactory` 通过公共 `IModelRegistryService` 解析 `ModelId`，再按 `RuntimeId` 选择连接器；WebApi 的模型列表与详情端点也只依赖同一公共门面。
 
 ## providers/Inkwell.Persistence.EFCore
 

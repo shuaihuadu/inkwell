@@ -56,6 +56,7 @@
 - 始终检查自己的代码，确保其一致性、可维护性和可测试性
 - 如果需求描述不明确或缺乏足够上下文，务必主动询问以获得澄清
 - 所有 JSON 操作仅使用 `System.Text.Json`
+- EF Core Migration 必须通过 `dotnet ef migrations add` 由 EF Core CLI 生成，禁止手写、复制或人工创建 Migration、Designer 与 ModelSnapshot 文件；生成后仅当 EF Core CLI 无法表达必要的数据转换时，才允许对生成结果做最小调整，并必须说明原因与验证方式
 - 先确保代码质量和功能正确，最终的文档需要获取用户确认
 
 ## 前端代码规范（`src/app/desktop/`，尚未开工，先定规矩）

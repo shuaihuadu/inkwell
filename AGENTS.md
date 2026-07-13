@@ -28,6 +28,7 @@
 
 - **运行时**：.NET 10 + ASP.NET Core 10 + C# 14
 - **Agent 引擎**：Microsoft Agent Framework（MAF）— `Microsoft.Agents.AI` / `.AGUI` / `.Workflows` / `.DurableTask`
+- **模型网关**：LiteLLM Proxy；Inkwell 保留逻辑模型目录，MAF Agent Factory 仅通过 OpenAI-compatible API 调用网关（[ADR-026](docs/03-architecture/adr/ADR-026-model-gateway-litellm.md)）
 - **数据访问**：EF Core 10 Code-First + Migrations，两 Provider（SQL Server 2025 / PostgreSQL 17）通过 `IPersistenceProvider` 抽象（[ADR-004](docs/03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）；dev / 测试用 [Testcontainers](https://testcontainers.com/) 起真实实例
 - **向量库**：Qdrant 1.x，gRPC SDK
 - **缓存**：Redis 8（dev 容器 / prod Azure Cache for Redis 或自建 StatefulSet），通过 `ICacheProvider` 抽象（[ADR-016](docs/03-architecture/adr/ADR-016-cache-provider-redis.md)）
@@ -37,7 +38,7 @@
 
 ### 2.3 部署（[ADR-005](docs/03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)）
 
-- **dev**：Docker Compose（api / postgres / qdrant / redis / minio / otel-collector / tempo / loki / prometheus / grafana）
+- **dev**：Aspire AppHost（[ADR-025](docs/03-architecture/adr/ADR-025-local-orchestration-aspire.md)）；按真实依赖编排 WebApi / Worker / 双 Migrator / PostgreSQL / SQL Server / LiteLLM 等资源
 - **prod**：AKS + Helm Chart；HPA min 2 / max 10
 - **CI**：GitHub Actions（[OQ-A007 closed §A](docs/03-architecture/open-questions-arch.md)）
 
@@ -50,7 +51,7 @@
 
 ### 2.5 私有依赖来源
 
-- 暂无私有 NuGet / npm registry。Azure OpenAI / Azure Speech 凭据走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/)（prod）/ Docker Compose `.env`（dev）（[OQ-A006 closed §B](docs/03-architecture/open-questions-arch.md)）；**v1 不引入 Azure Key Vault**（残余风险走 [RISK-013](docs/03-architecture/risk-analysis.md)）。
+- 暂无私有 NuGet / npm registry。Azure Speech 等应用凭据与 LiteLLM 持有的模型厂商凭据走 [Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/)（prod）/ `.env` 或 .NET User Secrets（dev）；默认 LiteLLM 路径的厂商凭据不注入 WebApi / Worker，显式原生 Runtime 的凭据只注入承载该 Runtime 的进程（[ADR-026](docs/03-architecture/adr/ADR-026-model-gateway-litellm.md)）。**v1 不引入 Azure Key Vault**（残余风险走 [RISK-013](docs/03-architecture/risk-analysis.md)）。
 
 ## 3. 模块边界 / 禁区
 
@@ -62,16 +63,17 @@
 
 **`src/core/Inkwell.Abstractions/`**（端口层 / 1 csproj）
 
-- 全部接口：`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentRuntime` / 业务模块对外接口
+- 全部接口：`IPersistenceProvider` / `IFileStorageProvider` / `ICacheProvider` / `IQueueProvider` / `IAgentFactory` / `IModelRegistryService` / 业务模块对外接口
 - `IPersistenceProvider` 是**事务 + SaveChanges + Repository 工厂**三能力 facade；业务命名空间通过 `provider.GetRepository<IXxxRepository>()` 取具名 Repo（事务作用域外） / `uow.GetRepository<IXxxRepository>()`（事务作用域内），二者签名同款（[design-review-report.md §13](docs/04-detailed-design/design-review-report.md) Q1=A2 picker(2026-05-18)）
 - **向量存储抽象复用** [`Microsoft.Extensions.VectorData.VectorStore`](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) + `VectorStoreCollection<TKey, TRecord>`（[ADR-020](docs/03-architecture/adr/ADR-020-vector-store-microsoft-extensions-vectordata.md)，Inkwell 不重发明 `IVectorStore`，仅提供 Builder DSL `UseQdrantVectorStore` / `UseInMemoryVectorStore` / `UseAzureOpenAIEmbeddings`）
 - DTO / Model / Options
 - Builder DSL（`IInkwellBuilder` / `AddInkwell()`、参考 MAF `AgentApplicationBuilder` 模式）
 
-**`src/core/Inkwell.Core/`**（业务层 + AgentRuntime / 1 csproj）
+**`src/core/Inkwell.Core/`**（业务层 + Agent Factory / 1 csproj）
 
 - 业务命名空间：`Inkwell.Core.Auth` / `.Agents` / `.Models` / `.Tools` / `.Skills` / `.KnowledgeBase` / `.Memory` / `.PublicApi` / `.Traces` / `.Versioning` / `.Multimodal` / `.Conversations` / `.Health`（触发器 / 多 Agent 编排推迟至 v2，`.Triggers` / `.Orchestrations` 不在 v1 列表内）
-- `Inkwell.Core.AgentRuntime` 命名空间——**唯一**允许 `using Microsoft.Agents.AI.*` 的位置（[ADR-017 §依赖规则](docs/03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](docs/03-architecture/risk-analysis.md)）
+- `Inkwell.Core.AgentRuntime` 命名空间——MAF `IAgentFactory`、`ModelRoutingAgentFactory` 与模型 Runtime 连接器装配位置；LiteLLM 是默认 OpenAI-compatible Runtime，Azure OpenAI 等原生 Runtime 只能显式注册，且不得作为 LiteLLM 故障自动旁路（[ADR-026](docs/03-architecture/adr/ADR-026-model-gateway-litellm.md)）
+- `Inkwell.Core.Models` 命名空间——多来源只读模型 Registry，聚合 appsettings 原生模型与 LiteLLM `GET /v1/models` 自动发现；管理 Publisher / Family / `SourceId` / `RuntimeId` / `RemoteModelId`、能力和可用性，不向产品 API 透传 LiteLLM 原始响应
 - 不含任何 `ICacheProvider`/`IQueueProvider`/`IFileStorageProvider`/Vector Store 的默认实现——默认实现均在 `providers/*`
 
 **`src/core/providers/`**（多 Provider 适配器 / 12 csproj）
@@ -112,7 +114,7 @@
 
 - 控制台项目，运行完 `MigrationRunner.MigrateAsync()` + `SeedAsync()` 即退出，不常驻、不开任何监听端口
 - 只依赖 `Inkwell.Abstractions` + `Inkwell.Persistence.EFCore`（含 SqlServer / Postgres 两 final adapter，运行时按 `Inkwell:Persistence:Provider` 配置二选一），**不依赖** `Inkwell.Core`
-- dev：Docker Compose 一次性 service，`Inkwell.WebApi`/`Inkwell.Worker` 通过 `depends_on.condition: service_completed_successfully` 等待其退出码 0
+- dev：Aspire 一次性 project resource，`Inkwell.WebApi` / `Inkwell.Worker` 通过 `WaitForCompletion` 等待其退出码 0
 - prod：Helm `pre-install,pre-upgrade` hook Job，与 WebApi/Worker 共用同一镜像 tag（[RISK-015](docs/03-architecture/risk-analysis.md) 三产物同步）
 
 **客户端 `src/app/desktop/`**（路径由原 `apps/desktop/` 收敛到 `src/app/`）
@@ -129,7 +131,7 @@
 - **客户端 → 后端**：所有 `src/app/desktop/src/features/*` 通过 `src/app/desktop/src/shared/network/` 调用后端 API；不允许跨过 shared 层直连后端。
 - **业务命名空间 → 端口层**：`Inkwell.Core.*`（除 `Inkwell.Core.AgentRuntime`）业务命名空间**只能依赖 `Inkwell.Abstractions`** + 进程内 BCL；不得直接 `using Microsoft.Agents.AI.*`、`using StackExchange.Redis`、`using Azure.Storage.Blobs`、`using Microsoft.EntityFrameworkCore.SqlServer`、`using Npgsql.*`、`using Minio.*`。CI 强制由 [Roslyn analyzer / `BannedSymbols.txt`](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/) 验证。
 - **注入风格统一**：业务命名空间统一通过 DI inject `IPersistenceProvider`，再 `provider.GetRepository<IXxxRepository>()` 拿具名 Repo；**不**直接 inject 具名 `IXxxRepository`（防止 13 个具名 Repo 重复出现在每个业务 csproj 的 ctor 参数列）。CI 强制由 [Roslyn analyzer / `BannedSymbols.txt`](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/) 在业务 csproj 范围内拒 ctor 参数类型 = `IXxxRepository`
-- **`Inkwell.Core.AgentRuntime` 命名空间例外**：是**唯一**允许 `using Microsoft.Agents.AI.*` 的位置；对外暴露 `IAgentRuntime` 接口（在 `Inkwell.Abstractions`），禁止把 MAF type 泄漏到接口签名。
+- **Agent Factory 边界**：Agent 执行入口采用 MAF 原生 `IAgentFactory.BuildAgentAsync(...)`，不再维护自建 `IAgentRuntime` facade；`Inkwell.Core.AgentRuntime` 先通过 `IModelRegistryService` 解析业务 `ModelId`，再按 `RuntimeId` 构建 `AIAgent`。MAF 负责实际调用，业务 Model 和持久化接口不得泄漏 LiteLLM 私有配置类型。
 - **providers/\* → 端口层**：`src/core/providers/Inkwell.*` 只能引用 `Inkwell.Abstractions` + 该 Provider 自身的 SDK（如 `Microsoft.EntityFrameworkCore.SqlServer` / `Azure.Storage.Blobs` / `StackExchange.Redis`）；**禁止**引用 `Inkwell.Core`。**EFCore family 例外**（[ADR-021](docs/03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）：`providers/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` **允许**引用同 providers/ 下的 `Inkwell.Persistence.EFCore` shared base csproj（shared adapter base + final adapter 分层）；base 仍**禁止**引用 `Inkwell.Core` / 其他兄弟 csproj。其他 family（FileStorage / Cache / Queue / VectorStore）**不享受此例外**——如需同样拓扑必须以独立 ADR 为入口（[RISK-017](docs/03-architecture/risk-analysis.md)）。
 - **`Inkwell.WebApi` / `Inkwell.Worker` → 全部**（[ADR-019](docs/03-architecture/adr/ADR-019-process-topology-webapi-worker-split.md)）：DI 装配是唯一允许同时 `using` 多个 providers + Inkwell.Core 的位置。`Inkwell.WebApi` 仅注册 enqueue 侧，`Inkwell.Worker` 跑 consumer + DurableTask runner。
 - **`Inkwell.Migrator` → 仅 Persistence**（[ADR-024](docs/03-architecture/adr/ADR-024-database-migration-seed-standalone-job.md)）：只引用 `Inkwell.Abstractions` + `Inkwell.Persistence.EFCore`（含 SqlServer / Postgres 两 final adapter），**不引用** `Inkwell.Core`；不做业务逻辑，只跑 Migration + Seed。

@@ -17,8 +17,7 @@ downstream: []
 ---
 
 <!-- 2026-05-10 [ADR-019 进程拓扑](./ADR-019-process-topology-webapi-worker-split.md) 引入后：OTel `service.name` resource attribute 区分 `inkwell-webapi` / `inkwell-worker`；Prometheus scrape 双 source；Grafana Dashboard 加「队列吞吐 / Worker 健康」面板。 -->
-
-本地调试需要集成Aspire
+<!-- 2026-07-13 [ADR-025 本地编排](./ADR-025-local-orchestration-aspire.md) 落地后：dev 由 Aspire AppHost 编排 OTel Collector / Tempo / Loki / Prometheus / Grafana，取代本 ADR 原定的 Docker Compose。 -->
 
 # ADR-013 可观测性：OpenTelemetry + 自托管 Grafana 栈
 
@@ -30,7 +29,7 @@ downstream: []
 
 ## 决策
 
-**可观测性栈：OpenTelemetry .NET SDK 输出 → OTel Collector → 三个后端：[Tempo](https://grafana.com/oss/tempo/)（trace）/ [Loki](https://grafana.com/oss/loki/)（log）/ [Prometheus](https://prometheus.io/)（metric）；统一 UI 走 [Grafana](https://grafana.com/)。dev 用 Docker Compose 跑全栈；prod 用 Helm Chart 部署到 AKS。**
+**可观测性栈：OpenTelemetry .NET SDK 输出 → OTel Collector → 三个后端：[Tempo](https://grafana.com/oss/tempo/)（trace）/ [Loki](https://grafana.com/oss/loki/)（log）/ [Prometheus](https://prometheus.io/)（metric）；统一 UI 走 [Grafana](https://grafana.com/)。dev 用 Aspire AppHost 跑全栈；prod 用 Helm Chart 部署到 AKS。**
 
 - SDK 配置：`AddOpenTelemetry()` + `WithMetrics()` + `WithTracing()` + `WithLogs()`，全部走 OTLP gRPC 到 Collector。`service.name` resource attribute 区分 `inkwell-webapi` / `inkwell-worker`（[ADR-019](./ADR-019-process-topology-webapi-worker-split.md)），dashboards 按 service 维度切分。
 - Collector：单 Deployment，配置 receiver = OTLP（双 source：webapi + worker），exporter = Tempo / Loki / Prometheus。
@@ -63,7 +62,7 @@ downstream: []
 
 - OpenTelemetry 是 CNCF 标准，与 Microsoft Agent Framework 内置 instrumentation 直接对齐。
 - Grafana 栈（Tempo / Loki / Prometheus）是 [grafana/helm-charts](https://github.com/grafana/helm-charts) 一键部署，[ADR-005](./ADR-005-deployment-docker-compose-aks.md) Helm 模板友好。
-- dev 环境 Compose 跑全栈，开发人员本地能看 Run trace + log + metric，调试效率高。
+- dev 环境 Aspire AppHost 跑全栈，开发人员本地能看 Run trace + log + metric，调试效率高。
 - v2 客户切到非 Azure 环境时，可观测性栈零修改可迁移。
 
 ### 负面

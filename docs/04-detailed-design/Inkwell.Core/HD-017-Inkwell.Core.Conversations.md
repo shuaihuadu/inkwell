@@ -20,9 +20,9 @@ upstream:
 
 > **2026-07-12 替代性 errata（Session/History 归属）**：独立 `IAgentConversationService` / `IAgentSessionService` 不再作为 Agent Run 的中间编排层；下方相关调用链保留为历史依据。会话连续性采用 MAF `AgentSession`，历史注入与成功调用后的新消息落库采用 `ChatHistoryProvider`。Inkwell 持久化层仍保存 `AgentSessionDefinition` 与 `AgentChatMessage`，Repository 负责数据访问；后续 Session/History 实现负责授权、Session 创建/恢复、`thread_id` 映射、标题与顺序号等业务不变量，WebApi 不直接操作 Repository。
 >
-> **2026-07-12 Session/Message 模型 errata**：每个 `AgentSessionDefinition` 在创建时锁定 `AgentVersionId`，后续恢复不得跟随 Agent 当前发布指针漂移。MAF Session 只能由该版本构建出的 `AIAgent.CreateSessionAsync` 创建，或由同一版本 Agent 的 `DeserializeSessionAsync` 从 `MafSessionState` 恢复；每次成功运行后通过同一 Agent 的 `SerializeSessionAsync` 捕获状态。`InkwellChatHistoryProvider` 是无会话字段的 MAF Provider，业务 Session ID 只存于 `AgentSession.StateBag`；它依赖 MAF 基类的成功判定与消息过滤，仅在成功调用后以 Serializable 事务批量追加 request + response。
+> **2026-07-12 Session/Message 模型 errata**：每个 `AgentSessionDefinition` 在创建时锁定 `AgentVersionId`，后续恢复不得跟随 Agent 当前发布指针漂移。MAF Session 只能由该版本构建出的 `AIAgent.CreateSessionAsync` 创建，或由同一版本 Agent 的 `DeserializeSessionAsync` 从 `SessionState` 恢复；每次成功运行后通过同一 Agent 的 `SerializeSessionAsync` 捕获状态。`InkwellChatHistoryProvider` 是无会话字段的 MAF Provider，业务 Session ID 只存于 `AgentSession.StateBag`；它依赖 MAF 基类的成功判定与消息过滤，仅在成功调用后以 Serializable 事务批量追加 request + response。
 >
-> **术语约束**：对外与运行时统一使用 **Session**；数据库现有 `Conversation` Entity/列名可在不破坏迁移兼容性的前提下暂留，代码中的新增 API 不再混用 Conversation 与 Session。`AgentChatMessage.Message` 是完整 `Microsoft.Extensions.AI.ChatMessage` 业务真值，数据库 `conversation_messages.MessageJson` 保存其 JSON；Role、Text、AuthorName 等仅可作为查询/索引派生投影，不得形成第二套独立可写状态。下方仍引用 `ContentJson`、自建 `AgentChatRole` / `AgentMessageContentPart` 或 `DatabaseChatHistoryProvider` 的段落均为被本 errata 替代的历史设计。
+> **术语约束**：对外与运行时统一使用 **Session**；数据库现有 `Conversation` Entity/列名可在不破坏迁移兼容性的前提下暂留，代码中的新增 API 不再混用 Conversation 与 Session。`AgentChatMessage.Message` 是完整 `Microsoft.Extensions.AI.ChatMessage` 业务真值，数据库 `agent_chat_message.Message` 保存其 JSON；Role、Text、AuthorName 等仅可作为查询/索引派生投影，不得形成第二套独立可写状态。下方仍引用 `ContentJson`、自建 `AgentChatRole` / `AgentMessageContentPart` 或 `DatabaseChatHistoryProvider` 的段落均为被本 errata 替代的历史设计。
 >
 > **本 HD 是 H3 第四张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-016 `Inkwell.Core.Tools`](HD-016-Inkwell.Core.Tools.md) 之后起草。
 >
@@ -341,7 +341,7 @@ src/core/Inkwell.Core/
 - `AgentVersionId`：`Guid`，外键 → `agent_versions.Id`，创建 Session 时锁定，删除版本受限
 - `OwnerUserId`：`Guid`（`IHasOwner`），非唯一索引（[§1.3 Q1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)，此处语义 = 会话参与用户，非 Agent Owner）
 - `Title`：`string?`，长度上限 30（[ui-spec.md UI-005 §5.1](../01-requirements/ui-spec.md)"首条用户消息前 30 字"）
-- `MafSessionStateJson`：`string?`，由对应版本 `AIAgent.SerializeSessionAsync` 生成；首次运行前可空
+- `SessionState`：`string?`，由对应版本 `AIAgent.SerializeSessionAsync` 生成；首次运行前可空
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`（`UpdatedTime` 兼作"最近使用时间"依据）
 - `RowVersion`：`IHasRowVersion`（乐观并发，防"追加消息"与"清空对话"并发写互相覆盖）
 
@@ -351,7 +351,7 @@ src/core/Inkwell.Core/
 
 - `Id`：`Guid` v7，主键
 - `ConversationId`：`Guid`，外键 → `conversations.Id`，非唯一索引
-- `MessageJson`：`string`，完整序列化 `Microsoft.Extensions.AI.ChatMessage`，非空；保留 MessageId、AuthorName、工具调用/结果、多模态内容和扩展属性
+- `Message`：`string`，完整序列化 `Microsoft.Extensions.AI.ChatMessage`，非空；保留 MessageId、AuthorName、工具调用/结果、多模态内容和扩展属性
 - `SequenceNumber`：`int`，会话内严格递增（[HD-017 §1.3 Q3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)）
 - `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
 
