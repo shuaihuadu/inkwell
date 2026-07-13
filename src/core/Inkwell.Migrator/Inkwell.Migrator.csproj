@@ -4,6 +4,7 @@
         <OutputType>Exe</OutputType>
         <RootNamespace>Inkwell.Migrator</RootNamespace>
         <AssemblyName>Inkwell.Migrator</AssemblyName>
+        <InvariantGlobalization>false</InvariantGlobalization>
         <!--
       ADR-024：一次性 Migration + Seed 入口，运行完 MigrationRunner.MigrateAsync() + SeedAsync() 即退出，
       不常驻、不开任何监听端口。只依赖 Inkwell.Abstractions + Inkwell.Persistence.EFCore（含 SqlServer /

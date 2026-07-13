@@ -1,0 +1,22 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Inkwell.AppHost</RootNamespace>
+        <AssemblyName>Inkwell.AppHost</AssemblyName>
+        <InvariantGlobalization>false</InvariantGlobalization>
+        <UserSecretsId>inkwell-apphost-development</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+        <PackageReference Include="Aspire.Hosting.SqlServer" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Inkwell.Migrator\Inkwell.Migrator.csproj" IsAspireProjectResource="true" />
+        <ProjectReference Include="..\Inkwell.WebApi\Inkwell.WebApi.csproj" IsAspireProjectResource="true" />
+        <ProjectReference Include="..\Inkwell.Worker\Inkwell.Worker.csproj" IsAspireProjectResource="true" />
+    </ItemGroup>
+
+</Project>

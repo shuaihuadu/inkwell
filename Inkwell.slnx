@@ -124,6 +124,7 @@
     <Folder Name="/src/app/" />
     <Folder Name="/src/core/">
         <Project Path="src/core/Inkwell.Abstractions/Inkwell.Abstractions.csproj" />
+        <Project Path="src/core/Inkwell.AppHost/Inkwell.AppHost.csproj" />
         <Project Path="src/core/Inkwell.Core/Inkwell.Core.csproj" />
         <Project Path="src/core/Inkwell.Migrator/Inkwell.Migrator.csproj" />
         <Project Path="src/core/Inkwell.WebApi/Inkwell.WebApi.csproj" />
