@@ -1,0 +1,6 @@
+<!-- Inkwell 品牌标记 - 曜石紫涟漪 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+    <circle cx="16" cy="16" r="14" stroke="#68469C" stroke-width="2" opacity="0.35"/>
+    <circle cx="16" cy="16" r="9" stroke="#68469C" stroke-width="2.5" opacity="0.65"/>
+    <circle cx="16" cy="16" r="4" fill="#68469C"/>
+</svg>

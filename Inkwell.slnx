@@ -106,7 +106,7 @@
         <File Path="docs/07-reviews/2026-05-10-h2-architecture-review.md" />
     </Folder>
     <Folder Name="/prototypes/" />
-    <Folder Name="/prototypes/inkwell-agent-platform/" />
+    <Folder Name="/prototypes/inkwell-visual-design/" />
     <Folder Name="/Solution Items/">
         <File Path=".dockerignore" />
         <File Path=".editorconfig" />

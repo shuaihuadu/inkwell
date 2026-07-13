@@ -483,6 +483,8 @@ conf.properties
 
 # Playwright
 playwright-report/
+test-results/
+prototypes/*/screenshots/
 
 # Static Web App deployment config
 swa-cli.config.json
