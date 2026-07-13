@@ -16,8 +16,8 @@ internal static class AgentSkillMappingExtensions
             Name = entity.Name,
             Description = entity.Description,
             Content = entity.ContentMarkdown,
-            ReferenceFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ReferenceFileUrisJson) ?? [],
-            AssetFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.AssetFileUrisJson) ?? [],
+            ReferenceFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ReferenceFileUris) ?? [],
+            AssetFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.AssetFileUris) ?? [],
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
         };
@@ -33,8 +33,8 @@ internal static class AgentSkillMappingExtensions
             Name = model.Name,
             Description = model.Description,
             ContentMarkdown = model.Content,
-            ReferenceFileUrisJson = JsonSerializer.Serialize(model.ReferenceFileUris),
-            AssetFileUrisJson = JsonSerializer.Serialize(model.AssetFileUris),
+            ReferenceFileUris = JsonSerializer.Serialize(model.ReferenceFileUris),
+            AssetFileUris = JsonSerializer.Serialize(model.AssetFileUris),
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
         };

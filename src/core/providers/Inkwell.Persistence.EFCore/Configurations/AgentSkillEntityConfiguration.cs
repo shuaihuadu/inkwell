@@ -9,7 +9,6 @@ internal sealed class AgentSkillEntityConfiguration : IEntityTypeConfiguration<A
 {
     public void Configure(EntityTypeBuilder<AgentSkillEntity> b)
     {
-        b.ToTable("skills");
         b.HasKey(x => x.Id);
         b.Property(x => x.Name).IsRequired().HasMaxLength(200);
         b.Property(x => x.Description).IsRequired();

@@ -9,10 +9,9 @@ internal sealed class AgentVersionEntityConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<AgentVersionEntity> builder)
     {
-        builder.ToTable("agent_versions");
         builder.HasKey(version => version.Id);
         builder.HasIndex(version => new { version.AgentId, version.VersionNumber }).IsUnique();
-        builder.Property(version => version.SnapshotJson).IsRequired();
+        builder.Property(version => version.Snapshot).IsRequired();
         builder.Property(version => version.ChangeSummary).HasMaxLength(500);
         builder.HasOne<AgentEntity>()
             .WithMany()

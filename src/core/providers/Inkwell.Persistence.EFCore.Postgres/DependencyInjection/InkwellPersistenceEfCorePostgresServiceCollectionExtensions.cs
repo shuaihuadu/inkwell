@@ -52,6 +52,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
                         TimeSpan.FromSeconds(postgresOptions.MaxRetryDelaySeconds),
                         errorCodesToAdd: null)
                     .CommandTimeout(persistenceOptions.CommandTimeoutSeconds))
+                .UseSnakeCaseNamingConvention()
                 .AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
         });
 

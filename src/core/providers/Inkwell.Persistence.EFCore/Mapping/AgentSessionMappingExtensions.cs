@@ -4,9 +4,9 @@ using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
 
-internal static class AgentConversationMappingExtensions
+internal static class AgentSessionMappingExtensions
 {
-    public static AgentSessionDefinition ToModel(this AgentConversationEntity entity)
+    public static AgentSessionDefinition ToModel(this AgentSessionEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
@@ -17,25 +17,25 @@ internal static class AgentConversationMappingExtensions
             AgentVersionId = entity.AgentVersionId,
             OwnerUserId = entity.OwnerUserId,
             Title = entity.Title,
-            MafSessionState = DeserializeSessionState(entity.MafSessionStateJson),
+            SessionState = DeserializeSessionState(entity.SessionState),
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
             RowVersion = entity.RowVersion,
         };
     }
 
-    public static AgentConversationEntity ToEntity(this AgentSessionDefinition model)
+    public static AgentSessionEntity ToEntity(this AgentSessionDefinition model)
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        return new AgentConversationEntity
+        return new AgentSessionEntity
         {
             Id = model.Id,
             AgentId = model.AgentId,
             AgentVersionId = model.AgentVersionId,
             OwnerUserId = model.OwnerUserId,
             Title = model.Title,
-            MafSessionStateJson = model.MafSessionState is JsonElement state
+            SessionState = model.SessionState is JsonElement state
                 ? state.GetRawText()
                 : null,
             CreatedTime = model.CreatedTime,

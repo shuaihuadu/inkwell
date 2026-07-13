@@ -2,7 +2,7 @@
 
 namespace Inkwell.Persistence.EFCore.Entities;
 
-internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner, IHasRowVersion
+internal sealed class AgentSessionEntity : IHasTimestamps, IHasOwner, IHasRowVersion
 {
     public Guid Id { get; init; }
 
@@ -14,7 +14,7 @@ internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner, IHasR
 
     public string? Title { get; init; }
 
-    public string? MafSessionStateJson { get; init; }
+    public string? SessionState { get; init; }
 
     public DateTimeOffset CreatedTime { get; init; }
 
@@ -22,5 +22,5 @@ internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner, IHasR
 
     public byte[] RowVersion { get; init; } = [];
 
-    public List<AgentConversationMessageEntity> Messages { get; init; } = [];
+    public List<AgentChatMessageEntity> Messages { get; init; } = [];
 }

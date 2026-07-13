@@ -24,10 +24,10 @@ public sealed record class AgentSessionDefinition : IHasTimestamps, IHasOwner, I
     public string? Title { get; init; }
 
     /// <summary>
-    /// 获取由对应 <c>AIAgent.SerializeSessionAsync</c> 生成的 MAF Session 状态。
+    /// 获取由对应 <c>AIAgent.SerializeSessionAsync</c> 生成的 Session 状态。
     /// 恢复时必须交由同一 Agent 版本构建出的 <c>AIAgent.DeserializeSessionAsync</c> 处理。
     /// </summary>
-    public JsonElement? MafSessionState { get; init; }
+    public JsonElement? SessionState { get; init; }
 
     /// <summary>获取创建时间。</summary>
     public required DateTimeOffset CreatedTime { get; init; }

@@ -12,7 +12,7 @@ internal sealed class AgentVersionEntity : IHasTimestamps, IHasRowVersion
 
     public AgentVersionStatus Status { get; init; }
 
-    public string SnapshotJson { get; init; } = string.Empty;
+    public string Snapshot { get; init; } = string.Empty;
 
     public Guid CreatedByUserId { get; init; }
 

@@ -10,7 +10,7 @@ internal static class AgentVersionMappingExtensions
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        AgentSnapshot snapshot = JsonSerializer.Deserialize<AgentSnapshot>(entity.SnapshotJson)
+        AgentSnapshot snapshot = JsonSerializer.Deserialize<AgentSnapshot>(entity.Snapshot)
             ?? throw new JsonException($"Agent version snapshot is null: versionId={entity.Id}");
 
         return new AgentVersion
@@ -39,7 +39,7 @@ internal static class AgentVersionMappingExtensions
             AgentId = model.AgentId,
             VersionNumber = model.VersionNumber,
             Status = model.Status,
-            SnapshotJson = JsonSerializer.Serialize(model.Snapshot),
+            Snapshot = JsonSerializer.Serialize(model.Snapshot),
             CreatedByUserId = model.CreatedByUserId,
             ChangeSummary = model.ChangeSummary,
             CreatedTime = model.CreatedTime,

@@ -11,9 +11,9 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        AgentConversationMessageEntity entity = message.ToEntity();
+        AgentChatMessageEntity entity = message.ToEntity();
 
-        db.Set<AgentConversationMessageEntity>().Add(entity);
+        db.Set<AgentChatMessageEntity>().Add(entity);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return entity.ToModel();
@@ -21,12 +21,12 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
 
     public async Task<PagedResult<AgentChatMessage>> ListMessagesBySession(Guid sessionId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
     {
-        IOrderedQueryable<AgentConversationMessageEntity> query = db.Set<AgentConversationMessageEntity>().AsNoTracking()
-            .Where(x => x.ConversationId == sessionId)
+        IOrderedQueryable<AgentChatMessageEntity> query = db.Set<AgentChatMessageEntity>().AsNoTracking()
+            .Where(x => x.SessionId == sessionId)
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentConversationMessageEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
+        List<AgentChatMessageEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
             .Take(pagination.PageSize)
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -37,9 +37,9 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
 
     public async Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid sessionId, int? maxMessages = null, CancellationToken ct = default)
     {
-        IQueryable<AgentConversationMessageEntity> query = db.Set<AgentConversationMessageEntity>()
+        IQueryable<AgentChatMessageEntity> query = db.Set<AgentChatMessageEntity>()
             .AsNoTracking()
-            .Where(entity => entity.ConversationId == sessionId)
+            .Where(entity => entity.SessionId == sessionId)
             .OrderByDescending(entity => entity.SequenceNumber);
 
         if (maxMessages is > 0)
@@ -47,7 +47,7 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
             query = query.Take(maxMessages.Value);
         }
 
-        List<AgentConversationMessageEntity> entities = await query.ToListAsync(ct).ConfigureAwait(false);
+        List<AgentChatMessageEntity> entities = await query.ToListAsync(ct).ConfigureAwait(false);
         entities.Reverse();
 
         return [.. entities.Select(entity => entity.ToModel().Message)];
@@ -62,7 +62,7 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
             return [];
         }
 
-        bool sessionExists = await db.Set<AgentConversationEntity>()
+        bool sessionExists = await db.Set<AgentSessionEntity>()
             .AsNoTracking()
             .AnyAsync(entity => entity.Id == sessionId, ct)
             .ConfigureAwait(false);
@@ -72,12 +72,12 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
             throw new KeyNotFoundException($"Agent session not found: id={sessionId}");
         }
 
-        int lastSequenceNumber = await db.Set<AgentConversationMessageEntity>()
-            .Where(entity => entity.ConversationId == sessionId)
+        int lastSequenceNumber = await db.Set<AgentChatMessageEntity>()
+            .Where(entity => entity.SessionId == sessionId)
             .MaxAsync(entity => (int?)entity.SequenceNumber, ct)
             .ConfigureAwait(false) ?? 0;
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        List<AgentConversationMessageEntity> entities = new(messages.Count);
+        List<AgentChatMessageEntity> entities = new(messages.Count);
 
         for (int index = 0; index < messages.Count; index++)
         {
@@ -93,7 +93,7 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
             entities.Add(message.ToEntity());
         }
 
-        db.Set<AgentConversationMessageEntity>().AddRange(entities);
+        db.Set<AgentChatMessageEntity>().AddRange(entities);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return [.. entities.Select(entity => entity.ToModel())];
@@ -101,26 +101,26 @@ internal sealed class AgentSessionMessageRepository(InkwellDbContext db) : IAgen
 
     public async Task<bool> DeleteMessage(Guid sessionId, Guid messageId, CancellationToken ct = default)
     {
-        AgentConversationMessageEntity? entity = await db.Set<AgentConversationMessageEntity>()
-            .FirstOrDefaultAsync(x => x.Id == messageId && x.ConversationId == sessionId, ct).ConfigureAwait(false);
+        AgentChatMessageEntity? entity = await db.Set<AgentChatMessageEntity>()
+            .FirstOrDefaultAsync(x => x.Id == messageId && x.SessionId == sessionId, ct).ConfigureAwait(false);
 
         if (entity is null)
         {
             return false;
         }
 
-        db.Set<AgentConversationMessageEntity>().Remove(entity);
+        db.Set<AgentChatMessageEntity>().Remove(entity);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return true;
     }
 
     public async Task<int> DeleteMessagesBySession(Guid sessionId, CancellationToken ct = default) =>
-        await db.Set<AgentConversationMessageEntity>().Where(x => x.ConversationId == sessionId).ExecuteDeleteAsync(ct).ConfigureAwait(false);
+        await db.Set<AgentChatMessageEntity>().Where(x => x.SessionId == sessionId).ExecuteDeleteAsync(ct).ConfigureAwait(false);
 
-    private static System.Linq.Expressions.Expression<Func<AgentConversationMessageEntity, object?>> FieldSelector(string field) => field switch
+    private static System.Linq.Expressions.Expression<Func<AgentChatMessageEntity, object?>> FieldSelector(string field) => field switch
     {
-        nameof(AgentConversationMessageEntity.CreatedTime) => x => x.CreatedTime,
+        nameof(AgentChatMessageEntity.CreatedTime) => x => x.CreatedTime,
         _ => x => x.SequenceNumber,
     };
 }

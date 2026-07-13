@@ -5,23 +5,22 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Inkwell.Persistence.EFCore.Configurations;
 
-internal sealed class AgentConversationEntityConfiguration : IEntityTypeConfiguration<AgentConversationEntity>
+internal sealed class AgentSessionEntityConfiguration : IEntityTypeConfiguration<AgentSessionEntity>
 {
-    public void Configure(EntityTypeBuilder<AgentConversationEntity> b)
+    public void Configure(EntityTypeBuilder<AgentSessionEntity> b)
     {
-        b.ToTable("conversations");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.AgentId, x.OwnerUserId });
         b.HasIndex(x => x.AgentVersionId);
         b.Property(x => x.Title).HasMaxLength(30);
-        b.Property(x => x.MafSessionStateJson);
+        b.Property(x => x.SessionState);
         b.HasOne<AgentVersionEntity>()
             .WithMany()
             .HasForeignKey(x => x.AgentVersionId)
             .OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Messages)
-            .WithOne(x => x.Conversation)
-            .HasForeignKey(x => x.ConversationId)
+            .WithOne(x => x.Session)
+            .HasForeignKey(x => x.SessionId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

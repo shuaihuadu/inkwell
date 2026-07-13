@@ -9,7 +9,6 @@ internal sealed class AgentEntityConfiguration : IEntityTypeConfiguration<AgentE
 {
     public void Configure(EntityTypeBuilder<AgentEntity> b)
     {
-        b.ToTable("agents");
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.IsShared);
         b.HasIndex(x => x.CurrentPublishedVersionId);

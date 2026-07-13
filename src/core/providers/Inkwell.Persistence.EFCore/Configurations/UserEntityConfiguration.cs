@@ -9,7 +9,6 @@ internal sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEnt
 {
     public void Configure(EntityTypeBuilder<UserEntity> b)
     {
-        b.ToTable("users");
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.Username).IsUnique();
         b.Property(x => x.Username).IsRequired().HasMaxLength(100);

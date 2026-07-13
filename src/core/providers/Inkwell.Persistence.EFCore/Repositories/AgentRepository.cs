@@ -32,7 +32,18 @@ internal sealed class AgentRepository(InkwellDbContext db) : IAgentRepository
 
         try
         {
-            db.Set<AgentEntity>().Update(agent.ToEntity());
+            AgentEntity updatedEntity = agent.ToEntity();
+            AgentEntity? trackedEntity = db.Set<AgentEntity>().Local.FirstOrDefault(entity => entity.Id == agent.Id);
+
+            if (trackedEntity is null)
+            {
+                db.Set<AgentEntity>().Update(updatedEntity);
+            }
+            else
+            {
+                db.Entry(trackedEntity).CurrentValues.SetValues(updatedEntity);
+            }
+
             await db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex)

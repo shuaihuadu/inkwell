@@ -22,13 +22,13 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
 
     internal DbSet<UserEntity> Users => this.Set<UserEntity>();
 
-    internal DbSet<AgentToolEntity> Tools => this.Set<AgentToolEntity>();
+    internal DbSet<AgentToolEntity> AgentTools => this.Set<AgentToolEntity>();
 
-    internal DbSet<AgentConversationEntity> Conversations => this.Set<AgentConversationEntity>();
+    internal DbSet<AgentSessionEntity> AgentSession => this.Set<AgentSessionEntity>();
 
-    internal DbSet<AgentConversationMessageEntity> ConversationMessages => this.Set<AgentConversationMessageEntity>();
+    internal DbSet<AgentChatMessageEntity> AgentChatMessage => this.Set<AgentChatMessageEntity>();
 
-    internal DbSet<AgentSkillEntity> Skills => this.Set<AgentSkillEntity>();
+    internal DbSet<AgentSkillEntity> AgentSkills => this.Set<AgentSkillEntity>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,6 +43,7 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
             this.ApplyRowVersion(modelBuilder);
             ApplyOwnerIndex(modelBuilder);
             ApplyEnumAsString(modelBuilder);
+            this.ApplyJsonColumnTypes(modelBuilder);
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
@@ -115,5 +116,18 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
                 }
             }
         }
+    }
+
+    private void ApplyJsonColumnTypes(ModelBuilder modelBuilder)
+    {
+        bool isPostgres = this.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+        string jsonColumnType = isPostgres ? "jsonb" : "json";
+
+        modelBuilder.Entity<AgentChatMessageEntity>().Property(entity => entity.Message).HasColumnType(jsonColumnType);
+        modelBuilder.Entity<AgentSessionEntity>().Property(entity => entity.SessionState).HasColumnType(jsonColumnType);
+        modelBuilder.Entity<AgentSkillEntity>().Property(entity => entity.ReferenceFileUris).HasColumnType(jsonColumnType);
+        modelBuilder.Entity<AgentSkillEntity>().Property(entity => entity.AssetFileUris).HasColumnType(jsonColumnType);
+        modelBuilder.Entity<AgentToolEntity>().Property(entity => entity.ParametersJsonSchema).HasColumnType(jsonColumnType);
+        modelBuilder.Entity<AgentVersionEntity>().Property(entity => entity.Snapshot).HasColumnType(jsonColumnType);
     }
 }

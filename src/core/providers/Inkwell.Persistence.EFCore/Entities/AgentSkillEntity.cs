@@ -13,10 +13,10 @@ internal sealed class AgentSkillEntity : IHasTimestamps
     public string ContentMarkdown { get; init; } = "";
 
     /// <summary>序列化的 <c>IReadOnlyList&lt;Uri&gt;</c>；默认空数组。</summary>
-    public string ReferenceFileUrisJson { get; init; } = "[]";
+    public string ReferenceFileUris { get; init; } = "[]";
 
     /// <summary>序列化的 <c>IReadOnlyList&lt;Uri&gt;</c>；默认空数组。</summary>
-    public string AssetFileUrisJson { get; init; } = "[]";
+    public string AssetFileUris { get; init; } = "[]";
 
     public DateTimeOffset CreatedTime { get; init; }
 

@@ -9,7 +9,6 @@ internal sealed class AgentToolEntityConfiguration : IEntityTypeConfiguration<Ag
 {
     public void Configure(EntityTypeBuilder<AgentToolEntity> b)
     {
-        b.ToTable("tools");
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.Name).IsUnique();
         b.Property(x => x.Name).IsRequired().HasMaxLength(200);

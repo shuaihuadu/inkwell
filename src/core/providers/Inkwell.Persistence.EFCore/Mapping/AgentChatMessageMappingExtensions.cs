@@ -4,32 +4,32 @@ using Inkwell.Persistence.EFCore.Entities;
 
 namespace Inkwell.Persistence.EFCore.Mapping;
 
-internal static class AgentConversationMessageMappingExtensions
+internal static class AgentChatMessageMappingExtensions
 {
-    public static AgentChatMessage ToModel(this AgentConversationMessageEntity entity)
+    public static AgentChatMessage ToModel(this AgentChatMessageEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
         return new AgentChatMessage
         {
             Id = entity.Id,
-            SessionId = entity.ConversationId,
-            Message = DeserializeMessage(entity.MessageJson),
+            SessionId = entity.SessionId,
+            Message = DeserializeMessage(entity.Message),
             SequenceNumber = entity.SequenceNumber,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
         };
     }
 
-    public static AgentConversationMessageEntity ToEntity(this AgentChatMessage model)
+    public static AgentChatMessageEntity ToEntity(this AgentChatMessage model)
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        return new AgentConversationMessageEntity
+        return new AgentChatMessageEntity
         {
             Id = model.Id,
-            ConversationId = model.SessionId,
-            MessageJson = JsonSerializer.Serialize(model.Message),
+            SessionId = model.SessionId,
+            Message = JsonSerializer.Serialize(model.Message),
             SequenceNumber = model.SequenceNumber,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,

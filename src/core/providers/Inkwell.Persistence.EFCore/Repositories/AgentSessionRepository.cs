@@ -11,9 +11,9 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
     {
         ArgumentNullException.ThrowIfNull(sessionDefinition);
 
-        AgentConversationEntity entity = sessionDefinition.ToEntity();
+        AgentSessionEntity entity = sessionDefinition.ToEntity();
 
-        db.Set<AgentConversationEntity>().Add(entity);
+        db.Set<AgentSessionEntity>().Add(entity);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return entity.ToModel();
@@ -22,7 +22,7 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
     public async Task<AgentSessionDefinition> GetSession(Guid id, CancellationToken ct = default)
     {
         // AsNoTracking：同 AgentRepository.GetAgent 的说明，避免与 UpdateSession 产生重复追踪冲突。
-        AgentConversationEntity? entity = await db.Set<AgentConversationEntity>().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
+        AgentSessionEntity? entity = await db.Set<AgentSessionEntity>().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct).ConfigureAwait(false);
 
         return entity?.ToModel() ?? throw new KeyNotFoundException($"Agent session not found: id={id}");
     }
@@ -33,9 +33,9 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
 
         try
         {
-            AgentConversationEntity entity = sessionDefinition.ToEntity();
+            AgentSessionEntity entity = sessionDefinition.ToEntity();
 
-            db.Set<AgentConversationEntity>().Update(entity);
+            db.Set<AgentSessionEntity>().Update(entity);
             await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
             return entity.ToModel();
@@ -48,12 +48,12 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
 
     public async Task<PagedResult<AgentSessionDefinition>> ListSessionsByAgent(Guid agentId, Guid ownerUserId, Pagination pagination, SortOrder sort, CancellationToken ct = default)
     {
-        IOrderedQueryable<AgentConversationEntity> query = db.Set<AgentConversationEntity>().AsNoTracking()
+        IOrderedQueryable<AgentSessionEntity> query = db.Set<AgentSessionEntity>().AsNoTracking()
             .Where(x => x.AgentId == agentId && x.OwnerUserId == ownerUserId)
             .ApplySort(sort, FieldSelector);
 
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentConversationEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
+        List<AgentSessionEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize)
             .Take(pagination.PageSize)
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -63,15 +63,15 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
     }
 
     public async Task<IReadOnlyList<Guid>> FindUsedAgentIdsByOwner(Guid ownerUserId, CancellationToken ct = default) =>
-        await db.Set<AgentConversationEntity>().AsNoTracking()
-            .Where(c => c.OwnerUserId == ownerUserId && db.Set<AgentConversationMessageEntity>().Any(m => m.ConversationId == c.Id))
+        await db.Set<AgentSessionEntity>().AsNoTracking()
+            .Where(c => c.OwnerUserId == ownerUserId && db.Set<AgentChatMessageEntity>().Any(m => m.SessionId == c.Id))
             .Select(c => c.AgentId)
             .Distinct()
             .ToListAsync(ct).ConfigureAwait(false);
 
     public async Task<IReadOnlyDictionary<Guid, DateTimeOffset>> FindLastActivityByAgents(IReadOnlyList<Guid> agentIds, Guid viewerUserId, CancellationToken ct = default)
     {
-        var grouped = await db.Set<AgentConversationEntity>().AsNoTracking()
+        var grouped = await db.Set<AgentSessionEntity>().AsNoTracking()
             .Where(x => agentIds.Contains(x.AgentId) && x.OwnerUserId == viewerUserId)
             .GroupBy(x => x.AgentId)
             .Select(g => new { AgentId = g.Key, LastActivity = g.Max(x => x.UpdatedTime) })
@@ -80,9 +80,9 @@ internal sealed class AgentSessionRepository(InkwellDbContext db) : IAgentSessio
         return grouped.ToDictionary(x => x.AgentId, x => x.LastActivity);
     }
 
-    private static System.Linq.Expressions.Expression<Func<AgentConversationEntity, object?>> FieldSelector(string field) => field switch
+    private static System.Linq.Expressions.Expression<Func<AgentSessionEntity, object?>> FieldSelector(string field) => field switch
     {
-        nameof(AgentConversationEntity.CreatedTime) => x => x.CreatedTime,
+        nameof(AgentSessionEntity.CreatedTime) => x => x.CreatedTime,
         _ => x => x.UpdatedTime,
     };
 }
