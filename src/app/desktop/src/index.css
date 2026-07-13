@@ -1,0 +1,308 @@
+:root {
+    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    color: #18201f;
+    background: #f3f5f4;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+}
+button,
+input,
+textarea {
+    font: inherit;
+}
+#root {
+    min-height: 100vh;
+}
+.brand-mark {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    color: #fff;
+    background: #176b5b;
+    border-radius: 6px;
+    font-family: Georgia, serif;
+    font-size: 34px;
+}
+.brand-mark.small {
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+}
+.login-page {
+    display: grid;
+    grid-template-columns: minmax(360px, 42%) 1fr;
+    min-height: 100vh;
+}
+.login-brand {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+    padding: clamp(48px, 8vw, 120px);
+    color: #f7f3e8;
+    background: #173c37;
+}
+.login-brand h1.ant-typography {
+    margin: 0;
+    color: #fff;
+    font-family: Georgia, serif;
+    font-size: 56px;
+    letter-spacing: 0;
+}
+.login-brand .ant-typography {
+    max-width: 420px;
+    color: #c9d9d5;
+    font-size: 18px;
+}
+.login-pattern {
+    position: absolute;
+    right: -100px;
+    bottom: -130px;
+    width: 420px;
+    height: 420px;
+    border: 64px solid #cfaa63;
+    border-radius: 50%;
+    opacity: 0.38;
+}
+.login-form-panel {
+    display: grid;
+    place-items: center;
+    padding: 48px;
+    background:
+        radial-gradient(circle at 80% 15%, #e8eee9 0 8%, transparent 8.5%),
+        #f7f8f6;
+}
+.login-form-wrap {
+    width: min(100%, 420px);
+}
+.login-form-wrap h2.ant-typography {
+    margin: 10px 0 6px;
+    font-size: 34px;
+}
+.login-form-wrap .ant-alert {
+    margin: 24px 0;
+}
+.login-form-wrap .ant-form {
+    margin-top: 30px;
+}
+.eyebrow {
+    color: #176b5b;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.workspace-shell {
+    min-height: 100vh;
+    background: #eef1ef;
+}
+.app-header {
+    display: flex;
+    align-items: center;
+    height: 58px;
+    padding: 0 18px;
+    border-bottom: 1px solid #dfe4e1;
+    background: #fff;
+}
+.app-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 210px;
+    font-family: Georgia, serif;
+    font-size: 19px;
+}
+.connection-state {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    color: #52706a;
+    font-size: 12px;
+}
+.connection-state span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #31a174;
+    box-shadow: 0 0 0 3px #dff3e9;
+}
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-left: 24px;
+}
+.app-sidebar {
+    width: 210px;
+    min-height: calc(100vh - 58px);
+    padding: 12px 8px;
+    border-right: 1px solid #dfe4e1;
+    background: #fff;
+}
+.app-sidebar .ant-menu {
+    border-inline-end: 0 !important;
+}
+.workspace-main {
+    display: grid;
+    grid-template-columns: minmax(340px, 42%) 1fr;
+    width: calc(100vw - 210px);
+    height: calc(100vh - 58px);
+}
+.library-pane {
+    overflow-y: auto;
+    padding: 24px;
+    border-right: 1px solid #dfe4e1;
+    background: #f7f8f6;
+}
+.pane-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.pane-heading h3.ant-typography {
+    margin: 0 0 2px;
+    font-size: 22px;
+}
+.agent-list {
+    margin-top: 18px;
+}
+.agent-list .ant-list-item {
+    cursor: pointer;
+    margin-bottom: 8px;
+    padding: 14px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #fff;
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+.agent-list .ant-list-item:hover {
+    border-color: #a8c7bf;
+}
+.agent-list .ant-list-item.selected {
+    border-color: #176b5b;
+    background: #edf6f3;
+}
+.agent-avatar {
+    color: #176b5b !important;
+    background: #dcece7 !important;
+}
+.agent-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.chat-panel {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-width: 0;
+    background: #fff;
+}
+.chat-empty {
+    place-items: center;
+}
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    padding: 14px 22px;
+    border-bottom: 1px solid #e5e9e7;
+}
+.chat-header h4.ant-typography {
+    margin: 0;
+    font-size: 16px;
+}
+.message-list {
+    overflow-y: auto;
+    padding: 30px clamp(20px, 5vw, 70px);
+}
+.conversation-starter {
+    display: grid;
+    justify-items: center;
+    padding-top: 14vh;
+    color: #176b5b;
+    text-align: center;
+}
+.conversation-starter > .anticon {
+    font-size: 32px;
+}
+.conversation-starter h4.ant-typography {
+    margin: 15px 0 5px;
+}
+.message-row {
+    display: flex;
+    gap: 12px;
+    margin: 0 auto 22px;
+    max-width: 760px;
+}
+.message-row.user {
+    flex-direction: row-reverse;
+}
+.message-bubble {
+    max-width: 78%;
+    padding: 11px 14px;
+    border-radius: 6px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    background: #f0f3f2;
+}
+.message-row.user .message-bubble {
+    color: #fff;
+    background: #176b5b;
+}
+.typing {
+    color: #78908b;
+}
+.typing::after {
+    content: "...";
+    animation: pulse 1.2s infinite;
+}
+.composer {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 12px;
+    margin: 0 clamp(20px, 5vw, 70px) 24px;
+    padding: 10px 10px 10px 14px;
+    border: 1px solid #cbd5d1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 8px 30px rgb(27 56 49 / 8%);
+}
+.composer textarea {
+    border: 0 !important;
+    box-shadow: none !important;
+    resize: none;
+}
+@keyframes pulse {
+    50% {
+        opacity: 0.35;
+    }
+}
+@media (max-width: 1120px) {
+    .app-sidebar {
+        width: 76px;
+    }
+    .app-sidebar .ant-menu-title-content {
+        display: none;
+    }
+    .workspace-main {
+        width: calc(100vw - 76px);
+        grid-template-columns: minmax(300px, 44%) 1fr;
+    }
+}
