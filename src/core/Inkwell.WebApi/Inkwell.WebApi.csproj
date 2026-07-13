@@ -15,6 +15,7 @@
         <ProjectReference Include="..\Inkwell.Core\Inkwell.Core.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <ProjectReference Include="..\providers\Inkwell.FileStorage.Local\Inkwell.FileStorage.Local.csproj" />
         <ProjectReference Include="..\providers\Inkwell.FileStorage.MinIO\Inkwell.FileStorage.MinIO.csproj" />
         <ProjectReference Include="..\providers\Inkwell.FileStorage.AzureBlob\Inkwell.FileStorage.AzureBlob.csproj" />
         <ProjectReference Include="..\providers\Inkwell.Cache.Redis\Inkwell.Cache.Redis.csproj" />
@@ -29,6 +30,7 @@
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
         <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" />
+        <PackageReference Include="Scalar.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />

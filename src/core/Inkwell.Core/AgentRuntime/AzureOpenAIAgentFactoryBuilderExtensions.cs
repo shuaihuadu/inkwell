@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Inkwell;
 
@@ -20,8 +21,9 @@ public static class AzureOpenAIAgentFactoryBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(credential);
 
-        builder.Services.AddSingleton(credential);
-        builder.Services.AddSingleton<IAgentFactory, AzureOpenAIAgentFactory>();
+        builder.Services.TryAddSingleton(credential);
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IModelRuntimeAgentBuilder, AzureOpenAIAgentFactory>());
+        builder.Services.TryAddSingleton<IAgentFactory, ModelRoutingAgentFactory>();
 
         return builder;
     }

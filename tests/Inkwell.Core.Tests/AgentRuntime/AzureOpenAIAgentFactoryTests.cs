@@ -17,11 +17,12 @@ public sealed class AzureOpenAIAgentFactoryTests
         // Arrange
         AzureOpenAIAgentFactory factory = CreateFactory();
         InMemoryChatHistoryProvider historyProvider = new();
-        AgentVersion version = CreateVersion("configured-model");
+        AgentVersion version = CreateVersion("business-model");
+        ModelDefinition model = CreateModel("business-model", "azure-deployment");
         AgentBuildOptions buildOptions = new() { ChatHistoryProvider = historyProvider };
 
         // Act
-        AIAgent agent = await factory.BuildAsync(version, buildOptions);
+        AIAgent agent = factory.Build(model, version, buildOptions);
 
         // Assert
         ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
@@ -33,21 +34,19 @@ public sealed class AzureOpenAIAgentFactoryTests
     }
 
     /// <summary>
-    /// 验证快照未指定模型时仍可使用 Factory 默认部署构建 Agent。
+    /// 验证 Azure OpenAI 连接器声明稳定的运行时标识。
     /// </summary>
     [TestMethod]
-    public async Task BuildAsync_WithoutSnapshotModel_UsesDefaultDeploymentAsync()
+    public void RuntimeId_ReturnsAzureOpenAI()
     {
         // Arrange
         AzureOpenAIAgentFactory factory = CreateFactory();
-        AgentVersion version = CreateVersion(modelId: null);
 
         // Act
-        AIAgent agent = await factory.BuildAsync(version, new AgentBuildOptions());
+        string runtimeId = factory.RuntimeId;
 
         // Assert
-        Assert.IsInstanceOfType<ChatClientAgent>(agent);
-        Assert.AreEqual("Research assistant", agent.Name);
+        Assert.AreEqual("azure-openai", runtimeId);
     }
 
     private static AzureOpenAIAgentFactory CreateFactory() => new(new AzureOpenAICredential
@@ -56,6 +55,16 @@ public sealed class AzureOpenAIAgentFactoryTests
         ApiKey = "test-api-key",
         DeploymentName = "default-model",
     });
+
+    private static ModelDefinition CreateModel(string id, string remoteModelId) => new()
+    {
+        Id = id,
+        DisplayName = id,
+        SourceId = "configuration",
+        RuntimeId = "azure-openai",
+        RemoteModelId = remoteModelId,
+        IsAvailable = true,
+    };
 
     private static AgentVersion CreateVersion(string? modelId) => new()
     {

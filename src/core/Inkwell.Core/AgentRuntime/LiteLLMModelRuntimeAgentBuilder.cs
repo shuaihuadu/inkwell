@@ -1,44 +1,37 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Azure;
-using Azure.AI.OpenAI;
+using System.ClientModel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
+using OpenAI;
 using OpenAI.Chat;
 
 namespace Inkwell;
 
 /// <summary>
-/// 使用 Azure OpenAI Chat Completions 客户端构建 MAF Agent。
+/// 使用 LiteLLM OpenAI-compatible Chat Completions 构建 MAF Agent。
 /// </summary>
-internal sealed class AzureOpenAIAgentFactory
-    : IModelRuntimeAgentBuilder
+internal sealed class LiteLLMModelRuntimeAgentBuilder : IModelRuntimeAgentBuilder
 {
-    private readonly AzureOpenAIClient _client;
-
-    /// <inheritdoc />
-    public string RuntimeId => "azure-openai";
+    private readonly OpenAIClient _client;
 
     /// <summary>
-    /// 初始化 <see cref="AzureOpenAIAgentFactory"/>。
+    /// 初始化 <see cref="LiteLLMModelRuntimeAgentBuilder"/>。
     /// </summary>
-    /// <param name="credential">Azure OpenAI 连接凭据。</param>
-    public AzureOpenAIAgentFactory(AzureOpenAICredential credential)
+    /// <param name="options">LiteLLM 连接配置。</param>
+    public LiteLLMModelRuntimeAgentBuilder(IOptions<LiteLLMModelRegistryOptions> options)
     {
-        ArgumentNullException.ThrowIfNull(credential);
+        ArgumentNullException.ThrowIfNull(options);
 
-        if (!Uri.TryCreate(credential.Endpoint, UriKind.Absolute, out Uri? endpoint))
-        {
-            throw new ArgumentException("Azure OpenAI endpoint must be an absolute URI.", nameof(credential));
-        }
-
-        if (string.IsNullOrWhiteSpace(credential.ApiKey))
-        {
-            throw new ArgumentException("Azure OpenAI API key is required.", nameof(credential));
-        }
-
-        this._client = new AzureOpenAIClient(endpoint, new AzureKeyCredential(credential.ApiKey));
+        LiteLLMModelRegistryOptions value = options.Value;
+        Uri openAIEndpoint = new(value.Endpoint, "v1/");
+        OpenAIClientOptions clientOptions = new() { Endpoint = openAIEndpoint };
+        this._client = new OpenAIClient(new ApiKeyCredential(value.ApiKey), clientOptions);
     }
+
+    /// <inheritdoc />
+    public string RuntimeId => "litellm";
 
     /// <inheritdoc />
     public AIAgent Build(
@@ -63,7 +56,6 @@ internal sealed class AzureOpenAIAgentFactory
             MaxOutputTokens = parameters?.MaxTokens,
             Tools = [.. agentBuildOptions.Tools],
         };
-
         ChatClientAgentOptions options = new()
         {
             Id = agentVersion.Id.ToString(),

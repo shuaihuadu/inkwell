@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.WebApi.Protocols;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Inkwell.WebApi.Tests.Protocols;
 
@@ -24,22 +25,26 @@ public sealed class AgentProtocolEndpointRouteBuilderExtensionsTests
         TestEndpointRouteBuilder endpoints = new(serviceProvider);
 
         // Act
-        endpoints.MapAgentProtocols();
-        string[] routePatterns =
+        endpoints.MapAgentProtocols(AuthorizationPolicies.RequireAuthenticatedUser);
+        RouteEndpoint[] routes =
         [
             .. endpoints.DataSources
                 .SelectMany(dataSource => dataSource.Endpoints)
                 .OfType<RouteEndpoint>()
-                .Select(endpoint => endpoint.RoutePattern.RawText)
-                .Where(pattern => pattern is not null)
-                .Cast<string>(),
         ];
+        string?[] routePatterns = [.. routes.Select(endpoint => endpoint.RoutePattern.RawText)];
 
         // Assert
         CollectionAssert.Contains(routePatterns, "/agent/{agentId}");
         CollectionAssert.Contains(routePatterns, "/agent/{agentId}/v1/chat/completions/");
         CollectionAssert.Contains(routePatterns, "/agent/{agentId}/v1/responses/");
         CollectionAssert.Contains(routePatterns, "/v1/conversations/");
+
+        foreach (RouteEndpoint route in routes)
+        {
+            IAuthorizeData authorization = route.Metadata.GetOrderedMetadata<IAuthorizeData>().Single();
+            Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, authorization.Policy);
+        }
     }
 
     private sealed class TestEndpointRouteBuilder(IServiceProvider serviceProvider) : IEndpointRouteBuilder

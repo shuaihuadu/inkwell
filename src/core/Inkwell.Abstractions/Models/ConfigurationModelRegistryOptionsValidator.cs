@@ -4,21 +4,21 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Inkwell;
 
-internal sealed class ModelCatalogOptionsValidator : IValidateOptions<ModelCatalogOptions>
+internal sealed class ConfigurationModelRegistryOptionsValidator : IValidateOptions<ConfigurationModelRegistryOptions>
 {
-    public ValidateOptionsResult Validate(string? name, ModelCatalogOptions options)
+    public ValidateOptionsResult Validate(string? name, ConfigurationModelRegistryOptions options)
     {
         List<ValidationResult> results = [];
         ValidationContext context = new(options);
 
         if (!Validator.TryValidateObject(options, context, results, validateAllProperties: true))
         {
-            return ValidateOptionsResult.Fail(results.Select(r => r.ErrorMessage ?? "Invalid ModelCatalogOptions."));
+            return ValidateOptionsResult.Fail(results.Select(r => r.ErrorMessage ?? "Invalid ConfigurationModelRegistryOptions."));
         }
 
         List<string> errors = [];
 
-        foreach (ModelEntryOptions entry in options.Models)
+        foreach (ConfigurationModelEntryOptions entry in options.Models)
         {
             ValidationContext entryContext = new(entry);
             List<ValidationResult> entryResults = [];
@@ -38,11 +38,6 @@ internal sealed class ModelCatalogOptionsValidator : IValidateOptions<ModelCatal
         if (duplicateIds.Count > 0)
         {
             errors.Add($"Duplicate model Id(s): {string.Join(", ", duplicateIds)}.");
-        }
-
-        if (!options.Models.Any(m => m.Provider == ModelProviderKind.AzureOpenAI && m.IsAvailable))
-        {
-            errors.Add("At least one available model with Provider=AzureOpenAI is required.");
         }
 
         return errors.Count > 0 ? ValidateOptionsResult.Fail(errors) : ValidateOptionsResult.Success;

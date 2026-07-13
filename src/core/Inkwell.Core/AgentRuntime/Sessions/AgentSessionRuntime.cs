@@ -24,7 +24,7 @@ internal static class AgentSessionRuntime
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(sessionDefinition);
 
-        AgentSession session = sessionDefinition.MafSessionState is JsonElement serializedState
+        AgentSession session = sessionDefinition.SessionState is JsonElement serializedState
             ? await agent.DeserializeSessionAsync(serializedState, cancellationToken: cancellationToken).ConfigureAwait(false)
             : await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
 
@@ -55,7 +55,7 @@ internal static class AgentSessionRuntime
 
         return sessionDefinition with
         {
-            MafSessionState = serializedState,
+            SessionState = serializedState,
             UpdatedTime = DateTimeOffset.UtcNow,
         };
     }

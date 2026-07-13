@@ -21,6 +21,7 @@ public static class AuthenticationBuilderExtensions
 
         services
             .AddAuthorizationBuilder()
+            .AddPolicy(AuthorizationPolicies.RequireAuthenticatedUser, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(AuthorizationPolicies.RequireSuperUser, policy => policy.RequireClaim(SessionClaimTypes.IsSuper, "true"));
 
         return services;
