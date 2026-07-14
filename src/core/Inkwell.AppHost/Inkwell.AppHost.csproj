@@ -15,6 +15,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="$(RepoRoot)images/ContainerImageConfiguration.cs" Link="ContainerImageConfiguration.cs" />
+        <Content Include="$(RepoRoot)images/container-images.json" Link="container-images.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\Inkwell.Migrator\Inkwell.Migrator.csproj" IsAspireProjectResource="true" />
         <ProjectReference Include="..\Inkwell.WebApi\Inkwell.WebApi.csproj" IsAspireProjectResource="true" />
         <ProjectReference Include="..\Inkwell.Worker\Inkwell.Worker.csproj" IsAspireProjectResource="true" />

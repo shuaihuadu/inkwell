@@ -1,0 +1,27 @@
+{
+  "AppHost": {
+    "OtelLgtm": {
+      "Image": "grafana/otel-lgtm",
+      "Tag": "0.29.0"
+    },
+    "LiteLLM": {
+      "Image": "docker.litellm.ai/berriai/litellm@sha256:9ef6f45bc0104940571765e610c52a1d761b5ec85efcd193795281086ee61277"
+    },
+    "Postgres": {
+      "Tag": "18.4"
+    },
+    "PgAdmin": {
+      "Tag": "9.16"
+    },
+    "SqlServer": {
+      "Tag": "2025-CU6-ubuntu-24.04"
+    }
+  },
+  "Tests": {
+    "Azurite": "mcr.microsoft.com/azure-storage/azurite:3.35.0",
+    "MinIO": "minio/minio:RELEASE.2025-09-07T16-13-09Z",
+    "Postgres": "postgres:18.4-alpine",
+    "Qdrant": "qdrant/qdrant:v1.18.2",
+    "Redis": "redis:8.8.0-alpine"
+  }
+}

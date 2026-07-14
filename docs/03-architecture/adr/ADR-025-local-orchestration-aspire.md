@@ -39,7 +39,7 @@ Inkwell 的本地开发需要统一处理资源生命周期、连接字符串注
 
 新增 `src/core/Inkwell.AppHost/`，使用 `Aspire.AppHost.Sdk` 和 `Aspire.Hosting.PostgreSQL`，首批只编排当前代码真实依赖的资源：
 
-- PostgreSQL 17，默认使用临时开发数据库；每次 AppHost 重建资源时由 Migrator 恢复 schema 与 Seed。
+- PostgreSQL 18，默认使用临时开发数据库；每次 AppHost 重建资源时由 Migrator 恢复 schema 与 Seed。
 - `Inkwell.Migrator` 一次性项目资源。
 - `Inkwell.WebApi` 常驻项目资源。
 - `Inkwell.Worker` 常驻项目资源。
@@ -50,12 +50,14 @@ PostgreSQL 数据库资源命名为 `Inkwell`，由 `WithReference` 注入 `Conn
 
 Redis、Qdrant、MinIO 不在首批 AppHost 中提前声明。对应入口项目切换到实际 Provider 后，再按真实消费关系加入 AppHost，避免出现资源已启动但应用仍使用内存实现的假集成。
 
-可观测性不依赖业务 Provider，按 [ADR-013](./ADR-013-observability-otel-self-hosted-grafana.md) 由 AppHost 编排 OTel Collector、Tempo、Loki、Prometheus 与 Grafana。WebApi / Worker 统一通过 OTLP gRPC 上报 trace、log、metric；Grafana 启动时预置三个后端数据源。当前基线只覆盖通用 ASP.NET Core、HttpClient 和 .NET Runtime 遥测，业务自定义指标、Dashboard 与 SMTP 告警规则仍按后续 H5 任务增量落地。
+可观测性不依赖业务 Provider，按 [ADR-013](./ADR-013-observability-otel-self-hosted-grafana.md) 由 AppHost 编排固定版本的 `grafana/otel-lgtm` dev 单容器，其中包含 OTel Collector、Tempo、Loki、Prometheus 与 Grafana。WebApi / Worker 统一通过 OTLP gRPC 上报 trace、log、metric；LGTM 预置三个后端数据源。该单容器仅用于本地开发、演示和测试，prod 仍按 ADR-013 独立部署各组件。当前基线只覆盖通用 ASP.NET Core、HttpClient 和 .NET Runtime 遥测，业务自定义指标、Dashboard 与 SMTP 告警规则仍按后续 H5 任务增量落地。
 
 ### 版本约束
 
 - Aspire SDK 与 Hosting integration 锁定同一稳定版本。
-- PostgreSQL 显式锁定 17，避免 Aspire 13.4 默认 PostgreSQL 18 与既有架构版本不一致。
+- AppHost 与 Provider 合同测试使用仓库级 `images/container-images.json` 作为镜像版本单一来源；默认值必须固定到 patch / release tag 或 digest，禁止 `latest` 和纯大版本浮动 tag，并允许通过 `INKWELL_CONTAINER_IMAGES__...` 环境变量临时覆盖。
+- PostgreSQL 支持基线锁定 18，当前 AppHost 使用 `18.4`，Testcontainers 使用 `18.4-alpine`。
+- PostgreSQL 官方镜像从 18 起将默认 `PGDATA` 调整为 `/var/lib/postgresql/18/docker`，声明的 volume 根目录调整为 `/var/lib/postgresql`；后续启用持久卷时必须使用 18 的目录约定，不能直接挂载或复用 17 的 `/var/lib/postgresql/data` 数据目录。
 - 首批 AppHost 不挂载数据卷。Aspire 默认生成的 PostgreSQL 密码与容器同生命周期，避免复用旧卷时因新密码无法通过健康检查；如需跨 AppHost 启动保留数据，必须同时设计稳定的本地 Secret 与卷生命周期。
 - AppHost 只承担本地开发编排，不作为生产运行时，也不生成或替代 Helm 部署资产。
 
@@ -97,7 +99,7 @@ Redis、Qdrant、MinIO 不在首批 AppHost 中提前声明。对应入口项目
 
 1. 将 `Inkwell.AppHost` 加入解决方案并编排 PostgreSQL、Migrator、WebApi、Worker。
 2. 验证 Migrator 成功完成后 WebApi/Worker 才启动，Migrator 失败时二者保持等待状态。
-3. 通过 AppHost 编排 OTel Collector、Tempo、Loki、Prometheus 与 Grafana，验证 trace、log、metric 三条链路。
+3. 通过 AppHost 编排 `grafana/otel-lgtm`，验证 trace、log、metric 三条链路；prod 拆分拓扑另行通过 Helm 集成测试验证。
 4. 将本地开发文档从 `docker compose up` 更新为运行 AppHost。
 5. 后续每启用一个外部 Provider，同步添加对应 Aspire hosting integration 和端到端验证。
 

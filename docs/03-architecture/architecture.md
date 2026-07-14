@@ -181,7 +181,7 @@ host.Run();
 >
 > H2 主决策（EF Core 10 + 三 Provider 切换 + Code First + Migration）不变；本 errata 仅声明配置键命名精化，便于 H3 / H5 引用时不踩字面量陷阱。
 
-- **关系数据**：EF Core 10（与 .NET 10 同步发布）+ Provider 切换（SQL Server 2025 / PostgreSQL 17），通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（精化历史见上方 errata）。
+- **关系数据**：EF Core 10（与 .NET 10 同步发布）+ Provider 切换（SQL Server 2025 / PostgreSQL 18），通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（精化历史见上方 errata）。
 - **向量数据**：[Qdrant 1.x](https://qdrant.tech/)，gRPC SDK，封装在 `Inkwell.DataAccess.VectorStore`。
 - **关键表**：
   - `agents` / `agent_versions`（[REQ-002](../01-requirements/requirements.md)）
@@ -252,20 +252,18 @@ host.Run();
 dotnet run --project src/core/Inkwell.AppHost
   ├─ visual-design                       (Vite 视觉设计原型，独立启动，默认端口 6800)
   ├─ desktop                             (Electron 原生客户端，等待 WebApi)
-  ├─ postgres / postgres-database       (PostgreSQL 17，当前业务主库)
+  ├─ postgres / postgres-database       (PostgreSQL 18，当前业务主库)
   ├─ sqlserver / sqlserver-database     (SQL Server 2025，双 Provider 验证)
   ├─ pgAdmin                            (PostgreSQL 管理入口)
   ├─ migrator-postgres                  (一次性 Migration + Seed)
   ├─ migrator-sqlserver                 (一次性 Migration + Seed)
   ├─ litellm                            (统一模型网关，ADR-026)
-  ├─ otel-collector                     (OTLP trace / log / metric 接收与分发)
-  ├─ tempo / loki / prometheus          (三类遥测后端)
-  ├─ grafana                            (预置 Tempo / Loki / Prometheus 数据源)
+  ├─ otel-lgtm                          (dev 单容器：Collector + Grafana + Tempo + Loki + Prometheus)
   ├─ webapi                             (等待双 Migrator、LiteLLM 与 Collector)
   └─ worker                             (等待双 Migrator、LiteLLM 与 Collector)
 ```
 
-Redis、Qdrant 与 MinIO 尚未加入首批 AppHost；当前 WebApi / Worker 分别使用 InMemory Cache、Channels Queue、Local FileStorage 与 InMemory VectorStore。启用对应外部 Provider 时再按真实依赖加入编排。Grafana 栈已经接入通用运行时遥测，业务自定义指标、Dashboard 与 SMTP 告警规则仍待后续任务落地。
+Redis、Qdrant 与 MinIO 尚未加入首批 AppHost；当前 WebApi / Worker 分别使用 InMemory Cache、Channels Queue、Local FileStorage 与 InMemory VectorStore。启用对应外部 Provider 时再按真实依赖加入编排。dev 使用固定版本的 `grafana/otel-lgtm` 单容器降低本地资源开销，prod 仍按本节下方拓扑独立部署 Collector、Grafana、Tempo、Loki 与 Prometheus。Grafana 栈已经接入通用运行时遥测，业务自定义指标、Dashboard 与 SMTP 告警规则仍待后续任务落地。
 
 ### 9.2 prod 部署（AKS + Helm）
 

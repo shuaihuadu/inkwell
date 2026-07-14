@@ -20,7 +20,7 @@ public sealed class QdrantVectorStoreProviderTests
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        container = new QdrantBuilder("qdrant/qdrant:latest").Build();
+        container = new QdrantBuilder(ContainerImageConfiguration.GetRequired("Tests:Qdrant")).Build();
 
         await container.StartAsync();
     }

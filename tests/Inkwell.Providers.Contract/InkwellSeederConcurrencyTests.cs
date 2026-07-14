@@ -21,12 +21,13 @@ namespace Inkwell.Providers.Contract;
 [TestClass]
 public sealed class InkwellSeederConcurrencyTests
 {
+    private const string ConfiguredAdminPassword = "configured-admin-password";
     private static PostgreSqlContainer? s_container;
 
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        s_container = new PostgreSqlBuilder(ContainerImageConfiguration.GetRequired("Tests:Postgres")).Build();
 
         await s_container.StartAsync();
     }
@@ -70,14 +71,14 @@ public sealed class InkwellSeederConcurrencyTests
         string[] hashParts = admin.PasswordHash.Split('$');
         byte[] salt = Convert.FromBase64String(hashParts[2]);
         byte[] expectedHash = Convert.FromBase64String(hashParts[3]);
-        byte[] adminHash = Rfc2898DeriveBytes.Pbkdf2("admin", salt, int.Parse(hashParts[1]), HashAlgorithmName.SHA256, expectedHash.Length);
-        byte[] oldPasswordHash = Rfc2898DeriveBytes.Pbkdf2("Admin@123456", salt, int.Parse(hashParts[1]), HashAlgorithmName.SHA256, expectedHash.Length);
+        byte[] configuredPasswordHash = Rfc2898DeriveBytes.Pbkdf2(ConfiguredAdminPassword, salt, int.Parse(hashParts[1]), HashAlgorithmName.SHA256, expectedHash.Length);
+        byte[] defaultPasswordHash = Rfc2898DeriveBytes.Pbkdf2("admin", salt, int.Parse(hashParts[1]), HashAlgorithmName.SHA256, expectedHash.Length);
 
         // Assert
         Assert.AreEqual(4, hashParts.Length);
         Assert.AreEqual("PBKDF2", hashParts[0]);
-        Assert.IsTrue(CryptographicOperations.FixedTimeEquals(adminHash, expectedHash));
-        Assert.IsFalse(CryptographicOperations.FixedTimeEquals(oldPasswordHash, expectedHash));
+        Assert.IsTrue(CryptographicOperations.FixedTimeEquals(configuredPasswordHash, expectedHash));
+        Assert.IsFalse(CryptographicOperations.FixedTimeEquals(defaultPasswordHash, expectedHash));
     }
 
     private static ServiceProvider BuildServiceProvider()
@@ -85,7 +86,14 @@ public sealed class InkwellSeederConcurrencyTests
         ServiceCollection services = new ServiceCollection();
         services.AddLogging();
 
-        IInkwellBuilder builder = services.AddInkwell(new ConfigurationBuilder().Build());
+        Dictionary<string, string?> configurationValues = new()
+        {
+            ["Inkwell:Persistence:Seed:AdminPassword"] = ConfiguredAdminPassword,
+        };
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
+            .Build();
+        IInkwellBuilder builder = services.AddInkwell(configuration);
 
         builder.UsePostgres(s_container!.GetConnectionString());
 

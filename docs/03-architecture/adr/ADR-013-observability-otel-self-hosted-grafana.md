@@ -17,7 +17,7 @@ downstream: []
 ---
 
 <!-- 2026-05-10 [ADR-019 进程拓扑](./ADR-019-process-topology-webapi-worker-split.md) 引入后：OTel `service.name` resource attribute 区分 `inkwell-webapi` / `inkwell-worker`；Prometheus scrape 双 source；Grafana Dashboard 加「队列吞吐 / Worker 健康」面板。 -->
-<!-- 2026-07-13 [ADR-025 本地编排](./ADR-025-local-orchestration-aspire.md) 落地后：dev 由 Aspire AppHost 编排 OTel Collector / Tempo / Loki / Prometheus / Grafana，取代本 ADR 原定的 Docker Compose。 -->
+<!-- 2026-07-14 [ADR-025 本地编排](./ADR-025-local-orchestration-aspire.md) 落地后：dev 由 Aspire AppHost 编排固定版本的 grafana/otel-lgtm 单容器，取代本 ADR 原定的 Docker Compose；prod 仍保持 OTel Collector / Tempo / Loki / Prometheus / Grafana 独立部署。 -->
 
 # ADR-013 可观测性：OpenTelemetry + 自托管 Grafana 栈
 

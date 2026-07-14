@@ -17,7 +17,7 @@ downstream: []
 
 ## 总体设计原则（[ADR-004](../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 
-- **两 Provider 切换**：SQL Server 2025 / PostgreSQL 17，通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（F9：选择器集中在 `Inkwell:Providers` 段，详细连接 / 超时配置在 `Inkwell:Persistence` 段；参 [HD-001 §3.11.1 `InkwellProvidersOptions`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）
+- **两 Provider 切换**：SQL Server 2025 / PostgreSQL 18，通过 `appsettings.json` 的 `Inkwell:Providers:Persistence` 字段选择（F9：选择器集中在 `Inkwell:Providers` 段，详细连接 / 超时配置在 `Inkwell:Persistence` 段；参 [HD-001 §3.11.1 `InkwellProvidersOptions`](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）
 - **Provider 原生 JSON**：JSON 属性的 CLR 契约统一为 `string` + `System.Text.Json`，物理列由 Provider 映射为 PostgreSQL `jsonb` / SQL Server 2025 `json`；UTC 时间统一 `DateTimeOffset`（[ADR-021 2026-07-13 errata](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md#provider-specific-字段映射策略)）
 - **主键策略**：[`Guid` v7](https://learn.microsoft.com/dotnet/api/system.guid.createversion7)（[HD-002 Q2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)），16 字节 binary 映射
 - **命名（F5 解释 A）**：实体属性名 **= 列名 × PascalCase 直接下发**，不做 snake_case 转换。如 `CreatedTime` 属性 → DB 列名也是 `CreatedTime`。HD-009 EFCore base 不引入 `UseSnakeCaseNamingConvention()` 之类的扩展；表名由 `IEntityTypeConfiguration<TEntity>.Configure` 在跨字段路径上显式设置（如 `agents` / `conversations` 是业务表名约定区分于列名约定）。

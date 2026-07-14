@@ -25,4 +25,9 @@
     <PackageReference Include="Microsoft.Extensions.Configuration" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)images/ContainerImageConfiguration.cs" Link="ContainerImageConfiguration.cs" />
+    <Content Include="$(RepoRoot)images/container-images.json" Link="container-images.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

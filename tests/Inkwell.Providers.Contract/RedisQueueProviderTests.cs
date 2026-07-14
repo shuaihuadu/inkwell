@@ -19,7 +19,7 @@ public sealed class RedisQueueProviderTests
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        container = new RedisBuilder("redis:8-alpine").Build();
+        container = new RedisBuilder(ContainerImageConfiguration.GetRequired("Tests:Redis")).Build();
 
         await container.StartAsync();
     }

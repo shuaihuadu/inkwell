@@ -19,7 +19,7 @@ public sealed class AzureBlobFileStorageProviderTests
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:latest").Build();
+        s_container = new AzuriteBuilder(ContainerImageConfiguration.GetRequired("Tests:Azurite")).Build();
 
         await s_container.StartAsync();
     }

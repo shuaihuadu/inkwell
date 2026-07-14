@@ -54,6 +54,8 @@ downstream: []
 - **回写**：→ [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) §决策；[tech-selection.md §4](./tech-selection.md)；[architecture.md §4](./architecture.md)。
 
 > **2026-07-08 决策更新（本条历史回答部分作废）**：Owner 决定移除 EF Core **InMemory 关系型数据库** Provider（不支持外键约束，本地开发 / 测试价值有限），持久化收敛为两 Provider（SQL Server 2025 / PostgreSQL 17），dev / 测试改用 [Testcontainers](https://testcontainers.com/) 起真实实例。上方"三库可切换" / "InMemory / SQL Server 2025 / PostgreSQL 17" 表述已不再成立；`InMemoryVectorStore`（向量存储子系统）不受影响。完整决策记录见 [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 2026-07-08 更新。本条历史记录保留不删，仅作废其中的三库表述。
+>
+> **2026-07-14 决策更新**：Owner 将 PostgreSQL 支持基线从 17 升级为 **18**，当前开发与测试固定到最新稳定补丁 `18.4`。上方历史回答及 2026-07-08 更新中的 PostgreSQL 17 仅保留为决策演进记录，当前有效组合为 SQL Server 2025 / PostgreSQL 18。
 
 ---
 

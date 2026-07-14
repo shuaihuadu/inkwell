@@ -399,7 +399,7 @@ builder.Services
 ## 12. 部署 / 配置
 
 - 无独立部署单元——本 csproj 是 library，不产 Docker image
-- dev `docker-compose`（[ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)）默认使用本 Provider（`postgres` 容器），是三 Provider 中 dev 环境的默认选择（[AGENTS.md §2.1](../../../AGENTS.md) PostgreSQL 17）
+- dev Aspire AppHost（[ADR-025](../../03-architecture/adr/ADR-025-local-orchestration-aspire.md)）默认使用本 Provider（`postgres` 容器），是两 Provider 中 dev 环境的默认选择（[AGENTS.md §2.2](../../../AGENTS.md) PostgreSQL 18）
 - prod AKS Helm Chart（[ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)）通过 `appsettings.Production.json` 中 `Inkwell:Providers:Persistence = "Postgres"`（[HD-001 §3.11.1 `InkwellProvidersOptions`](../Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md)）选中本 Provider；`ConnectionStrings:Inkwell` 由 K8s Secret 注入环境变量覆盖
 - **可观测性**：沿用 [HD-009 §3.2](HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) `EfCorePersistenceProvider` OTel span 基线；`EnableRetryOnFailure` 重试次数可通过 EF Core 内置 [`Microsoft.EntityFrameworkCore.Database.Command`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.diagnostics.dbloggercategory.database.command) 诊断事件观测，与 [HD-011 §12](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#12-部署--配置) 一致，本 HD 不新增独立监控内容
 

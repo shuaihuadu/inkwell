@@ -26,6 +26,8 @@ downstream:
 > **2026-05-10 增量更新·第二轮**：本 ADR §决策 line 39 “三 Provider 实现” 表述已被 [ADR-021 EFCore Persistence 共享层](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 精化（refinement，不 supersede）为：EFCore family = 4 csproj（`Inkwell.Persistence.EFCore` base + InMemory / SqlServer / Postgres 三 final adapter）。Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在 base；Migration SQL 文本为 Provider-specific，在 SqlServer / Postgres final adapter 各自 `Migrations/`；InMemory 不支持 Migration 仅走 `EnsureCreated`。csproj 12 → 13。
 >
 > **2026-07-08 增量更新·第三轮（取代上述两条中的 InMemory 部分）**：Owner 拍板：[`Microsoft.EntityFrameworkCore.InMemory`](https://learn.microsoft.com/ef/core/providers/in-memory/) 不支持外键约束等关系完整性行为，对本地开发 / 单测价值有限，**不再作为 v1 Provider**。关系数据 Provider 从三个收敛为**两个**（SQL Server 2025 / PostgreSQL 17）；本地开发与单元 / 集成测试改用 [Testcontainers](https://testcontainers.com/) 起真实 SqlServer / Postgres 实例，不再依赖 InMemory 进行快速无容器测试。csproj 总数相应减少（详见 [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 同日更新）。本条下方正文已直接删除 InMemory 相关描述，不再保留历史遗迹文字。
+>
+> **2026-07-14 增量更新·第四轮**：Owner 决定将 PostgreSQL 支持基线从 17 升级为 **18**，当前 dev / Testcontainers 固定到最新稳定补丁 `18.4`。Npgsql EF Core Provider 10 已支持 PostgreSQL 18；AppHost 不挂载持久卷，测试容器均使用临时实例，因此当前开发阶段不涉及已有数据目录升级。生产部署若已有 PostgreSQL 17 数据，必须通过 `pg_upgrade` 或 dump/restore 完成 major upgrade，不能直接复用 17 的数据目录。
 
 ## 上下文
 
@@ -41,7 +43,7 @@ downstream:
 
 ## 决策
 
-**关系数据：EF Core 10（与 .NET 10 同步发布）+ `IPersistenceProvider` 抽象 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 17）；向量数据：[Qdrant 1.x](https://qdrant.tech/) 独立服务。**
+**关系数据：EF Core 10（与 .NET 10 同步发布）+ `IPersistenceProvider` 抽象 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 18）；向量数据：[Qdrant 1.x](https://qdrant.tech/) 独立服务。**
 
 > 上述“两 Provider 实现”的 csproj 物理布局由 [ADR-021](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定：EFCore family = 3 csproj（`Inkwell.Persistence.EFCore` base + SqlServer / Postgres 两 final adapter）。
 

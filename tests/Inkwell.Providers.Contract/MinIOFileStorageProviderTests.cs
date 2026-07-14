@@ -21,7 +21,7 @@ public sealed class MinIOFileStorageProviderTests
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new MinioBuilder("minio/minio:latest").Build();
+        s_container = new MinioBuilder(ContainerImageConfiguration.GetRequired("Tests:MinIO")).Build();
 
         await s_container.StartAsync();
     }

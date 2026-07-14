@@ -23,7 +23,7 @@ public sealed class PostgresRowVersionSpikeTests
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        container = new PostgreSqlBuilder("postgres:17-alpine")
+        container = new PostgreSqlBuilder(ContainerImageConfiguration.GetRequired("Tests:Postgres"))
             .Build();
 
         await container.StartAsync();
