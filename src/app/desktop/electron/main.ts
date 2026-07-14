@@ -12,6 +12,7 @@ import type {
   LoginRequest,
   LoginResult,
   ModelDefinition,
+  UnlockResult,
 } from '../src/shared/network/contracts.js'
 
 const apiBaseUrl = (process.env.INKWELL_WEBAPI_URL ?? 'http://localhost:6801').replace(/\/$/, '')
@@ -194,10 +195,12 @@ const registerApiHandlers = (): void => {
     }
   })
 
-  ipcMain.handle('inkwell:unlock', async (_event, password: string): Promise<AuthIdentity> => {
+  ipcMain.handle('inkwell:unlock', async (_event, password: string): Promise<UnlockResult> => {
     if (authSnapshot.status !== 'locked' || !sessionToken || !authSnapshot.identity) {
       throw new Error('Client is not locked.')
     }
+
+    const identity = authSnapshot.identity
 
     try {
       await request<void>('/api/auth/unlock', {
@@ -205,14 +208,20 @@ const registerApiHandlers = (): void => {
         body: JSON.stringify({ password }),
       })
     } catch (reason) {
-      if (reason instanceof ApiRequestError && reason.status === 423) {
-        await clearAuthentication()
+      if (reason instanceof ApiRequestError) {
+        if (reason.status === 423) {
+          await clearAuthentication()
+          return { ok: false, code: 'account-locked' }
+        }
+        return { ok: false, code: reason.status === 401 ? 'invalid-password' : 'unknown' }
       }
-      throw reason
+
+      return { ok: false, code: 'offline' }
     }
-    setAuthState('authenticated', authSnapshot.identity)
+
+    setAuthState('authenticated', identity)
     scheduleIdleLock()
-    return authSnapshot.identity!
+    return { ok: true, identity }
   })
 
   ipcMain.handle('inkwell:logout', async (): Promise<void> => {

@@ -3,6 +3,7 @@
 using Inkwell.WebApi.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Inkwell.WebApi.Controllers;
 
@@ -21,6 +22,7 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     /// <returns>登录成功后的认证会话。</returns>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthorizationPolicies.AuthRateLimiterPolicy)]
     [ProducesResponseType<AuthSession>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -58,9 +60,16 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> LogoutAsync(CancellationToken cancellationToken)
     {
-        _ = await authService.LogoutAsync(this.GetRequiredBearerToken(), cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _ = await authService.LogoutAsync(this.GetRequiredBearerToken(), cancellationToken).ConfigureAwait(false);
 
-        return this.NoContent();
+            return this.NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return this.Unauthorized();
+        }
     }
 
     /// <summary>
@@ -72,11 +81,18 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     [ProducesResponseType<AuthSession>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthSession>> GetSessionAsync(CancellationToken cancellationToken)
     {
-        AuthSession session = await authService.ValidateSessionAsync(
-            this.GetRequiredBearerToken(),
-            cancellationToken).ConfigureAwait(false);
+        try
+        {
+            AuthSession session = await authService.ValidateSessionAsync(
+                this.GetRequiredBearerToken(),
+                cancellationToken).ConfigureAwait(false);
 
-        return this.Ok(session);
+            return this.Ok(session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return this.Unauthorized();
+        }
     }
 
     /// <summary>
@@ -86,6 +102,7 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>无响应正文。</returns>
     [HttpPost("unlock")]
+    [EnableRateLimiting(AuthorizationPolicies.AuthRateLimiterPolicy)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status423Locked)]

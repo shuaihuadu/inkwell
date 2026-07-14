@@ -1,22 +1,19 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Diagnostics;
+using System.Security.Cryptography;
 using Inkwell.Persistence.EFCore.Entities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Inkwell.Persistence.EFCore;
 
 /// <summary>幂等 seed 入口；启动期由 <see cref="MigrationRunner"/> 调用。</summary>
-internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)
+internal sealed class InkwellSeeder(InkwellDbContext db, IOptions<PersistenceOptions> options, ILogger<InkwellSeeder> logger)
 {
-    /// <summary>
-    /// 默认管理员账号密码哈希（字面量，非运行时计算），明文密码 = <c>admin</c>。离线通过
-    /// <c>Inkwell.Auth.PasswordHasher.Hash("admin")</c> 预先计算得出（PBKDF2-HMACSHA256，
-    /// 迭代 600,000 次，盐 16 字节，输出 32 字节）。<see cref="InkwellSeeder"/> 不引用 <c>Inkwell.Auth</c>
-    /// （跨层依赖，AGENTS.md §3.2 禁止），仅使用本预计算字面量。生产部署后应强制修改此默认密码。
-    /// </summary>
-    private const string DefaultAdminPasswordHash =
-        "PBKDF2$600000$nlRFjDAWja7C0zFbWPNDGQ==$pgLLl4+b5j2/B2hF0aoFjcrgutvb4+dwl9EV4vjEWxk=";
+    private const int PasswordHashIterations = 600_000;
+    private const int PasswordSaltSize = 16;
+    private const int PasswordHashSize = 32;
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
@@ -46,12 +43,18 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
             }
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            string adminPassword = options.Value.Seed.AdminPassword;
+
+            if (string.IsNullOrWhiteSpace(adminPassword))
+            {
+                throw new InvalidOperationException("Configuration 'Inkwell:Persistence:Seed:AdminPassword' must not be empty.");
+            }
 
             db.Set<UserEntity>().Add(new UserEntity
             {
                 Id = Guid.CreateVersion7(),
                 Username = "admin",
-                PasswordHash = DefaultAdminPasswordHash,
+                PasswordHash = HashPassword(adminPassword),
                 IsSuper = true,
                 IsLocked = false,
                 FailedUnlockAttempts = 0,
@@ -78,5 +81,13 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
             Activity.Current?.AddException(inner);
             throw new InvalidOperationException($"Seeder segment '{SegmentName}' failed", inner);
         }
+    }
+
+    private static string HashPassword(string password)
+    {
+        byte[] salt = RandomNumberGenerator.GetBytes(PasswordSaltSize);
+        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, PasswordHashIterations, HashAlgorithmName.SHA256, PasswordHashSize);
+
+        return $"PBKDF2${PasswordHashIterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
 }

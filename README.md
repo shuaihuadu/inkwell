@@ -62,6 +62,14 @@ dotnet run --project src/core/Inkwell.AppHost
 
 Aspire Dashboard 会显示 Electron desktop、视觉设计原型、PostgreSQL 17、SQL Server 2025、pgAdmin、LiteLLM、两个 Provider 各自的 Migrator、WebApi 和 Worker。视觉设计原型作为独立 Vite 资源启动，不等待后端资源；Electron desktop 通过 `electron-vite dev` 启动，在 WebApi 就绪后打开原生窗口，并由 AppHost 注入 WebApi 地址。两个 Migrator 分别应用独立的 EF Core migration；WebApi 与 Worker 仅在两者均成功完成 Migration + Seed 且 LiteLLM 可用后启动，当前业务运行时仍以 PostgreSQL 为主库。
 
+默认管理员账号为 `admin`，开发环境默认密码为 `admin`。可通过 AppHost User Secrets 覆盖 Seed 密码，AppHost 会以 secret Parameter 将其传给两个 Migrator，不在 Dashboard 中显示明文：
+
+```bash
+dotnet user-secrets set "Inkwell:Persistence:Seed:AdminPassword" "<your-password>" --project src/core/Inkwell.AppHost
+```
+
+直接运行 Migrator 时可改用环境变量 `Inkwell__Persistence__Seed__AdminPassword`。该配置只在首次创建 `admin` 账号时生效；如果数据库中已存在该账号，幂等 Seeder 不会重置其密码。
+
 本地端口集中配置在 `src/core/Inkwell.AppHost/appsettings.json`，默认使用视觉设计原型 `6800`、WebApi `6801`、pgAdmin `6802`、SQL Server `6803`、LiteLLM `6804`；可通过对应的 `Ports__Prototype`、`Ports__WebApi` 等环境变量覆盖。Electron desktop 是原生进程，不占用固定的外部 HTTP 端口。访问 `http://localhost:6800` 打开视觉设计原型，`http://localhost:6801` 会跳转到 Scalar API 文档页面，`http://localhost:6802` 提供 pgAdmin 数据库管理页面；健康检查位于 `/healthz`，OpenAPI 文档位于 `/openapi/v1.json`。两套物理数据库均名为 `Inkwell`；Aspire 中以 `postgres-database` / `sqlserver-database` 两个唯一资源标识区分。PostgreSQL 使用小写 snake_case 物理标识符和 `jsonb`，SQL Server 使用 PascalCase 物理标识符和 SQL Server 2025 原生 `json`，两套 adapter 各自维护独立 migration。
 
 SQL Server 2025 Linux 容器仅官方支持 x86-64。在 Apple Silicon 上，Docker Desktop 可能通过 amd64 模拟运行该镜像，但此路径不属于 Microsoft 官方支持范围。SQL Server 2025 的原生向量能力不改变 v1 的存储边界：关系数据可使用 PostgreSQL 或 SQL Server，向量数据仍由 Qdrant Provider 承载。

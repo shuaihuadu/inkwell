@@ -168,13 +168,14 @@ downstream: []
 - **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore/InkwellSeeder.cs`
 - **职责**：幂等 seed 入口；启动期由 `MigrationRunner` 调；v1 落地一个具体 seed 段——默认管理员账号（`admin`）
 - **对外接口**：
-  - `internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)`
+  - `internal sealed class InkwellSeeder(InkwellDbContext db, IOptions<PersistenceOptions> options, ILogger<InkwellSeeder> logger)`
   - `public async Task SeedAsync(CancellationToken ct = default)`
 - **内部函数或类**：
-  - `private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)`——v1 唯一落地 seed 段，创建用户名 `admin` 的默认超级管理员账号；`PasswordHash` 为离线预先计算的字面量常量，不在运行时调用 `PasswordHasher`（`InkwellSeeder` 不引用 `Inkwell.Core.Auth`，无跨层依赖，[AGENTS.md §3.2](../../../AGENTS.md)）
+  - `private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)`——v1 唯一落地 seed 段，创建用户名 `admin` 的默认超级管理员账号；从 `Inkwell:Persistence:Seed:AdminPassword` 读取首次 Seed 密码（默认 `admin`），使用随机 16 字节盐和 PBKDF2-HMACSHA256 600,000 次迭代生成 `PasswordHash`，不记录明文密码
+  - `private static string HashPassword(string password)`——仅使用 BCL 生成与 `Inkwell.Core.Auth.PasswordHasher` 相同格式的自描述哈希；Provider 不引用 `Inkwell.Core.Auth`，保持 [AGENTS.md §3.2](../../../AGENTS.md) 依赖边界
   - 预留其他 seed 段扩展点：`SeedSystemUserAsync` / `SeedDefaultRolesAsync` / etc.（v1 范围外，未来业务 HD 按需增量贡献）
   - **幂等模式**：每个 seed 段先查业务唯一键（如 `users.Username`） → 不存在则 `Add`；**禁**用 `Id` 主键判定（[ADR-021 §Migration/DataSeed 启动行为](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
-- **输入数据**：DI 注入的 `InkwellDbContext`
+- **输入数据**：DI 注入的 `InkwellDbContext` + `PersistenceOptions.Seed.AdminPassword`；AppHost 通过 secret Parameter 注入，直接运行 Migrator 时可通过 `Inkwell__Persistence__Seed__AdminPassword` 覆盖
 - **输出数据**：成功无返回值；失败抛 BCL 异常（`InvalidOperationException` 包 inner）
 - **依赖模块**：`Microsoft.EntityFrameworkCore` / `Entities/UserEntity.cs`（[§3.7](#37-entitiesentityentitycs-模板--agententity-示例)） / Mapping（不依赖 `Common/Result.cs`）；**不**依赖 `Inkwell.Core.Auth.PasswordHasher`（跨层依赖，[AGENTS.md §3.2](../../../AGENTS.md) 禁止）
 - **错误处理**：seed 段任一 throw → 包成 `new InvalidOperationException($"Seeder segment '{segmentName}' failed", inner)`（[HD-002 §4.3](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) BCL 对照表事务回滚 row），记 `LogError` 含失败段名 + `Activity.AddException(inner)` 写 OTel 五字段；不重试（启动期失败由 K8s probe 触发 pod 重启）
@@ -184,87 +185,28 @@ downstream: []
   - 全部完成：`LogInformation("Seed done totalSegments={N} totalInserted={M} elapsed={Ms}ms")`
 - **测试要求**：
   - 首次跑插数、二次跑零插数（幂等断言）、任一段 throw 包成 `InvalidOperationException`、`AutoSeedOnStartup(false)` 时 Seeder 不被注入
-  - `SeedDefaultAdminAsync`：首次运行插入 `Username="admin"` 且 `IsSuper=true` 一条记录；二次运行零插入（幂等断言，按 `Username` 而非 `Id` 判定）；`PasswordHash` 值等于硬编码字面量常量（断言不触发任何运行时哈希计算）
+  - `SeedDefaultAdminAsync`：首次运行插入 `Username="admin"` 且 `IsSuper=true` 一条记录；配置的非默认密码可通过哈希校验、默认密码不可通过；二次运行零插入（幂等断言，按 `Username` 而非 `Id` 判定）
   - 覆盖率门槛 ≥ 95%
 
-**完整代码**：
+**核心代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore/InkwellSeeder.cs
-namespace Inkwell.Persistence.EFCore;
-
-using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Inkwell.Persistence.EFCore.Entities;
-
-internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)
+internal sealed class InkwellSeeder(
+  InkwellDbContext db,
+  IOptions<PersistenceOptions> options,
+  ILogger<InkwellSeeder> logger)
 {
-    /// <summary>
-    /// 默认管理员账号密码哈希（字面量，非运行时计算）。
-    /// 离线通过 <c>Inkwell.Core.Auth.PasswordHasher.Hash("admin")</c> 预先计算得出，
-    /// 算法 = PBKDF2-HMACSHA256，迭代 600,000 次，盐 16 字节，输出 32 字节，
-    /// 自描述字符串格式与常量定义详见 HD-014 §3.9。
-    /// InkwellSeeder 不引用 Inkwell.Core.Auth（跨层依赖，AGENTS.md §3.2 禁止），仅使用本预计算字面量。
-    /// </summary>
-    private const string DefaultAdminPasswordHash =
-      "PBKDF2$600000$nlRFjDAWja7C0zFbWPNDGQ==$pgLLl4+b5j2/B2hF0aoFjcrgutvb4+dwl9EV4vjEWxk=";
-
-    public async Task SeedAsync(CancellationToken ct = default)
+  private static string HashPassword(string password)
     {
-        logger.LogInformation("Seed begin");
-        var sw = Stopwatch.StartNew();
+    byte[] salt = RandomNumberGenerator.GetBytes(16);
+    byte[] hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, 600_000, HashAlgorithmName.SHA256, 32);
 
-        var inserted = await SeedDefaultAdminAsync(ct);
-
-        sw.Stop();
-        logger.LogInformation(
-            "Seed done totalSegments={N} totalInserted={M} elapsed={Ms}ms",
-            1, inserted, sw.ElapsedMilliseconds);
-    }
-
-    /// <summary>Seed 段：默认管理员账号（幂等，按 Username 唯一键判定，非 Id 判定）。</summary>
-    private async Task<int> SeedDefaultAdminAsync(CancellationToken ct)
-    {
-        const string segmentName = "DefaultAdmin";
-
-        try
-        {
-            var exists = await db.Set<UserEntity>().AnyAsync(x => x.Username == "admin", ct);
-            if (exists)
-            {
-                logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 0);
-                return 0;
-            }
-
-            var now = DateTimeOffset.UtcNow;
-            db.Set<UserEntity>().Add(new UserEntity
-            {
-                Id = Guid.CreateVersion7(),
-                Username = "admin",
-                PasswordHash = DefaultAdminPasswordHash,
-                IsSuper = true,
-                IsLocked = false,
-                FailedUnlockAttempts = 0,
-                CreatedTime = now,
-                UpdatedTime = now,
-            });
-            await db.SaveChangesAsync(ct);
-
-            logger.LogInformation("Seed {SegmentName} ok inserted={NewRowCount}", segmentName, 1);
-            return 1;
-        }
-        catch (Exception inner) when (inner is not OperationCanceledException)
-        {
-            logger.LogError(inner, "Seed {SegmentName} failed", segmentName);
-            Activity.Current?.AddException(inner);
-            throw new InvalidOperationException($"Seeder segment '{segmentName}' failed", inner);
-        }
+    return $"PBKDF2$600000${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
 }
 ```
 
-> **安全提示（文档提示，非本 HD 要实现的功能）**：生产环境部署后应强制要求管理员首次登录修改密码，或由运维直接通过 SQL 改密——`admin` / `admin` 是众所周知的默认凭据，不得作为生产环境长期密码。v1 `IAuthService`（[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)）未提供"首次登录强制改密"流程，留作后续需求，本 HD 不代为实现。
+> **安全提示**：`admin` / `admin` 仅作为本地开发默认值。部署时必须通过 Secret 设置 `Inkwell:Persistence:Seed:AdminPassword`；该配置只在 `admin` 账号不存在时生效，幂等 Seeder 不会重置已有账号密码。v1 `IAuthService`（[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)）未提供“首次登录强制改密”流程，留作后续需求。
 
 ### 3.5 MigrationRunner.cs
 

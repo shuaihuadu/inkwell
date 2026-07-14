@@ -9,6 +9,7 @@ using Inkwell.VectorStore.InMemory;
 using Inkwell.WebApi;
 using Inkwell.WebApi.Errors;
 using Inkwell.WebApi.Protocols;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -67,6 +68,18 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
+// 登录 / 解锁按客户端 IP 限流，防止密码暴力枚举（AuthController 上的 [EnableRateLimiting] 引用此策略名）。
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter(AuthorizationPolicies.AuthRateLimiterPolicy, limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
+    });
+});
+
 WebApplication app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -78,6 +91,7 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/", (IHostEnvironment environment) => environment.IsDevelopment()
     ? Results.Redirect("/scalar/v1")

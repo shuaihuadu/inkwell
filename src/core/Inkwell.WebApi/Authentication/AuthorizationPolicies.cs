@@ -10,4 +10,7 @@ public static class AuthorizationPolicies
 
     /// <summary>要求 <see cref="SessionClaimTypes.IsSuper"/> 为 <c>true</c>（超级管理员）。</summary>
     public const string RequireSuperUser = "RequireSuperUser";
+
+    /// <summary>登录 / 解锁等密码校验端点使用的按 IP 限流策略名称。</summary>
+    public const string AuthRateLimiterPolicy = "Auth";
 }

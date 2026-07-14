@@ -26,6 +26,11 @@ public sealed class PersistenceOptions
     public bool AutoSeedOnStartup { get; set; } = true;
 
     /// <summary>
+    /// 获取或设置持久化 Seed 配置。
+    /// </summary>
+    public PersistenceSeedOptions Seed { get; set; } = new();
+
+    /// <summary>
     /// 获取或设置是否启用敏感数据日志记录。
     /// </summary>
     public bool EnableSensitiveDataLogging { get; set; }

@@ -10,5 +10,5 @@ namespace Inkwell.WebApi.Auth;
 /// <param name="Username">用户名。</param>
 /// <param name="Password">密码。</param>
 public sealed record class LoginRequest(
-    [Required] string Username,
-    [Required] string Password);
+    [Required, StringLength(256)] string Username,
+    [Required, StringLength(256)] string Password);

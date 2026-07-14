@@ -39,7 +39,11 @@ internal sealed class AuthService(
 
         if (!PasswordHasher.Verify(password, user.PasswordHash))
         {
-            throw new UnauthorizedAccessException("Invalid username or password.");
+            bool nowLocked = await this.RegisterFailedPasswordAttemptAsync(user, ct).ConfigureAwait(false);
+
+            throw nowLocked
+                ? new InvalidOperationException("Account locked: too many failed login attempts.")
+                : new UnauthorizedAccessException("Invalid username or password.");
         }
 
         if (user.IsLocked)
@@ -58,7 +62,7 @@ internal sealed class AuthService(
             ct).ConfigureAwait(false);
 
         await persistenceProvider.ExecuteInTransactionAsync(
-            innerCt => this._users.UpdateUser(user with { LastLoginTime = now }, innerCt),
+            innerCt => this._users.UpdateUser(user with { LastLoginTime = now, FailedUnlockAttempts = 0 }, innerCt),
             ct).ConfigureAwait(false);
 
         return new AuthSession(user.Id, user.Username, user.IsSuper, token, now.AddHours(options.SessionTtlHours));
@@ -103,24 +107,40 @@ internal sealed class AuthService(
 
         User user = await this._users.GetUser(userId, ct).ConfigureAwait(false);
 
+        if (!PasswordHasher.Verify(password, user.PasswordHash))
+        {
+            bool nowLocked = await this.RegisterFailedPasswordAttemptAsync(user, ct).ConfigureAwait(false);
+
+            throw nowLocked
+                ? new InvalidOperationException("Account locked: too many failed unlock attempts.")
+                : new UnauthorizedAccessException("Invalid password.");
+        }
+
+        if (user.FailedUnlockAttempts != 0)
+        {
+            await persistenceProvider.ExecuteInTransactionAsync(
+                innerCt => this._users.UpdateUser(user with { FailedUnlockAttempts = 0 }, innerCt),
+                ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// 记录一次密码校验失败（登录或解锁场景共用同一失败计数），达到阈值时锁定账号。
+    /// </summary>
+    /// <param name="user">校验失败对应的账号。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>账号是否因本次失败而进入锁定状态。</returns>
+    private async Task<bool> RegisterFailedPasswordAttemptAsync(User user, CancellationToken ct)
+    {
         int maxAttempts = authOptions.Value.MaxFailedUnlockAttempts;
-        bool passwordCorrect = PasswordHasher.Verify(password, user.PasswordHash);
-        int newFailedAttempts = passwordCorrect ? 0 : user.FailedUnlockAttempts + 1;
-        bool nowLocked = !passwordCorrect && newFailedAttempts >= maxAttempts;
+        int newFailedAttempts = user.FailedUnlockAttempts + 1;
+        bool nowLocked = user.IsLocked || newFailedAttempts >= maxAttempts;
 
         await persistenceProvider.ExecuteInTransactionAsync(
-            innerCt => this._users.UpdateUser(user with { FailedUnlockAttempts = newFailedAttempts, IsLocked = user.IsLocked || nowLocked }, innerCt),
+            innerCt => this._users.UpdateUser(user with { FailedUnlockAttempts = newFailedAttempts, IsLocked = nowLocked }, innerCt),
             ct).ConfigureAwait(false);
 
-        if (!passwordCorrect)
-        {
-            if (nowLocked)
-            {
-                throw new InvalidOperationException("Account locked: too many failed unlock attempts.");
-            }
-
-            throw new UnauthorizedAccessException("Invalid password.");
-        }
+        return nowLocked;
     }
 
     public async Task UnlockAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default)

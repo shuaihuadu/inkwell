@@ -31,7 +31,7 @@ public sealed record class User : IHasTimestamps, IHasRowVersion
     public bool IsLocked { get; init; }
 
     /// <summary>
-    /// 获取连续解锁验证失败次数。
+    /// 获取连续密码验证失败次数（登录与客户端解锁场景共用同一计数）。
     /// </summary>
     public int FailedUnlockAttempts { get; init; }
 

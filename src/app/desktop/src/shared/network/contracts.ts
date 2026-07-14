@@ -14,6 +14,16 @@ export type LoginResult =
     | { ok: true; identity: AuthIdentity }
     | { ok: false; code: LoginFailureCode };
 
+export type UnlockFailureCode =
+    | "invalid-password"
+    | "account-locked"
+    | "offline"
+    | "unknown";
+
+export type UnlockResult =
+    | { ok: true; identity: AuthIdentity }
+    | { ok: false; code: UnlockFailureCode };
+
 export interface AuthIdentity {
     userId: string;
     username: string;
@@ -83,7 +93,7 @@ export interface InkwellDesktopApi {
     platform: string;
     restoreAuth: () => Promise<AuthSnapshot>;
     login: (request: LoginRequest) => Promise<LoginResult>;
-    unlock: (password: string) => Promise<AuthIdentity>;
+    unlock: (password: string) => Promise<UnlockResult>;
     logout: () => Promise<void>;
     reportActivity: () => void;
     onAuthStateChanged: (
