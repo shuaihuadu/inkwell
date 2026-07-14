@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import type { AuthSession } from "../../shared/network/contracts";
+import type { AuthSnapshot } from "../../shared/network/contracts";
 
-interface AuthState {
-    session: AuthSession | null;
-    setSession: (session: AuthSession | null) => void;
+interface AuthState extends AuthSnapshot {
+    setSnapshot: (snapshot: AuthSnapshot) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-    session: null,
-    setSession: (session) => set({ session }),
+    status: "restoring",
+    identity: null,
+    setSnapshot: (snapshot) => set(snapshot),
 }));

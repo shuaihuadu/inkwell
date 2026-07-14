@@ -21,6 +21,40 @@ textarea {
 #root {
     min-height: 100vh;
 }
+.auth-state-page,
+.lock-page {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    background: #eef1ef;
+}
+.lock-panel {
+    display: flex;
+    width: min(420px, calc(100vw - 48px));
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px;
+    border: 1px solid #dfe4e1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 18px 50px rgb(23 60 55 / 10%);
+}
+.lock-panel .lock-icon {
+    color: #176b5b;
+    font-size: 36px;
+}
+.lock-panel h2.ant-typography,
+.lock-panel .ant-typography {
+    margin: 0;
+}
+.lock-panel .ant-alert,
+.lock-panel .ant-form {
+    width: 100%;
+}
 .brand-mark {
     display: grid;
     place-items: center;
@@ -38,9 +72,10 @@ textarea {
     font-size: 20px;
 }
 .login-page {
-    display: grid;
-    grid-template-columns: minmax(360px, 42%) 1fr;
+    display: flex;
     min-height: 100vh;
+    overflow: hidden;
+    background: #f6f5f8;
 }
 .login-brand {
     position: relative;
@@ -48,59 +83,128 @@ textarea {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 20px;
-    padding: clamp(48px, 8vw, 120px);
-    color: #f7f3e8;
-    background: #173c37;
+    align-items: flex-start;
+    flex: 0 0 clamp(260px, 44%, 430px);
+    padding: 56px 48px;
+    background:
+        radial-gradient(circle at 18% 18%, rgb(104 70 156 / 66%) 0%, transparent 38%),
+        radial-gradient(circle at 85% 78%, rgb(67 135 189 / 18%) 0%, transparent 42%),
+        linear-gradient(145deg, #3d285e 0%, #21172f 100%);
 }
 .login-brand h1.ant-typography {
+    position: relative;
+    z-index: 1;
     margin: 0;
     color: #fff;
-    font-family: Georgia, serif;
-    font-size: 56px;
+    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    font-size: 62px;
+    font-weight: 600;
+    line-height: 1;
     letter-spacing: 0;
 }
-.login-brand .ant-typography {
-    max-width: 420px;
-    color: #c9d9d5;
-    font-size: 18px;
-}
-.login-pattern {
+.login-brand-rings {
     position: absolute;
-    right: -100px;
-    bottom: -130px;
-    width: 420px;
-    height: 420px;
-    border: 64px solid #cfaa63;
+    right: -110px;
+    bottom: -100px;
+    width: 300px;
+    height: 300px;
+    border: 1px solid rgb(255 255 255 / 12%);
     border-radius: 50%;
-    opacity: 0.38;
+    box-shadow: 0 0 0 42px rgb(255 255 255 / 3.5%), 0 0 0 86px rgb(255 255 255 / 1.8%);
 }
 .login-form-panel {
-    display: grid;
-    place-items: center;
-    padding: 48px;
-    background:
-        radial-gradient(circle at 80% 15%, #e8eee9 0 8%, transparent 8.5%),
-        #f7f8f6;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+    padding: 48px 44px;
+    overflow: hidden;
+    background: #fff;
+}
+.login-form-panel::after {
+    position: absolute;
+    top: -190px;
+    right: -210px;
+    width: 380px;
+    height: 380px;
+    border: 1px solid rgb(104 70 156 / 9%);
+    border-radius: 50%;
+    box-shadow: 0 0 0 38px rgb(104 70 156 / 4%), 0 0 0 82px rgb(104 70 156 / 2.7%);
+    content: "";
+    pointer-events: none;
+}
+.login-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.32;
+    background-image: linear-gradient(rgb(104 70 156 / 7%) 1px, transparent 1px), linear-gradient(90deg, rgb(104 70 156 / 7%) 1px, transparent 1px);
+    background-size: 36px 36px;
+    -webkit-mask-image: linear-gradient(135deg, transparent 10%, #000 55%, transparent 92%);
+    mask-image: linear-gradient(135deg, transparent 10%, #000 55%, transparent 92%);
 }
 .login-form-wrap {
-    width: min(100%, 420px);
+    position: relative;
+    z-index: 1;
+    width: min(100%, 360px);
 }
-.login-form-wrap h2.ant-typography {
-    margin: 10px 0 6px;
-    font-size: 34px;
+.login-heading {
+    margin-bottom: 24px;
+    text-align: center;
 }
-.login-form-wrap .ant-alert {
-    margin: 24px 0;
+.login-heading img {
+    display: block;
+    margin: 0 auto 14px;
 }
-.login-form-wrap .ant-form {
-    margin-top: 30px;
+.login-heading h4.ant-typography {
+    margin: 0 0 2px;
 }
-.eyebrow {
-    color: #176b5b;
+.login-alert {
+    margin-bottom: 12px;
+}
+.login-form {
+    display: grid;
+    gap: 16px;
+}
+.login-form .ant-form-item {
+    margin-bottom: 0;
+}
+.login-help.ant-typography {
+    margin: 36px 0 0;
+    text-align: center;
     font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
+}
+.login-version.ant-typography {
+    display: block;
+    margin-top: 20px;
+    text-align: center;
+    font-size: 11px;
+}
+@media (max-width: 720px) {
+    .login-page {
+        flex-direction: column;
+        overflow: auto;
+    }
+    .login-brand {
+        flex: 0 0 210px;
+        width: 100%;
+        padding: 40px 32px;
+    }
+    .login-brand h1.ant-typography {
+        font-size: 48px;
+    }
+    .login-form-panel {
+        min-height: 500px;
+        padding: 40px 24px 44px;
+    }
+    .login-form-panel::after {
+        top: -150px;
+        right: -150px;
+        width: 240px;
+        height: 240px;
+    }
 }
 .workspace-shell {
     min-height: 100vh;

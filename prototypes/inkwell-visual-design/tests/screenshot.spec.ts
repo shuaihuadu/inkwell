@@ -40,7 +40,9 @@ test.describe("Design Lab", () => {
         });
     });
 
-    test("mobile overview has no horizontal overflow", async ({ page }, testInfo) => {
+    test("mobile overview has no horizontal overflow", async ({
+        page,
+    }, testInfo) => {
         test.skip(testInfo.project.name !== "mobile");
         await page.goto("/");
         await waitForRender(page);
@@ -66,7 +68,9 @@ test.describe("Theme Explorer", () => {
         });
     });
 
-    test("tablet layout has no horizontal overflow", async ({ page }, testInfo) => {
+    test("tablet layout has no horizontal overflow", async ({
+        page,
+    }, testInfo) => {
         test.skip(testInfo.project.name !== "tablet");
         await page.goto("/themes");
         await waitForRender(page);
@@ -83,14 +87,16 @@ test.describe("Logo Explorer", () => {
         test.skip(testInfo.project.name !== "desktop-hd");
         await page.goto("/logos");
         await waitForRender(page);
-        const logosLoaded = await page.locator("img").evaluateAll((images) =>
-            images.every(
-                (image) =>
-                    image instanceof HTMLImageElement &&
-                    image.complete &&
-                    image.naturalWidth > 0,
-            ),
-        );
+        const logosLoaded = await page
+            .locator("img")
+            .evaluateAll((images) =>
+                images.every(
+                    (image) =>
+                        image instanceof HTMLImageElement &&
+                        image.complete &&
+                        image.naturalWidth > 0,
+                ),
+            );
         expect(logosLoaded).toBe(true);
         await page.screenshot({
             path: screenshotPath("05-logo-desktop.png"),
@@ -112,7 +118,9 @@ test.describe("Login Explorer", () => {
         });
     });
 
-    test("mobile layout has no horizontal overflow", async ({ page }, testInfo) => {
+    test("mobile layout has no horizontal overflow", async ({
+        page,
+    }, testInfo) => {
         test.skip(testInfo.project.name !== "mobile");
         await page.goto("/login");
         await waitForRender(page);
@@ -125,11 +133,43 @@ test.describe("Login Explorer", () => {
 });
 
 test.describe("Agent Design Page", () => {
-    test("opens model settings and conversation drawer", async ({ page }, testInfo) => {
+    test("configuration workspace fills wide viewports", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.goto("/agent");
+
+        const workspace = page.getByTestId("agent-configuration-workspace");
+        await expect(workspace).toBeVisible();
+        const widths = await workspace.evaluate((element) => {
+            const parent = element.parentElement;
+            const parentStyle = parent ? getComputedStyle(parent) : null;
+            return {
+                workspace: element.getBoundingClientRect().width,
+                parentContent:
+                    (parent?.getBoundingClientRect().width ?? 0) -
+                    Number.parseFloat(parentStyle?.paddingLeft ?? "0") -
+                    Number.parseFloat(parentStyle?.paddingRight ?? "0"),
+                outerPadding: Number.parseFloat(
+                    parentStyle?.paddingLeft ?? "0",
+                ),
+            };
+        });
+
+        expect(widths.workspace).toBeCloseTo(widths.parentContent, 0);
+        expect(widths.outerPadding).toBe(0);
+    });
+
+    test("opens model settings and conversation drawer", async ({
+        page,
+    }, testInfo) => {
         test.skip(testInfo.project.name !== "desktop-hd");
         await page.goto("/agent");
         await page.getByText("模型与参数", { exact: true }).click();
-        await expect(page.getByText("Temperature", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("Temperature", { exact: true }),
+        ).toBeVisible();
         await page.getByRole("button", { name: "开始对话" }).click();
         await expect(page.getByRole("dialog")).toBeVisible();
         await page.screenshot({
@@ -145,7 +185,36 @@ test.describe("Agent Design Page", () => {
         await expect(page.getByText("删除这个 Agent？")).toBeVisible();
     });
 
-    test("tablet layout has no horizontal overflow", async ({ page }, testInfo) => {
+    test("shows chat history and compaction as separate concerns", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/agent");
+        await page.getByRole("button", { name: "上下文策略" }).click();
+        await expect(
+            page.getByText("InkwellChatHistoryProvider", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("switch", { name: "启用压缩流水线" }),
+        ).toBeDisabled();
+        for (const strategy of [
+            "ToolResultCompactionStrategy",
+            "SummarizationCompactionStrategy",
+            "SlidingWindowCompactionStrategy",
+            "TruncationCompactionStrategy",
+        ]) {
+            await expect(
+                page.getByText(strategy, { exact: true }),
+            ).toBeVisible();
+        }
+        await expect(
+            page.getByText("聊天记录存储与模型输入压缩相互独立"),
+        ).toBeVisible();
+    });
+
+    test("tablet layout has no horizontal overflow", async ({
+        page,
+    }, testInfo) => {
         test.skip(testInfo.project.name !== "tablet");
         await page.goto("/agent");
         await waitForRender(page);

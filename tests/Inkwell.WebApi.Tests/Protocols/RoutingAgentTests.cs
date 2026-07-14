@@ -1,5 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Security.Claims;
 using Inkwell.WebApi.Protocols;
 
 namespace Inkwell.WebApi.Tests.Protocols;
@@ -18,25 +19,27 @@ public sealed class RoutingAgentTests
     {
         // Arrange
         Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
         AgentVersion firstVersion = CreateVersion(agentId, 1);
         AgentVersion secondVersion = CreateVersion(agentId, 2);
-        StubAgentRepository agents = new(CreateDefinition(agentId, firstVersion.Id));
-        StubAgentVersionRepository versions = new(firstVersion, secondVersion);
+        StubAgentVersionService versions = new(CreateDefinition(agentId, ownerUserId, firstVersion.Id), firstVersion, secondVersion);
         RecordingAgentFactory factory = new();
         ServiceCollection services = new();
-        services.AddSingleton<IAgentRepository>(agents);
-        services.AddSingleton<IAgentVersionRepository>(versions);
+        services.AddSingleton<IAgentVersionService>(versions);
         services.AddSingleton<IAgentFactory>(factory);
         services.AddSingleton<IAgentToolBindingResolver, EmptyToolBindingResolver>();
         using ServiceProvider serviceProvider = services.BuildServiceProvider();
         DefaultHttpContext httpContext = new();
         httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
         HttpContextAccessor accessor = new() { HttpContext = httpContext };
         RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
 
         // Act
         AgentSession session = await agent.CreateSessionAsync();
-        agents.Definition = CreateDefinition(agentId, secondVersion.Id);
+        versions.Definition = CreateDefinition(agentId, ownerUserId, secondVersion.Id);
         JsonElement serializedState = await agent.SerializeSessionAsync(session);
         AgentSession restoredSession = await agent.DeserializeSessionAsync(serializedState);
 
@@ -49,10 +52,10 @@ public sealed class RoutingAgentTests
         CollectionAssert.DoesNotContain(factory.BuiltVersionIds, secondVersion.Id);
     }
 
-    private static AgentDefinition CreateDefinition(Guid agentId, Guid publishedVersionId) => new()
+    private static AgentDefinition CreateDefinition(Guid agentId, Guid ownerUserId, Guid publishedVersionId) => new()
     {
         Id = agentId,
-        OwnerUserId = Guid.CreateVersion7(),
+        OwnerUserId = ownerUserId,
         CurrentPublishedVersionId = publishedVersionId,
         LatestPublishedVersionNumber = 1,
         CreatedTime = DateTimeOffset.UtcNow,
@@ -126,38 +129,33 @@ public sealed class RoutingAgentTests
 
     private sealed class StubAgentSession : AgentSession;
 
-    private sealed class StubAgentRepository(AgentDefinition definition) : IAgentRepository
+    private sealed class StubAgentVersionService(
+        AgentDefinition definition,
+        params AgentVersion[] versions) : IAgentVersionService
     {
         public AgentDefinition Definition { get; set; } = definition;
 
-        public Task<AgentDefinition> AddAgent(AgentDefinition agent, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task UpdateAgent(AgentDefinition agent, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task<AgentDefinition> GetAgent(Guid id, CancellationToken ct = default) => Task.FromResult(this.Definition);
-
-        public Task<bool> DeleteAgent(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task<PagedResult<AgentDefinition>> ListAgents(Pagination pagination, SortOrder sort, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AgentDefinition>> FindAgentsByOwner(Guid ownerUserId, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AgentDefinition>> FindSharedAgents(Guid excludingOwnerUserId, CancellationToken ct = default) => throw new NotSupportedException();
-    }
-
-    private sealed class StubAgentVersionRepository(params AgentVersion[] versions) : IAgentVersionRepository
-    {
         private readonly Dictionary<Guid, AgentVersion> _versions = versions.ToDictionary(version => version.Id);
 
-        public Task<AgentVersion> AddVersionAsync(AgentVersion version, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(this._versions[this.Definition.CurrentPublishedVersionId!.Value]);
 
-        public Task<AgentVersion> UpdateVersionAsync(AgentVersion version, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<AgentVersion> GetVersionAsync(Guid versionId, CancellationToken cancellationToken = default) =>
+        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
             Task.FromResult(this._versions[versionId]);
 
-        public Task<IReadOnlyList<AgentVersion>> ListVersionsByAgentAsync(Guid agentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(this._versions[versionId]);
 
-        public Task<IReadOnlyDictionary<Guid, AgentVersion>> FindVersionsByIdsAsync(IReadOnlyList<Guid> versionIds, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<AgentVersion>> ListVersionsAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentVersion> SaveDraftAsync(Guid agentId, AgentSnapshot snapshot, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentVersion> PublishDraftAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentVersion> RollbackAsync(Guid agentId, Guid sourceVersionId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

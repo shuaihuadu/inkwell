@@ -8,6 +8,25 @@ namespace Inkwell;
 public interface IAgentVersionService
 {
     /// <summary>
+    /// 获取指定 Agent 当前可调用的发布版本。
+    /// </summary>
+    /// <param name="agentId">Agent 标识。</param>
+    /// <param name="requestingUserId">请求用户标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>当前发布且请求用户可见的版本。</returns>
+    Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取指定的可调用发布版本。
+    /// </summary>
+    /// <param name="agentId">Agent 标识。</param>
+    /// <param name="versionId">版本标识。</param>
+    /// <param name="requestingUserId">请求用户标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>指定且请求用户可见的发布版本。</returns>
+    Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 获取指定版本。
     /// </summary>
     /// <param name="agentId">Agent 标识。</param>

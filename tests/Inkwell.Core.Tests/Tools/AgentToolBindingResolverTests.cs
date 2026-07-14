@@ -37,7 +37,7 @@ public sealed class AgentToolBindingResolverTests
             },
         };
         AgentToolBindingResolver resolver = new(
-            new StubAgentToolRepository(tool),
+            new StubPersistenceProvider(new StubAgentToolRepository(tool)),
             executors);
 
         // Act
@@ -75,6 +75,24 @@ public sealed class AgentToolBindingResolverTests
             throw new NotSupportedException();
 
         public Task<PagedResult<AgentToolDefinition>> ListTools(Pagination pagination, SortOrder sort, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class StubPersistenceProvider(IAgentToolRepository tools) : IPersistenceProvider
+    {
+        public TRepository GetRepository<TRepository>() where TRepository : notnull =>
+            tools is TRepository repository ? repository : throw new NotSupportedException();
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResult> ExecuteInTransactionAsync<TResult>(Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task ExecuteInTransactionAsync(IsolationLevel isolationLevel, Func<CancellationToken, Task> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResult> ExecuteInTransactionAsync<TResult>(IsolationLevel isolationLevel, Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }

@@ -7,9 +7,11 @@ namespace Inkwell;
 
 /// <summary><see cref="IAgentToolBindingResolver"/> 唯一实现；<see cref="AgentToolBinding"/> → <see cref="AIFunction"/> 翻译 + 执行委托合并逻辑。</summary>
 internal sealed class AgentToolBindingResolver(
-    IAgentToolRepository tools,
+    IPersistenceProvider persistence,
     IReadOnlyDictionary<Guid, Func<string, CancellationToken, Task<string>>> toolExecutors) : IAgentToolBindingResolver
 {
+    private readonly IAgentToolRepository _tools = persistence.GetRepository<IAgentToolRepository>();
+
     public async Task<IReadOnlyList<AIFunction>> ResolveAsync(IReadOnlyList<AgentToolBinding> bindings, CancellationToken ct = default)
     {
         if (bindings.Count == 0)
@@ -21,7 +23,7 @@ internal sealed class AgentToolBindingResolver(
 
         foreach (AgentToolBinding binding in bindings)
         {
-            AgentToolDefinition tool = await tools.GetTool(binding.ToolId, ct).ConfigureAwait(false);
+            AgentToolDefinition tool = await this._tools.GetTool(binding.ToolId, ct).ConfigureAwait(false);
 
             if (!toolExecutors.TryGetValue(binding.ToolId, out Func<string, CancellationToken, Task<string>>? invoke))
             {

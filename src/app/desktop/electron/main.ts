@@ -1,17 +1,106 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, powerMonitor, safeStorage, shell } from 'electron'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   AgentDefinition,
   AgentSummary,
-  AuthSession,
+  AuthIdentity,
+  AuthSnapshot,
+  AuthStatus,
   ChatRequest,
   CreateAgentRequest,
   LoginRequest,
+  LoginResult,
   ModelDefinition,
 } from '../src/shared/network/contracts.js'
 
 const apiBaseUrl = (process.env.INKWELL_WEBAPI_URL ?? 'http://localhost:6801').replace(/\/$/, '')
+const authSessionFileName = 'auth-session.bin'
+const idleLockMilliseconds = 5 * 60 * 1000
+const applicationIconPath = join(__dirname, '../renderer/logo.png')
 let sessionToken: string | null = null
+let authSnapshot: AuthSnapshot = { status: 'restoring', identity: null }
+let idleLockTimer: NodeJS.Timeout | null = null
+
+interface InternalAuthSession extends AuthIdentity {
+  sessionToken: string
+}
+
+class ApiRequestError extends Error {
+  public readonly status: number
+
+  public constructor(
+    status: number,
+    message: string,
+  ) {
+    super(message)
+    this.status = status
+  }
+}
+
+const broadcastAuthState = (): void => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('inkwell:auth-state-changed', authSnapshot)
+  }
+}
+
+const setAuthState = (status: AuthStatus, identity: AuthIdentity | null): void => {
+  authSnapshot = { status, identity }
+  broadcastAuthState()
+}
+
+const getAuthSessionPath = (): string => join(app.getPath('userData'), authSessionFileName)
+
+const deletePersistedToken = async (): Promise<void> => {
+  await rm(getAuthSessionPath(), { force: true })
+}
+
+const persistToken = async (token: string): Promise<void> => {
+  if (!safeStorage.isEncryptionAvailable()) return
+
+  const targetPath = getAuthSessionPath()
+  const temporaryPath = `${targetPath}.tmp`
+  await writeFile(temporaryPath, safeStorage.encryptString(token), { mode: 0o600 })
+  await rename(temporaryPath, targetPath)
+}
+
+const readPersistedToken = async (): Promise<string | null> => {
+  if (!safeStorage.isEncryptionAvailable()) return null
+
+  try {
+    return safeStorage.decryptString(await readFile(getAuthSessionPath()))
+  } catch (reason) {
+    const errorCode = reason instanceof Error && 'code' in reason ? reason.code : undefined
+    if (errorCode !== 'ENOENT') await deletePersistedToken()
+    return null
+  }
+}
+
+const clearIdleLockTimer = (): void => {
+  if (idleLockTimer) clearTimeout(idleLockTimer)
+  idleLockTimer = null
+}
+
+const lockAuthentication = (): void => {
+  clearIdleLockTimer()
+  if (authSnapshot.status === 'authenticated') {
+    setAuthState('locked', authSnapshot.identity)
+  }
+}
+
+const scheduleIdleLock = (): void => {
+  clearIdleLockTimer()
+  if (authSnapshot.status === 'authenticated') {
+    idleLockTimer = setTimeout(lockAuthentication, idleLockMilliseconds)
+  }
+}
+
+const clearAuthentication = async (): Promise<void> => {
+  clearIdleLockTimer()
+  sessionToken = null
+  await deletePersistedToken()
+  setAuthState('anonymous', null)
+}
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -26,33 +115,125 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   if (!response.ok) {
     const detail = await response.text()
-    throw new Error(detail || `Inkwell API request failed with status ${response.status}.`)
+    if (response.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/unlock') {
+      await clearAuthentication()
+    }
+    throw new ApiRequestError(response.status, detail || `Inkwell API request failed with status ${response.status}.`)
   }
 
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>)
 }
 
+const requireAuthenticated = (): void => {
+  if (authSnapshot.status !== 'authenticated' || !sessionToken) {
+    throw new Error(authSnapshot.status === 'locked' ? 'Client is locked.' : 'Authentication is required.')
+  }
+}
+
+const restoreAuthentication = async (): Promise<AuthSnapshot> => {
+  const persistedToken = await readPersistedToken()
+  if (!persistedToken) {
+    setAuthState('anonymous', null)
+    return authSnapshot
+  }
+
+  sessionToken = persistedToken
+  try {
+    const session = await request<InternalAuthSession>('/api/auth/session')
+    const identity = toAuthIdentity(session)
+    setAuthState('authenticated', identity)
+    scheduleIdleLock()
+  } catch (reason) {
+    if (!(reason instanceof ApiRequestError)) {
+      setAuthState('offline', null)
+    }
+  }
+
+  return authSnapshot
+}
+
+const toAuthIdentity = (session: InternalAuthSession): AuthIdentity => ({
+  userId: session.userId,
+  username: session.username,
+  isSuper: session.isSuper,
+  expiresAt: session.expiresAt,
+})
+
 const registerApiHandlers = (): void => {
-  ipcMain.handle('inkwell:login', async (_event, login: LoginRequest): Promise<AuthSession> => {
-    const session = await request<AuthSession>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(login),
-    })
-    sessionToken = session.sessionToken
-    return { ...session, sessionToken: '' }
+  ipcMain.handle('inkwell:restore-auth', restoreAuthentication)
+
+  ipcMain.handle('inkwell:login', async (_event, login: LoginRequest): Promise<LoginResult> => {
+    try {
+      const session = await request<InternalAuthSession>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(login),
+      })
+      sessionToken = session.sessionToken
+      try {
+        await persistToken(sessionToken)
+      } catch (reason) {
+        console.error('Unable to persist the authentication session; it will remain available for this process only.', reason)
+      }
+      const identity = toAuthIdentity(session)
+      setAuthState('authenticated', identity)
+      scheduleIdleLock()
+      return { ok: true, identity }
+    } catch (reason) {
+      if (reason instanceof ApiRequestError) {
+        const code = reason.status === 401
+          ? 'invalid-credentials'
+          : reason.status === 423
+            ? 'account-locked'
+            : reason.status === 429
+              ? 'rate-limited'
+              : 'unknown'
+        return { ok: false, code }
+      }
+
+      return { ok: false, code: 'offline' }
+    }
+  })
+
+  ipcMain.handle('inkwell:unlock', async (_event, password: string): Promise<AuthIdentity> => {
+    if (authSnapshot.status !== 'locked' || !sessionToken || !authSnapshot.identity) {
+      throw new Error('Client is not locked.')
+    }
+
+    try {
+      await request<void>('/api/auth/unlock', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      })
+    } catch (reason) {
+      if (reason instanceof ApiRequestError && reason.status === 423) {
+        await clearAuthentication()
+      }
+      throw reason
+    }
+    setAuthState('authenticated', authSnapshot.identity)
+    scheduleIdleLock()
+    return authSnapshot.identity!
   })
 
   ipcMain.handle('inkwell:logout', async (): Promise<void> => {
     try {
       await request<void>('/api/auth/logout', { method: 'POST' })
     } finally {
-      sessionToken = null
+      await clearAuthentication()
     }
   })
 
-  ipcMain.handle('inkwell:list-agents', () => request<AgentSummary[]>('/api/agents/mine'))
-  ipcMain.handle('inkwell:list-models', () => request<ModelDefinition[]>('/api/models'))
+  ipcMain.on('inkwell:activity', scheduleIdleLock)
+  ipcMain.handle('inkwell:list-agents', () => {
+    requireAuthenticated()
+    return request<AgentSummary[]>('/api/agents/mine')
+  })
+  ipcMain.handle('inkwell:list-models', () => {
+    requireAuthenticated()
+    return request<ModelDefinition[]>('/api/models')
+  })
   ipcMain.handle('inkwell:create-agent', async (_event, input: CreateAgentRequest): Promise<AgentDefinition> => {
+    requireAuthenticated()
     const agent = await request<AgentDefinition>('/api/agents', {
       method: 'POST',
       body: JSON.stringify(input),
@@ -62,6 +243,7 @@ const registerApiHandlers = (): void => {
   })
 
   ipcMain.handle('inkwell:chat', async (event, input: ChatRequest): Promise<void> => {
+    requireAuthenticated()
     const response = await fetch(`${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -78,6 +260,7 @@ const registerApiHandlers = (): void => {
 
     if (!response.ok || !response.body) {
       const detail = await response.text()
+      if (response.status === 401) await clearAuthentication()
       throw new Error(detail || `Agent request failed with status ${response.status}.`)
     }
 
@@ -113,6 +296,7 @@ const createWindow = (): void => {
     height: 920,
     minWidth: 1080,
     minHeight: 720,
+    icon: applicationIconPath,
     show: false,
     title: 'Inkwell',
     backgroundColor: '#f3f5f7',
@@ -141,7 +325,10 @@ const createWindow = (): void => {
 }
 
 app.whenReady().then(() => {
+  app.dock?.setIcon(applicationIconPath)
   registerApiHandlers()
+  powerMonitor.on('lock-screen', lockAuthentication)
+  app.on('browser-window-blur', lockAuthentication)
   createWindow()
 
   app.on('activate', () => {

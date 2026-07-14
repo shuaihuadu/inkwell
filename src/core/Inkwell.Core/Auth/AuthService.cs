@@ -7,7 +7,6 @@ namespace Inkwell;
 
 /// <summary><see cref="IAuthService"/> 唯一实现；编排密码校验 / 会话缓存读写 / 失败计数。</summary>
 internal sealed class AuthService(
-    IUserRepository users,
     IPersistenceProvider persistenceProvider,
     ICacheProvider cacheProvider,
     IOptions<AuthOptions> authOptions,
@@ -15,6 +14,8 @@ internal sealed class AuthService(
 {
     /// <summary>账号不存在时仍执行一次哑校验，避免账号枚举计时侧信道。</summary>
     private const string DummyPasswordHash = "PBKDF2$600000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    private readonly IUserRepository _users = persistenceProvider.GetRepository<IUserRepository>();
 
     public async Task<AuthSession> LoginAsync(string username, string password, string? clientIp = null, CancellationToken ct = default)
     {
@@ -25,11 +26,13 @@ internal sealed class AuthService(
 
         try
         {
-            user = await users.GetUserByUsername(username, ct).ConfigureAwait(false);
+            user = await this._users.GetUserByUsername(username, ct).ConfigureAwait(false);
         }
         catch (KeyNotFoundException)
         {
-            // 假验证：与真实路径耗时对齐，避免计时侧信道账号枚举。
+            // 账号不存在时仍执行一次相同成本的 PBKDF2 校验，使其响应时间尽量接近
+            // “账号存在但密码错误”的路径，降低攻击者根据耗时差异枚举有效账号的风险。
+            // DummyPasswordHash 仅用于消耗等量计算时间，校验结果必须丢弃，随后统一返回登录失败。
             _ = PasswordHasher.Verify(password, DummyPasswordHash);
             throw new UnauthorizedAccessException("Invalid username or password.");
         }
@@ -55,7 +58,7 @@ internal sealed class AuthService(
             ct).ConfigureAwait(false);
 
         await persistenceProvider.ExecuteInTransactionAsync(
-            innerCt => users.UpdateUser(user with { LastLoginTime = now }, innerCt),
+            innerCt => this._users.UpdateUser(user with { LastLoginTime = now }, innerCt),
             ct).ConfigureAwait(false);
 
         return new AuthSession(user.Id, user.Username, user.IsSuper, token, now.AddHours(options.SessionTtlHours));
@@ -98,7 +101,7 @@ internal sealed class AuthService(
     {
         ArgumentException.ThrowIfNullOrEmpty(password);
 
-        User user = await users.GetUser(userId, ct).ConfigureAwait(false);
+        User user = await this._users.GetUser(userId, ct).ConfigureAwait(false);
 
         int maxAttempts = authOptions.Value.MaxFailedUnlockAttempts;
         bool passwordCorrect = PasswordHasher.Verify(password, user.PasswordHash);
@@ -106,7 +109,7 @@ internal sealed class AuthService(
         bool nowLocked = !passwordCorrect && newFailedAttempts >= maxAttempts;
 
         await persistenceProvider.ExecuteInTransactionAsync(
-            innerCt => users.UpdateUser(user with { FailedUnlockAttempts = newFailedAttempts, IsLocked = user.IsLocked || nowLocked }, innerCt),
+            innerCt => this._users.UpdateUser(user with { FailedUnlockAttempts = newFailedAttempts, IsLocked = user.IsLocked || nowLocked }, innerCt),
             ct).ConfigureAwait(false);
 
         if (!passwordCorrect)
@@ -134,9 +137,9 @@ internal sealed class AuthService(
 
         await persistenceProvider.ExecuteInTransactionAsync(async innerCt =>
         {
-            User user = await users.GetUser(targetUserId, innerCt).ConfigureAwait(false);
+            User user = await this._users.GetUser(targetUserId, innerCt).ConfigureAwait(false);
 
-            await users.UpdateUser(user with { IsLocked = false, FailedUnlockAttempts = 0 }, innerCt).ConfigureAwait(false);
+            await this._users.UpdateUser(user with { IsLocked = false, FailedUnlockAttempts = 0 }, innerCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
 
@@ -144,13 +147,13 @@ internal sealed class AuthService(
     {
         if (isLocked is not null)
         {
-            IReadOnlyList<User> filtered = await users.FindUsersByLockedStatus(isLocked.Value, ct).ConfigureAwait(false);
+            IReadOnlyList<User> filtered = await this._users.FindUsersByLockedStatus(isLocked.Value, ct).ConfigureAwait(false);
 
             return [.. filtered.Select(ToAccountSummary)];
         }
 
         List<User> all = await PaginationHelper.CollectAllAsync(
-            (pagination, innerCt) => users.ListUsers(pagination, SortOrder.ByCreatedAtDesc, innerCt),
+            (pagination, innerCt) => this._users.ListUsers(pagination, SortOrder.ByCreatedAtDesc, innerCt),
             ct).ConfigureAwait(false);
 
         return [.. all.Select(ToAccountSummary)];

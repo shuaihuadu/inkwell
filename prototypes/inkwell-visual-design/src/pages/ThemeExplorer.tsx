@@ -33,9 +33,9 @@ import {
     EditOutlined,
 } from "@ant-design/icons";
 import { THEMES, THEME_NAMES, type ThemeName } from "../tokens/themes";
-import inkwellMark from "../../assets/logos/inkwell-mark.svg?no-inline";
+import logo from "../../assets/logos/logo.svg?no-inline";
 
-const INKWELL_MARK = inkwellMark;
+const INKWELL_MARK = logo;
 
 const TABLE_DATA = [
     {

@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
+int prototypePort = GetPort(builder.Configuration["Ports:Prototype"], "Ports:Prototype", 6800);
 int webApiPort = GetPort(builder.Configuration["Ports:WebApi"], "Ports:WebApi", 6801);
 int pgAdminPort = GetPort(builder.Configuration["Ports:PgAdmin"], "Ports:PgAdmin", 6802);
 int sqlServerPort = GetPort(builder.Configuration["Ports:SqlServer"], "Ports:SqlServer", 6803);
@@ -9,6 +10,15 @@ int grafanaPort = GetPort(builder.Configuration["Ports:Grafana"], "Ports:Grafana
 int prometheusPort = GetPort(builder.Configuration["Ports:Prometheus"], "Ports:Prometheus", 6806);
 int tempoPort = GetPort(builder.Configuration["Ports:Tempo"], "Ports:Tempo", 6807);
 int lokiPort = GetPort(builder.Configuration["Ports:Loki"], "Ports:Loki", 6808);
+
+string visualDesignDirectory = Path.GetFullPath(
+    Path.Combine(builder.AppHostDirectory, "../../../prototypes/inkwell-visual-design"));
+string desktopDirectory = Path.GetFullPath(
+    Path.Combine(builder.AppHostDirectory, "../../../src/app/desktop"));
+
+builder.AddViteApp("visual-design", visualDesignDirectory)
+    .WithEndpoint("http", endpoint => endpoint.Port = prototypePort)
+    .WithExternalHttpEndpoints();
 
 IResourceBuilder<ContainerResource> tempo = builder
     .AddContainer("tempo", "grafana/tempo", "2.8.2")
@@ -99,7 +109,8 @@ IResourceBuilder<ProjectResource> sqlServerMigrator = builder
     .WithEnvironment("Inkwell__Persistence__Provider", "SqlServer")
     .WaitFor(sqlServerDatabase);
 
-builder.AddProject<Projects.Inkwell_WebApi>("webapi")
+IResourceBuilder<ProjectResource> webApi = builder
+    .AddProject<Projects.Inkwell_WebApi>("webapi")
     .WithReference(database)
     .WithEnvironment("ConnectionStrings__Inkwell", database.Resource.ConnectionStringExpression)
     .WithEnvironment("Inkwell__LiteLLM__Endpoint", liteLLM.GetEndpoint("http"))
@@ -112,6 +123,11 @@ builder.AddProject<Projects.Inkwell_WebApi>("webapi")
     .WaitFor(collector)
     .WaitForCompletion(postgresMigrator)
     .WaitForCompletion(sqlServerMigrator);
+
+builder.AddJavaScriptApp("desktop", desktopDirectory)
+    .WithRunScript("dev")
+    .WithEnvironment("INKWELL_WEBAPI_URL", webApi.GetEndpoint("http"))
+    .WaitFor(webApi);
 
 builder.AddProject<Projects.Inkwell_Worker>("worker")
     .WithReference(database)

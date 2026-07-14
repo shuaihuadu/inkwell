@@ -1,13 +1,12 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-
-using Inkwell.Persistence;
-
 namespace Inkwell;
 
-/// <summary><see cref="IAgentSkillContentResolver"/> 唱一实现；缺失 SkillId 采用尽力而为、不中断策略。</summary>
-internal sealed class AgentSkillContentResolver(IAgentSkillRepository skills) : IAgentSkillContentResolver
+/// <summary><see cref="IAgentSkillContentResolver"/> 唯一实现；缺失 SkillId 采用尽力而为、不中断策略。</summary>
+internal sealed class AgentSkillContentResolver(IPersistenceProvider persistence) : IAgentSkillContentResolver
 {
+    private readonly IAgentSkillRepository _skills = persistence.GetRepository<IAgentSkillRepository>();
+
     public async Task<AgentSkillResolutionResult> ResolveAsync(IReadOnlyList<AgentSkillBinding> bindings, CancellationToken ct = default)
     {
         if (bindings.Count == 0)
@@ -22,7 +21,7 @@ internal sealed class AgentSkillContentResolver(IAgentSkillRepository skills) : 
         {
             try
             {
-                AgentSkillDefinition skill = await skills.GetSkill(binding.SkillId, ct).ConfigureAwait(false);
+                AgentSkillDefinition skill = await this._skills.GetSkill(binding.SkillId, ct).ConfigureAwait(false);
 
                 resolved.Add(ToSkillContent(skill));
             }

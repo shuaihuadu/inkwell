@@ -1,24 +1,25 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Text.Json.Nodes;
-using Inkwell.Persistence;
 
 namespace Inkwell;
 
 /// <summary><see cref="IAgentToolCatalogService"/> 唯一实现；只读查询 + 绑定参数校验。</summary>
-internal sealed class AgentToolCatalogService(IAgentToolRepository tools) : IAgentToolCatalogService
+internal sealed class AgentToolCatalogService(IPersistenceProvider persistence) : IAgentToolCatalogService
 {
+    private readonly IAgentToolRepository _tools = persistence.GetRepository<IAgentToolRepository>();
+
     public async Task<IReadOnlyList<AgentToolDefinition>> ListAvailableToolsAsync(CancellationToken ct = default)
     {
         List<AgentToolDefinition> all = await PaginationHelper.CollectAllAsync(
-            (pagination, innerCt) => tools.ListTools(pagination, SortOrder.ByCreatedAtDesc, innerCt),
+            (pagination, innerCt) => this._tools.ListTools(pagination, SortOrder.ByCreatedAtDesc, innerCt),
             ct).ConfigureAwait(false);
 
         return all;
     }
 
     public async Task<AgentToolDefinition> GetToolAsync(Guid toolId, CancellationToken ct = default) =>
-        await tools.GetTool(toolId, ct).ConfigureAwait(false);
+        await this._tools.GetTool(toolId, ct).ConfigureAwait(false);
 
     public async Task ValidateToolBindingAsync(Guid toolId, string? parametersJson, CancellationToken ct = default)
     {

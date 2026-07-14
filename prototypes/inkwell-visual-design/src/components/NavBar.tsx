@@ -10,7 +10,7 @@ import {
 import { BulbOutlined, BulbFilled } from "@ant-design/icons";
 import { useDesign } from "../context/DesignContext";
 import { THEMES, THEME_NAMES } from "../tokens/themes";
-import inkwellMark from "../../assets/logos/inkwell-mark.svg?no-inline";
+import logo from "../../assets/logos/logo.svg?no-inline";
 
 const NAV_ITEMS = [
     { path: "/", label: "Design Lab" },
@@ -45,7 +45,7 @@ export default function NavBar() {
         >
             {/* Brand */}
             <Space className="design-nav-brand" align="center" size={8}>
-                <img src={inkwellMark} alt="Inkwell" width={28} height={28} />
+                <img src={logo} alt="Inkwell" width={28} height={28} />
                 <Typography.Text
                     strong
                     style={{

@@ -20,7 +20,7 @@ public sealed class InkwellChatHistoryProviderTests
         Guid sessionId = Guid.CreateVersion7();
         ChatMessage historicalMessage = new(ChatRole.User, "history");
         FakeMessageRepository repository = new([historicalMessage]);
-        InkwellChatHistoryProvider provider = new(repository, new RecordingPersistenceProvider(), 10);
+        InkwellChatHistoryProvider provider = new(new RecordingPersistenceProvider(repository), 10);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(session, sessionId);
@@ -49,8 +49,8 @@ public sealed class InkwellChatHistoryProviderTests
         // Arrange
         Guid sessionId = Guid.CreateVersion7();
         FakeMessageRepository repository = new([]);
-        RecordingPersistenceProvider persistence = new();
-        InkwellChatHistoryProvider provider = new(repository, persistence);
+        RecordingPersistenceProvider persistence = new(repository);
+        InkwellChatHistoryProvider provider = new(persistence);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(session, sessionId);
@@ -79,8 +79,8 @@ public sealed class InkwellChatHistoryProviderTests
     {
         // Arrange
         FakeMessageRepository repository = new([]);
-        RecordingPersistenceProvider persistence = new();
-        InkwellChatHistoryProvider provider = new(repository, persistence);
+        RecordingPersistenceProvider persistence = new(repository);
+        InkwellChatHistoryProvider provider = new(persistence);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(session, Guid.CreateVersion7());
@@ -188,9 +188,12 @@ public sealed class InkwellChatHistoryProviderTests
         }
     }
 
-    private sealed class RecordingPersistenceProvider : IPersistenceProvider
+    private sealed class RecordingPersistenceProvider(IAgentSessionMessageRepository messages) : IPersistenceProvider
     {
         public IsolationLevel? LastIsolationLevel { get; private set; }
+
+        public TRepository GetRepository<TRepository>() where TRepository : notnull =>
+            messages is TRepository repository ? repository : throw new NotSupportedException();
 
         public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
             await action(ct).ConfigureAwait(false);

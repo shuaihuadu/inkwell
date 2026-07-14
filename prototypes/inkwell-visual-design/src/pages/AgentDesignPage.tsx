@@ -6,14 +6,11 @@ import {
     Checkbox,
     Col,
     Descriptions,
-    Divider,
     Drawer,
     Form,
     Input,
     InputNumber,
     Popconfirm,
-    Progress,
-    Radio,
     Row,
     Select,
     Slider,
@@ -39,9 +36,10 @@ import {
     CheckCircleOutlined,
     CloseCircleOutlined,
     LoadingOutlined,
-    StarOutlined,
+    SlidersOutlined,
     ToolOutlined,
-    ApartmentOutlined,
+    ReadOutlined,
+    CompressOutlined,
     HistoryOutlined,
     UserOutlined,
     RobotOutlined,
@@ -66,7 +64,7 @@ type SectionKey =
     | "model"
     | "tools"
     | "skills"
-    | "memory"
+    | "context"
     | "version";
 
 type Density = "standard" | "compact";
@@ -76,19 +74,32 @@ type Density = "standard" | "compact";
 const SECTIONS: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
     { key: "basic", label: "基础信息", icon: <UserOutlined /> },
     { key: "instructions", label: "Instructions", icon: <RobotOutlined /> },
-    { key: "model", label: "模型与参数", icon: <StarOutlined /> },
+    { key: "model", label: "模型与参数", icon: <SlidersOutlined /> },
     { key: "tools", label: "工具", icon: <ToolOutlined /> },
-    { key: "skills", label: "Skills", icon: <StarOutlined /> },
-    { key: "memory", label: "长期记忆", icon: <ApartmentOutlined /> },
+    { key: "skills", label: "Skills", icon: <ReadOutlined /> },
+    { key: "context", label: "上下文策略", icon: <CompressOutlined /> },
     { key: "version", label: "版本与调试", icon: <HistoryOutlined /> },
 ];
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_MODELS = [
-    { value: "azure-gpt4o", label: "Azure OpenAI GPT-4o" },
-    { value: "azure-gpt4o-mini", label: "Azure OpenAI GPT-4o-mini" },
-    { value: "azure-gpt4", label: "Azure OpenAI GPT-4 (Turbo)" },
+    {
+        value: "azure-gpt4o",
+        label: "Azure OpenAI GPT-4o",
+        capabilities: ["视觉", "工具", "结构化输出"],
+    },
+    {
+        value: "azure-gpt4o-mini",
+        label: "Azure OpenAI GPT-4o-mini",
+        capabilities: ["视觉", "工具"],
+    },
+    {
+        value: "qwen-max",
+        label: "Qwen Max（元数据待补齐）",
+        capabilities: [],
+        disabled: true,
+    },
 ];
 
 const MOCK_TOOLS = [
@@ -112,13 +123,11 @@ const MOCK_SKILLS = [
         id: "s1",
         name: "ReportWriter",
         description: "生成报告 Skill，含模板与格式规范",
-        version: "1.2.0",
     },
     {
         id: "s2",
         name: "DataAnalyzer",
         description: "数据分析与图表生成",
-        version: "0.9.4",
     },
 ];
 
@@ -189,9 +198,9 @@ function SectionBasic({
                             )}
                             <Typography.Text
                                 type="secondary"
-                                  style={{ fontSize: 10, whiteSpace: "nowrap" }}
+                                style={{ fontSize: 10, whiteSpace: "nowrap" }}
                             >
-                                  PNG/JPG · ≤ 2 MB
+                                可选图片
                             </Typography.Text>
                         </div>
                     </Form.Item>
@@ -231,6 +240,18 @@ function SectionBasic({
                             disabled={readonly}
                         />
                     </Form.Item>
+                    <Form.Item
+                        label="团队可见"
+                        tooltip="对应 Agent 管理态的 IsShared，不随版本快照回滚。"
+                        style={{ marginTop: 18, marginBottom: 0 }}
+                    >
+                        <Switch
+                            defaultChecked
+                            checkedChildren="已共享"
+                            unCheckedChildren="仅自己"
+                            disabled={readonly}
+                        />
+                    </Form.Item>
                 </Col>
             </Row>
         </Form>
@@ -244,7 +265,6 @@ function SectionInstructions({
     readonly: boolean;
     density: Density;
 }) {
-    const { token } = antdTheme.useToken();
     const [charCount, setCharCount] = useState(420);
     const WARN_THRESHOLD = 32000;
     return (
@@ -252,18 +272,7 @@ function SectionInstructions({
             layout="vertical"
             size={density === "compact" ? "small" : "middle"}
         >
-            <Form.Item
-                label={
-                    <Space>
-                        <span>Instructions</span>
-                        <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
-                            <QuestionCircleOutlined
-                                style={{ color: token.colorTextSecondary }}
-                            />
-                        </Tooltip>
-                    </Space>
-                }
-            >
+            <Form.Item>
                 {charCount >= WARN_THRESHOLD && (
                     <Alert
                         type="warning"
@@ -273,6 +282,7 @@ function SectionInstructions({
                     />
                 )}
                 <Input.TextArea
+                    aria-label="Instructions"
                     rows={density === "compact" ? 8 : 12}
                     disabled={readonly}
                     defaultValue={`你是一名专业的研究助手，擅长以下工作：
@@ -326,7 +336,26 @@ function SectionModel({
                     initialValue="azure-gpt4o"
                     style={{ marginBottom: 0 }}
                 >
-                    <Select options={MOCK_MODELS} disabled={readonly} />
+                    <Select
+                        disabled={readonly}
+                        options={MOCK_MODELS.map((model) => ({
+                            value: model.value,
+                            disabled: model.disabled,
+                            label: (
+                                <Space size={6} wrap>
+                                    <span>{model.label}</span>
+                                    {model.capabilities.map((capability) => (
+                                        <Tag
+                                            key={capability}
+                                            style={{ marginInlineEnd: 0 }}
+                                        >
+                                            {capability}
+                                        </Tag>
+                                    ))}
+                                </Space>
+                            ),
+                        }))}
+                    />
                 </Form.Item>
             </div>
 
@@ -622,39 +651,15 @@ function SectionSkills({
 }) {
     const { token } = antdTheme.useToken();
     const [checked, setChecked] = useState<string[]>(["s1"]);
-    const [showError, setShowError] = useState(false);
 
     return (
         <div>
-            {!readonly && (
-                <div style={{ marginBottom: 16 }}>
-                    <Upload
-                        showUploadList={false}
-                        beforeUpload={() => {
-                            setShowError(true);
-                            return false;
-                        }}
-                    >
-                        <Button
-                            icon={<UploadOutlined />}
-                            size={density === "compact" ? "small" : "middle"}
-                        >
-                            上传 Skill
-                        </Button>
-                    </Upload>
-                    {showError && (
-                        <Alert
-                            type="error"
-                            showIcon
-                            closable
-                            onClose={() => setShowError(false)}
-                            style={{ marginTop: 8 }}
-                            message="v1 不支持携带 scripts/ 的 Skill"
-                            description="请仅提供 SKILL.md / references/ / assets/ 结构"
-                        />
-                    )}
-                </div>
-            )}
+            <Typography.Text
+                type="secondary"
+                style={{ display: "block", fontSize: 12, marginBottom: 12 }}
+            >
+                从统一 Skill 管理中选择需要挂载到当前 Agent 的 Skill。
+            </Typography.Text>
 
             <Space
                 direction="vertical"
@@ -701,9 +706,6 @@ function SectionSkills({
                                     >
                                         {s.name}
                                     </Typography.Text>
-                                    <Tag style={{ fontSize: 10 }}>
-                                        v{s.version}
-                                    </Tag>
                                 </Space>
                                 <Typography.Text
                                     type="secondary"
@@ -711,29 +713,6 @@ function SectionSkills({
                                 >
                                     {s.description}
                                 </Typography.Text>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: 8,
-                                        marginTop: 6,
-                                    }}
-                                >
-                                    {[
-                                        "Discovery",
-                                        "Activation",
-                                        "Execution",
-                                    ].map((phase, idx) => (
-                                        <Tag
-                                            key={phase}
-                                            color={
-                                                idx < 2 ? "success" : "default"
-                                            }
-                                            style={{ fontSize: 10 }}
-                                        >
-                                            {phase}: {idx < 2 ? "命中" : "—"}
-                                        </Tag>
-                                    ))}
-                                </div>
                             </div>
                         </div>
                     </Card>
@@ -748,7 +727,7 @@ function SectionSkills({
                         }}
                     >
                         <Typography.Text type="secondary">
-                            还没有挂载任何 Skill
+                            统一 Skill 管理中暂无可用 Skill
                         </Typography.Text>
                     </div>
                 )}
@@ -757,83 +736,166 @@ function SectionSkills({
     );
 }
 
-function SectionMemory({
+function SectionContext({
     readonly,
     density,
 }: {
     readonly: boolean;
     density: Density;
 }) {
-    const [mode, setMode] = useState<"off" | "full" | "summary">("summary");
+    const { token } = antdTheme.useToken();
+    const strategies = [
+        {
+            name: "工具结果压缩",
+            type: "ToolResultCompactionStrategy",
+            trigger: "消息数超过 7",
+            description: "折叠较早的工具调用及结果，保留简短结果摘要。",
+        },
+        {
+            name: "摘要压缩",
+            type: "SummarizationCompactionStrategy",
+            trigger: "Token 数超过 1,280",
+            description: "调用摘要模型，将较早的消息组替换为上下文摘要。",
+        },
+        {
+            name: "滑动窗口",
+            type: "SlidingWindowCompactionStrategy",
+            trigger: "对话轮次超过 4",
+            description: "按完整对话轮次移除较早内容，始终保留系统消息。",
+        },
+        {
+            name: "Token 截断",
+            type: "TruncationCompactionStrategy",
+            trigger: "Token 数超过 32,768",
+            description: "按消息组丢弃最早内容，作为上下文预算的最后保护。",
+        },
+    ];
 
     return (
         <div>
-            <Form
-                layout="vertical"
-                size={density === "compact" ? "small" : "middle"}
-            >
-                <Form.Item label="长期记忆模式">
-                    <Radio.Group
-                        value={mode}
-                        onChange={(e) => setMode(e.target.value as typeof mode)}
-                        disabled={readonly}
-                    >
-                        <Space
-                            direction="vertical"
-                            size={density === "compact" ? 4 : 8}
-                        >
-                            <Radio value="off">
-                                <Typography.Text>关</Typography.Text>
-                                <Typography.Text
-                                    type="secondary"
-                                    style={{ fontSize: 12, marginLeft: 8 }}
-                                >
-                                    每次对话独立，不保留上下文
-                                </Typography.Text>
-                            </Radio>
-                            <Radio value="full">
-                                <Typography.Text>
-                                    开（保留全文）
-                                </Typography.Text>
-                                <Typography.Text
-                                    type="secondary"
-                                    style={{ fontSize: 12, marginLeft: 8 }}
-                                >
-                                    将历史对话完整传入上下文
-                                </Typography.Text>
-                            </Radio>
-                            <Radio value="summary">
-                                <Typography.Text>开（摘要式）</Typography.Text>
-                                <Typography.Text
-                                    type="secondary"
-                                    style={{ fontSize: 12, marginLeft: 8 }}
-                                >
-                                    定期压缩历史为摘要，节省 token
-                                </Typography.Text>
-                            </Radio>
-                        </Space>
-                    </Radio.Group>
-                </Form.Item>
-            </Form>
-            {mode !== "off" && (
-                <Alert
-                    type="info"
-                    showIcon
-                    message="切换可能影响已有对话上下文，详细行为见后端策略"
-                    style={{ marginTop: 8 }}
-                />
-            )}
-            <Divider />
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                当前已积累摘要片段：
-                <Typography.Text strong>12 条</Typography.Text>， 最近更新：
-                <Typography.Text>2026-07-11 14:32</Typography.Text>
-            </Typography.Text>
-            <Progress
-                percent={38}
-                size="small"
-                style={{ maxWidth: 300, marginTop: 8 }}
+            <Alert
+                type="info"
+                showIcon
+                title="聊天记录存储与模型输入压缩相互独立"
+                description="InkwellChatHistoryProvider 负责读取并全量保存 Session 消息；MAF CompactionProvider 只在调用模型前规整上下文，不删除后端聊天记录。"
+                style={{ marginBottom: 20 }}
             />
+            <div
+                style={{
+                    padding: density === "compact" ? 12 : 16,
+                    marginBottom: 20,
+                    border: `1px solid ${token.colorBorderSecondary}`,
+                    borderRadius: 8,
+                    background: token.colorFillQuaternary,
+                }}
+            >
+                <Space size={8} wrap>
+                    <Typography.Text strong>聊天历史提供程序</Typography.Text>
+                    <Tag color="processing">InkwellChatHistoryProvider</Tag>
+                    <Tag color="success">全量持久化</Tag>
+                </Space>
+                <Typography.Text
+                    type="secondary"
+                    style={{ display: "block", fontSize: 12, marginTop: 6 }}
+                >
+                    运行前按时间顺序加载历史；运行成功后追加本轮请求与响应。
+                </Typography.Text>
+            </div>
+
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 16,
+                    marginBottom: 12,
+                }}
+            >
+                <div>
+                    <Space size={8} wrap>
+                        <Typography.Text strong>
+                            模型输入压缩流水线
+                        </Typography.Text>
+                        <Tag>CompactionProvider</Tag>
+                        <Tag>实验性 API</Tag>
+                    </Space>
+                    <Typography.Text
+                        type="secondary"
+                        style={{ display: "block", fontSize: 12, marginTop: 4 }}
+                    >
+                        策略按由温和到激进的顺序执行，每项独立判断触发条件。
+                    </Typography.Text>
+                </div>
+                <Switch
+                    aria-label="启用压缩流水线"
+                    checked={false}
+                    disabled
+                    checkedChildren="已启用"
+                    unCheckedChildren="待接入"
+                />
+            </div>
+
+            <Space
+                direction="vertical"
+                size={density === "compact" ? 8 : 10}
+                style={{ width: "100%" }}
+            >
+                {strategies.map((strategy, index) => (
+                    <Card
+                        key={strategy.type}
+                        size="small"
+                        style={{
+                            borderRadius: 8,
+                            opacity: readonly ? 0.72 : 1,
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 12,
+                            }}
+                        >
+                            <Tag style={{ marginInlineEnd: 0 }}>
+                                {index + 1}
+                            </Tag>
+                            <div style={{ flex: 1 }}>
+                                <Space size={8} wrap>
+                                    <Typography.Text strong>
+                                        {strategy.name}
+                                    </Typography.Text>
+                                    <Typography.Text
+                                        code
+                                        type="secondary"
+                                        style={{ fontSize: 11 }}
+                                    >
+                                        {strategy.type}
+                                    </Typography.Text>
+                                    <Tag color="blue">{strategy.trigger}</Tag>
+                                </Space>
+                                <Typography.Text
+                                    type="secondary"
+                                    style={{
+                                        display: "block",
+                                        fontSize: 12,
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    {strategy.description}
+                                </Typography.Text>
+                            </div>
+                        </div>
+                    </Card>
+                ))}
+            </Space>
+
+            <Typography.Text
+                type="secondary"
+                style={{ display: "block", fontSize: 11, marginTop: 12 }}
+            >
+                AgentSnapshot 的可序列化策略 DTO 与 MAF
+                映射尚未锁定，当前仅展示候选流水线，不开放保存。
+            </Typography.Text>
         </div>
     );
 }
@@ -855,8 +917,14 @@ function SectionVersion() {
                 <Descriptions.Item label="最后保存时间">
                     2026-07-11 16:45:22
                 </Descriptions.Item>
-                <Descriptions.Item label="保存人">
+                <Descriptions.Item label="创建人">
                     owner-alice
+                </Descriptions.Item>
+                <Descriptions.Item label="发布时间">
+                    2026-07-11 16:48:05
+                </Descriptions.Item>
+                <Descriptions.Item label="变更摘要">
+                    优化研究报告结构并更新模型参数
                 </Descriptions.Item>
             </Descriptions>
             <Space>
@@ -893,8 +961,8 @@ function SectionContent({
             return <SectionTools readonly={readonly} density={density} />;
         case "skills":
             return <SectionSkills readonly={readonly} density={density} />;
-        case "memory":
-            return <SectionMemory readonly={readonly} density={density} />;
+        case "context":
+            return <SectionContext readonly={readonly} density={density} />;
         case "version":
             return <SectionVersion />;
         default:
@@ -980,7 +1048,10 @@ function ConversationDrawer({
                         <Typography.Text strong style={{ display: "block" }}>
                             智能研究助手
                         </Typography.Text>
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        <Typography.Text
+                            type="secondary"
+                            style={{ fontSize: 11 }}
+                        >
                             Azure OpenAI GPT-4o · v3
                         </Typography.Text>
                     </div>
@@ -1033,19 +1104,25 @@ function ConversationDrawer({
                 </Typography.Paragraph>
 
                 {!sentMessage ? (
-                    <Space orientation="vertical" size={8} style={{ width: "100%" }}>
-                        {["整理一份竞品研究框架", "分析这份资料的关键结论", "为调研报告设计目录"].map(
-                            (prompt) => (
-                                <Button
-                                    key={prompt}
-                                    block
-                                    style={{ textAlign: "left", height: 40 }}
-                                    onClick={() => setMessage(prompt)}
-                                >
-                                    {prompt}
-                                </Button>
-                            ),
-                        )}
+                    <Space
+                        orientation="vertical"
+                        size={8}
+                        style={{ width: "100%" }}
+                    >
+                        {[
+                            "整理一份竞品研究框架",
+                            "分析这份资料的关键结论",
+                            "为调研报告设计目录",
+                        ].map((prompt) => (
+                            <Button
+                                key={prompt}
+                                block
+                                style={{ textAlign: "left", height: 40 }}
+                                onClick={() => setMessage(prompt)}
+                            >
+                                {prompt}
+                            </Button>
+                        ))}
                     </Space>
                 ) : (
                     <>
@@ -1099,7 +1176,13 @@ function ConversationDrawer({
                     placeholder="输入消息，Enter 发送，Shift + Enter 换行"
                     style={{ marginBottom: 10 }}
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                    }}
+                >
                     <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                         当前使用已保存版本 v3
                     </Typography.Text>
@@ -1278,7 +1361,11 @@ export default function AgentDesignPage() {
                                     type="text"
                                     aria-label="删除 Agent"
                                     icon={<DeleteOutlined />}
-                                    size={density === "compact" ? "small" : "middle"}
+                                    size={
+                                        density === "compact"
+                                            ? "small"
+                                            : "middle"
+                                    }
                                 />
                             </Tooltip>
                         </Popconfirm>
@@ -1342,22 +1429,18 @@ export default function AgentDesignPage() {
                 style={{
                     flex: 1,
                     minHeight: 0,
-                    padding: density === "compact" ? 12 : 20,
                     overflow: "hidden",
                 }}
             >
                 <div
+                    data-testid="agent-configuration-workspace"
                     style={{
                         width: "100%",
-                        maxWidth: 1440,
                         height: "100%",
-                        margin: "0 auto",
                         display: "flex",
                         overflow: "hidden",
                         background: token.colorBgContainer,
                         border: `1px solid ${token.colorBorderSecondary}`,
-                        borderRadius: 8,
-                        boxShadow: `0 10px 34px ${token.colorText}0A`,
                     }}
                 >
                     {/* Section Navigation */}
@@ -1418,10 +1501,15 @@ export default function AgentDesignPage() {
                             {SECTIONS.map((s) => {
                                 const active = s.key === section;
                                 return (
-                                    <div
+                                    <button
                                         key={s.key}
+                                        type="button"
                                         onClick={() => setSection(s.key)}
                                         style={{
+                                            position: "relative",
+                                            zIndex: 1,
+                                            width: "100%",
+                                            border: 0,
                                             display: "flex",
                                             alignItems: "center",
                                             gap: siderCollapsed ? 0 : 8,
@@ -1442,11 +1530,17 @@ export default function AgentDesignPage() {
                                             color: active
                                                 ? token.colorPrimary
                                                 : token.colorText,
-                                            transition: "all 0.15s",
+                                            transition:
+                                                "background-color 0.15s, color 0.15s",
                                             fontSize:
                                                 density === "compact" ? 12 : 13,
                                             fontWeight: active ? 600 : 400,
+                                            fontFamily: "inherit",
+                                            textAlign: "left",
                                         }}
+                                        aria-current={
+                                            active ? "page" : undefined
+                                        }
                                     >
                                         <Tooltip
                                             title={
@@ -1477,7 +1571,7 @@ export default function AgentDesignPage() {
                                                 {s.label}
                                             </span>
                                         )}
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>
@@ -1503,6 +1597,9 @@ export default function AgentDesignPage() {
                         >
                             <div
                                 style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
                                     marginBottom:
                                         density === "compact" ? 18 : 26,
                                     paddingBottom:
@@ -1519,12 +1616,28 @@ export default function AgentDesignPage() {
                                             ?.label
                                     }
                                 </Typography.Title>
+                                {section === "instructions" && (
+                                    <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
+                                        <Button
+                                            type="text"
+                                            size="small"
+                                            aria-label="Instructions 帮助"
+                                            icon={<QuestionCircleOutlined />}
+                                            style={{
+                                                color: token.colorTextSecondary,
+                                            }}
+                                        />
+                                    </Tooltip>
+                                )}
                                 {isReadonly && section !== "version" && (
                                     <Alert
                                         type="info"
                                         showIcon
                                         message="只读模式：当前非 Owner，所有字段不可编辑"
-                                        style={{ marginTop: 12 }}
+                                        style={{
+                                            marginTop: 12,
+                                            flexBasis: "100%",
+                                        }}
                                         icon={<EyeInvisibleOutlined />}
                                     />
                                 )}

@@ -44,6 +44,8 @@ Inkwell 的本地开发需要统一处理资源生命周期、连接字符串注
 - `Inkwell.WebApi` 常驻项目资源。
 - `Inkwell.Worker` 常驻项目资源。
 
+AppHost 另行编排两个职责独立的本地客户端资源。`prototypes/inkwell-visual-design` 是 Vite 本地评审站点，默认端口由 `Ports:Prototype=6800` 统一配置；该资源不等待 Migrator、WebApi 或 Worker，便于后端资源尚未就绪时独立评审界面，且不进入产品依赖图。`src/app/desktop` 则作为 Electron 产品客户端通过 `electron-vite dev` 启动，等待 WebApi 就绪并由 AppHost 注入 `INKWELL_WEBAPI_URL`；它是本地原生进程，不声明固定的外部 HTTP 端口，也不参与生产部署制品编排。
+
 PostgreSQL 数据库资源命名为 `Inkwell`，由 `WithReference` 注入 `ConnectionStrings:Inkwell`。Migrator 额外接收 `Inkwell:Persistence:Provider=Postgres`。WebApi 与 Worker 使用 `WaitForCompletion(migrator)`，只有 Migrator 成功退出后才启动；Migrator 使用 `WaitFor(database)` 等待数据库就绪。
 
 Redis、Qdrant、MinIO 不在首批 AppHost 中提前声明。对应入口项目切换到实际 Provider 后，再按真实消费关系加入 AppHost，避免出现资源已启动但应用仍使用内存实现的假集成。
@@ -106,4 +108,3 @@ Redis、Qdrant、MinIO 不在首批 AppHost 中提前声明。对应入口项目
 ## 置信度
 
 `high`。Aspire 13.4.6 已通过当前 .NET 10 解决方案的实际编译验证，`AddPostgres`、`WithReference`、`WaitFor` 与 `WaitForCompletion` 均可用。
-

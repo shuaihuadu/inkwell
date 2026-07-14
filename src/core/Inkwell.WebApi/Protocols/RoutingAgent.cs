@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -108,28 +109,12 @@ internal sealed class RoutingAgent(
         CancellationToken cancellationToken)
     {
         Guid agentId = this.GetRouteAgentId();
-        IAgentVersionRepository versions = services.GetRequiredService<IAgentVersionRepository>();
-        AgentVersion version;
+        Guid userId = this.GetRequiredUserId();
+        IAgentVersionService versionService = services.GetRequiredService<IAgentVersionService>();
 
-        if (versionId.HasValue)
-        {
-            version = await versions.GetVersionAsync(versionId.Value, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            IAgentRepository agents = services.GetRequiredService<IAgentRepository>();
-            AgentDefinition definition = await agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
-            Guid publishedVersionId = definition.CurrentPublishedVersionId
-                ?? throw new InvalidOperationException($"Agent '{agentId}' has no published version.");
-            version = await versions.GetVersionAsync(publishedVersionId, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (version.AgentId != agentId || version.Status != AgentVersionStatus.Published)
-        {
-            throw new InvalidOperationException($"Agent version '{version.Id}' is not a published version of agent '{agentId}'.");
-        }
-
-        return version;
+        return versionId.HasValue
+            ? await versionService.GetPublishedVersionAsync(agentId, versionId.Value, userId, cancellationToken).ConfigureAwait(false)
+            : await versionService.GetPublishedVersionAsync(agentId, userId, cancellationToken).ConfigureAwait(false);
     }
 
     private Guid GetRouteAgentId()
@@ -139,6 +124,15 @@ internal sealed class RoutingAgent(
         return Guid.TryParse(routeValue, out Guid agentId)
             ? agentId
             : throw new InvalidOperationException("The route does not contain a valid agentId.");
+    }
+
+    private Guid GetRequiredUserId()
+    {
+        string? claimValue = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(claimValue, out Guid userId)
+            ? userId
+            : throw new UnauthorizedAccessException("The authenticated user identifier is missing or invalid.");
     }
 
     private async ValueTask<(AIAgent Agent, RoutingAgentSession Session)> ResolveRuntimeAsync(

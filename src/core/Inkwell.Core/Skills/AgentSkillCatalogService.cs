@@ -1,24 +1,25 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Text.RegularExpressions;
-using Inkwell.Persistence;
 
 namespace Inkwell;
 
 /// <summary><see cref="IAgentSkillCatalogService"/> 唯一实现；只读查询 + 上传解析与持久化。</summary>
-internal sealed partial class AgentSkillCatalogService(IAgentSkillRepository skills, IPersistenceProvider persistence) : IAgentSkillCatalogService
+internal sealed partial class AgentSkillCatalogService(IPersistenceProvider persistence) : IAgentSkillCatalogService
 {
+    private readonly IAgentSkillRepository _skills = persistence.GetRepository<IAgentSkillRepository>();
+
     public async Task<IReadOnlyList<AgentSkillDefinition>> ListAvailableSkillsAsync(CancellationToken ct = default)
     {
         List<AgentSkillDefinition> all = await PaginationHelper.CollectAllAsync(
-            (pagination, innerCt) => skills.ListSkills(pagination, SortOrder.ByCreatedAtDesc, innerCt),
+            (pagination, innerCt) => this._skills.ListSkills(pagination, SortOrder.ByCreatedAtDesc, innerCt),
             ct).ConfigureAwait(false);
 
         return all;
     }
 
     public async Task<AgentSkillDefinition> GetSkillAsync(Guid skillId, CancellationToken ct = default) =>
-        await skills.GetSkill(skillId, ct).ConfigureAwait(false);
+        await this._skills.GetSkill(skillId, ct).ConfigureAwait(false);
 
     public async Task<AgentSkillDefinition> UploadSkillAsync(AgentSkillUploadRequest request, CancellationToken ct = default)
     {
@@ -45,7 +46,7 @@ internal sealed partial class AgentSkillCatalogService(IAgentSkillRepository ski
         };
 
         return await persistence.ExecuteInTransactionAsync(
-            innerCt => skills.AddSkill(skill, innerCt),
+            innerCt => this._skills.AddSkill(skill, innerCt),
             ct).ConfigureAwait(false);
     }
 

@@ -78,4 +78,37 @@ public sealed class AuthController(IAuthService authService) : InkwellController
 
         return this.Ok(session);
     }
+
+    /// <summary>
+    /// 验证当前用户密码以解除客户端锁定。
+    /// </summary>
+    /// <param name="request">解锁请求。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>无响应正文。</returns>
+    [HttpPost("unlock")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status423Locked)]
+    public async Task<IActionResult> UnlockAsync(
+        UnlockRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await authService.VerifyPasswordForUnlockAsync(
+                this.GetRequiredUserId(),
+                request.Password,
+                cancellationToken).ConfigureAwait(false);
+
+            return this.NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return this.Unauthorized();
+        }
+        catch (InvalidOperationException)
+        {
+            return this.StatusCode(StatusCodes.Status423Locked);
+        }
+    }
 }

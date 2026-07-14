@@ -25,18 +25,9 @@
     -->
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Azure.AI.OpenAI" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!--
-      仅供 AgentRuntime/ 目录下的多协议路由壳（RoutingAgent + 端点注册扩展）使用：
-      需要 IHttpContextAccessor（解析 agentId / callerUserId）+ IEndpointRouteBuilder（挂 MapAGUI 等）。
-      2026-07-10 errata（ADR-017 §依赖规则第 3 条扩展，详见 docs/03-architecture/adr/ADR-017 对应条目）。
-    -->
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

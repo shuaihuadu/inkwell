@@ -250,6 +250,8 @@ host.Run();
 
 ```text
 dotnet run --project src/core/Inkwell.AppHost
+  ├─ visual-design                       (Vite 视觉设计原型，独立启动，默认端口 6800)
+  ├─ desktop                             (Electron 原生客户端，等待 WebApi)
   ├─ postgres / postgres-database       (PostgreSQL 17，当前业务主库)
   ├─ sqlserver / sqlserver-database     (SQL Server 2025，双 Provider 验证)
   ├─ pgAdmin                            (PostgreSQL 管理入口)

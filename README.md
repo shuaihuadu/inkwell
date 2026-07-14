@@ -39,7 +39,7 @@ Inkwell is a production-ready "agent factory" built on the [Microsoft Agent Fram
 
 - **后端**：`Inkwell.Abstractions` / `Inkwell.Core` / 12 个 Provider 适配器 / `Inkwell.WebApi` / `Inkwell.Worker` / `Inkwell.Migrator` 已实现并通过 `dotnet build`；Postgres / Redis / MinIO / AzureBlob / Qdrant 均有真实 Testcontainers 集成测试覆盖。
 - **详细设计（H3）**：`Inkwell.Abstractions` 全部端口已评审通过；`Inkwell.Core` 业务模块多数已评审通过，少数仍在草稿阶段。
-- **客户端 / 部署栈**：Electron 客户端尚未开工；Aspire AppHost 已编排 PostgreSQL 17 / SQL Server 2025 / pgAdmin / 双 Provider Migrator / WebApi / Worker，Helm 生产部署配置尚未搭建。
+- **客户端 / 部署栈**：Electron 客户端已形成可运行开发基线；Aspire AppHost 已编排 Electron desktop、独立视觉设计原型、PostgreSQL 17 / SQL Server 2025 / pgAdmin / 双 Provider Migrator / WebApi / Worker，Helm 生产部署配置尚未搭建。
 
 ## Roadmap
 
@@ -49,7 +49,7 @@ Inkwell is a production-ready "agent factory" built on the [Microsoft Agent Fram
 - 🚧 H3 剩余业务模块详细设计：`Models` / `Skills` 已起草待评审；`KnowledgeBase` / `Memory` / `PublicApi` / `Traces` / `Versioning` / `Multimodal` / `Health` 尚未起草
 - 🚧 H4 测试用例设计（尚未开始）
 - 🚧 `Inkwell.WebApi` ↔ `Inkwell.Worker` 跨服务集成用例（enqueue → consume → ack，覆盖知识库入库、DurableTask 场景）
-- ⬜ Electron + React 客户端（尚未开工）
+- 🚧 Electron + React 客户端（已具备登录、Agent 工作区与聊天开发基线，其他功能持续实现）
 - 🚧 Aspire AppHost（dev）已完成首批编排；Helm Chart（prod）尚未搭建
 
 ## 本地启动
@@ -60,9 +60,9 @@ Inkwell is a production-ready "agent factory" built on the [Microsoft Agent Fram
 dotnet run --project src/core/Inkwell.AppHost
 ```
 
-Aspire Dashboard 会显示 PostgreSQL 17、SQL Server 2025、pgAdmin、LiteLLM、两个 Provider 各自的 Migrator、WebApi 和 Worker。两个 Migrator 分别应用独立的 EF Core migration；WebApi 与 Worker 仅在两者均成功完成 Migration + Seed 且 LiteLLM 可用后启动，当前业务运行时仍以 PostgreSQL 为主库。
+Aspire Dashboard 会显示 Electron desktop、视觉设计原型、PostgreSQL 17、SQL Server 2025、pgAdmin、LiteLLM、两个 Provider 各自的 Migrator、WebApi 和 Worker。视觉设计原型作为独立 Vite 资源启动，不等待后端资源；Electron desktop 通过 `electron-vite dev` 启动，在 WebApi 就绪后打开原生窗口，并由 AppHost 注入 WebApi 地址。两个 Migrator 分别应用独立的 EF Core migration；WebApi 与 Worker 仅在两者均成功完成 Migration + Seed 且 LiteLLM 可用后启动，当前业务运行时仍以 PostgreSQL 为主库。
 
-本地端口集中配置在 `src/core/Inkwell.AppHost/appsettings.json`，默认预留前端 `6800`、WebApi `6801`、pgAdmin `6802`、SQL Server `6803`、LiteLLM `6804`；当前已接入的服务可通过对应的 `Ports__*` 环境变量覆盖，前端端口将在 Electron 客户端接入后启用。访问 `http://localhost:6801` 会跳转到 Scalar API 文档页面，`http://localhost:6802` 提供 pgAdmin 数据库管理页面；健康检查位于 `/healthz`，OpenAPI 文档位于 `/openapi/v1.json`。两套物理数据库均名为 `Inkwell`；Aspire 中以 `postgres-database` / `sqlserver-database` 两个唯一资源标识区分。PostgreSQL 使用小写 snake_case 物理标识符和 `jsonb`，SQL Server 使用 PascalCase 物理标识符和 SQL Server 2025 原生 `json`，两套 adapter 各自维护独立 migration。
+本地端口集中配置在 `src/core/Inkwell.AppHost/appsettings.json`，默认使用视觉设计原型 `6800`、WebApi `6801`、pgAdmin `6802`、SQL Server `6803`、LiteLLM `6804`；可通过对应的 `Ports__Prototype`、`Ports__WebApi` 等环境变量覆盖。Electron desktop 是原生进程，不占用固定的外部 HTTP 端口。访问 `http://localhost:6800` 打开视觉设计原型，`http://localhost:6801` 会跳转到 Scalar API 文档页面，`http://localhost:6802` 提供 pgAdmin 数据库管理页面；健康检查位于 `/healthz`，OpenAPI 文档位于 `/openapi/v1.json`。两套物理数据库均名为 `Inkwell`；Aspire 中以 `postgres-database` / `sqlserver-database` 两个唯一资源标识区分。PostgreSQL 使用小写 snake_case 物理标识符和 `jsonb`，SQL Server 使用 PascalCase 物理标识符和 SQL Server 2025 原生 `json`，两套 adapter 各自维护独立 migration。
 
 SQL Server 2025 Linux 容器仅官方支持 x86-64。在 Apple Silicon 上，Docker Desktop 可能通过 amd64 模拟运行该镜像，但此路径不属于 Microsoft 官方支持范围。SQL Server 2025 的原生向量能力不改变 v1 的存储边界：关系数据可使用 PostgreSQL 或 SQL Server，向量数据仍由 Qdrant Provider 承载。
 

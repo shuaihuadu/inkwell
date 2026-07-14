@@ -43,6 +43,6 @@ Vite 开发服务器默认使用终端输出的本地地址。`npm run preview` 
 
 本原型只探索已经进入 UI 说明的界面范围。它不实现后端调用、鉴权、文件解析、Token 生成、版本管理或 Agent 执行，也不增加注册、密码重置、工具市场、Skill Execution、多 Agent 编排等 v1 范围外功能。
 
-品牌标记源文件为 `assets/logos/inkwell-mark.svg`，由 Vite 统一打包并用于页面与 favicon。
+品牌标记源文件为 `assets/logos/logo.svg`，由 Vite 统一打包并用于页面与 favicon。
 
 详细覆盖关系与截图索引见 [coverage.md](coverage.md)。最终主题、Logo 和页面方案仍需人工评审决定，本原型不代表定稿。

@@ -202,13 +202,13 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
 {
     /// <summary>
     /// 默认管理员账号密码哈希（字面量，非运行时计算）。
-    /// 离线通过 <c>Inkwell.Core.Auth.PasswordHasher.Hash("Admin@123456")</c> 预先计算得出，
+    /// 离线通过 <c>Inkwell.Core.Auth.PasswordHasher.Hash("admin")</c> 预先计算得出，
     /// 算法 = PBKDF2-HMACSHA256，迭代 600,000 次，盐 16 字节，输出 32 字节，
     /// 自描述字符串格式与常量定义详见 HD-014 §3.9。
     /// InkwellSeeder 不引用 Inkwell.Core.Auth（跨层依赖，AGENTS.md §3.2 禁止），仅使用本预计算字面量。
     /// </summary>
     private const string DefaultAdminPasswordHash =
-        "AQAAAAEACSfAAAAAEI86HC2eS19gcYKTpLXG1+h8ekLPQjIjCzehyxGhnMyefnAo6QuX1HCkrlkrL+WbiQ==";
+      "PBKDF2$600000$nlRFjDAWja7C0zFbWPNDGQ==$pgLLl4+b5j2/B2hF0aoFjcrgutvb4+dwl9EV4vjEWxk=";
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
@@ -264,7 +264,7 @@ internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> 
 }
 ```
 
-> **安全提示（文档提示，非本 HD 要实现的功能）**：生产环境部署后应强制要求管理员首次登录修改密码，或由运维直接通过 SQL 改密——`admin` / `Admin@123456` 是众所周知的默认凭据，不得作为生产环境长期密码。v1 `IAuthService`（[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)）未提供"首次登录强制改密"流程，留作后续需求，本 HD 不代为实现。
+> **安全提示（文档提示，非本 HD 要实现的功能）**：生产环境部署后应强制要求管理员首次登录修改密码，或由运维直接通过 SQL 改密——`admin` / `admin` 是众所周知的默认凭据，不得作为生产环境长期密码。v1 `IAuthService`（[HD-014](../Inkwell.Core/HD-014-Inkwell.Core.Auth.md)）未提供"首次登录强制改密"流程，留作后续需求，本 HD 不代为实现。
 
 ### 3.5 MigrationRunner.cs
 

@@ -34,8 +34,8 @@ import { useAuthStore } from "../auth/auth-store";
 import { ChatPanel } from "../chat/chat-panel";
 
 export function AgentWorkspace() {
-    const session = useAuthStore((state) => state.session);
-    const setSession = useAuthStore((state) => state.setSession);
+    const identity = useAuthStore((state) => state.identity);
+    const setSnapshot = useAuthStore((state) => state.setSnapshot);
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(search);
@@ -78,7 +78,7 @@ export function AgentWorkspace() {
     const logout = async (): Promise<void> => {
         await desktopApi.logout();
         queryClient.clear();
-        setSession(null);
+        setSnapshot({ status: "anonymous", identity: null });
     };
 
     return (
@@ -94,9 +94,9 @@ export function AgentWorkspace() {
                 </div>
                 <div className="user-actions">
                     <Avatar>
-                        {session?.username.slice(0, 1).toUpperCase()}
+                        {identity?.username.slice(0, 1).toUpperCase()}
                     </Avatar>
-                    <Typography.Text>{session?.username}</Typography.Text>
+                    <Typography.Text>{identity?.username}</Typography.Text>
                     <Tooltip title="退出登录">
                         <Button
                             type="text"

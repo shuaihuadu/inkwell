@@ -11,9 +11,9 @@ import {
     theme as antdTheme,
 } from "antd";
 import { CheckCircleOutlined, CopyOutlined } from "@ant-design/icons";
-import inkwellMark from "../../assets/logos/inkwell-mark.svg?no-inline";
+import logo from "../../assets/logos/logo.svg?no-inline";
 
-const INKWELL_MARK = inkwellMark;
+const INKWELL_MARK = logo;
 
 const SIZES = [16, 24, 32, 64, 96];
 
@@ -96,7 +96,7 @@ export default function LogoExplorer() {
     const { token } = antdTheme.useToken();
 
     const copyAssetName = async () => {
-        await navigator.clipboard.writeText("assets/logos/inkwell-mark.svg");
+        await navigator.clipboard.writeText("assets/logos/logo.svg");
         message.success("文件名已复制");
     };
 
@@ -220,7 +220,7 @@ export default function LogoExplorer() {
                                 }}
                                 onClick={copyAssetName}
                             >
-                                assets/logos/inkwell-mark.svg
+                                assets/logos/logo.svg
                             </Tag>
                         </Space>
                     </Card>

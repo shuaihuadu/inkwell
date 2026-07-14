@@ -4,7 +4,10 @@ using Microsoft.Extensions.AI;
 
 namespace Inkwell;
 
-internal sealed class JsonDelegateAIFunction(
+/// <summary>
+/// 将 JSON 输入输出委托包装为可由模型调用的 <see cref="AIFunction"/>。
+/// </summary>
+public sealed class JsonDelegateAIFunction(
     string name,
     string description,
     string parametersJsonSchema,
@@ -12,16 +15,20 @@ internal sealed class JsonDelegateAIFunction(
 {
     private readonly Func<string, CancellationToken, Task<string>> _invoke = invoke ?? throw new ArgumentNullException(nameof(invoke));
 
+    /// <inheritdoc />
     public override string Name { get; } = !string.IsNullOrWhiteSpace(name)
         ? name
         : throw new ArgumentException("Function name is required.", nameof(name));
 
+    /// <inheritdoc />
     public override string Description { get; } = !string.IsNullOrWhiteSpace(description)
         ? description
         : throw new ArgumentException("Function description is required.", nameof(description));
 
+    /// <inheritdoc />
     public override JsonElement JsonSchema { get; } = ParseJsonSchema(parametersJsonSchema);
 
+    /// <inheritdoc />
     protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
     {
         string argumentsJson = JsonSerializer.Serialize((IDictionary<string, object?>)arguments);

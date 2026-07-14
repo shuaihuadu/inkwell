@@ -13,13 +13,14 @@ namespace Inkwell;
 /// Provider 实例不保存任何会话特定状态；业务 Session 标识存储在 <see cref="AgentSession.StateBag"/> 中。
 /// </remarks>
 internal sealed class InkwellChatHistoryProvider(
-    IAgentSessionMessageRepository messages,
     IPersistenceProvider persistence,
     int? maxMessagesToRetrieve = null) : ChatHistoryProvider
 {
     internal const string SessionIdStateKey = "Inkwell.SessionId";
 
     private static readonly IReadOnlyList<string> stateKeys = [SessionIdStateKey];
+
+    private readonly IAgentSessionMessageRepository _messages = persistence.GetRepository<IAgentSessionMessageRepository>();
 
     /// <inheritdoc />
     public override IReadOnlyList<string> StateKeys => stateKeys;
@@ -39,7 +40,7 @@ internal sealed class InkwellChatHistoryProvider(
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
         Guid sessionId = GetSessionId(context.Session);
-        IReadOnlyList<ChatMessage> history = await messages.ListHistoryMessagesAsync(sessionId, maxMessagesToRetrieve, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<ChatMessage> history = await this._messages.ListHistoryMessagesAsync(sessionId, maxMessagesToRetrieve, cancellationToken).ConfigureAwait(false);
 
         return history;
     }
@@ -59,7 +60,7 @@ internal sealed class InkwellChatHistoryProvider(
             IsolationLevel.Serializable,
             async innerCancellationToken =>
             {
-                await messages.AppendMessagesAsync(sessionId, newMessages, innerCancellationToken).ConfigureAwait(false);
+                await this._messages.AppendMessagesAsync(sessionId, newMessages, innerCancellationToken).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
     }

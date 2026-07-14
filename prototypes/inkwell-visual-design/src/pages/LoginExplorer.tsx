@@ -21,7 +21,7 @@ import {
     WarningOutlined,
 } from "@ant-design/icons";
 import { useDesign } from "../context/DesignContext";
-import inkwellMark from "../../assets/logos/inkwell-mark.svg?no-inline";
+import logo from "../../assets/logos/logo.svg?no-inline";
 
 /** 严格按 ui-spec.md §1.2 / §1.5 定义 */
 type LoginState =
@@ -70,7 +70,7 @@ function LoginForm({
             {/* App branding */}
             <div style={{ textAlign: "center", marginBottom: 24 }}>
                 <img
-                    src={inkwellMark}
+                    src={logo}
                     alt="Inkwell"
                     width={64}
                     height={64}
@@ -107,10 +107,11 @@ function LoginForm({
                 layout="vertical"
                 size="large"
                 initialValues={{ username: "", password: "" }}
+                style={{ display: "grid", gap: 16 }}
             >
                 <Form.Item
                     name="username"
-                    label="账号"
+                    style={{ marginBottom: 0 }}
                     rules={[
                         { required: true, message: "请输入账号" },
                         { max: 64, message: "账号长度不超过 64" },
@@ -126,7 +127,7 @@ function LoginForm({
 
                 <Form.Item
                     name="password"
-                    label="密码"
+                    style={{ marginBottom: 0 }}
                     rules={[{ required: true, message: "请输入密码" }]}
                 >
                     <Input.Password
@@ -152,7 +153,7 @@ function LoginForm({
                 style={{
                     textAlign: "center",
                     fontSize: 12,
-                    marginTop: 16,
+                    marginTop: 36,
                     marginBottom: 0,
                 }}
             >
@@ -160,7 +161,7 @@ function LoginForm({
             </Typography.Paragraph>
 
             {/* Version */}
-            <div style={{ textAlign: "center", marginTop: 16 }}>
+            <div style={{ textAlign: "center", marginTop: 20 }}>
                 <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                     v{version ?? "1.0.0"} · Build 20260713
                 </Typography.Text>

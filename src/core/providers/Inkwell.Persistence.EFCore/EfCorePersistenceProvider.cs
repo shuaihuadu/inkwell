@@ -3,17 +3,23 @@
 using System.Data;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Persistence.EFCore;
 
 /// <summary>
-/// 唯一 <see cref="IPersistenceProvider"/> 实现（ADR-021 D1）。只负责事务边界；具名 Repository 由业务服务
-/// 直接构造函数注入，与本类共享同一 Scoped <see cref="InkwellDbContext"/> 实例，因此自动参与同一事务。
+/// 唯一 <see cref="IPersistenceProvider"/> 实现（ADR-021 D1）。
 /// </summary>
-internal sealed class EfCorePersistenceProvider(InkwellDbContext db, ILogger<EfCorePersistenceProvider> logger) : IPersistenceProvider
+internal sealed class EfCorePersistenceProvider(
+    InkwellDbContext db,
+    IServiceProvider services,
+    ILogger<EfCorePersistenceProvider> logger) : IPersistenceProvider
 {
     private static readonly ActivitySource activitySource = new("Inkwell.Persistence.EFCore");
+
+    public TRepository GetRepository<TRepository>() where TRepository : notnull =>
+        services.GetRequiredService<TRepository>();
 
     public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
         this.ExecuteInTransactionAsync(IsolationLevel.Unspecified, async innerCt =>

@@ -10,13 +10,13 @@ namespace Inkwell.Persistence.EFCore;
 internal sealed class InkwellSeeder(InkwellDbContext db, ILogger<InkwellSeeder> logger)
 {
     /// <summary>
-    /// 默认管理员账号密码哈希（字面量，非运行时计算），明文密码 = <c>Admin@123456</c>。离线通过
-    /// <c>Inkwell.Auth.PasswordHasher.Hash("Admin@123456")</c> 预先计算得出（PBKDF2-HMACSHA256，
+    /// 默认管理员账号密码哈希（字面量，非运行时计算），明文密码 = <c>admin</c>。离线通过
+    /// <c>Inkwell.Auth.PasswordHasher.Hash("admin")</c> 预先计算得出（PBKDF2-HMACSHA256，
     /// 迭代 600,000 次，盐 16 字节，输出 32 字节）。<see cref="InkwellSeeder"/> 不引用 <c>Inkwell.Auth</c>
     /// （跨层依赖，AGENTS.md §3.2 禁止），仅使用本预计算字面量。生产部署后应强制修改此默认密码。
     /// </summary>
     private const string DefaultAdminPasswordHash =
-        "PBKDF2$600000$SLze+l5RYEDXaFrnaFfIlg==$Gv70+ogRffSPwVJB2ri1WDP0rgZj8ZzQ8pOXYcy4MAE=";
+        "PBKDF2$600000$nlRFjDAWja7C0zFbWPNDGQ==$pgLLl4+b5j2/B2hF0aoFjcrgutvb4+dwl9EV4vjEWxk=";
 
     public async Task SeedAsync(CancellationToken ct = default)
     {

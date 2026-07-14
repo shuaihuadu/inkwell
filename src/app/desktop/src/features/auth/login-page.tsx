@@ -1,105 +1,131 @@
-import { LockOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, Button, Form, Input, Typography } from "antd";
-import { useState } from "react";
-import { desktopApi } from "../../shared/network/desktop-api";
-import type { LoginRequest } from "../../shared/network/contracts";
-import { useAuthStore } from "./auth-store";
+import { GlobalOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
+import { Alert, Button, ConfigProvider, Form, Input, Typography } from 'antd'
+import type { InputRef } from 'antd'
+import { useEffect, useRef, useState } from 'react'
+import { desktopApi } from '../../shared/network/desktop-api'
+import type { LoginFailureCode, LoginRequest } from '../../shared/network/contracts'
+import { useAuthStore } from './auth-store'
 
-export function LoginPage() {
-    const setSession = useAuthStore((state) => state.setSession);
-    const [error, setError] = useState<string | null>(null);
-    const [submitting, setSubmitting] = useState(false);
+const loginErrors: Record<LoginFailureCode, string> = {
+    'invalid-credentials': '账号或密码错误，请重试',
+    'account-locked': '账号已被锁定，请联系系统管理员',
+    'rate-limited': '登录过于频繁，请稍后重试',
+    offline: '网络异常，已断开。请检查网络连接',
+    unknown: '登录失败，请稍后重试',
+}
+
+interface LoginPageProps {
+    initiallyOffline?: boolean
+}
+
+export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
+    const [form] = Form.useForm<LoginRequest>()
+    const passwordInputRef = useRef<InputRef>(null)
+    const setSnapshot = useAuthStore((state) => state.setSnapshot)
+    const [failure, setFailure] = useState<LoginFailureCode | null>(initiallyOffline ? 'offline' : null)
+    const [submitting, setSubmitting] = useState(false)
+    const fieldsDisabled = submitting || failure === 'offline'
+    const submitDisabled = fieldsDisabled || failure === 'account-locked'
+
+    useEffect(() => {
+        if (failure === 'invalid-credentials') passwordInputRef.current?.focus()
+    }, [failure])
 
     const login = async (values: LoginRequest): Promise<void> => {
-        setSubmitting(true);
-        setError(null);
+        setSubmitting(true)
+        setFailure(null)
+
         try {
-            setSession(await desktopApi.login(values));
-        } catch (reason) {
-            setError(
-                reason instanceof Error
-                    ? reason.message
-                    : "登录失败，请检查服务状态。",
-            );
+            const result = await desktopApi.login(values)
+            if (result.ok) {
+                setSnapshot({ status: 'authenticated', identity: result.identity })
+            } else {
+                setFailure(result.code)
+                if (result.code === 'invalid-credentials') {
+                    form.setFieldValue('password', '')
+                }
+                if (result.code === 'offline') setSnapshot({ status: 'offline', identity: null })
+            }
+        } catch {
+            setFailure('unknown')
         } finally {
-            setSubmitting(false);
+            setSubmitting(false)
         }
-    };
+    }
 
     return (
-        <main className="login-page">
-            <section className="login-brand" aria-label="Inkwell 产品介绍">
-                <div className="brand-mark">I</div>
-                <div>
-                    <Typography.Title>Inkwell</Typography.Title>
-                    <Typography.Paragraph>
-                        创建、管理并运行团队的智能 Agent。
-                    </Typography.Paragraph>
-                </div>
-                <div className="login-pattern" aria-hidden="true" />
+        <ConfigProvider theme={{ token: { colorPrimary: '#68469c', colorInfo: '#68469c' } }}>
+            <main className="login-page">
+            <section className="login-brand" aria-label="Inkwell">
+                <Typography.Title>Inkwell</Typography.Title>
+                <div className="login-brand-rings" aria-hidden="true" />
             </section>
+
             <section className="login-form-panel">
+                <div className="login-grid" aria-hidden="true" />
                 <div className="login-form-wrap">
-                    <Typography.Text className="eyebrow">
-                        工作空间登录
-                    </Typography.Text>
-                    <Typography.Title level={2}>欢迎回来</Typography.Title>
-                    <Typography.Paragraph type="secondary">
-                        使用 Inkwell 账户继续进入 Agent 工作台。
-                    </Typography.Paragraph>
-                    {error && (
+                    <header className="login-heading">
+                        <img src="./logo.svg" alt="Inkwell" width="64" height="64" />
+                        <Typography.Title level={4}>Inkwell Agent 平台</Typography.Title>
+                    </header>
+
+                    {failure && (
                         <Alert
-                            type="error"
+                            className="login-alert"
+                            type={failure === 'rate-limited' || failure === 'offline' ? 'warning' : 'error'}
                             showIcon
-                            message="无法登录"
-                            description={error}
+                            icon={failure === 'offline' ? <GlobalOutlined /> : undefined}
+                            message={loginErrors[failure]}
                         />
                     )}
+
                     <Form<LoginRequest>
+                        form={form}
                         layout="vertical"
-                        initialValues={{
-                            username: "admin",
-                            password: "Admin@123456",
-                        }}
+                        size="large"
+                        className="login-form"
+                        initialValues={{ username: '', password: '' }}
                         onFinish={login}
                         requiredMark={false}
                     >
                         <Form.Item
-                            label="用户名"
                             name="username"
                             rules={[
-                                { required: true, message: "请输入用户名" },
+                                { required: true, message: '请输入账号' },
+                                { max: 64, message: '账号长度不超过 64' },
                             ]}
                         >
                             <Input
-                                size="large"
                                 prefix={<UserOutlined />}
+                                placeholder="请输入账号"
                                 autoComplete="username"
+                                autoFocus
+                                disabled={fieldsDisabled}
                             />
                         </Form.Item>
-                        <Form.Item
-                            label="密码"
-                            name="password"
-                            rules={[{ required: true, message: "请输入密码" }]}
-                        >
+                        <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
                             <Input.Password
-                                size="large"
+                                ref={passwordInputRef}
                                 prefix={<LockOutlined />}
+                                placeholder="请输入密码"
                                 autoComplete="current-password"
+                                disabled={fieldsDisabled}
                             />
                         </Form.Item>
-                        <Button
-                            block
-                            size="large"
-                            type="primary"
-                            htmlType="submit"
-                            loading={submitting}
-                        >
-                            登录
+                        <Button block type="primary" htmlType="submit" loading={submitting} disabled={submitDisabled}>
+                            {submitting ? '登录中…' : '登录'}
                         </Button>
                     </Form>
+
+                    <Typography.Paragraph className="login-help" type="secondary">
+                        如忘记密码或需要开通账号，请联系系统管理员
+                    </Typography.Paragraph>
+                    <Typography.Text className="login-version" type="secondary">
+                        v0.0.0 · Build 20260714
+                    </Typography.Text>
                 </div>
             </section>
-        </main>
-    );
+            </main>
+        </ConfigProvider>
+    )
 }

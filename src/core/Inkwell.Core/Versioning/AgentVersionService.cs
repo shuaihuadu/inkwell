@@ -6,16 +6,45 @@ namespace Inkwell;
 /// <see cref="IAgentVersionService"/> 默认实现。
 /// </summary>
 internal sealed class AgentVersionService(
-    IAgentRepository agents,
-    IAgentVersionRepository versions,
     IPersistenceProvider persistence) : IAgentVersionService
 {
-    public async Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default)
+    private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
+    private readonly IAgentVersionRepository _versions = persistence.GetRepository<IAgentVersionRepository>();
+
+    public async Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default)
     {
-        AgentDefinition agent = await agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
+        AgentDefinition agent = await this._agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
         ValidateVisibility(agent, requestingUserId);
 
-        AgentVersion version = await versions.GetVersionAsync(versionId, cancellationToken).ConfigureAwait(false);
+        Guid publishedVersionId = agent.CurrentPublishedVersionId
+            ?? throw new InvalidOperationException($"Agent has no published version: agentId={agentId}");
+        AgentVersion version = await this._versions.GetVersionAsync(publishedVersionId, cancellationToken).ConfigureAwait(false);
+        ValidateVersionBelongsToAgent(version, agentId);
+
+        return version.Status == AgentVersionStatus.Published
+            ? version
+            : throw new InvalidOperationException($"Current Agent version is not published: agentId={agentId}, versionId={version.Id}");
+    }
+
+    public async Task<AgentVersion> GetPublishedVersionAsync(
+        Guid agentId,
+        Guid versionId,
+        Guid requestingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        AgentVersion version = await this.GetVersionAsync(agentId, versionId, requestingUserId, cancellationToken).ConfigureAwait(false);
+
+        return version.Status == AgentVersionStatus.Published
+            ? version
+            : throw new InvalidOperationException($"Agent version is not published: agentId={agentId}, versionId={version.Id}");
+    }
+
+    public async Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default)
+    {
+        AgentDefinition agent = await this._agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
+        ValidateVisibility(agent, requestingUserId);
+
+        AgentVersion version = await this._versions.GetVersionAsync(versionId, cancellationToken).ConfigureAwait(false);
         ValidateVersionBelongsToAgent(version, agentId);
 
         return version;
@@ -23,10 +52,10 @@ internal sealed class AgentVersionService(
 
     public async Task<IReadOnlyList<AgentVersion>> ListVersionsAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default)
     {
-        AgentDefinition agent = await agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
+        AgentDefinition agent = await this._agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
         ValidateVisibility(agent, requestingUserId);
 
-        IReadOnlyList<AgentVersion> agentVersions = await versions.ListVersionsByAgentAsync(agentId, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<AgentVersion> agentVersions = await this._versions.ListVersionsByAgentAsync(agentId, cancellationToken).ConfigureAwait(false);
 
         return agent.OwnerUserId == requestingUserId
             ? agentVersions
@@ -45,14 +74,14 @@ internal sealed class AgentVersionService(
 
         return persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
         {
-            AgentDefinition agent = await agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
+            AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
             ValidateOwnership(agent, actorUserId);
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
 
             if (agent.DraftVersionId is Guid draftVersionId)
             {
-                AgentVersion draft = await versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
+                AgentVersion draft = await this._versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
                 ValidateDraft(draft, agentId);
 
                 AgentVersion updatedDraft = draft with
@@ -62,12 +91,12 @@ internal sealed class AgentVersionService(
                     UpdatedTime = now,
                 };
 
-                return await versions.UpdateVersionAsync(updatedDraft, innerCancellationToken).ConfigureAwait(false);
+                return await this._versions.UpdateVersionAsync(updatedDraft, innerCancellationToken).ConfigureAwait(false);
             }
 
             AgentVersion newDraft = CreateDraft(agent, snapshot, actorUserId, changeSummary, now);
-            AgentVersion savedDraft = await versions.AddVersionAsync(newDraft, innerCancellationToken).ConfigureAwait(false);
-            await agents.UpdateAgent(agent with { DraftVersionId = savedDraft.Id, UpdatedTime = now }, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion savedDraft = await this._versions.AddVersionAsync(newDraft, innerCancellationToken).ConfigureAwait(false);
+            await this._agents.UpdateAgent(agent with { DraftVersionId = savedDraft.Id, UpdatedTime = now }, innerCancellationToken).ConfigureAwait(false);
 
             return savedDraft;
         }, cancellationToken);
@@ -76,12 +105,12 @@ internal sealed class AgentVersionService(
     public Task<AgentVersion> PublishDraftAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
         persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
         {
-            AgentDefinition agent = await agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
+            AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
             ValidateOwnership(agent, actorUserId);
 
             Guid draftVersionId = agent.DraftVersionId
                 ?? throw new InvalidOperationException($"Agent has no draft version: agentId={agentId}");
-            AgentVersion draft = await versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion draft = await this._versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
             ValidateDraft(draft, agentId);
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -94,7 +123,7 @@ internal sealed class AgentVersionService(
                 PublishedTime = now,
             };
 
-            AgentVersion savedVersion = await versions.UpdateVersionAsync(published, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion savedVersion = await this._versions.UpdateVersionAsync(published, innerCancellationToken).ConfigureAwait(false);
             AgentDefinition updatedAgent = agent with
             {
                 CurrentPublishedVersionId = savedVersion.Id,
@@ -102,7 +131,7 @@ internal sealed class AgentVersionService(
                 LatestPublishedVersionNumber = nextVersionNumber,
                 UpdatedTime = now,
             };
-            await agents.UpdateAgent(updatedAgent, innerCancellationToken).ConfigureAwait(false);
+            await this._agents.UpdateAgent(updatedAgent, innerCancellationToken).ConfigureAwait(false);
 
             return savedVersion;
         }, cancellationToken);
@@ -115,7 +144,7 @@ internal sealed class AgentVersionService(
         CancellationToken cancellationToken = default) =>
         persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
         {
-            AgentDefinition agent = await agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
+            AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
             ValidateOwnership(agent, actorUserId);
 
             if (agent.DraftVersionId is not null)
@@ -123,7 +152,7 @@ internal sealed class AgentVersionService(
                 throw new InvalidOperationException($"Agent has unpublished draft changes: agentId={agentId}");
             }
 
-            AgentVersion source = await versions.GetVersionAsync(sourceVersionId, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion source = await this._versions.GetVersionAsync(sourceVersionId, innerCancellationToken).ConfigureAwait(false);
             ValidateVersionBelongsToAgent(source, agentId);
 
             if (source.Status != AgentVersionStatus.Published)
@@ -147,14 +176,14 @@ internal sealed class AgentVersionService(
                 PublishedTime = now,
             };
 
-            AgentVersion savedVersion = await versions.AddVersionAsync(rollbackVersion, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion savedVersion = await this._versions.AddVersionAsync(rollbackVersion, innerCancellationToken).ConfigureAwait(false);
             AgentDefinition updatedAgent = agent with
             {
                 CurrentPublishedVersionId = savedVersion.Id,
                 LatestPublishedVersionNumber = nextVersionNumber,
                 UpdatedTime = now,
             };
-            await agents.UpdateAgent(updatedAgent, innerCancellationToken).ConfigureAwait(false);
+            await this._agents.UpdateAgent(updatedAgent, innerCancellationToken).ConfigureAwait(false);
 
             return savedVersion;
         }, cancellationToken);

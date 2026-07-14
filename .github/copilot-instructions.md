@@ -8,6 +8,29 @@
 - 明确指令（比如"删掉这个文件"）照做即可；涉及方案选型、设计取舍类的讨论，该反对就反对，不要为了让我满意而附和有问题的决定
 - 有分歧摆出来讨论，但最终拍板权在我；讨论过程不等于抗命，达成一致或我明确决定后要执行到位，不要反复纠缠已经拍板的结论
 
+## 后端分层实现边界
+
+以下规则是后端实现与代码评审的强制约束。新增或修改代码前必须先确定职责归属，并将实现放置在对应层。现有代码违反边界时，不得以保持旧有模式为由继续扩散，应在本次改动范围内将相关职责调整到正确层。确需变更分层边界时，必须先向 Owner 说明原因、影响与替代方案，获得明确确认后再实施。
+
+### WebApi 层
+
+- **职责**：`Inkwell.WebApi` 负责 HTTP 与传输协议适配、调用上下文提取和 Service 调用。HTTP 专属职责包括路由、请求绑定、请求 DTO 格式校验、`HttpContext`、Header、客户端 IP、Claims、Authentication / Authorization、Rate Limiting、文件上传、SSE / 流式响应以及请求取消传播。
+- **上下文传递**：从 `HttpContext` 或 Claims 提取的 `UserId` 等调用者信息，必须转换为明确的业务参数传入 Service。Service 的执行结果或异常由 WebApi 映射为 HTTP 状态码、响应 DTO 或 Problem Details；重复映射应收敛到全局异常处理或统一的 WebApi 组件。
+- **禁止事项**：WebApi 不得实现业务规则，不得直接调用 Repository，不得在 Controller、Endpoint、Middleware 或 Authentication Handler 中完成资源所有权判断、账号锁定规则、业务状态流转、跨资源操作编排或事务控制。
+
+### Service 层
+
+- **职责**：Service 负责业务规则与用例编排，包括业务授权、状态转换、跨资源操作顺序、事务边界和失败语义；输入与输出使用明确的业务 DTO、值对象和调用者标识。
+- **依赖边界**：Service 按用例需要调用 Repository、`IPersistenceProvider`、`ICacheProvider`、`IQueueProvider`、`IFileStorageProvider`、`IAgentFactory`、`IModelRegistryService`、`TimeProvider` 等抽象端口，以及职责单一且依赖方向合规的其他业务 Service。具体依赖白名单以 [AGENTS.md §3.2](../AGENTS.md) 为准。
+- **禁止事项**：Service 不得依赖 `HttpContext`、`IHttpContextAccessor`、Controller、`IActionResult`、HTTP Header、HTTP 状态码等传输层概念，也不得依赖 EF Core、Redis、Blob、Queue、MAF Hosting 等具体 Provider 或 SDK 实现。
+
+### Repository 层
+
+- **职责**：Repository 负责持久化数据的读取与写入，包括 CRUD、业务语义查询、筛选、排序、分页、投影、批量读写、Entity / Model 映射、乐观并发和数据库约束处理。Repository 方法可以使用 `Get*`、`Find*`、`List*` 等业务语义名称，但其实现必须保持为数据访问行为。
+- **依赖边界**：Repository 依赖持久化抽象、数据库上下文以及所属 Provider 所需的数据库 SDK；对业务层仅暴露 Model、查询结果和数据访问异常，不暴露 Entity、`DbContext` 或 Provider 私有类型。
+- **禁止事项**：Repository 不得读取 `HttpContext` 或 Claims，不得执行业务授权，不得决定账号锁定、Agent 发布或其他业务状态流转，不得编排多个 Repository 的事务，不得调用外部模型或业务 Service。
+- **职责判定**：Repository 决定如何读取或保存数据；Service 决定是否执行该操作，以及用例中的执行顺序和业务后果。
+
 ## 文档规范
 
 - 不要每次修改代码之后都要写总结文档；是否需要写总结文档取决于修改的复杂程度和影响范围，并需获取用户确认后再写
