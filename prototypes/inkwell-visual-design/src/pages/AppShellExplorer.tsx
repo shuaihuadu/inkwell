@@ -362,14 +362,14 @@ function AgentLibraryMock({
                 </Space>
             </div>
 
-            <div
-                style={{
-                    height: 46,
-                    display: "flex",
-                    alignItems: "flex-start",
-                }}
-            >
-                {activeTab === "mine" && (
+            {activeTab === "mine" && (
+                <div
+                    style={{
+                        height: 46,
+                        display: "flex",
+                        alignItems: "flex-start",
+                    }}
+                >
                     <Segmented<AgentStatusFilter>
                         block
                         value={statusFilter}
@@ -390,12 +390,17 @@ function AgentLibraryMock({
                         ]}
                         style={{ width: 320 }}
                     />
-                )}
-            </div>
+                </div>
+            )}
 
             {/* 每页固定为 5 列 × 4 行的画布。即使筛选后不足 20 项，也保留四行高度，
              * 让下方总数和分页控件的位置保持稳定；标题单行、描述两行省略。 */}
-            <div style={{ minHeight: 548, position: "relative" }}>
+            <div
+                style={{
+                    minHeight: activeTab === "shared" ? 594 : 548,
+                    position: "relative",
+                }}
+            >
                 <Row gutter={[12, 12]} align="stretch">
                     {pageAgents.map((agent, index) => (
                         <Col
