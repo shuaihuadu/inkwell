@@ -4,7 +4,7 @@ import DesignLab from './pages/DesignLab'
 import ThemeExplorer from './pages/ThemeExplorer'
 import LogoExplorer from './pages/LogoExplorer'
 import LoginExplorer from './pages/LoginExplorer'
-import AgentDesignPage from './pages/AgentDesignPage'
+import AppShellExplorer from './pages/AppShellExplorer'
 
 const router = createBrowserRouter([
   {
@@ -15,7 +15,7 @@ const router = createBrowserRouter([
       { path: 'themes', element: <ThemeExplorer /> },
       { path: 'logos', element: <LogoExplorer /> },
       { path: 'login', element: <LoginExplorer /> },
-      { path: 'agent', element: <AgentDesignPage /> },
+      { path: 'shell', element: <AppShellExplorer /> },
     ],
   },
 ])

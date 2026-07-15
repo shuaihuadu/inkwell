@@ -14,7 +14,7 @@ import {
     BgColorsOutlined,
     PictureOutlined,
     LoginOutlined,
-    RobotOutlined,
+    LayoutOutlined,
     ArrowRightOutlined,
 } from "@ant-design/icons";
 
@@ -49,14 +49,14 @@ const LAB_CARDS = [
         color: "#1D4ED8",
     },
     {
-        path: "/agent",
-        icon: <RobotOutlined style={{ fontSize: 32 }} />,
-        title: "Agent 设计页",
+        path: "/shell",
+        icon: <LayoutOutlined style={{ fontSize: 32 }} />,
+        title: "AppShell 外壳",
         description:
-            "UI-004 高保真方案，10 个区段导航，2 种布局密度，真实表单控件全状态演示。",
-        meta: ["10 个区段", "2 种密度", "UI-004 对齐"],
+            "顶栏 + 左侧 nav + 主区，左侧为两级可展开分组（工作区 / 资源中心 / 系统管理）；点击 Agent 空间卡片可钻入完整的 UI-004 设计页或直达对话页，同屏看到壳 + 页面的整体效果。后续新页面也会接入这里，不再新开顶导。",
+        meta: ["OQ-011 对齐", "可折叠 Sider", "内嵌 UI-004"],
         badge: "2",
-        color: "#166534",
+        color: "#4338CA",
     },
 ];
 

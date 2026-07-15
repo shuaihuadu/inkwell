@@ -120,9 +120,6 @@ export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
                     <Typography.Paragraph className="login-help" type="secondary">
                         如忘记密码或需要开通账号，请联系系统管理员
                     </Typography.Paragraph>
-                    <Typography.Text className="login-version" type="secondary">
-                        v0.0.0 · Build 20260714
-                    </Typography.Text>
                 </div>
             </section>
             </main>

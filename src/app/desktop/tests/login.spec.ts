@@ -47,7 +47,6 @@ test("renders the prototype-aligned login experience", async ({ browserName }, t
         await expect(
             page.getByText("如忘记密码或需要开通账号，请联系系统管理员"),
         ).toBeVisible();
-        await expect(page.getByText("v0.0.0 · Build 20260714")).toBeVisible();
 
         const brandBox = await page.locator(".login-brand").boundingBox();
         const brandTitleBox = await page

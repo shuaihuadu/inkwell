@@ -54,11 +54,9 @@ const STATE_OPTIONS: { value: LoginState; label: string }[] = [
 /** 登录表单 */
 function LoginForm({
     state,
-    version,
     showTopError = true,
 }: {
     state: LoginState;
-    version?: string;
     showTopError?: boolean;
 }) {
     const isError = state in ERROR_MAP;
@@ -159,13 +157,6 @@ function LoginForm({
             >
                 如忘记密码或需要开通账号，请联系系统管理员
             </Typography.Paragraph>
-
-            {/* Version */}
-            <div style={{ textAlign: "center", marginTop: 20 }}>
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                    v{version ?? "1.0.0"} · Build 20260713
-                </Typography.Text>
-            </div>
         </div>
     );
 }
@@ -295,7 +286,7 @@ function WorkstationLogin({
                         zIndex: 1,
                     }}
                 >
-                    <LoginForm state={state} version="1.0.0" />
+                    <LoginForm state={state} />
                 </div>
             </div>
         </div>
@@ -424,7 +415,6 @@ export default function LoginExplorer() {
                             "密码 Input.Password — 必填，含显示/隐藏切换",
                             "登录按钮 — 提交中时 loading，离线/锁定时置灰",
                             '"如忘记密码…联系系统管理员" 提示文字',
-                            "版本号 + 构建号 (底部)",
                         ].map((f) => (
                             <Typography.Text key={f} style={{ fontSize: 12 }}>
                                 ✓ {f}

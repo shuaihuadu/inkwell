@@ -176,12 +176,6 @@ textarea {
     text-align: center;
     font-size: 12px;
 }
-.login-version.ant-typography {
-    display: block;
-    margin-top: 20px;
-    text-align: center;
-    font-size: 11px;
-}
 @media (max-width: 720px) {
     .login-page {
         flex-direction: column;

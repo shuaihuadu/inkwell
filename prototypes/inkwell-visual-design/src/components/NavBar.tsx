@@ -7,7 +7,7 @@ import {
     Typography,
     theme as antdTheme,
 } from "antd";
-import { BulbOutlined, BulbFilled } from "@ant-design/icons";
+import { SunFilled, MoonFilled } from "@ant-design/icons";
 import { useDesign } from "../context/DesignContext";
 import { THEMES, THEME_NAMES } from "../tokens/themes";
 import logo from "../../assets/logos/logo.svg?no-inline";
@@ -17,7 +17,7 @@ const NAV_ITEMS = [
     { path: "/themes", label: "主题" },
     { path: "/logos", label: "Logo" },
     { path: "/login", label: "登录页" },
-    { path: "/agent", label: "Agent 设计" },
+    { path: "/shell", label: "AppShell" },
 ];
 
 export default function NavBar() {
@@ -142,13 +142,13 @@ export default function NavBar() {
                         ),
                     }))}
                 />
-                {/* Dark mode toggle */}
+                {/* Dark mode toggle：太阳/月亮图标，跟 AppShellExplorer 顶栏的同款开关保持一致 */}
                 <Switch
                     size="small"
                     checked={isDark}
                     onChange={setIsDark}
-                    checkedChildren={<BulbFilled />}
-                    unCheckedChildren={<BulbOutlined />}
+                    checkedChildren={<MoonFilled />}
+                    unCheckedChildren={<SunFilled />}
                 />
             </div>
         </Layout.Header>

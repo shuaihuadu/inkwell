@@ -1,54 +1,162 @@
+.inkwell-agent-avatar {
+    width: 72px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+}
+
+.inkwell-agent-avatar-editor {
+    color: #fff;
+    cursor: pointer;
+}
+
+.inkwell-agent-avatar-editor-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    background: rgb(0 0 0 / 48%);
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.inkwell-agent-avatar-editor:hover .inkwell-agent-avatar-editor-overlay,
+.inkwell-agent-avatar-editor:focus-visible .inkwell-agent-avatar-editor-overlay {
+    opacity: 1;
+}
+
+.inkwell-agent-avatar-editor:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -3px;
+}
+
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100%;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100%;
 }
 
 .prototype-page {
-  width: 100%;
-  margin: 0 auto;
-  padding: 28px 24px 60px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+}
+
+/* AppShell "关于" 入口呼吸灯：用 currentColor 驱动柔光脉动，不写死颜色，随主题 token 自动换色 */
+@keyframes inkwell-breathe {
+    0%,
+    100% {
+        filter: drop-shadow(0 0 0 currentColor);
+        opacity: 0.72;
+    }
+    50% {
+        filter: drop-shadow(0 0 5px currentColor);
+        opacity: 1;
+    }
+}
+
+.inkwell-breathe-icon {
+    animation: inkwell-breathe 1.5s ease-in-out infinite;
+}
+
+/* Agent 空间卡片右上角“编辑”快捷按钮：仅已发布 Agent 显示，默认隐藏、hover 卡片时才浮现，
+ * 避免已发布 Agent 卡片被"点击即进对话"占用后失去快速回到配置页的入口
+ * （requirements.md §13 第 30 条 / ui-spec.md §3.4 2026-07-15 修订）。 */
+.inkwell-agent-card-edit-btn {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.inkwell-agent-card:hover .inkwell-agent-card-edit-btn {
+    opacity: 1;
+}
+
+/*
+ * Ant Design X 的 Sender 输入框获得焦点时，内部 textarea 会套用 antd Input 的默认
+ * focus 描边（outline: colorPrimary solid 1px，直角），跟 Sender 卡片本身的圆角描边
+ * 叠在一起，视觉上像文本框自己又多出一层方框。Sender 卡片整体的描边/阴影已经足够表达
+ * "这是一个输入区"，textarea 自己的这层直角描边纯属多余，去掉。
+ */
+.ant-sender-input:focus,
+.ant-sender-input:focus-visible {
+    outline: none !important;
+}
+
+/*
+ * AntD Alert 默认间隙偏松：无 description 时 padding 是 8px 12px 还算紧凑，
+ * 但一旦传了 description（"with-description" 变体）padding 会跳到 16px 24px，
+ * 图标也从跟随字号变成固定 24px + 12px 右边距，整块看起来明显比周围内容"胖"一圈。
+ * 这里统一收紧，两种变体都覆盖。
+ */
+.inkwell-compact-alert.ant-alert {
+    padding: 6px 12px;
+}
+
+.inkwell-compact-alert .ant-alert-icon {
+    margin-inline-end: 6px;
+}
+
+.inkwell-compact-alert.ant-alert-with-description {
+    padding: 10px 14px;
+}
+
+.inkwell-compact-alert.ant-alert-with-description .ant-alert-icon {
+    font-size: 18px;
+    margin-inline-end: 8px;
+}
+
+.inkwell-compact-alert .ant-alert-title {
+    margin-bottom: 2px;
 }
 
 @media (max-width: 767px) {
-  .prototype-page {
-    padding: 20px 16px 40px;
-  }
+    .prototype-page {
+        padding: 20px 16px 40px;
+    }
 
-  .design-nav {
-    height: auto !important;
-    min-height: 96px;
-    padding: 8px 12px !important;
-    gap: 8px !important;
-    align-content: center;
-  }
+    .design-nav {
+        height: auto !important;
+        min-height: 96px;
+        padding: 8px 12px !important;
+        gap: 8px !important;
+        align-content: center;
+    }
 
-  .design-nav-subtitle,
-  .design-nav-theme {
-    display: none !important;
-  }
+    .design-nav-subtitle,
+    .design-nav-theme {
+        display: none !important;
+    }
 
-  .design-nav-controls {
-    margin-left: auto !important;
-  }
+    .design-nav-controls {
+        margin-left: auto !important;
+    }
 
-  .design-nav-links {
-    order: 3;
-    width: 100%;
-    overflow-x: auto;
-  }
+    .design-nav-links {
+        order: 3;
+        width: 100%;
+        overflow-x: auto;
+    }
 
-  .design-nav-links::-webkit-scrollbar {
-    display: none;
-  }
+    .design-nav-links::-webkit-scrollbar {
+        display: none;
+    }
 
-  .design-nav-links a {
-    flex: 0 0 auto;
-  }
+    .design-nav-links a {
+        flex: 0 0 auto;
+    }
 }
