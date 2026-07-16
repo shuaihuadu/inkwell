@@ -1,9 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-
 namespace Inkwell;
 
 /// <summary><see cref="IAuthService"/> 的 DI 注册入口。</summary>

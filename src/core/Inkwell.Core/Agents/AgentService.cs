@@ -1,41 +1,35 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Collections.Immutable;
-
 namespace Inkwell;
 
 /// <summary><see cref="IAgentService"/> 唯一实现；CRUD / 共享 / 克隆的完整业务逻辑。</summary>
 internal sealed class AgentService(
-    IPersistenceProvider persistence) : IAgentService
+    IPersistenceProvider persistence,
+    IAgentBuildOptionsResolver buildOptionsResolver) : IAgentService
 {
     private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
-    private readonly IAgentVersionRepository _versions = persistence.GetRepository<IAgentVersionRepository>();
 
     public async Task<AgentDefinition> CreateAgentAsync(AgentUpsertRequest request, Guid ownerUserId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateBasicFields(request);
 
+        AgentBuildOptions buildOptions = await buildOptionsResolver.ResolveAsync(request, ct).ConfigureAwait(false);
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        AgentSnapshot snapshot = ToSnapshot(request);
         AgentDefinition agent = new()
         {
             Id = Guid.CreateVersion7(),
             OwnerUserId = ownerUserId,
+            Name = request.Name,
+            AvatarUri = request.AvatarUri,
+            Description = request.Description,
+            Instructions = request.Instructions,
+            BuildOptions = buildOptions,
             CreatedTime = now,
             UpdatedTime = now,
         };
 
-        return await persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
-        {
-            AgentDefinition savedAgent = await this._agents.AddAgent(agent, innerCancellationToken).ConfigureAwait(false);
-            AgentVersion draft = CreateDraft(savedAgent, snapshot, ownerUserId, now);
-            AgentVersion savedDraft = await this._versions.AddVersionAsync(draft, innerCancellationToken).ConfigureAwait(false);
-            AgentDefinition updatedAgent = savedAgent with { DraftVersionId = savedDraft.Id };
-            await this._agents.UpdateAgent(updatedAgent, innerCancellationToken).ConfigureAwait(false);
-
-            return updatedAgent;
-        }, ct).ConfigureAwait(false);
+        return await this._agents.AddAgent(agent, ct).ConfigureAwait(false);
     }
 
     public async Task<AgentDefinition> UpdateAgentAsync(Guid agentId, AgentUpsertRequest request, Guid actorUserId, CancellationToken ct = default)
@@ -43,66 +37,23 @@ internal sealed class AgentService(
         ArgumentNullException.ThrowIfNull(request);
         ValidateBasicFields(request);
 
-        return await persistence.ExecuteInTransactionAsync(async innerCt =>
+        AgentDefinition agent = await this._agents.GetAgent(agentId, ct).ConfigureAwait(false);
+        ValidateOwnership(agent, actorUserId);
+
+        AgentBuildOptions buildOptions = await buildOptionsResolver.ResolveAsync(request, ct).ConfigureAwait(false);
+        AgentDefinition updated = agent with
         {
-            AgentDefinition agent = await this._agents.GetAgent(agentId, innerCt).ConfigureAwait(false);
+            Name = request.Name,
+            AvatarUri = request.AvatarUri,
+            Description = request.Description,
+            Instructions = request.Instructions,
+            BuildOptions = buildOptions,
+            UpdatedTime = DateTimeOffset.UtcNow,
+        };
 
-            ValidateOwnership(agent, actorUserId);
+        await this._agents.UpdateAgent(updated, ct).ConfigureAwait(false);
 
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            int nextVersionNumber = checked(agent.LatestPublishedVersionNumber + 1);
-            AgentSnapshot snapshot = ToSnapshot(request);
-            AgentVersion published;
-
-            if (agent.DraftVersionId is Guid draftVersionId)
-            {
-                AgentVersion draft = await this._versions.GetVersionAsync(draftVersionId, innerCt).ConfigureAwait(false);
-
-                if (draft.AgentId != agentId || draft.Status != AgentVersionStatus.Draft)
-                {
-                    throw new InvalidOperationException($"Agent draft pointer is invalid: agentId={agentId}, versionId={draftVersionId}");
-                }
-
-                published = draft with
-                {
-                    VersionNumber = nextVersionNumber,
-                    Status = AgentVersionStatus.Published,
-                    Snapshot = snapshot,
-                    CreatedByUserId = actorUserId,
-                    UpdatedTime = now,
-                    PublishedTime = now,
-                };
-                published = await this._versions.UpdateVersionAsync(published, innerCt).ConfigureAwait(false);
-            }
-            else
-            {
-                published = new AgentVersion
-                {
-                    Id = Guid.CreateVersion7(),
-                    AgentId = agentId,
-                    VersionNumber = nextVersionNumber,
-                    Status = AgentVersionStatus.Published,
-                    Snapshot = snapshot,
-                    CreatedByUserId = actorUserId,
-                    CreatedTime = now,
-                    UpdatedTime = now,
-                    PublishedTime = now,
-                };
-                published = await this._versions.AddVersionAsync(published, innerCt).ConfigureAwait(false);
-            }
-
-            AgentDefinition updated = agent with
-            {
-                CurrentPublishedVersionId = published.Id,
-                DraftVersionId = null,
-                LatestPublishedVersionNumber = nextVersionNumber,
-                UpdatedTime = now,
-            };
-
-            await this._agents.UpdateAgent(updated, innerCt).ConfigureAwait(false);
-
-            return updated;
-        }, ct).ConfigureAwait(false);
+        return updated;
     }
 
     public async Task<bool> DeleteAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
@@ -127,18 +78,18 @@ internal sealed class AgentService(
         return agent;
     }
 
-    public async Task<IReadOnlyList<AgentSummary>> ListMyAgentsAsync(Guid ownerUserId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AgentListItem>> ListMyAgentsAsync(Guid ownerUserId, CancellationToken ct = default)
     {
         IReadOnlyList<AgentDefinition> mine = await this._agents.FindAgentsByOwner(ownerUserId, ct).ConfigureAwait(false);
 
-        return await this.ToAgentSummariesAsync(mine, ct).ConfigureAwait(false);
+        return ToAgentListItems(mine);
     }
 
-    public async Task<IReadOnlyList<AgentSummary>> ListSharedAgentsAsync(Guid excludingOwnerUserId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AgentListItem>> ListSharedAgentsAsync(Guid excludingOwnerUserId, CancellationToken ct = default)
     {
         IReadOnlyList<AgentDefinition> shared = await this._agents.FindSharedAgents(excludingOwnerUserId, ct).ConfigureAwait(false);
 
-        return await this.ToAgentSummariesAsync(shared, ct).ConfigureAwait(false);
+        return ToAgentListItems(shared);
     }
 
     public Task ShareAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
@@ -172,30 +123,21 @@ internal sealed class AgentService(
     public async Task<AgentDefinition> CloneAgentAsync(Guid agentId, Guid newOwnerUserId, CancellationToken ct = default)
     {
         AgentDefinition source = await this._agents.GetAgent(agentId, ct).ConfigureAwait(false);
-        Guid sourceVersionId = source.DraftVersionId ?? source.CurrentPublishedVersionId
-            ?? throw new InvalidOperationException($"Agent has no version to clone: agentId={agentId}");
-        AgentVersion sourceVersion = await this._versions.GetVersionAsync(sourceVersionId, ct).ConfigureAwait(false);
-
         DateTimeOffset now = DateTimeOffset.UtcNow;
         AgentDefinition clone = new()
         {
             Id = Guid.CreateVersion7(),
             OwnerUserId = newOwnerUserId,
+            Name = $"{source.Name}（副本）",
+            AvatarUri = source.AvatarUri,
+            Description = source.Description,
+            Instructions = source.Instructions,
+            BuildOptions = source.BuildOptions,
             CreatedTime = now,
             UpdatedTime = now,
         };
 
-        return await persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
-        {
-            AgentDefinition savedClone = await this._agents.AddAgent(clone, innerCancellationToken).ConfigureAwait(false);
-            AgentSnapshot cloneSnapshot = sourceVersion.Snapshot with { Name = $"{sourceVersion.Snapshot.Name}（副本）" };
-            AgentVersion cloneDraft = CreateDraft(savedClone, cloneSnapshot, newOwnerUserId, now);
-            AgentVersion savedDraft = await this._versions.AddVersionAsync(cloneDraft, innerCancellationToken).ConfigureAwait(false);
-            AgentDefinition updatedClone = savedClone with { DraftVersionId = savedDraft.Id };
-            await this._agents.UpdateAgent(updatedClone, innerCancellationToken).ConfigureAwait(false);
-
-            return updatedClone;
-        }, ct).ConfigureAwait(false);
+        return await this._agents.AddAgent(clone, ct).ConfigureAwait(false);
     }
 
     private static void ValidateOwnership(AgentDefinition agent, Guid actorUserId)
@@ -219,60 +161,14 @@ internal sealed class AgentService(
         }
     }
 
-    private async Task<IReadOnlyList<AgentSummary>> ToAgentSummariesAsync(IReadOnlyList<AgentDefinition> agentDefinitions, CancellationToken cancellationToken)
-    {
-        List<Guid> activeVersionIds = [.. agentDefinitions
-            .Select(agent => agent.DraftVersionId ?? agent.CurrentPublishedVersionId)
-            .OfType<Guid>()];
-        IReadOnlyDictionary<Guid, AgentVersion> activeVersions = await this._versions.FindVersionsByIdsAsync(activeVersionIds, cancellationToken).ConfigureAwait(false);
-
-        List<AgentSummary> summaries = [];
-
-        foreach (AgentDefinition agent in agentDefinitions)
-        {
-            Guid? activeVersionId = agent.DraftVersionId ?? agent.CurrentPublishedVersionId;
-
-            if (activeVersionId is not Guid versionId || !activeVersions.TryGetValue(versionId, out AgentVersion? version))
-            {
-                continue;
-            }
-
-            AgentSnapshot snapshot = version.Snapshot;
-            summaries.Add(new AgentSummary(
-                agent.Id,
-                snapshot.Name,
-                snapshot.AvatarUri,
-                snapshot.Description is null ? null : snapshot.Description[..Math.Min(60, snapshot.Description.Length)],
-                agent.OwnerUserId,
-                agent.IsShared,
-                agent.LatestPublishedVersionNumber,
-                agent.UpdatedTime));
-        }
-
-        return summaries;
-    }
-
-    private static AgentSnapshot ToSnapshot(AgentUpsertRequest request) => new()
-    {
-        Name = request.Name,
-        AvatarUri = request.AvatarUri,
-        Description = request.Description,
-        Instructions = request.Instructions,
-        ModelId = request.ModelId,
-        ModelParameters = request.ModelParameters,
-        ToolBindings = request.ToolBindings?.ToImmutableArray() ?? [],
-        SkillBindings = request.SkillBindings?.ToImmutableArray() ?? [],
-    };
-
-    private static AgentVersion CreateDraft(AgentDefinition agent, AgentSnapshot snapshot, Guid actorUserId, DateTimeOffset now) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        AgentId = agent.Id,
-        VersionNumber = checked(agent.LatestPublishedVersionNumber + 1),
-        Status = AgentVersionStatus.Draft,
-        Snapshot = snapshot,
-        CreatedByUserId = actorUserId,
-        CreatedTime = now,
-        UpdatedTime = now,
-    };
+    private static IReadOnlyList<AgentListItem> ToAgentListItems(IReadOnlyList<AgentDefinition> agents) =>
+        [.. agents.Select(agent => new AgentListItem(
+            agent.Id,
+            agent.Name,
+            agent.AvatarUri,
+            agent.Description is null ? null : agent.Description[..Math.Min(60, agent.Description.Length)],
+            agent.OwnerUserId,
+            agent.IsShared,
+            agent.LatestPublishedVersionNumber,
+            agent.UpdatedTime))];
 }

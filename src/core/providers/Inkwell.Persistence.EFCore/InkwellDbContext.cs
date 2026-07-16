@@ -1,17 +1,14 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Reflection;
-using Inkwell.Persistence.EFCore.Entities;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.Extensions.Logging;
 
 namespace Inkwell.Persistence.EFCore;
 
 /// <summary>
-/// base <see cref="DbContext"/>；登记全部 <c>DbSet&lt;XxxEntity&gt;</c>，<see cref="OnModelCreating"/> 扫描三 mixin
-/// 并应用全部 <see cref="IEntityTypeConfiguration{TEntity}"/>。final adapter 通过继承调整 Provider-specific 行为。
+/// 表示 EF Core 共享数据库上下文，登记全部实体集合并应用时间戳、所有者索引和实体类型配置。
+/// 具体数据库适配器可通过继承调整数据库提供程序专属行为。
 /// </summary>
 /// <param name="options">数据库上下文配置。</param>
 public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbContext(options)
@@ -24,9 +21,11 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
 
     internal DbSet<AgentToolEntity> AgentTools => this.Set<AgentToolEntity>();
 
-    internal DbSet<AgentSessionEntity> AgentSession => this.Set<AgentSessionEntity>();
+    internal DbSet<AgentConversationEntity> AgentConversations => this.Set<AgentConversationEntity>();
 
-    internal DbSet<AgentChatMessageEntity> AgentChatMessage => this.Set<AgentChatMessageEntity>();
+    internal DbSet<AgentChatMessageEntity> AgentChatMessages => this.Set<AgentChatMessageEntity>();
+
+    internal DbSet<AgentSessionStateEntity> AgentSessionStates => this.Set<AgentSessionStateEntity>();
 
     internal DbSet<AgentSkillEntity> AgentSkills => this.Set<AgentSkillEntity>();
 
@@ -40,10 +39,7 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         try
         {
             ApplyTimestamps(modelBuilder);
-            this.ApplyRowVersion(modelBuilder);
             ApplyOwnerIndex(modelBuilder);
-            ApplyEnumAsString(modelBuilder);
-            this.ApplyJsonColumnTypes(modelBuilder);
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
@@ -54,10 +50,9 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         List<IMutableEntityType> entityTypes = modelBuilder.Model.GetEntityTypes().ToList();
 
         logger.LogInformation(
-            "EFCore model created: {EntityCount} entities, {TimestampedCount} with IHasTimestamps, {RowVersionedCount} with IHasRowVersion",
+            "EFCore model created: {EntityCount} entities, {TimestampedCount} with IHasTimestamps",
             entityTypes.Count,
-            entityTypes.Count(t => typeof(IHasTimestamps).IsAssignableFrom(t.ClrType)),
-            entityTypes.Count(t => typeof(IHasRowVersion).IsAssignableFrom(t.ClrType)));
+            entityTypes.Count(t => typeof(IHasTimestamps).IsAssignableFrom(t.ClrType)));
     }
 
     private static void ApplyTimestamps(ModelBuilder mb)
@@ -69,65 +64,11 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         }
     }
 
-    /// <summary>
-    /// SqlServer 原生 <c>rowversion</c> 列由数据库引擎自增生成，<c>IsRowVersion()</c>（隐含
-    /// <c>ValueGeneratedOnAddOrUpdate</c>）语义正确；但 Postgres 没有对应的数据库端自增机制，
-    /// <c>ValueGeneratedOnAddOrUpdate</c> 会让 EF Core 在 INSERT 语句中跳过该列，违反列的非空约束。
-    /// Postgres 场景只标记 <c>IsConcurrencyToken()</c>，新值完全由
-    /// <c>PostgresRowVersionInterceptor.SavingChangesAsync</c> 在 Added/Modified 时手动赋值，
-    /// 交给正常的 INSERT/UPDATE 语句当作客户端提供的普通列值发送。
-    /// </summary>
-    private void ApplyRowVersion(ModelBuilder mb)
-    {
-        bool isPostgres = this.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-
-        foreach (IMutableEntityType? entityType in mb.Model.GetEntityTypes().Where(t => typeof(IHasRowVersion).IsAssignableFrom(t.ClrType)))
-        {
-            PropertyBuilder property = mb.Entity(entityType.ClrType).Property(nameof(IHasRowVersion.RowVersion));
-
-            if (isPostgres)
-            {
-                property.IsConcurrencyToken();
-            }
-            else
-            {
-                property.IsRowVersion();
-            }
-        }
-    }
-
     private static void ApplyOwnerIndex(ModelBuilder mb)
     {
         foreach (IMutableEntityType? entityType in mb.Model.GetEntityTypes().Where(t => typeof(IHasOwner).IsAssignableFrom(t.ClrType)))
         {
             mb.Entity(entityType.ClrType).HasIndex(nameof(IHasOwner.OwnerUserId));
         }
-    }
-
-    private static void ApplyEnumAsString(ModelBuilder mb)
-    {
-        foreach (IMutableEntityType entityType in mb.Model.GetEntityTypes())
-        {
-            foreach (PropertyInfo property in entityType.ClrType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (property.PropertyType.IsEnum)
-                {
-                    mb.Entity(entityType.ClrType).Property(property.Name).HasConversion<string>().HasMaxLength(64);
-                }
-            }
-        }
-    }
-
-    private void ApplyJsonColumnTypes(ModelBuilder modelBuilder)
-    {
-        bool isPostgres = this.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-        string jsonColumnType = isPostgres ? "jsonb" : "json";
-
-        modelBuilder.Entity<AgentChatMessageEntity>().Property(entity => entity.Message).HasColumnType(jsonColumnType);
-        modelBuilder.Entity<AgentSessionEntity>().Property(entity => entity.SessionState).HasColumnType(jsonColumnType);
-        modelBuilder.Entity<AgentSkillEntity>().Property(entity => entity.ReferenceFileUris).HasColumnType(jsonColumnType);
-        modelBuilder.Entity<AgentSkillEntity>().Property(entity => entity.AssetFileUris).HasColumnType(jsonColumnType);
-        modelBuilder.Entity<AgentToolEntity>().Property(entity => entity.ParametersJsonSchema).HasColumnType(jsonColumnType);
-        modelBuilder.Entity<AgentVersionEntity>().Property(entity => entity.Snapshot).HasColumnType(jsonColumnType);
     }
 }

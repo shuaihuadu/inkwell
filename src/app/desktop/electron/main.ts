@@ -3,7 +3,7 @@ import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   AgentDefinition,
-  AgentSummary,
+  AgentListItem,
   AuthIdentity,
   AuthSnapshot,
   AuthStatus,
@@ -235,7 +235,7 @@ const registerApiHandlers = (): void => {
   ipcMain.on('inkwell:activity', scheduleIdleLock)
   ipcMain.handle('inkwell:list-agents', () => {
     requireAuthenticated()
-    return request<AgentSummary[]>('/api/agents/mine')
+    return request<AgentListItem[]>('/api/agents/mine')
   })
   ipcMain.handle('inkwell:list-models', () => {
     requireAuthenticated()

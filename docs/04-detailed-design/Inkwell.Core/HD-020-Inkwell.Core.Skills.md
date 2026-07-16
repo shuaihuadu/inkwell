@@ -19,6 +19,8 @@ upstream:
 
 > **本 HD 是 H3 第七张业务命名空间（`Inkwell.Core.*`）详细设计**，在起草顺序上紧接 [HD-019 `Inkwell.Core.Models`](HD-019-Inkwell.Core.Models.md) 之后（本次提交时 HD-019 frontmatter 仍为 `status: draft`，本 HD 不对该状态做任何断言或修改）。
 >
+> **2026-07-16 替代性 errata（Skill Definition 进入 AgentRuntime）**：Agent 构建链现由 `IAgentBuildOptionsResolver` 根据 Snapshot 绑定加载 `AgentSkillDefinition` 并写入 `AgentBuildOptions.Skills`，缺失 Skill 延续尽力而为策略；`ModelRoutingAgentFactory` 在唯一允许依赖 MAF 的 AgentRuntime 边界将其转换为 `AgentInlineSkill` 与 `AgentSkillsProvider`。下方“AgentRuntime 尚未起草”及旧消费方描述保留为历史依据，不再代表当前实现状态；v1 仍不执行 Skill scripts。
+>
 > **治理声明**：本文件全文不包含任何"已用 `vscode_askQuestions` 向 Owner 真实确认"的表述——本次起草会话未发起任何 `vscode_askQuestions` 交互。全部标注"作者判断"的条目均为作者基于现有证据链的判断；存在真实产品 / 技术含义分歧、无法从现有文档判定的问题，原样列入 [§8](#8-需要-owner-确认的问题)，不代答、不假装已确认。
 >
 > **范围核实结论（非臆造，逐条附证据）**：

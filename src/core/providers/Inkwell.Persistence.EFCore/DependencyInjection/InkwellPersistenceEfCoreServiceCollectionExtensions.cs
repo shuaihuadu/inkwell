@@ -9,8 +9,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Inkwell.Persistence.EFCore.DependencyInjection;
 
 /// <summary>
-/// 注册 EFCore family shared base 服务；不绑定 Provider（final adapter csproj 各自 <c>Use*</c> 扩展方法
-/// 注册 <c>DbContext</c> 选项 + <see cref="IDbContextInitializer"/>）。
+/// 注册 EF Core 持久化家族的共享基础服务，不绑定具体数据库提供程序。
+/// 最终适配器分别通过对应扩展方法注册数据库上下文选项和初始化器。
 /// </summary>
 internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
 {
@@ -28,8 +28,9 @@ internal static class InkwellPersistenceEfCoreServiceCollectionExtensions
         services.AddScoped<IAgentVersionRepository, AgentVersionRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAgentToolRepository, AgentToolRepository>();
-        services.AddScoped<IAgentSessionRepository, AgentSessionRepository>();
-        services.AddScoped<IAgentSessionMessageRepository, AgentSessionMessageRepository>();
+        services.AddScoped<IAgentConversationRepository, AgentConversationRepository>();
+        services.AddScoped<IAgentChatMessageRepository, AgentChatMessageRepository>();
+        services.AddScoped<IAgentSessionStateRepository, AgentSessionStateRepository>();
         services.AddScoped<IAgentSkillRepository, AgentSkillRepository>();
 
         return services;

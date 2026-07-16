@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Inkwell.Persistence.EFCore.Configurations;

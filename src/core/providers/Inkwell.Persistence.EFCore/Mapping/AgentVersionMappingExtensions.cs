@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
-
 namespace Inkwell.Persistence.EFCore.Mapping;
 
 internal static class AgentVersionMappingExtensions
@@ -18,14 +16,12 @@ internal static class AgentVersionMappingExtensions
             Id = entity.Id,
             AgentId = entity.AgentId,
             VersionNumber = entity.VersionNumber,
-            Status = entity.Status,
             Snapshot = snapshot,
             CreatedByUserId = entity.CreatedByUserId,
             ChangeSummary = entity.ChangeSummary,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
             PublishedTime = entity.PublishedTime,
-            RowVersion = entity.RowVersion,
         };
     }
 
@@ -38,14 +34,12 @@ internal static class AgentVersionMappingExtensions
             Id = model.Id,
             AgentId = model.AgentId,
             VersionNumber = model.VersionNumber,
-            Status = model.Status,
             Snapshot = JsonSerializer.Serialize(model.Snapshot),
             CreatedByUserId = model.CreatedByUserId,
             ChangeSummary = model.ChangeSummary,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
             PublishedTime = model.PublishedTime,
-            RowVersion = model.RowVersion,
         };
     }
 }

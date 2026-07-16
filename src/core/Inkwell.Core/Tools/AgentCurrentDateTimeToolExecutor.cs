@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Inkwell;

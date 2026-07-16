@@ -1,8 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-
 namespace Inkwell.WebApi.Controllers;
 
 /// <summary>
@@ -29,10 +26,10 @@ public sealed class AgentsController(IAgentService agentService) : InkwellContro
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>Agent 摘要列表。</returns>
     [HttpGet("mine")]
-    [ProducesResponseType<IReadOnlyList<AgentSummary>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<AgentSummary>>> ListMineAsync(CancellationToken cancellationToken)
+    [ProducesResponseType<IReadOnlyList<AgentListItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AgentListItem>>> ListMineAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<AgentSummary> agents = await agentService.ListMyAgentsAsync(this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<AgentListItem> agents = await agentService.ListMyAgentsAsync(this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
 
         return this.Ok(agents);
     }
@@ -41,10 +38,10 @@ public sealed class AgentsController(IAgentService agentService) : InkwellContro
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>Agent 摘要列表。</returns>
     [HttpGet("shared")]
-    [ProducesResponseType<IReadOnlyList<AgentSummary>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<AgentSummary>>> ListSharedAsync(CancellationToken cancellationToken)
+    [ProducesResponseType<IReadOnlyList<AgentListItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AgentListItem>>> ListSharedAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<AgentSummary> agents = await agentService.ListSharedAgentsAsync(this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<AgentListItem> agents = await agentService.ListSharedAgentsAsync(this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
 
         return this.Ok(agents);
     }

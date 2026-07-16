@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Mapping;
 
 namespace Inkwell.Persistence.EFCore.Repositories;
@@ -22,18 +21,11 @@ internal sealed class AgentVersionRepository(InkwellDbContext db) : IAgentVersio
     {
         ArgumentNullException.ThrowIfNull(version);
 
-        try
-        {
-            AgentVersionEntity entity = version.ToEntity();
-            db.Set<AgentVersionEntity>().Update(entity);
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        AgentVersionEntity entity = version.ToEntity();
+        db.Set<AgentVersionEntity>().Update(entity);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            return entity.ToModel();
-        }
-        catch (DbUpdateConcurrencyException exception)
-        {
-            throw new InvalidOperationException($"Optimistic concurrency conflict: AgentVersion Id={version.Id}", exception);
-        }
+        return entity.ToModel();
     }
 
     public async Task<AgentVersion> GetVersionAsync(Guid versionId, CancellationToken cancellationToken = default)

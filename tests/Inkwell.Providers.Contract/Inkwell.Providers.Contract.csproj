@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>Inkwell.Providers.Contract</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

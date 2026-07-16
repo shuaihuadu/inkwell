@@ -2,15 +2,13 @@
 
 namespace Inkwell.Persistence.EFCore.Entities;
 
-internal sealed class AgentVersionEntity : IHasTimestamps, IHasRowVersion
+internal sealed class AgentVersionEntity : IHasTimestamps
 {
     public Guid Id { get; init; }
 
     public Guid AgentId { get; init; }
 
     public int VersionNumber { get; init; }
-
-    public AgentVersionStatus Status { get; init; }
 
     public string Snapshot { get; init; } = string.Empty;
 
@@ -24,5 +22,4 @@ internal sealed class AgentVersionEntity : IHasTimestamps, IHasRowVersion
 
     public DateTimeOffset? PublishedTime { get; init; }
 
-    public byte[] RowVersion { get; init; } = [];
 }

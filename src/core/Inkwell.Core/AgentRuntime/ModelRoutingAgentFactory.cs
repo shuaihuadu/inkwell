@@ -1,6 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Collections.Immutable;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 
 namespace Inkwell;
 
@@ -9,22 +11,53 @@ namespace Inkwell;
 /// </summary>
 internal sealed class ModelRoutingAgentFactory(
     IModelRegistryService modelRegistry,
-    IEnumerable<IModelRuntimeAgentBuilder> runtimeBuilders) : IAgentFactory
+    IEnumerable<IModelRuntimeChatClientProvider> runtimeClientProviders,
+    IPersistenceProvider persistence) : IAgentFactory
 {
     /// <inheritdoc />
-    public async ValueTask<AIAgent> BuildAsync(
-        AgentVersion agentVersion,
-        AgentBuildOptions agentBuildOptions,
-        CancellationToken cancellationToken = default)
+    public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(agentVersion);
-        ArgumentNullException.ThrowIfNull(agentBuildOptions);
+        ArgumentNullException.ThrowIfNull(agent);
+
+        return this.BuildCoreAsync(
+            agent.Id.ToString(),
+            agent.Name,
+            agent.Description,
+            agent.Instructions,
+            agent.BuildOptions,
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask<AIAgent> BuildAsync(AgentVersion version, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+
+        AgentSnapshot snapshot = version.Snapshot;
+
+        return this.BuildCoreAsync(
+            version.Id.ToString(),
+            snapshot.Name,
+            snapshot.Description,
+            snapshot.Instructions,
+            snapshot.BuildOptions,
+            cancellationToken);
+    }
+
+    private async ValueTask<AIAgent> BuildCoreAsync(
+        string id,
+        string name,
+        string? description,
+        string? instructions,
+        AgentBuildOptions buildOptions,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
-        string? modelId = agentVersion.Snapshot.ModelId;
+        string? modelId = buildOptions.ModelOptions.ModelId;
         if (string.IsNullOrWhiteSpace(modelId))
         {
-            throw new InvalidOperationException("Agent snapshot ModelId is required.");
+            throw new InvalidOperationException("Agent ModelId is required.");
         }
 
         ModelDefinition model = await modelRegistry.GetModelAsync(modelId, cancellationToken).ConfigureAwait(false);
@@ -34,14 +67,54 @@ internal sealed class ModelRoutingAgentFactory(
                 $"Model '{model.Id}' is unavailable: {model.UnavailableReason ?? "No reason was provided."}");
         }
 
-        IModelRuntimeAgentBuilder? runtimeBuilder = runtimeBuilders.FirstOrDefault(
-            builder => string.Equals(builder.RuntimeId, model.RuntimeId, StringComparison.OrdinalIgnoreCase));
-        if (runtimeBuilder is null)
+        IModelRuntimeChatClientProvider? runtimeClientProvider = runtimeClientProviders.FirstOrDefault(
+            provider => string.Equals(provider.RuntimeId, model.RuntimeId, StringComparison.OrdinalIgnoreCase));
+        if (runtimeClientProvider is null)
         {
             throw new InvalidOperationException(
                 $"No model runtime is registered for RuntimeId '{model.RuntimeId}' used by model '{model.Id}'.");
         }
 
-        return runtimeBuilder.Build(model, agentVersion, agentBuildOptions, cancellationToken);
+        AgentModelOptions modelOptions = buildOptions.ModelOptions;
+        ChatClientAgentOptions options = new()
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            ChatOptions = new ChatOptions
+            {
+                ModelId = model.RemoteModelId,
+                Instructions = instructions,
+                Temperature = (float?)modelOptions.Temperature,
+                TopP = (float?)modelOptions.TopP,
+                MaxOutputTokens = modelOptions.MaxTokens,
+            },
+            ChatHistoryProvider = this.CreateChatHistoryProvider(buildOptions.ChatHistoryOptions),
+            AIContextProviders = CreateContextProviders(buildOptions.Skills),
+        };
+
+        IChatClient chatClient = runtimeClientProvider.GetChatClient(model);
+        return chatClient.AsAIAgent(options);
+    }
+
+    private InkwellChatHistoryProvider? CreateChatHistoryProvider(AgentChatHistoryOptions? options) =>
+        options is null
+            ? null
+            : new InkwellChatHistoryProvider(persistence, options.MaxMessagesToRetrieve);
+
+    private static List<AIContextProvider> CreateContextProviders(
+        ImmutableArray<AgentSkillDefinition> skillDefinitions)
+    {
+        List<AIContextProvider> contextProviders = [];
+
+        if (skillDefinitions.Length > 0)
+        {
+            List<AgentSkill> skills = skillDefinitions
+                .Select(definition => (AgentSkill)new AgentInlineSkill(definition.Name, definition.Description, definition.Content))
+                .ToList();
+            contextProviders.Add(new AgentSkillsProvider(skills));
+        }
+
+        return contextProviders;
     }
 }

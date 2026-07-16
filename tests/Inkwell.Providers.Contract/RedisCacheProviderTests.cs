@@ -1,8 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.Cache.Redis;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.Redis;
 
 namespace Inkwell.Providers.Contract;

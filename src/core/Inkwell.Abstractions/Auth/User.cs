@@ -3,7 +3,7 @@
 namespace Inkwell;
 
 /// <summary>账号业务 Model。</summary>
-public sealed record class User : IHasTimestamps, IHasRowVersion
+public sealed record class User : IHasTimestamps
 {
     /// <summary>
     /// 获取用户标识。
@@ -50,8 +50,4 @@ public sealed record class User : IHasTimestamps, IHasRowVersion
     /// </summary>
     public required DateTimeOffset UpdatedTime { get; init; }
 
-    /// <summary>
-    /// 获取用于乐观并发控制的行版本。
-    /// </summary>
-    public byte[] RowVersion { get; init; } = [];
 }

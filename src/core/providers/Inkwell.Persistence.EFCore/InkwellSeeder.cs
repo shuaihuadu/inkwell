@@ -2,7 +2,6 @@
 
 using System.Diagnostics;
 using System.Security.Cryptography;
-using Inkwell.Persistence.EFCore.Entities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

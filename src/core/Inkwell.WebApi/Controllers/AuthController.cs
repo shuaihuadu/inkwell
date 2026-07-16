@@ -1,8 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.WebApi.Auth;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Inkwell.WebApi.Controllers;

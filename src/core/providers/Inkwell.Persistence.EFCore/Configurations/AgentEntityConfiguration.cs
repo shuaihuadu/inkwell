@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Inkwell.Persistence.EFCore.Configurations;
@@ -12,6 +11,9 @@ internal sealed class AgentEntityConfiguration : IEntityTypeConfiguration<AgentE
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.IsShared);
         b.HasIndex(x => x.CurrentPublishedVersionId);
-        b.HasIndex(x => x.DraftVersionId);
+        b.Property(x => x.Name).HasMaxLength(50).IsRequired();
+        b.Property(x => x.AvatarUri).HasMaxLength(2048);
+        b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.BuildOptions).IsRequired();
     }
 }

@@ -1,11 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Testcontainers.Minio;
-using Inkwell;
 using Inkwell.FileStorage.MinIO;
+using Testcontainers.Minio;
 
 namespace Inkwell.Providers.Contract;
 

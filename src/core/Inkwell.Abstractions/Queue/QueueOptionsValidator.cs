@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Inkwell;
 
 internal sealed class QueueOptionsValidator : IValidateOptions<QueueOptions>

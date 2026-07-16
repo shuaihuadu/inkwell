@@ -1,12 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-
 namespace Inkwell;
 
-/// <summary>注册 <see cref="IAgentToolCatalogService"/> / <see cref="IAgentToolBindingResolver"/> 默认实现 + 内置工具执行委托字典。</summary>
+/// <summary>注册 <see cref="IAgentToolCatalogService"/> 默认实现 + 内置工具执行委托字典。</summary>
 public static class AgentToolsBuilderExtensions
 {
     /// <summary>
@@ -21,7 +17,6 @@ public static class AgentToolsBuilderExtensions
 
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddScoped<IAgentToolCatalogService, AgentToolCatalogService>();
-        builder.Services.AddScoped<IAgentToolBindingResolver, AgentToolBindingResolver>();
         builder.Services.AddSingleton<IReadOnlyDictionary<Guid, Func<string, CancellationToken, Task<string>>>>(sp =>
         {
             AgentCurrentDateTimeToolExecutor currentDateTime = new AgentCurrentDateTimeToolExecutor(sp.GetRequiredService<TimeProvider>());

@@ -25,7 +25,7 @@ upstream:
 >
 > **2026-07-13 替代性 errata（ADR-026 LiteLLM 模型网关）**：下方原设计中的 Catalog 命名、`ModelProviderKind`、单一配置来源和逐厂商 Agent Runtime 描述，已被 [ADR-026](../../03-architecture/adr/ADR-026-model-gateway-litellm.md) 取代；旧章节保留为历史审计依据，不再代表当前契约。当前契约如下：
 >
-> - **公共门面**改为 `IModelRegistryService`，DTO 改为 `ModelDefinition`。Agent `ModelId` / `AgentModelParameters`、模型可用性和能力元数据继续保留。
+> - **公共门面**改为 `IModelRegistryService`，DTO 改为 `ModelDefinition`。Agent 使用 `AgentModelOptions` 聚合逻辑 `ModelId` 与 temperature / top_p / max_tokens，模型可用性和能力元数据继续保留。
 > - **来源聚合**：`ConfigurationModelRegistrySource` 读取 `Inkwell:Models` 原生模型；`LiteLLMModelRegistrySource` 通过稳定的 `GET /v1/models` 自动发现当前凭据可调用的 LiteLLM `model_name`。聚合后 `Id` 按大小写不敏感全局唯一，跨来源重名直接失败。
 > - **身份维度分离**：删除 `ModelProviderKind`；`ModelDefinition` 分别记录 Publisher、Family、`SourceId`、`RuntimeId` 与 `RemoteModelId`。配置来源不等于运行时连接，用户可看到 OpenAI / Alibaba 与 GPT / Qwen 身份。
 > - **能力字段**为 `SupportsVision` / `SupportsTools` / `SupportsStructuredOutput` / `ContextWindowTokens?`。LiteLLM 自动发现但缺少 Publisher / Family / 能力元数据的模型仍返回给 UI，但 `IsAvailable=false`；补齐元数据并显式启用后才可选择。

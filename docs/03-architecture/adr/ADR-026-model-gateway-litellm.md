@@ -59,7 +59,7 @@ flowchart LR
 - `SourceId`（配置来源）、`RuntimeId`（执行连接）与 `RemoteModelId`（远端模型名）三个独立维度。
 - Publisher / Family 的标识与显示名称，以及 UI 展示名称、可用状态和不可用原因。
 - 模型能力元数据：视觉、工具调用、结构化输出，以及上下文窗口等产品校验所需信息。
-- Agent 草稿和已发布版本中的 `ModelId` 与 `AgentModelParameters`。
+- Agent 草稿和已发布版本中的 `AgentModelOptions`，统一承载逻辑 `ModelId` 与模型调用参数。
 - 实际逻辑模型、参数、token 用量、网关返回的上游模型标识和错误分类等 trace 字段。
 
 这些信息属于 Inkwell 产品契约。LiteLLM 的配置文件不是客户端 API，也不是 Agent 历史版本的事实源。

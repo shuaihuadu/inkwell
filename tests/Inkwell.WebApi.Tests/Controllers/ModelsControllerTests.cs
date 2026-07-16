@@ -1,8 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.WebApi.Controllers;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Tests.Controllers;
 

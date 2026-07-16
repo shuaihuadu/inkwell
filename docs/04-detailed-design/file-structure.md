@@ -106,7 +106,6 @@ src/core/Inkwell.Abstractions/
     MessageEnvelope.cs                 # HD-005 锁定（含 traceparent 字段，RISK-015）
   AgentRuntime/
     IAgentRuntime.cs                   # HD-006 锁定
-    AgentRuntimeOptions.cs             # HD-006 锁定
   VectorStore/                          # HD-008 锁定（type-alias + Builder DSL 钩子，不重新发明 IVectorStore）
 ```
 
@@ -124,12 +123,12 @@ src/core/Inkwell.Abstractions/
 >     SkillDefinition.cs               # 与 ADR-010 静态加载 Skill 区分
 >     ISkillRepository.cs
 >   Conversations/
->     Conversation.cs                  # 默认无后缀
->     IConversationRepository.cs
->     Message.cs
->     IMessageRepository.cs
->     AguiRunEvent.cs
->     IAguiRunEventRepository.cs
+>     AgentConversation.cs             # 产品会话聚合（HD-017 2026-07-15 errata）
+>     IAgentConversationRepository.cs
+>     AgentChatMessage.cs              # 完整 ChatMessage 历史真值
+>     IAgentChatMessageRepository.cs
+>     AgentSessionState.cs             # MAF Session 检查点
+>     IAgentSessionStateRepository.cs
 >   KnowledgeBase/
 >     KnowledgeBase.cs
 >     IKnowledgeBaseRepository.cs
@@ -192,14 +191,18 @@ src/core/Inkwell.Abstractions/Persistence/
 ### Persistence/Conversations（HD-017 落地，2026-07-08）
 
 > 由 [HD-017 §2 / §3.1 ~ §3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。
+>
+> **2026-07-15 替代性 errata**：原 `Conversation` / `ConversationMessage` 两 Model 无法区分产品聚合与 MAF 运行时状态，且缺少状态 Repository。当前文件结构以 [HD-017 §0.2](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#02-文件与职责替代) 为准；旧文件名由以下清单取代。
 
 ```text
 src/core/Inkwell.Abstractions/Persistence/
   Conversations/                        # 新增子目录（HD-017）
-    Conversation.cs                     # 业务 Model（会话），IHasTimestamps + IHasOwner + IHasRowVersion
-    ConversationMessage.cs              # 业务 Model（消息），IHasTimestamps
-    IConversationRepository.cs          # 具名 Repository（6 方法：AddConversation/GetConversation/UpdateConversation/ListConversationsByAgent/FindUsedAgentIdsByOwner/FindLastActivityByAgents）
-    IConversationMessageRepository.cs   # 具名 Repository（4 方法：AddMessage/ListMessagesByConversation/DeleteMessage/DeleteMessagesByConversation）
+    AgentConversation.cs                # 产品会话聚合；含不可变 AgentVersionId 与 Run 租约字段
+    AgentChatMessage.cs                 # 完整 ChatMessage 真值；ConversationId + RunId + SequenceNumber
+    AgentSessionState.cs                # MAF AgentSession 持久化检查点；ConversationId 为 PK/FK
+    IAgentConversationRepository.cs     # 会话 CRUD、列表查询与数据库原子 Run 租约
+    IAgentChatMessageRepository.cs      # 消息批量追加、历史查询、清空与 Run 幂等检查
+    IAgentSessionStateRepository.cs     # 状态 Get/Add/Update/Delete，Revision + RowVersion CAS
 ```
 
 ### Persistence/Skills（HD-020 落地）
@@ -333,6 +336,8 @@ providers/Inkwell.Queue.Redis/
 > 由 [HD-006 §2 / §3](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 锁定。
 >
 > 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `AgentRuntime/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变（仅 `Microsoft.Extensions.{DependencyInjection,Configuration,Options,Logging}.Abstractions` + `Microsoft.Extensions.VectorData.Abstractions` + BCL 内置 `System.Text.Json`）。**严禁**引入 `Microsoft.Agents.AI.*` 等任何 MAF 包（[ADR-017 §依赖规则第 3/4 条](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001](../03-architecture/risk-analysis.md) MAF 接触面收敛约束）——`Inkwell.Core.AgentRuntime` 命名空间是**唯一**允许 `using Microsoft.Agents.AI.*` 的位置，本端口接口与 DTO 全部使用 Inkwell 自有类型，不泄漏 `AIAgent` / `AgentSession` / `ChatMessage` / `AgentResponse` / `AgentResponseUpdate` 等 MAF 类型。
+>
+> **2026-07-15 边界注释**：下方 `AgentRuntime/AgentChatMessage.cs` 属于 HD-006 原 facade 的历史文件树，已被 HD-006 2026-07-12 MAF 原生 Factory errata 取代，不是当前持久化消息 Model。当前产品消息真值仅指 `Persistence/Conversations/AgentChatMessage.cs`；MAF Run 输入输出直接使用框架 `ChatMessage`，不得再创建第二套可写消息状态。
 
 ```text
 src/core/Inkwell.Abstractions/
@@ -342,14 +347,14 @@ src/core/Inkwell.Abstractions/
     AgentTurnResult.cs                   # record，非流式最终结果（含 ToolCalls 回溯）
     AgentChatMessage.cs                  # record，对话消息（Role + Content 封闭子类型族）
     AgentMessageContentPart.cs           # abstract record + TextPart/ImagePart/DocumentPart
-    AgentModelParameters.cs              # record，temperature/top_p/max_tokens（REQ-006）
+    AgentModelOptions.cs                 # record，ModelId + temperature/top_p/max_tokens（REQ-005/REQ-006）
     AgentToolDefinition.cs               # record，工具描述 + 同进程调用委托 + AgentToolCallRecord（REQ-007）
     AgentRunEvent.cs                     # abstract record + 6 个 sealed 子类型（流式事件，对应 AG-UI 四大类）
-    AgentRuntimeOptions.cs               # DefaultTemperature/DefaultTopP/DefaultMaxTokens/RunTimeoutSeconds/EnableSensitiveDataLogging
-    AgentRuntimeOptionsValidator.cs      # IValidateOptions<AgentRuntimeOptions>
 ```
 
-**文件计数**：HD-006 新增 10 个 `*.cs`（AgentRuntime/ 10）；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）= 44 个 `*.cs` + 1 个 `.csproj`。
+  > **2026-07-17 替代说明**：本节是 HD-006 原始文件规划，`AgentRuntimeOptions.cs` / `AgentRuntimeOptionsValidator.cs` / `AgentToolCallRecord.cs` 已删除；原始计数仅作设计审计，不代表当前仓库文件数。
+
+  **原始文件计数**：HD-006 规划新增 10 个 `*.cs`（AgentRuntime/ 10）；Abstractions csproj 当时累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）= 44 个 `*.cs` + 1 个 `.csproj`。
 
 **对接 `Inkwell.Core.AgentRuntime` 的契约**（无独立 Provider csproj，[ADR-017 §依赖规则](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) 下 `Inkwell.AgentRuntime` 合并进 `Inkwell.Core.AgentRuntime` 命名空间）：
 
@@ -360,7 +365,7 @@ src/core/Inkwell.Core/AgentRuntime/
   AzureOpenAIAgentRuntimeBuilderExtensions.cs        # UseAzureOpenAIAgentRuntime(...)
 ```
 
-> Provider（模型云服务）特定凭证由 `Inkwell.Core.AgentRuntime` 独立锁定；**严禁**回填到 `Inkwell.Abstractions/AgentRuntime/AgentRuntimeOptions.cs`（违反 [ADR-017 端口零外部包约束](../03-architecture/adr/ADR-017-backend-module-topology-ports-and-adapters.md) + [RISK-001 MAF 接触面收敛约束](../03-architecture/risk-analysis.md)）。
+> Provider（模型云服务）特定凭证由 `Inkwell.Core.AgentRuntime` 独立承载，不得回填到 `Inkwell.Abstractions`。
 
 ## Inkwell.Abstractions.VectorStore
 
@@ -531,30 +536,35 @@ src/core/Inkwell.Core/
 > 由 [HD-017 §2 / §3](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。**本 HD 是 H3 第四张业务命名空间 HD**——`IConversationService` 是"业务模块对外接口"（[HD-001 §5.1](Inkwell.Abstractions/HD-001-Inkwell.Abstractions-foundation.md#51-命名) `I<Module>Service` 命名类别），独立落 `Conversations/` 子目录（与 `Persistence/Conversations/` 的业务 Model + Repository 接口是两个不同子目录，命名空间分别为 `Inkwell.Abstractions.Conversations` / `Inkwell.Abstractions.Persistence.Conversations`）。
 >
 > 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
+>
+> **2026-07-15 替代性 errata**：产品 API 重新统一为 Conversation 术语；原 `IConversationService` / `ConversationSummary` / `ConversationService` 由 Agent 前缀类型取代。MAF `AgentSessionStore` 与 `ChatHistoryProvider` 适配器不放在业务 Service 中，而放在唯一允许依赖 MAF 的 `Inkwell.Core.AgentRuntime`。
 
 ```text
 src/core/Inkwell.Abstractions/
   Conversations/                           # 新增子目录（HD-017）
-    IConversationService.cs                # 顶层业务门面（8 方法）
-    ConversationSummary.cs                 # 会话列表投影 DTO（历史会话侧栏）
+    IAgentConversationService.cs           # 产品会话 CRUD、Owner 授权、清空与单 Run 规则
+    AgentConversationSummary.cs            # 会话列表投影 DTO（历史会话侧栏）
     ConversationOptions.cs                 # MaxMessagesPerConversation / EnableSensitiveDataLogging
     ConversationOptionsValidator.cs        # IValidateOptions<ConversationOptions>
 ```
 
-**文件计数**：HD-017 在 `Conversations/` 新增 4 个 `*.cs` + 在 `Persistence/Conversations/`（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）新增 4 个 `*.cs`，合计 8 个；Abstractions csproj 累计 11（HD-001）+ 8（HD-002 本体）+ 7（HD-003）+ 4（HD-004）+ 4（HD-005）+ 10（HD-006）+ 7（HD-007）+ 2（HD-008）+ 7（HD-014）+ 8（HD-015）+ 6（HD-016）+ 8（HD-017）= **82** 个 `*.cs` + 1 个 `.csproj`。
+**文件计数 errata**：HD-017 当前在 `Conversations/` 贡献 4 个、在 `Persistence/Conversations/` 贡献 6 个，合计 10 个 `*.cs`；原“8 个”计数仅对应已被替代的旧设计。全项目累计数待 H5 实体文件落地后按实际文件重新核算，不再沿用旧加法。
 
 **对接 `Inkwell.Core.Conversations` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
   Conversations/
-    ConversationService.cs                 # 唯一 IConversationService 实现
+    AgentConversationService.cs            # 唯一 IAgentConversationService 实现
     ConversationBuilderExtensions.cs       # UseDefaultConversationService()
+  AgentRuntime/
+    InkwellAgentSessionStore.cs             # MAF AgentSessionStore 适配；不读取 HttpContext
+    InkwellChatHistoryProvider.cs           # MAF ChatHistoryProvider；数据库消息为历史真值
 ```
 
-`Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）+ 2（HD-017）= **14** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正同上）。
+`Inkwell.Core.Conversations` 当前贡献 2 个文件；Session Store 与 History Provider 两个适配器计入 `Inkwell.Core.AgentRuntime`。旧累计计数由本 errata 取代，最终以 H5 实际文件清单为准。
 
-> `Persistence/Conversations/Conversation.cs` + `ConversationMessage.cs` + `IConversationRepository.cs` + `IConversationMessageRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Conversations 小节](#persistenceconversationshd-017-落地2026-07-08)）；EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
+> `Persistence/Conversations/` 的 3 个 Model + 3 个具名 Repository 接口由本 HD 锁定；EFCore Entity / Configuration / Mapping / Repository 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Configurations,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。`Inkwell.Core.AgentRuntime` 适配器通过业务 Service、MAF conversation key 或标准 `RunAgentInput.forwardedProps.inkwell` 的服务端覆盖值访问显式上下文，不读取 `HttpContext`，也不把 `threadId` 或客户端 `runId` 当作授权凭证。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
 >
 > **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../01-requirements/requirements.md)）。本节原 `## Inkwell.Abstractions.AuditLogs`（HD-018 `IAuditLogger` 唯一实现 + `Persistence/AuditLogs/` + `Audit/` 追加文件）已随 HD-007 / HD-018 一并删除；下游章节的累计文件计数不再包含该段贡献，具体数值以各自 HD 文档最终版为准，不在此处逐一重算。
 
@@ -591,9 +601,9 @@ src/core/Inkwell.Core/
       LiteLLMModelMetadataOptions.cs         # 产品元数据覆盖
       LiteLLMModelsResponse.cs               # 私有协议响应 DTO
   AgentRuntime/
-    IModelRuntimeAgentBuilder.cs             # 运行时连接器契约
+    IModelRuntimeChatClientProvider.cs       # 运行时 Chat Client 提供契约
     ModelRoutingAgentFactory.cs              # Registry 驱动的 MAF Agent Factory
-    LiteLLMModelRuntimeAgentBuilder.cs        # OpenAI-compatible LiteLLM 连接器
+    LiteLLMModelRuntimeChatClientProvider.cs  # OpenAI-compatible LiteLLM Chat Client Provider
 ```
 
 `Inkwell.Core.csproj` 累计 19（HD-014~HD-018）+ 2（HD-019）= **21** 个 `*.cs` + 1 个 `.csproj`。

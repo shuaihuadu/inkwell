@@ -42,7 +42,7 @@ downstream: []
 | H5-002 | 公共外壳与全局体验 | AppShell、导航、网络状态、全局错误、主题 | 待起草任务简报 | [范围说明](H5-002-app-shell/scope.md) |
 | H5-003 | Agent 空间与基础管理 | UI-003、我的/团队共享、搜索、筛选、删除、共享、点击分流 | 待起草任务简报 | [范围说明](H5-003-agent-space/scope.md) |
 | H5-004 | Agent 设计与配置 | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布 | 待设计核验 | [范围说明](H5-004-agent-design/scope.md) |
-| H5-005 | Agent 会话 | 后端 AG-UI 优先；随后接入 TypeScript SDK、Ant Design X、会话历史与 Activity | 待设计核验 | [范围说明](H5-005-agent-conversation/scope.md) |
+| H5-005 | Agent 会话 | 会话数据与 REST 优先；随后接入 MAF AG-UI、TypeScript SDK、Ant Design X 与 Activity | 待设计核验 | [范围说明](H5-005-agent-conversation/scope.md) |
 | H5-006 | 版本管理 | UI-008、版本列表、diff、回滚 | 待起草任务简报 | 路线图定义 |
 | H5-007 | 调试与评测 | UI-007、Trace、评测集、回放 | H3 未完成 | 路线图定义 |
 | H5-008 | Admin 管理 | UI-009、账号解封、撤销他人共享 | H3 未完成 | 路线图定义 |

@@ -15,7 +15,8 @@ public sealed class PostgresDesignTimeDbContextFactory : IDesignTimeDbContextFac
         optionsBuilder.UseNpgsql(
             "Host=localhost;Port=5432;Database=inkwell_design;Username=postgres;Password=postgres",
             npgsql => npgsql.MigrationsAssembly("Inkwell.Persistence.EFCore.Postgres"))
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+            .ReplaceService<IModelCustomizer, PostgresModelCustomizer>();
 
         return new InkwellDbContext(optionsBuilder.Options);
     }

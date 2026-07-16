@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Mapping;
 
 namespace Inkwell.Persistence.EFCore.Repositories;
@@ -30,15 +29,8 @@ internal sealed class UserRepository(InkwellDbContext db) : IUserRepository
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        try
-        {
-            db.Set<UserEntity>().Update(user.ToEntity());
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            throw new InvalidOperationException($"Optimistic concurrency conflict: User Id={user.Id}", ex);
-        }
+        db.Set<UserEntity>().Update(user.ToEntity());
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<User> GetUser(Guid id, CancellationToken ct = default)

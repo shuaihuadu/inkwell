@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
-
 namespace Inkwell.Persistence.EFCore.Mapping;
 
 internal static class UserMappingExtensions
@@ -21,7 +19,6 @@ internal static class UserMappingExtensions
             LastLoginTime = entity.LastLoginTime,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
-            RowVersion = entity.RowVersion,
         };
     }
 
@@ -40,7 +37,6 @@ internal static class UserMappingExtensions
             LastLoginTime = model.LastLoginTime,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
-            RowVersion = model.RowVersion,
         };
     }
 
@@ -59,7 +55,6 @@ internal static class UserMappingExtensions
             LastLoginTime = entity.LastLoginTime,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
-            RowVersion = entity.RowVersion,
         });
     }
 }

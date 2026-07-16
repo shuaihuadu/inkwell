@@ -2,15 +2,23 @@
 
 namespace Inkwell.Persistence.EFCore.Entities;
 
-internal sealed class AgentEntity : IHasTimestamps, IHasRowVersion, IHasOwner
+internal sealed class AgentEntity : IHasTimestamps, IHasOwner
 {
     public Guid Id { get; init; }
 
     public Guid OwnerUserId { get; init; }
 
-    public Guid? CurrentPublishedVersionId { get; init; }
+    public string Name { get; init; } = string.Empty;
 
-    public Guid? DraftVersionId { get; init; }
+    public string? AvatarUri { get; init; }
+
+    public string? Description { get; init; }
+
+    public string? Instructions { get; init; }
+
+    public string BuildOptions { get; init; } = string.Empty;
+
+    public Guid? CurrentPublishedVersionId { get; init; }
 
     public int LatestPublishedVersionNumber { get; init; }
 
@@ -22,5 +30,4 @@ internal sealed class AgentEntity : IHasTimestamps, IHasRowVersion, IHasOwner
 
     public DateTimeOffset UpdatedTime { get; init; }
 
-    public byte[] RowVersion { get; init; } = [];
 }

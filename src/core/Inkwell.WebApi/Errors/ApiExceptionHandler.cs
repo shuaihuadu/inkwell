@@ -1,13 +1,13 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Errors;
 
 /// <summary>
 /// 将业务层预期异常转换为统一的 HTTP Problem Details 响应。
 /// </summary>
+/// <param name="problemDetailsService">Problem Details 响应写入服务。</param>
 public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
     /// <inheritdoc />

@@ -14,7 +14,8 @@ public sealed class SqlServerDesignTimeDbContextFactory : IDesignTimeDbContextFa
 
         optionsBuilder.UseSqlServer(
             "Server=localhost,1433;Database=inkwell_design;User ID=sa;Password=Inkwell-Local-2025!;TrustServerCertificate=True",
-            sqlServer => sqlServer.MigrationsAssembly("Inkwell.Persistence.EFCore.SqlServer"));
+            sqlServer => sqlServer.MigrationsAssembly("Inkwell.Persistence.EFCore.SqlServer"))
+            .ReplaceService<IModelCustomizer, SqlServerModelCustomizer>();
 
         return new InkwellDbContext(optionsBuilder.Options);
     }

@@ -1,8 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.WebApi.Controllers;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Inkwell.WebApi.Conversations;
 
 namespace Inkwell.WebApi.Tests.Controllers;
 
@@ -13,7 +12,7 @@ namespace Inkwell.WebApi.Tests.Controllers;
 public sealed class ControllerRoutingTests
 {
     /// <summary>
-    /// 验证 MVC 实际发现的业务 API 路由与迁移前保持一致。
+    /// 验证 MVC 实际发现的业务 API 路由符合预期。
     /// </summary>
     [TestMethod]
     public void Controllers_RegisterExpectedBusinessApiRoutes()
@@ -35,20 +34,25 @@ public sealed class ControllerRoutingTests
         ];
 
         // Assert
-        CollectionAssert.Contains(routePatterns, "api/auth/login");
-        CollectionAssert.Contains(routePatterns, "api/auth/logout");
-        CollectionAssert.Contains(routePatterns, "api/auth/session");
-        CollectionAssert.Contains(routePatterns, "api/agents");
-        CollectionAssert.Contains(routePatterns, "api/agents/mine");
-        CollectionAssert.Contains(routePatterns, "api/agents/shared");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/share");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/clone");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/versions");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/versions/{versionId:guid}");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/draft");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/publish");
-        CollectionAssert.Contains(routePatterns, "api/agents/{agentId:guid}/versions/{versionId:guid}/rollback");
+        Assert.Contains("api/auth/login", routePatterns);
+        Assert.Contains("api/auth/logout", routePatterns);
+        Assert.Contains("api/auth/session", routePatterns);
+        Assert.Contains("api/agents", routePatterns);
+        Assert.Contains("api/agents/mine", routePatterns);
+        Assert.Contains("api/agents/shared", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/share", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/clone", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/versions", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/versions/{versionId:guid}", routePatterns);
+        Assert.DoesNotContain("api/agents/{agentId:guid}/draft", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/publish", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/versions/{versionId:guid}/rollback", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/conversations", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/conversations/{conversationId:guid}/messages", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/conversations/{conversationId:guid}/messages/{messageId:guid}", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/conversations/{conversationId:guid}/clear", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/conversations/{conversationId:guid}", routePatterns);
     }
 
     /// <summary>
@@ -97,5 +101,40 @@ public sealed class ControllerRoutingTests
         Assert.AreEqual("api/agents/{agentId:guid}", versionsRoute);
         Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, agentsPolicy);
         Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, versionsPolicy);
+    }
+
+    /// <summary>
+    /// 验证 Conversation Controller 要求有效登录态且响应不泄漏内部持久化字段。
+    /// </summary>
+    [TestMethod]
+    public void ConversationController_DefinesAuthorizationAndSafeResponseBoundary()
+    {
+        // Arrange
+        Type controllerType = typeof(AgentConversationsController);
+        string[] forbiddenPropertyNames =
+        [
+            "SessionKey",
+            "OwnerUserId",
+            "LastCommittedRunId",
+            "SerializedState",
+        ];
+
+        // Act
+        string? route = controllerType.GetCustomAttributes(typeof(RouteAttribute), inherit: true).Cast<RouteAttribute>().Single().Template;
+        string? policy = controllerType.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true).Cast<AuthorizeAttribute>().Single().Policy;
+        string[] responsePropertyNames =
+        [
+            .. typeof(AgentConversationResponse).GetProperties().Select(property => property.Name),
+            .. typeof(AgentConversationListItem).GetProperties().Select(property => property.Name),
+            .. typeof(AgentChatMessageResponse).GetProperties().Select(property => property.Name),
+        ];
+
+        // Assert
+        Assert.AreEqual("api/agents/{agentId:guid}/conversations", route);
+        Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, policy);
+        foreach (string forbiddenPropertyName in forbiddenPropertyNames)
+        {
+            Assert.DoesNotContain(forbiddenPropertyName, responsePropertyNames);
+        }
     }
 }

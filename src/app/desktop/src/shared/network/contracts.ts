@@ -43,7 +43,7 @@ export interface AuthSnapshot {
     identity: AuthIdentity | null;
 }
 
-export interface AgentSummary {
+export interface AgentListItem {
     id: string;
     name: string;
     avatarUri: string | null;
@@ -99,7 +99,7 @@ export interface InkwellDesktopApi {
     onAuthStateChanged: (
         listener: (snapshot: AuthSnapshot) => void,
     ) => () => void;
-    listAgents: () => Promise<AgentSummary[]>;
+    listAgents: () => Promise<AgentListItem[]>;
     listModels: () => Promise<ModelDefinition[]>;
     createAgent: (request: CreateAgentRequest) => Promise<AgentDefinition>;
     chat: (request: ChatRequest) => Promise<void>;

@@ -1,15 +1,11 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Testcontainers.PostgreSql;
-using Inkwell;
 using Inkwell.Persistence.EFCore;
 using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
 
 namespace Inkwell.Providers.Contract;
 

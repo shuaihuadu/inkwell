@@ -3,7 +3,7 @@
 namespace Inkwell.Core.Tests.Versioning;
 
 /// <summary>
-/// 验证 Agent 草稿、发布、可见性和回滚生命周期。
+/// 验证 Agent 发布版本、可见性和回滚生命周期。
 /// </summary>
 [TestClass]
 public sealed class AgentVersionServiceTests
@@ -27,7 +27,7 @@ public sealed class AgentVersionServiceTests
 
         // Assert
         Assert.AreEqual(published.Id, resolved.Id);
-        Assert.AreEqual(AgentVersionStatus.Published, resolved.Status);
+        Assert.AreEqual(agent.Id, resolved.AgentId);
     }
 
     /// <summary>
@@ -52,89 +52,43 @@ public sealed class AgentVersionServiceTests
     }
 
     /// <summary>
-    /// 验证即使 Owner 可见草稿，也不能把草稿解析为可调用发布版本。
+    /// 验证发布当前 Agent 会创建自包含快照并更新版本指针。
     /// </summary>
     [TestMethod]
-    public async Task GetPublishedVersionAsync_ForDraftVersion_ThrowsInvalidOperationAsync()
+    public async Task PublishAsync_WithCurrentAgent_CreatesImmutableSnapshotAsync()
     {
         // Arrange
         Guid ownerUserId = Guid.CreateVersion7();
         AgentDefinition agent = CreateAgent(ownerUserId);
-        AgentVersion draft = CreateDraft(agent, ownerUserId, "draft");
-        agent = agent with { DraftVersionId = draft.Id };
-        AgentVersionService service = CreateService(agent, draft);
-
-        // Act
-        Task ActAsync() => service.GetPublishedVersionAsync(agent.Id, draft.Id, ownerUserId);
-
-        // Assert
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(ActAsync);
-    }
-
-    /// <summary>
-    /// 验证发布草稿会更新聚合指针并保留不可变快照。
-    /// </summary>
-    [TestMethod]
-    public async Task PublishDraftAsync_WithExistingDraft_PublishesAndUpdatesAgentAsync()
-    {
-        // Arrange
-        Guid ownerUserId = Guid.CreateVersion7();
-        AgentDefinition agent = CreateAgent(ownerUserId);
-        AgentVersion draft = CreateDraft(agent, ownerUserId, "draft");
-        agent = agent with { DraftVersionId = draft.Id };
         InMemoryAgentRepository agents = new(agent);
-        InMemoryAgentVersionRepository versions = new(draft);
+        InMemoryAgentVersionRepository versions = new();
         AgentVersionService service = new(new ImmediatePersistenceProvider(agents, versions));
 
         // Act
-        AgentVersion published = await service.PublishDraftAsync(agent.Id, ownerUserId);
+        AgentVersion published = await service.PublishAsync(agent.Id, ownerUserId);
 
         // Assert
         AgentDefinition updatedAgent = await agents.GetAgent(agent.Id);
-        Assert.AreEqual(AgentVersionStatus.Published, published.Status);
-        Assert.AreEqual(1, published.VersionNumber);
-        Assert.IsNotNull(published.PublishedTime);
+        Assert.AreEqual(agent.Id, published.AgentId);
+        Assert.AreEqual(agent.Name, published.Snapshot.Name);
+        Assert.AreSame(agent.BuildOptions, published.Snapshot.BuildOptions);
         Assert.AreEqual(published.Id, updatedAgent.CurrentPublishedVersionId);
-        Assert.IsNull(updatedAgent.DraftVersionId);
         Assert.AreEqual(1, updatedAgent.LatestPublishedVersionNumber);
+        Assert.IsNotNull(published.PublishedTime);
     }
 
     /// <summary>
-    /// 验证共享用户只能看到已发布版本，不能看到 Owner 草稿。
+    /// 验证回滚会创建新的发布快照并把历史内容恢复为当前 Agent 定义。
     /// </summary>
     [TestMethod]
-    public async Task ListVersionsAsync_ForSharedViewer_ExcludesDraftAsync()
-    {
-        // Arrange
-        Guid ownerUserId = Guid.CreateVersion7();
-        Guid viewerUserId = Guid.CreateVersion7();
-        AgentDefinition agent = CreateAgent(ownerUserId) with { IsShared = true, LatestPublishedVersionNumber = 1 };
-        AgentVersion published = CreatePublished(agent, ownerUserId, 1, "published");
-        AgentVersion draft = CreateDraft(agent, ownerUserId, "draft") with { VersionNumber = 2 };
-        agent = agent with { CurrentPublishedVersionId = published.Id, DraftVersionId = draft.Id };
-        AgentVersionService service = CreateService(agent, published, draft);
-
-        // Act
-        IReadOnlyList<AgentVersion> visibleVersions = await service.ListVersionsAsync(agent.Id, viewerUserId);
-
-        // Assert
-        Assert.HasCount(1, visibleVersions);
-        Assert.AreEqual(published.Id, visibleVersions[0].Id);
-        Assert.AreEqual(AgentVersionStatus.Published, visibleVersions[0].Status);
-    }
-
-    /// <summary>
-    /// 验证回滚会复制历史快照形成新版本，而不会修改历史版本。
-    /// </summary>
-    [TestMethod]
-    public async Task RollbackAsync_FromPublishedVersion_CreatesNewPublishedVersionAsync()
+    public async Task RollbackAsync_FromPublishedVersion_CreatesVersionAndRestoresAgentAsync()
     {
         // Arrange
         Guid ownerUserId = Guid.CreateVersion7();
         AgentDefinition agent = CreateAgent(ownerUserId) with { LatestPublishedVersionNumber = 2 };
         AgentVersion versionOne = CreatePublished(agent, ownerUserId, 1, "version-one");
-        AgentVersion versionTwo = CreatePublished(agent, ownerUserId, 2, "version-two");
-        agent = agent with { CurrentPublishedVersionId = versionTwo.Id };
+        AgentVersion versionTwo = CreatePublished(agent with { Instructions = "version-two" }, ownerUserId, 2, "version-two");
+        agent = agent with { CurrentPublishedVersionId = versionTwo.Id, Instructions = "current-edit" };
         InMemoryAgentRepository agents = new(agent);
         InMemoryAgentVersionRepository versions = new(versionOne, versionTwo);
         AgentVersionService service = new(new ImmediatePersistenceProvider(agents, versions));
@@ -144,58 +98,25 @@ public sealed class AgentVersionServiceTests
 
         // Assert
         AgentDefinition updatedAgent = await agents.GetAgent(agent.Id);
-        AgentVersion originalVersion = await versions.GetVersionAsync(versionOne.Id);
         Assert.AreNotEqual(versionOne.Id, rollback.Id);
+        Assert.AreEqual(agent.Id, rollback.AgentId);
         Assert.AreEqual(3, rollback.VersionNumber);
         Assert.AreEqual("version-one", rollback.Snapshot.Instructions);
-        Assert.AreEqual("version-one", originalVersion.Snapshot.Instructions);
+        Assert.AreEqual("version-one", updatedAgent.Instructions);
         Assert.AreEqual(rollback.Id, updatedAgent.CurrentPublishedVersionId);
         Assert.AreEqual(3, updatedAgent.LatestPublishedVersionNumber);
-    }
-
-    /// <summary>
-    /// 验证保存草稿只替换草稿快照，不生成额外版本。
-    /// </summary>
-    [TestMethod]
-    public async Task SaveDraftAsync_WithExistingDraft_ReplacesSnapshotAsync()
-    {
-        // Arrange
-        Guid ownerUserId = Guid.CreateVersion7();
-        AgentDefinition agent = CreateAgent(ownerUserId);
-        AgentVersion draft = CreateDraft(agent, ownerUserId, "old");
-        agent = agent with { DraftVersionId = draft.Id };
-        InMemoryAgentVersionRepository versions = new(draft);
-        AgentVersionService service = new(new ImmediatePersistenceProvider(new InMemoryAgentRepository(agent), versions));
-        AgentSnapshot updatedSnapshot = CreateSnapshot("new");
-
-        // Act
-        AgentVersion updatedDraft = await service.SaveDraftAsync(agent.Id, updatedSnapshot, ownerUserId, "updated draft");
-
-        // Assert
-        IReadOnlyList<AgentVersion> allVersions = await versions.ListVersionsByAgentAsync(agent.Id);
-        Assert.HasCount(1, allVersions);
-        Assert.AreEqual(draft.Id, updatedDraft.Id);
-        Assert.AreEqual(AgentVersionStatus.Draft, updatedDraft.Status);
-        Assert.AreEqual("new", updatedDraft.Snapshot.Instructions);
-        Assert.IsNull(updatedDraft.PublishedTime);
     }
 
     private static AgentDefinition CreateAgent(Guid ownerUserId) => new()
     {
         Id = Guid.CreateVersion7(),
         OwnerUserId = ownerUserId,
-        CreatedTime = DateTimeOffset.UtcNow,
-        UpdatedTime = DateTimeOffset.UtcNow,
-    };
-
-    private static AgentVersion CreateDraft(AgentDefinition agent, Guid ownerUserId, string instructions) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        AgentId = agent.Id,
-        VersionNumber = agent.LatestPublishedVersionNumber + 1,
-        Status = AgentVersionStatus.Draft,
-        Snapshot = CreateSnapshot(instructions),
-        CreatedByUserId = ownerUserId,
+        Name = "Versioned agent",
+        Instructions = "current",
+        BuildOptions = new AgentBuildOptions
+        {
+            ModelOptions = new AgentModelOptions { ModelId = "test-model" },
+        },
         CreatedTime = DateTimeOffset.UtcNow,
         UpdatedTime = DateTimeOffset.UtcNow,
     };
@@ -203,27 +124,27 @@ public sealed class AgentVersionServiceTests
     private static AgentVersion CreatePublished(AgentDefinition agent, Guid ownerUserId, int versionNumber, string instructions)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        Guid versionId = Guid.CreateVersion7();
 
         return new AgentVersion
         {
-            Id = Guid.CreateVersion7(),
+            Id = versionId,
             AgentId = agent.Id,
             VersionNumber = versionNumber,
-            Status = AgentVersionStatus.Published,
-            Snapshot = CreateSnapshot(instructions),
+            Snapshot = new AgentSnapshot
+            {
+                Name = agent.Name,
+                AvatarUri = agent.AvatarUri,
+                Description = agent.Description,
+                Instructions = instructions,
+                BuildOptions = agent.BuildOptions,
+            },
             CreatedByUserId = ownerUserId,
             CreatedTime = now,
             UpdatedTime = now,
             PublishedTime = now,
         };
     }
-
-    private static AgentSnapshot CreateSnapshot(string instructions) => new()
-    {
-        Name = "Versioned agent",
-        Instructions = instructions,
-        ModelId = "test-model",
-    };
 
     private static AgentVersionService CreateService(AgentDefinition agent, params AgentVersion[] versions) =>
         new(new ImmediatePersistenceProvider(

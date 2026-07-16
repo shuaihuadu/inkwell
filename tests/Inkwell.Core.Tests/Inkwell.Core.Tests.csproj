@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <RootNamespace>Inkwell.Core.Tests</RootNamespace>
+        <NoWarn>$(NoWarn);MAAI001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

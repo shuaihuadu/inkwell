@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
-
 namespace Inkwell.Persistence.EFCore.Mapping;
 
 internal static class AgentChatMessageMappingExtensions
@@ -13,8 +11,10 @@ internal static class AgentChatMessageMappingExtensions
         return new AgentChatMessage
         {
             Id = entity.Id,
-            SessionId = entity.SessionId,
-            Message = DeserializeMessage(entity.Message),
+            ConversationId = entity.ConversationId,
+            RunId = entity.RunId,
+            RunMessageIndex = entity.RunMessageIndex,
+            Message = AgentChatMessageSerializer.Deserialize(entity.Message),
             SequenceNumber = entity.SequenceNumber,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
@@ -28,15 +28,14 @@ internal static class AgentChatMessageMappingExtensions
         return new AgentChatMessageEntity
         {
             Id = model.Id,
-            SessionId = model.SessionId,
-            Message = JsonSerializer.Serialize(model.Message),
+            ConversationId = model.ConversationId,
+            RunId = model.RunId,
+            RunMessageIndex = model.RunMessageIndex,
+            Message = AgentChatMessageSerializer.Serialize(model.Message),
             SequenceNumber = model.SequenceNumber,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
         };
     }
 
-    private static ChatMessage DeserializeMessage(string messageJson) =>
-        JsonSerializer.Deserialize<ChatMessage>(messageJson)
-        ?? throw new JsonException("The persisted chat message JSON deserialized to null.");
 }

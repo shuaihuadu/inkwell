@@ -1,8 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.Persistence.EFCore.DependencyInjection;
-using Inkwell.Persistence.EFCore.Postgres.Interceptors;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -36,9 +34,6 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
             builder.Services.PostConfigure(configure);
         }
 
-        // Postgres 使用拦截器维护 byte[] RowVersion（HD-012 §4）。
-        builder.Services.AddSingleton<ISaveChangesInterceptor, PostgresRowVersionInterceptor>();
-
         builder.Services.AddDbContext<InkwellDbContext>((sp, options) =>
         {
             PersistenceOptions persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
@@ -53,7 +48,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
                         errorCodesToAdd: null)
                     .CommandTimeout(persistenceOptions.CommandTimeoutSeconds))
                 .UseSnakeCaseNamingConvention()
-                .AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
+                .ReplaceService<IModelCustomizer, PostgresModelCustomizer>();
         });
 
         builder.Services.AddSingleton<IDbContextInitializer, PostgresDbContextInitializer>();

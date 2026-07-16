@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Mapping;
 
 namespace Inkwell.Persistence.EFCore.Repositories;
@@ -30,26 +29,19 @@ internal sealed class AgentRepository(InkwellDbContext db) : IAgentRepository
     {
         ArgumentNullException.ThrowIfNull(agent);
 
-        try
-        {
-            AgentEntity updatedEntity = agent.ToEntity();
-            AgentEntity? trackedEntity = db.Set<AgentEntity>().Local.FirstOrDefault(entity => entity.Id == agent.Id);
+        AgentEntity updatedEntity = agent.ToEntity();
+        AgentEntity? trackedEntity = db.Set<AgentEntity>().Local.FirstOrDefault(entity => entity.Id == agent.Id);
 
-            if (trackedEntity is null)
-            {
-                db.Set<AgentEntity>().Update(updatedEntity);
-            }
-            else
-            {
-                db.Entry(trackedEntity).CurrentValues.SetValues(updatedEntity);
-            }
-
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch (DbUpdateConcurrencyException ex)
+        if (trackedEntity is null)
         {
-            throw new InvalidOperationException($"Optimistic concurrency conflict: AgentDefinition Id={agent.Id}", ex);
+            db.Set<AgentEntity>().Update(updatedEntity);
         }
+        else
+        {
+            db.Entry(trackedEntity).CurrentValues.SetValues(updatedEntity);
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<AgentDefinition> GetAgent(Guid id, CancellationToken ct = default)
@@ -79,16 +71,25 @@ internal sealed class AgentRepository(InkwellDbContext db) : IAgentRepository
     {
         IOrderedQueryable<AgentEntity> query = db.Set<AgentEntity>().AsNoTracking().ApplySort(sort, FieldSelector);
         long total = await query.LongCountAsync(ct).ConfigureAwait(false);
-        List<AgentDefinition> items = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        List<AgentEntity> entities = await query.Skip((pagination.Page - 1) * pagination.PageSize).Take(pagination.PageSize).ToListAsync(ct).ConfigureAwait(false);
+        List<AgentDefinition> items = [.. entities.Select(AgentMappingExtensions.ToModel)];
 
         return new PagedResult<AgentDefinition>(items, total, pagination);
     }
 
-    public async Task<IReadOnlyList<AgentDefinition>> FindAgentsByOwner(Guid ownerUserId, CancellationToken ct = default) =>
-        await db.Set<AgentEntity>().AsNoTracking().Where(x => x.OwnerUserId == ownerUserId).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+    public async Task<IReadOnlyList<AgentDefinition>> FindAgentsByOwner(Guid ownerUserId, CancellationToken ct = default)
+    {
+        List<AgentEntity> entities = await db.Set<AgentEntity>().AsNoTracking().Where(x => x.OwnerUserId == ownerUserId).ToListAsync(ct).ConfigureAwait(false);
 
-    public async Task<IReadOnlyList<AgentDefinition>> FindSharedAgents(Guid excludingOwnerUserId, CancellationToken ct = default) =>
-        await db.Set<AgentEntity>().AsNoTracking().Where(x => x.IsShared && x.OwnerUserId != excludingOwnerUserId).SelectAsModel().ToListAsync(ct).ConfigureAwait(false);
+        return [.. entities.Select(AgentMappingExtensions.ToModel)];
+    }
+
+    public async Task<IReadOnlyList<AgentDefinition>> FindSharedAgents(Guid excludingOwnerUserId, CancellationToken ct = default)
+    {
+        List<AgentEntity> entities = await db.Set<AgentEntity>().AsNoTracking().Where(x => x.IsShared && x.OwnerUserId != excludingOwnerUserId).ToListAsync(ct).ConfigureAwait(false);
+
+        return [.. entities.Select(AgentMappingExtensions.ToModel)];
+    }
 
     private static System.Linq.Expressions.Expression<Func<AgentEntity, object?>> FieldSelector(string field) => field switch
     {

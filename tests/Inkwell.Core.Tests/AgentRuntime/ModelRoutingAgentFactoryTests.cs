@@ -16,13 +16,13 @@ public sealed class ModelRoutingAgentFactoryTests
     {
         // Arrange
         ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: true);
-        StubModelRuntimeAgentBuilder azureRuntime = new("azure-openai");
-        StubModelRuntimeAgentBuilder liteLLMRuntime = new("litellm");
-        ModelRoutingAgentFactory factory = new(new StubModelRegistryService(model), [azureRuntime, liteLLMRuntime]);
+        StubModelRuntimeChatClientProvider azureRuntime = new("azure-openai");
+        StubModelRuntimeChatClientProvider liteLLMRuntime = new("litellm");
+        ModelRoutingAgentFactory factory = CreateFactory(model, [azureRuntime, liteLLMRuntime]);
         AgentVersion version = CreateVersion(model.Id);
 
         // Act
-        AIAgent agent = await factory.BuildAsync(version, new AgentBuildOptions());
+        AIAgent agent = await factory.BuildAsync(version);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -39,12 +39,12 @@ public sealed class ModelRoutingAgentFactoryTests
     {
         // Arrange
         ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: false);
-        StubModelRuntimeAgentBuilder runtime = new("litellm");
-        ModelRoutingAgentFactory factory = new(new StubModelRegistryService(model), [runtime]);
+        StubModelRuntimeChatClientProvider runtime = new("litellm");
+        ModelRoutingAgentFactory factory = CreateFactory(model, [runtime]);
 
         // Act
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => factory.BuildAsync(CreateVersion(model.Id), new AgentBuildOptions()).AsTask());
+            () => factory.BuildAsync(CreateVersion(model.Id)).AsTask());
 
         // Assert
         StringAssert.Contains(exception.Message, "metadata is incomplete");
@@ -59,14 +59,41 @@ public sealed class ModelRoutingAgentFactoryTests
     {
         // Arrange
         ModelDefinition model = CreateModel("claude", "anthropic-native", isAvailable: true);
-        ModelRoutingAgentFactory factory = new(new StubModelRegistryService(model), []);
+        ModelRoutingAgentFactory factory = CreateFactory(model, []);
 
         // Act
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => factory.BuildAsync(CreateVersion(model.Id), new AgentBuildOptions()).AsTask());
+            () => factory.BuildAsync(CreateVersion(model.Id)).AsTask());
 
         // Assert
         StringAssert.Contains(exception.Message, "anthropic-native");
+    }
+
+    /// <summary>
+    /// 验证 Inkwell Skill 定义只在模型运行时边界转换为 MAF 对象。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildAsync_WithSkillDefinitions_ResolvesRuntimeObjectsAsync()
+    {
+        // Arrange
+        ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: true);
+        StubModelRuntimeChatClientProvider runtime = new("litellm");
+        ModelRoutingAgentFactory factory = CreateFactory(model, [runtime]);
+        AgentBuildOptions buildOptions = new()
+        {
+            ModelOptions = new AgentModelOptions { ModelId = model.Id },
+            Skills = [CreateSkillDefinition()],
+        };
+        AgentVersion version = CreateVersion(model.Id, buildOptions);
+
+        // Act
+        AIAgent agent = await factory.BuildAsync(version);
+
+        // Assert
+        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        List<AIContextProvider> contextProviders = chatClientAgent.AIContextProviders?.ToList() ?? [];
+        Assert.HasCount(1, contextProviders);
+        Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
     }
 
     private static ModelDefinition CreateModel(string id, string runtimeId, bool isAvailable) => new()
@@ -80,22 +107,47 @@ public sealed class ModelRoutingAgentFactoryTests
         UnavailableReason = isAvailable ? null : "Model metadata is incomplete.",
     };
 
-    private static AgentVersion CreateVersion(string modelId) => new()
+    private static ModelRoutingAgentFactory CreateFactory(
+        ModelDefinition model,
+        IEnumerable<IModelRuntimeChatClientProvider> runtimeClientProviders) =>
+        new(new StubModelRegistryService(model), runtimeClientProviders, new StubPersistenceProvider());
+
+    private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
         Id = Guid.CreateVersion7(),
-        AgentId = Guid.CreateVersion7(),
-        VersionNumber = 1,
-        Status = AgentVersionStatus.Draft,
-        CreatedByUserId = Guid.CreateVersion7(),
-        Snapshot = new AgentSnapshot
-        {
-            Name = "Test agent",
-            Instructions = "Test instructions",
-            ModelId = modelId,
-        },
+        Name = "source-review",
+        Description = "Reviews sources.",
+        Content = "Review every source before citing it.",
         CreatedTime = DateTimeOffset.UtcNow,
         UpdatedTime = DateTimeOffset.UtcNow,
     };
+
+    private static AgentVersion CreateVersion(string modelId, AgentBuildOptions? buildOptions = null)
+    {
+        Guid agentId = Guid.CreateVersion7();
+        Guid versionId = Guid.CreateVersion7();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        return new AgentVersion
+        {
+            Id = versionId,
+            AgentId = agentId,
+            VersionNumber = 1,
+            Snapshot = new AgentSnapshot
+            {
+                Name = "Test agent",
+                Instructions = "Test instructions",
+                BuildOptions = buildOptions ?? new AgentBuildOptions
+                {
+                    ModelOptions = new AgentModelOptions { ModelId = modelId },
+                },
+            },
+            CreatedByUserId = Guid.CreateVersion7(),
+            CreatedTime = now,
+            UpdatedTime = now,
+            PublishedTime = now,
+        };
+    }
 
     private sealed class StubModelRegistryService(ModelDefinition model) : IModelRegistryService
     {
@@ -106,7 +158,7 @@ public sealed class ModelRoutingAgentFactoryTests
             Task.FromResult(model);
     }
 
-    private sealed class StubModelRuntimeAgentBuilder(string runtimeId) : IModelRuntimeAgentBuilder
+    private sealed class StubModelRuntimeChatClientProvider(string runtimeId) : IModelRuntimeChatClientProvider
     {
         public string RuntimeId => runtimeId;
 
@@ -114,20 +166,34 @@ public sealed class ModelRoutingAgentFactoryTests
 
         public ModelDefinition? Model { get; private set; }
 
-        public AIAgent Build(
-            ModelDefinition model,
-            AgentVersion agentVersion,
-            AgentBuildOptions agentBuildOptions,
-            CancellationToken cancellationToken = default)
+        public IChatClient GetChatClient(ModelDefinition model)
         {
             this.WasCalled = true;
             this.Model = model;
-            AzureOpenAIAgentFactory factory = new(new AzureOpenAICredential
+            AzureOpenAIModelRuntimeChatClientProvider provider = new(new AzureOpenAICredential
             {
                 Endpoint = "https://example.openai.azure.com",
                 ApiKey = "test-api-key",
             });
-            return factory.Build(model, agentVersion, agentBuildOptions, cancellationToken);
+            return provider.GetChatClient(model);
         }
+    }
+
+    private sealed class StubPersistenceProvider : IPersistenceProvider
+    {
+        public TRepository GetRepository<TRepository>() where TRepository : notnull =>
+            throw new NotSupportedException();
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResult> ExecuteInTransactionAsync<TResult>(Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task ExecuteInTransactionAsync(IsolationLevel isolationLevel, Func<CancellationToken, Task> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<TResult> ExecuteInTransactionAsync<TResult>(IsolationLevel isolationLevel, Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }

@@ -47,8 +47,8 @@ IInkwellBuilder inkwellBuilder = builder.Services.AddInkwell(builder.Configurati
     .UseInMemoryVectorStore()
     .UseDefaultAuthService()
     .UseDefaultAgentServices()
+    .UseDefaultConversationService()
     .UseDefaultToolService()
-    //.UseDefaultSessionService()
     .UseDefaultSkillService()
     .AddModelRegistry()
     .AddLiteLLMModelRegistrySource();
@@ -56,7 +56,7 @@ IInkwellBuilder inkwellBuilder = builder.Services.AddInkwell(builder.Configurati
 if (!string.IsNullOrWhiteSpace(azureOpenAICredential.Endpoint)
     && !string.IsNullOrWhiteSpace(azureOpenAICredential.ApiKey))
 {
-    inkwellBuilder.UseAzureOpenAIAgentFactory(azureOpenAICredential);
+    inkwellBuilder.UseAzureOpenAIModelRuntime(azureOpenAICredential);
 }
 
 inkwellBuilder.Build();

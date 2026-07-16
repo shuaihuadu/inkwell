@@ -18,6 +18,20 @@ upstream:
 <!-- markdownlint-disable MD060 -->
 <!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-007 / HD-014 / HD-015 / HD-016 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
 
+> **2026-07-17 Run 租约移除 errata**：Conversation 不再维护 Run 租约或 fencing。`AgentConversation` 不包含 `ActiveRunId` / `RunLeaseExpiresTime`；Service 与 Repository 不提供 acquire / renew / release 或条件更新接口；消息批次继续使用服务端 `ExecutionId` 作为幂等关联键，SessionState 继续使用 Revision 处理并发。下方所有租约、fencing、`LeaseLost`、租约冲突异常及专用 `409` 描述均被本 errata 取代，不再代表当前代码契约。
+>
+> **2026-07-15 替代性 errata（`AgentConversation` 与 MAF `AgentSession` 边界）**：Owner 在当前对话中直接确认三项产品不变量：(1) 每个产品会话永久锁定创建时的 `AgentVersion`；(2) REST 先创建 `AgentConversation`，第一次 AG-UI Run 再懒创建 MAF `AgentSession`；(3) 同一 `AgentConversation` 同时只允许一个 Run，后到请求返回 `409 Conflict`，不排队、不并行合并。本 errata 取代 2026-07-12 errata 中把产品会话称为 `AgentSessionDefinition`、把产品元数据与 MAF `SessionState` 混存、以及“对外统一使用 Session”的结论。下方旧章节保留为历史评审依据；凡与本 errata 冲突，以本 errata 为准。
+>
+> **2026-07-16 实际 Agent Session 暂缓 errata**：产品 `AgentConversation` 的版本绑定和消息真值不变量保持不变；实际 MAF `AgentSession` 的创建、包装、持久化和恢复方案暂停，等待后续单独讨论。`RoutingAgentSession` / `RoutingAgentSessionState` 已删除，当前路由代理不承载 `AgentVersionId` 或实际 Agent 状态。下方关于 wrapper Session、`InkwellAgentSessionStore` 和首次 Run 懒建 Session 的实现描述暂不代表当前代码契约。
+>
+> **2026-07-16 会话列表查询边界 errata**：当前已接入消费面仅需要用户会话列表。Repository 直接投影安全裁剪类型 `AgentConversationListItem`，Service 原样返回 `PagedResult<AgentConversationListItem>`，WebApi 直接序列化该结果，不再维护 `AgentConversationListResult`、`AgentConversationListItemResponse` 或重复分页映射。列表项只包含 `Id`、`AgentVersionId`、`Title`、`LastActivityTime`、`CreatedTime`，不得暴露完整 `AgentConversation` 的 Owner、SessionKey 或提交状态字段。下方要求所有 Service Result 均映射为 WebApi Response 的通用描述不再适用于此只读列表查询。
+>
+> **规范化修正**：`AgentVersionId` 的唯一业务真值位于 `AgentConversation`，创建后不可变。理由是版本绑定发生在 REST 创建产品会话时，而 `AgentSessionState` 直到首次 Run 才存在；若只把版本放在懒建状态行，会使“已创建但尚未运行”的产品会话没有版本绑定。`AgentSessionState` 不重复保存 `AgentVersionId`，恢复时必须经 `ConversationId` 读取 `AgentConversation.AgentVersionId`，再由该版本构建出的同一类 `AIAgent` 创建或反序列化 Session。此前“`AgentSessionState` 至少包含 `AgentVersionId`”的机械字段要求由此被规范化不变量取代，避免两个可独立更新的版本外键形成双重真值。
+>
+> **术语修正**：`AgentConversation` 是用户可见、可列表、可清空、可删除的产品聚合；MAF `AgentSession` 是由特定 `AIAgent` 创建的运行时对话状态，可能包含历史引用、memory 与 behavior，不能假设跨 Agent 或跨版本复用；`AgentSessionState` 只是该运行时状态的持久化检查点。`threadId` 是 `AgentConversation.Id.ToString("D")` 的稳定表示，不是授权凭证。旧文中的 `Conversation` / `ConversationMessage` / `AgentSessionDefinition` 分别由 `AgentConversation` / `AgentChatMessage` / `AgentSessionState` 取代。
+>
+> **2026-07-16 AG-UI wire contract 修正**：经核对 `@ag-ui/client@0.0.57` / `@ag-ui/core@0.0.57` 发布包原始 TypeScript，`HttpAgent` 每次 POST 会对标准 `RunAgentInput` 直接 `JSON.stringify`，其中 `messages` 是 agent 当前完整消息快照（仅过滤 `activity`），不是“本轮新增消息”。本修正撤销本节的 `AsyncLocal` Run Context accessor 与“客户端只发新增消息”设计。后端直接绑定 MAF 使用的 `AGUI.Abstractions.RunAgentInput`；服务端 `ExecutionId` 仅用于内部消息幂等与执行关联，不信任客户端 `runId`。
+>
 > **2026-07-12 替代性 errata（Session/History 归属）**：独立 `IAgentConversationService` / `IAgentSessionService` 不再作为 Agent Run 的中间编排层；下方相关调用链保留为历史依据。会话连续性采用 MAF `AgentSession`，历史注入与成功调用后的新消息落库采用 `ChatHistoryProvider`。Inkwell 持久化层仍保存 `AgentSessionDefinition` 与 `AgentChatMessage`，Repository 负责数据访问；后续 Session/History 实现负责授权、Session 创建/恢复、`thread_id` 映射、标题与顺序号等业务不变量，WebApi 不直接操作 Repository。
 >
 > **2026-07-12 Session/Message 模型 errata**：每个 `AgentSessionDefinition` 在创建时锁定 `AgentVersionId`，后续恢复不得跟随 Agent 当前发布指针漂移。MAF Session 只能由该版本构建出的 `AIAgent.CreateSessionAsync` 创建，或由同一版本 Agent 的 `DeserializeSessionAsync` 从 `SessionState` 恢复；每次成功运行后通过同一 Agent 的 `SerializeSessionAsync` 捕获状态。`InkwellChatHistoryProvider` 是无会话字段的 MAF Provider，业务 Session ID 只存于 `AgentSession.StateBag`；它依赖 MAF 基类的成功判定与消息过滤，仅在成功调用后以 Serializable 事务批量追加 request + response。
@@ -40,6 +54,77 @@ upstream:
 > **2026-07-08 Owner 确认（§8 四项，`vscode_askQuestions` 真实交互）**：Owner 在本次会话中通过 `vscode_askQuestions` 逐条真实确认 [§8](#8-需要-owner-确认的问题) 全部四项：**Q&A-A** 选方案 B——补写审计（**2026-07-09 更新**：随审计日志功能整体取消，本项已作废，详见 [§8 Q&A-A](#8-需要-owner-确认的问题)）；**Q&A-B** 选方案 A——查看者视角（本 HD 现有默认实现不变，仅将确认状态由“待确认”更新为“已解决”）；**Q&A-C** 选方案 C——v1 暂不实现超限行为（本 HD 现有默认实现不变，仅标注已解决）；**Q&A-D** 选方案 B——`agui_run_events` 归属判给未起草的 `Inkwell.Core.Traces`（本 HD 维持不实现该表，`database-design.md` 该行归属更新留待 `Inkwell.Core.Traces` 起草时处理，本次不越权修改该文件）。
 >
 > **2026-07-10 errata（H5 落地：采用 MAF `ChatHistoryProvider` 惯用法，§1.4 消费链路描述过期）**：H5 编码阶段实现 [HD-006 `IAgentRuntime`](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 时，Owner 决定改用 MAF `ChatHistoryProvider` 惯用法，本 HD §1.4 原描述的"`Inkwell.WebApi` 预先调 `GetHistoryMessagesAsync` 拼装历史、再调 `IAgentInvocationService.RunAsync`"五步流程已过期。新流程：`Inkwell.WebApi` 只需把本轮新消息作为 `messages` 传给 `IAgentInvocationService.RunAsync`，历史读取 + 用户/助手消息落库均由新增的 `Inkwell.Core.AgentRuntime.DatabaseChatHistoryProvider`（`ChatHistoryProvider` 子类，委托本 HD `IAgentConversationService`）在 MAF 执行管线内自动完成。`IAgentConversationService.GetHistoryMessagesAsync` 依旧保留（仍供 `Inkwell.WebApi` 用于渲染历史列表等展示场景），但不再是 Run 链路中的必经步骤。本次已就地修订 §1.1 / §1.4，不新增独立文档。
+
+## 0. 2026-07-15 当前契约（替代下方冲突章节）
+
+### 0.1 聚合与关系基数
+
+| 模型 | 当前字段与不变量 |
+| --- | --- |
+| `AgentConversation` | `Id`、不可变 `SessionKey`、不可变 `AgentId`、不可变 `AgentVersionId`、`OwnerUserId`、`Title?`、`ActiveRunId?`、`RunLeaseExpiresTime?`、`LastCommittedRunId?`、`LastActivityTime`、`CreatedTime`、`UpdatedTime`、`RowVersion`。REST 创建时生成 `Id`，把规范化 `Id.ToString("D")` 写入唯一 `SessionKey`，解析目标版本并同时写入 `AgentId + AgentVersionId`；后续发布、回滚或当前版本指针变化均不得改写。`SessionKey` 是 MAF Store 使用的 opaque lookup key，Store 不解析其格式。`ActiveRunId` / `LastCommittedRunId` 存服务端 `ExecutionId`，绝不存客户端 AG-UI `runId`。`LastActivityTime` 只在消息批次成功提交时更新，租约占用、续租和释放不得改变它。 |
+| `AgentChatMessage` | `Id`、`ConversationId`、`RunId?`、`RunMessageIndex?`、完整 `Microsoft.Extensions.AI.ChatMessage` 的 `Message` JSON、`SequenceNumber`、`CreatedTime`、`UpdatedTime`。完整 `ChatMessage` 是消息唯一真值；Role、Text、AuthorName 只能是只读投影。`SequenceNumber` 在会话内严格递增。字段名 `RunId` 的值是服务端 `ExecutionId`；Run 产生的 request + response 必须使用同一非空值与从 0 连续分配的 `RunMessageIndex`，用于幂等与追踪；REST 导入或未来非 Run 写入时两者同时为空。 |
+| `AgentSessionState` | `ConversationId`（同时为 PK/FK）、`SerializedState`、`Revision`、`LastRunId?`、`UpdatedTime`、`RowVersion`。首次 AG-UI Run 懒建；不承载产品列表元数据，不重复 `AgentVersionId`。`LastRunId` 存服务端 `ExecutionId`；`Revision` 从 1 严格递增，状态更新使用 `RowVersion` 比较交换。只有完整成功 Run 才保存检查点；停止、断线或异常 Run 的消息可以提交，但不得把不完整状态保存为可恢复检查点。 |
+
+关系基数固定为：`AgentDefinition 1:N AgentVersion 1:N AgentConversation`、`User 1:N AgentConversation`、`AgentConversation 1:N AgentChatMessage`、`AgentConversation 1:0..1 AgentSessionState`。Conversation 通过 `(AgentId, AgentVersionId)` 复合外键绑定 `AgentVersion(AgentId, Id)`，不再另建 `AgentId → AgentDefinition` 直接 FK，既保证版本属于 Agent，又避免 SQL Server 多重级联路径。删除 `AgentConversation` 级联删除消息与状态；Owner 于 2026-07-16 明确选择删除 Agent 时沿 Agent → Version → Conversation 链级联删除全部历史。
+
+### 0.2 文件与职责替代
+
+以下是当前文件契约；下方 §2 / §3 中旧文件名和方法签名仅保留历史，不再指导实现。
+
+| 文件 | 职责 | 对外接口 | 内部函数或类 | 输入数据 | 输出数据 | 依赖模块 | 错误处理 | 日志要求 | 测试要求 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `Persistence/Conversations/AgentConversation.cs` | 产品会话聚合 Model | 上述 `AgentConversation` 字段 | 纯数据 record | REST 创建参数、已解析版本、租约状态 | 会话 Model | 持久化 mixin | Model 不做业务校验 | 不记录消息或标题原文 | 版本不可变、租约字段、record equality |
+| `Persistence/Conversations/AgentChatMessage.cs` | 完整消息持久化 Model | 上述 `AgentChatMessage` 字段 | 纯数据 record | `ConversationId`、`RunId`、完整 `ChatMessage` JSON、序号 | 消息 Model | `Microsoft.Extensions.AI` + 持久化 mixin | JSON 失败抛 `JsonException` | 不记录 `Message` 原文 | JSON 往返、Run 幂等、严格序号 |
+| `Persistence/Conversations/AgentSessionState.cs` | MAF Session 检查点 Model | 上述 `AgentSessionState` 字段 | 纯数据 record | 序列化状态、Revision、LastRunId | 状态 Model | 持久化 mixin | 并发冲突抛 `InvalidOperationException` | 不记录 `SerializedState` | 首次懒建、Revision CAS、0..1 约束 |
+| `Persistence/Conversations/IAgentConversationRepository.cs` | 会话查询、写入与 Run 租约原子占用 | `Add` / `Get` / `GetBySessionKey` / `List` / `TryAcquireRunLease` / `TryRenewRunLease` / `ReleaseRunLease` / 条件清空与删除 | Repository 接口 | 会话、opaque SessionKey、Owner、Agent、ExecutionId、数据库当前时间 | 会话或条件操作结果 | `IPersistenceProvider` | 未找到抛 `KeyNotFoundException`；条件操作失败返回稳定结果 | `db.repository.agent_conversation.<verb>` | 两请求竞争仅一个成功；过期租约可接管；错误或过期持有者不得续租、释放、清空或删除 |
+| `Persistence/Conversations/IAgentChatMessageRepository.cs` | 消息读取、Run 批次原子提交与单条/整段删除 | `ListByConversation` / `CommitRunMessages` / `DeleteMessage` / `DeleteByConversation` | Repository 接口 | ConversationId、MessageId、ExecutionId、规范消息批次、当前时间 | `Committed` / `AlreadyCommitted` / `LeaseLost` / `Conflict` / 删除结果 | `IPersistenceProvider` | 已有批次逐项完全一致才返回 `AlreadyCommitted`；相同幂等键内容不同返回 `Conflict`；消息不属于会话按未找到处理 | `db.repository.agent_chat_message.<verb>` | 同 Run 重试不重复；旧 Run 不得回写；序号并发；单删必须 fenced；提交时同步更新会话标记、标题和活动时间 |
+| `Persistence/Conversations/IAgentSessionStateRepository.cs` | MAF 状态检查点读取与 fenced CAS | `GetOrDefault` / `Save` / `DeleteByConversation` | Repository 接口 | ConversationId、ExecutionId、SerializedState、Revision、RowVersion、当前时间 | `Saved` / `LeaseLost` / `ConcurrencyConflict` | `IPersistenceProvider` | 租约失效与 CAS 冲突使用不同稳定结果 | `db.repository.agent_session_state.<verb>` | 0..1、Revision、并发冲突、停止 Run 不保存、删除幂等 |
+| `Conversations/IAgentConversationService.cs` | 产品会话 CRUD、Owner 授权、消息删除/清空、消息历史、单 Run 规则 | `CreateConversationAsync`、`ListConversationsAsync`、`GetMessagesAsync`、`DeleteMessageAsync`、`ClearConversationAsync`、`DeleteConversationAsync`、`AcquireRunAsync`、`RenewRunAsync`、`ReleaseRunAsync` | 接口；实现位于 `AgentConversationService` | 明确的 ownerUserId、agentId、conversationId、messageId、executionId | `{Concept}{Action}Result` 应用服务结果 | 仅 Abstractions + BCL | 越权抛 `UnauthorizedAccessException`；占用失败抛专用业务异常供 WebApi 映射 409 | `agent_conversation.<verb>`，不记录正文/状态 | Conversation Owner + Agent 双重授权、版本锁定、删除/清空原子性、租约全路径 |
+| `Inkwell.Core/Conversations/AgentConversationService.cs` | 实现产品会话业务规则和事务边界 | 实现 `IAgentConversationService` | 版本解析、授权、消息删除/清空事务、租约编排 | 端口参数 | 端口结果 | `IPersistenceProvider`、`TimeProvider`、版本查询端口 | 保持 BCL 异常约定；不接触 HTTP | 同接口 | 创建时锁版本；单删/清空同步失效状态并重算派生字段；删除级联；竞争测试 |
+| `Inkwell.Core/AgentRuntime/InkwellAgentSessionStore.cs` | MAF keyed singleton `AgentSessionStore` 适配器；按 conversation key 加载/保存检查点 | MAF Store 覆盖方法 | 解析 conversation key、读取绑定版本、创建/恢复 wrapper Session、Revision CAS | MAF conversation key、MAF 回调数据 | `AgentSession` / 保存结果 | MAF、`IServiceScopeFactory` | 会话不存在、版本不匹配或租约 fencing 失败即拒绝 | `agent_session_state.load/save`，不记录序列化正文 | 根容器解析生命周期、首轮懒建、完整消息快照、多轮恢复、旧 Run 不得回写、陈旧状态重建 |
+| `Inkwell.Core/AgentRuntime/InkwellChatHistoryProvider.cs` | 以数据库历史为真值识别请求快照中的新增输入，并将新增 request + response 幂等落库 | MAF `ChatHistoryProvider` 覆盖方法 | 协议消息 ID 对账、消息映射与 ExecutionId 关联 | 显式服务端 Run Context、完整请求消息快照、模型回复 | 注入历史或保存结果 | MAF、Conversations 业务端口 | 历史分叉/缺失拒绝；保存失败原样上抛并允许重试 | `agent_chat_history.load/save`，不记录正文 | 完整快照不重复落库；篡改历史拒绝；同 ExecutionId 重试不重复 |
+
+`Inkwell.Core.AgentRuntime` 是唯一允许直接依赖 MAF 并实现 `AgentSessionStore` / `ChatHistoryProvider` 的位置。MAF 当前在 endpoint mapping 阶段从根容器解析 keyed `AgentSessionStore`，因此 `InkwellAgentSessionStore` 必须注册为 keyed singleton，并通过 `IServiceScopeFactory` 为每次数据库操作创建短生命周期 scope。Store 必须遵循 MAF 的 opaque conversation-key 契约：用 `GetBySessionKey(string)` 精确查询，不解析 GUID，也不假定 isolation decorator 不会改写 key。WebApi filter 先授权并占用租约，再覆盖 `RunAgentInput.ForwardedProperties.inkwell`；`RoutingAgent` 读取该可信对象后，将 `{ conversationId, executionId, agentVersionId }` 写入 wrapper Session 的保留 StateBag key。History Provider 从该 key 读取本轮上下文；Store 保存时读取后立即 `TryRemoveValue`，再调用绑定 Agent 的序列化方法，确保瞬时 ExecutionId 不进入 `SerializedState`。恢复时若发现该保留 key 残留，必须删除并拒绝把旧 ExecutionId 用于新 Run。任何组件均不使用 `AsyncLocal`、`IHttpContextAccessor` 或其他 ambient holder。
+
+应用服务与 HTTP 类型遵循统一边界命名：单一 Model 或分页查询直接返回 `AgentConversation`、`PagedResult<AgentConversationListItem>` 与 `PagedResult<AgentChatMessage>`；只有一次操作产生多个业务输出时才定义 `{Concept}{Action}Result`，例如 `AgentConversationAcquireRunResult`。WebApi 映射为 `AgentConversationResponse`、`AgentConversationListItemResponse`、`AgentConversationDetailResponse`、`AgentChatMessageResponse` 与 `PagedResponse<AgentConversationListItemResponse>`。API Response 不暴露 `RowVersion`、`SessionKey`、租约字段、`SerializedState` 或 MAF Session；持久化 Model 也不得直接作为 HTTP Response。
+
+`OwnerUserId` 始终表示 Conversation 所属参与用户，不表示 Agent Owner。创建、列表、读消息、单条消息删除、清空和 Conversation 删除均以已认证用户匹配该字段授权；共享 Agent 的参与用户可以删除自己 Conversation 中的消息，或清空/删除该 Conversation，不能操作其他用户历史。只有“调试 Agent”是 Agent Owner 专属能力。Agent Owner 删除整个 Agent 是独立的系统级入口，并按已确认规则级联所有参与用户历史。
+
+### 0.3 创建、Run、清空与删除流程
+
+1. `POST /api/agents/{agentId}/conversations` 由 WebApi 提取已认证 `OwnerUserId` 并调用 Service。Service 校验 Agent 可调用，解析创建时目标 `AgentVersionId`，在同一事务写入 `AgentConversation`；此时不创建 `AgentSessionState`。
+2. AG-UI Run 必须携带 `threadId = conversationId.ToString("D")`。`HttpAgent` 发送当前完整消息快照；WebApi endpoint filter 从已绑定的 `RunAgentInput` 取得 `threadId` 和客户端 `runId`，生成独立服务端 `executionId`，再把 `ownerUserId + agentId + conversationId + executionId` 显式传给 Service。Service 校验 `OwnerUserId` 与 `AgentId` 均匹配会话，并以 `executionId` 原子占用 Run 租约；成功后 filter 覆盖 `forwardedProps.inkwell` 并调用 MAF handler。
+3. `InkwellAgentSessionStore` 首次加载不到状态时，按 conversation key 查询 `AgentConversation.AgentVersionId`，构建该版本内部 Agent 并创建 wrapper Session；后续按同一绑定版本恢复。`RoutingAgent` 从已验证的 `forwardedProps.inkwell` 取得本次 `ExecutionId` 与版本校验值，不读取当前发布指针。Store 不得返回内部 Agent 的裸 Session。
+4. `InkwellChatHistoryProvider` 覆盖调用前合并逻辑，不使用基类“Provider 历史 + 调用消息”默认拼接。它把数据库消息作为规范前缀，按非空协议 MessageId、角色、作者和完整 Content 逐项比较客户端快照；缺失 ID、重复 ID、顺序改变、内容改变、历史截短或分叉均拒绝，只有严格匹配后的后缀作为本轮新增输入。传给模型的最终集合是数据库规范历史加该新增后缀，任一历史消息只出现一次。成功回调把新增 request + response 作为一个批次提交；提交事务校验有效租约、连续分配 SequenceNumber、验证幂等内容、更新 `LastCommittedRunId`、首条成功 User 文本标题与 `LastActivityTime`。Store 随后独立保存状态检查点；两者不宣称同一事务。
+5. `ConversationRunLeaseResult` 仅携带 `conversationId + executionId` 管理 SSE 生命周期，不承担上下文传播；在内层结果结束的 `finally` 用独立短超时令牌释放租约，不使用已取消的 `RequestAborted`。释放失败只记录 warning 并依赖租约过期回收，不覆盖原始异常。
+6. 单条消息删除先用全新的操作 ID 原子占用租约，再在单一数据库事务内校验该操作仍持有租约且 `MessageId` 属于当前 Conversation，删除消息与 `AgentSessionState`，把 `LastCommittedRunId` 置空，并从剩余最早一条含文本的 User 消息重算 `Title`；`LastActivityTime` 取剩余最后消息的 `UpdatedTime`，无消息时取本次操作时间。保留其余消息及原 `SequenceNumber`，不重编号；下一 Run 从消息真值重建 Session。
+7. 清空会话同样先占用租约，再在单一数据库事务内删除全部消息和状态，把 `Title` 与 `LastCommittedRunId` 置空并刷新 `UpdatedTime` / `LastActivityTime`；保留 Conversation 与不可变版本绑定。
+8. 删除会话同样必须以新操作 ID 原子占用租约，并执行带持有者条件的删除；数据库级联删除消息与状态。先读租约再无条件删除不满足竞争安全要求。
+
+### 0.4 同一 Conversation 单 Run 契约
+
+`TryAcquireRunLease` 必须是一条数据库条件更新或等价的单事务比较交换：仅当 `ActiveRunId IS NULL`、当前 Run 已持有，或 `RunLeaseExpiresTime <= now` 时，才能把 `ActiveRunId` 写为当前 `runId`、把截止时间写为 `now + leaseDuration`。返回受影响行数 0 表示已有其他有效 Run；Service 将其转换为稳定的“conversation run conflict”业务异常，WebApi 统一映射 `409 Conflict`。不得在进程内锁、队列、Redis 或其他外部中间件中实现该规则，因为 WebApi 可多副本运行。
+
+释放同样使用条件更新 `WHERE Id = conversationId AND ActiveRunId = runId`；错误或过期持有者不能释放新 Run 的租约。当前租约时长是 Conversation Service 的私有策略，不公开尚无实际调用方的续租周期、清理超时或 Options 配置。SSE 生命周期包装器落地时，应由真实生命周期与故障处理需求重新确定续租和清理策略，不预先扩展公共配置契约。
+
+所有 Run 消息提交和 SessionState 保存都必须在各自数据库事务内再次验证 `AgentConversation.ActiveRunId == runId && RunLeaseExpiresTime > now`。租约过期不代表旧执行已经停止；即使尚无新 Run 接管，旧执行也不得写入。续租只能在相同持有者且租约仍未过期时延长，不得复用“过期即可接管”的 acquire 条件让旧 Run 自行复活。清空和删除的写入阶段执行同一有效租约校验。`RunId` 全局唯一且不得复用；测试必须覆盖“租约已过期但尚未被接管时旧 Run 尝试写入/续租”均失败。
+
+### 0.5 消息与 SessionState 的可恢复一致性
+
+数据库消息是历史唯一真值，`AgentSessionState` 是可丢弃并重建的运行时检查点，不得反向覆盖消息。消息批次通过唯一约束 `(ConversationId, RunId, RunMessageIndex)` 幂等，request + response 与各自连续 `SequenceNumber` 在一个数据库事务内提交；非 Run 消息的 `RunId` / `RunMessageIndex` 同时为空，不参与该唯一约束。状态保存按 `ConversationId` 读取当前状态，并由 Service 校验递增的 `Revision` 后写入，同时记录 `LastRunId`。
+
+加载状态时，仅当两个标记均非空且 `AgentSessionState.LastRunId == AgentConversation.LastCommittedRunId` 才允许反序列化；两者同时为空不构成有效检查点。不通过消息行数量或索引连续性猜测“最新完整 Run”。状态缺失、领先、落后、反序列化失败或 wrapper 版本校验失败时，删除/覆盖旧检查点，由绑定版本 Agent 创建新 Session，再由 History Provider 从数据库消息重建上下文。该降级可能丢失 runtime-only memory/behavior，但不能重复或遗失产品聊天历史。
+
+用户点击“停止生成”以及连接在已有增量后中断时，SSE 包装器使用独立短时令牌提交已确认的新增 User 消息与当前已生成 assistant 内容；assistant `ChatMessage.AdditionalProperties["inkwell.completionStatus"]` 写入 `stopped`，REST 映射为稳定的停止状态。该批次更新 `LastCommittedRunId` 与 `LastActivityTime`，但不保存 SessionState；下一轮因状态标记不匹配而从消息真值重建。模型在产生任何 assistant 内容前失败时不伪造 assistant 消息，错误由协议事件表达。完整成功、停止/断线、模型异常、消息提交失败、消息成功但状态保存失败五条路径必须分别测试；所有清理与中断提交均不得使用已取消的请求令牌。
+
+旧单表迁移遵循 [database-design.md “从旧 agent_session 单表迁移”](../database-design.md#从旧-agent_session-单表迁移)：会话与消息标识、顺序和正文全部保留，`SessionKey` 与 `LastActivityTime` 确定性回填，旧租约/Run 字段置空；旧 SessionState 因缺少可信完成标记而丢弃，下次 Run 从消息真值重建。H5-005-A 不得把“删除旧表后重新创建空表”作为迁移实现。
+
+### 0.6 REST 与 AG-UI 数据边界
+
+- 前端历史会话列表、会话详情与完整消息加载全部走 REST；AG-UI 不承担产品列表查询。
+- 每次 AG-UI Run 发送 `HttpAgent.messages` 的完整快照；这是 `@ag-ui/client@0.0.57` 的实际行为。后端以数据库历史为真值进行前缀/ID 对账，只持久化本轮新增输入与回复，不重复追加历史。
+- `threadId` 仅定位 `AgentConversation`，每次请求仍必须按已认证 `OwnerUserId` 与路由 `AgentId` 做业务授权。任一不匹配均拒绝，不能通过猜测 GUID 读取或运行他人会话。
+- `AgentConversation.AgentVersionId` 决定 Run 使用的 Agent 版本；路由中的 `AgentId` 只用于授权和一致性校验，不能重新解析“当前发布版本”覆盖会话绑定。
 
 ## 1. 模块概述
 

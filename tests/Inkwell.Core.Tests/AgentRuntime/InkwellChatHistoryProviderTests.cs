@@ -13,6 +13,7 @@ public sealed class InkwellChatHistoryProviderTests
     /// <summary>
     /// 验证 Provider 从 StateBag 路由业务 Session，并把历史置于当前请求之前。
     /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]
     public async Task InvokingAsync_WithAttachedSession_LoadsHistoryBeforeRequestAsync()
     {
@@ -25,9 +26,7 @@ public sealed class InkwellChatHistoryProviderTests
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(session, sessionId);
         ChatMessage requestMessage = new(ChatRole.User, "current");
-#pragma warning disable MAAI001
         ChatHistoryProvider.InvokingContext context = new(agent, session, [requestMessage]);
-#pragma warning restore MAAI001
 
         // Act
         List<ChatMessage> messages = [.. await provider.InvokingAsync(context)];
@@ -43,6 +42,7 @@ public sealed class InkwellChatHistoryProviderTests
     /// <summary>
     /// 验证成功调用把请求和响应作为一个可串行化事务批次保存。
     /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]
     public async Task InvokedAsync_OnSuccess_AppendsRequestAndResponseInSerializableTransactionAsync()
     {
@@ -56,16 +56,14 @@ public sealed class InkwellChatHistoryProviderTests
         InkwellChatHistoryProvider.AttachSession(session, sessionId);
         ChatMessage request = new(ChatRole.User, "question");
         ChatMessage response = new(ChatRole.Assistant, "answer");
-#pragma warning disable MAAI001
         ChatHistoryProvider.InvokedContext context = new(agent, session, [request], [response]);
-#pragma warning restore MAAI001
 
         // Act
         await provider.InvokedAsync(context);
 
         // Assert
         Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
-        Assert.AreEqual(sessionId, repository.LastAppendedSessionId);
+        Assert.AreEqual(sessionId, repository.AddedMessages[0].ConversationId);
         Assert.HasCount(2, repository.AppendedMessages);
         Assert.AreSame(request, repository.AppendedMessages[0]);
         Assert.AreSame(response, repository.AppendedMessages[1]);
@@ -74,6 +72,7 @@ public sealed class InkwellChatHistoryProviderTests
     /// <summary>
     /// 验证失败调用由 MAF 基类拦截，不写入聊天历史。
     /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]
     public async Task InvokedAsync_OnFailure_DoesNotAppendMessagesAsync()
     {
@@ -92,44 +91,6 @@ public sealed class InkwellChatHistoryProviderTests
         // Assert
         Assert.HasCount(0, repository.AppendedMessages);
         Assert.IsNull(persistence.LastIsolationLevel);
-    }
-
-    /// <summary>
-    /// 验证业务 Session 状态只能通过对应 Agent 创建、捕获并恢复。
-    /// </summary>
-    [TestMethod]
-    public async Task AgentSessionRuntime_CreateCaptureAndRestore_PreservesStateAsync()
-    {
-        // Arrange
-        Guid sessionId = Guid.CreateVersion7();
-        Guid agentId = Guid.CreateVersion7();
-        Guid agentVersionId = Guid.CreateVersion7();
-        Guid ownerUserId = Guid.CreateVersion7();
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        AgentSessionDefinition definition = new()
-        {
-            Id = sessionId,
-            AgentId = agentId,
-            AgentVersionId = agentVersionId,
-            OwnerUserId = ownerUserId,
-            CreatedTime = now,
-            UpdatedTime = now,
-        };
-        TestAgent creatingAgent = new();
-
-        // Act
-        AgentSession createdSession = await AgentSessionRuntime.OpenAsync(creatingAgent, definition);
-        createdSession.StateBag.SetValue("test-state", "preserved");
-        AgentSessionDefinition capturedDefinition = await AgentSessionRuntime.CaptureAsync(creatingAgent, createdSession, definition);
-        TestAgent restoringAgent = new();
-        AgentSession restoredSession = await AgentSessionRuntime.OpenAsync(restoringAgent, capturedDefinition);
-
-        // Assert
-        Assert.AreEqual(1, creatingAgent.CreateSessionCount);
-        Assert.AreEqual(1, creatingAgent.SerializeSessionCount);
-        Assert.AreEqual(1, restoringAgent.DeserializeSessionCount);
-        Assert.AreEqual(sessionId.ToString(), restoredSession.StateBag.GetValue<string>(InkwellChatHistoryProvider.SessionIdStateKey));
-        Assert.AreEqual("preserved", restoredSession.StateBag.GetValue<string>("test-state"));
     }
 
     private sealed class TestSession : AgentSession
@@ -188,7 +149,7 @@ public sealed class InkwellChatHistoryProviderTests
         }
     }
 
-    private sealed class RecordingPersistenceProvider(IAgentSessionMessageRepository messages) : IPersistenceProvider
+    private sealed class RecordingPersistenceProvider(IAgentChatMessageRepository messages) : IPersistenceProvider
     {
         public IsolationLevel? LastIsolationLevel { get; private set; }
 
@@ -214,21 +175,30 @@ public sealed class InkwellChatHistoryProviderTests
         }
     }
 
-    private sealed class FakeMessageRepository(IReadOnlyList<ChatMessage> history) : IAgentSessionMessageRepository
+    private sealed class FakeMessageRepository(IReadOnlyList<ChatMessage> history) : IAgentChatMessageRepository
     {
         public Guid? LastListedSessionId { get; private set; }
 
         public int? LastMaxMessages { get; private set; }
 
-        public Guid? LastAppendedSessionId { get; private set; }
-
         public List<ChatMessage> AppendedMessages { get; } = [];
 
-        public Task<AgentChatMessage> AddMessage(AgentChatMessage message, CancellationToken ct = default) =>
+        public List<AgentChatMessage> AddedMessages { get; } = [];
+
+        public Task<PagedResult<AgentChatMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<PagedResult<AgentChatMessage>> ListMessagesBySession(Guid sessionId, Pagination pagination, SortOrder sort, CancellationToken ct = default) =>
+        public Task<IReadOnlyList<AgentChatMessage>> ListAllMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentChatMessage>> ListMessagesByRun(Guid conversationId, string runId, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentChatMessage>> AddMessages(IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default)
+        {
+            this.AddedMessages.AddRange(messages);
+            this.AppendedMessages.AddRange(messages.Select(message => message.Message));
+            return Task.FromResult(messages);
+        }
 
         public Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid sessionId, int? maxMessages = null, CancellationToken ct = default)
         {
@@ -237,17 +207,9 @@ public sealed class InkwellChatHistoryProviderTests
             return Task.FromResult(history);
         }
 
-        public Task<IReadOnlyList<AgentChatMessage>> AppendMessagesAsync(Guid sessionId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
-        {
-            this.LastAppendedSessionId = sessionId;
-            this.AppendedMessages.AddRange(messages);
-            return Task.FromResult<IReadOnlyList<AgentChatMessage>>([]);
-        }
+        public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
 
-        public Task<bool> DeleteMessage(Guid sessionId, Guid messageId, CancellationToken ct = default) =>
-            throw new NotSupportedException();
-
-        public Task<int> DeleteMessagesBySession(Guid sessionId, CancellationToken ct = default) =>
+        public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }

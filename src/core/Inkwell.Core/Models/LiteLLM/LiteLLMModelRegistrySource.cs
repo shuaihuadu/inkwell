@@ -1,7 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Net.Http.Json;
-using Microsoft.Extensions.Options;
 
 namespace Inkwell;
 

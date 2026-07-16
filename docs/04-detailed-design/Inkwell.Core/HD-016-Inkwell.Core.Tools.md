@@ -20,6 +20,8 @@ upstream:
 
 > **本 HD 是 H3 第三张业务命名空间（`Inkwell.Core.*`）详细设计**，紧接在已 reviewed 的 [HD-015 `Inkwell.Core.Agents`](HD-015-Inkwell.Core.Agents.md) 之后起草。起草优先级见下方"起草顺序说明"。
 >
+> **2026-07-16 替代性 errata（工具 Definition 与 MAF 运行时对象分界）**：`IAgentToolBindingResolver`、内部 `AgentToolBindingResolver` 与 `JsonDelegateAIFunction` 均已移除；下方仍描述这些类型及其直接返回 `AIFunction` 的章节保留为历史依据，不再代表当前代码契约。现行链路由 `AgentBuildOptions.ToolBindings` 在 Snapshot 中保存工具 ID 与静态参数，不加载或复制可变的 `AgentToolDefinition`，也不转换为可执行 `AIFunction`；最终运行时接入方式等待 Agent Factory review 定稿。Tools 业务边界不公开 MAF 运行时对象。
+>
 > **起草顺序说明**：本 HD 之所以在 H3 起草顺序上插队到 `.Models` / `.Skills` / `.KnowledgeBase` 等模块之前，是因为 [HD-015 §8 Q&A-2](HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题) 记录的 Owner 决议——本次由 prompt 直接告知这是已成立的既定结论，本文件不重新发起确认，仅据此安排起草顺序。
 >
 > **范围核实结论（非臆造，逐条附证据）**：

@@ -27,7 +27,11 @@ upstream:
 
 > **2026-07-12 替代性 errata（管理面与运行面重新分界）**：本 HD 原 `IAgentInvocationService -> IAgentRuntime` 数据面链路已移除；下方相关章节保留为历史依据，不再代表现行契约。`IAgentService` 只承担可编辑 `AgentDefinition` 的 CRUD、共享与克隆。发布/保存形成不可变 `AgentVersion` + `AgentSnapshot`，运行面由 `IAgentFactory` 直接构建 MAF `AIAgent`。协议入口负责完成调用者鉴权、加载目标版本和运行时附加项后调用 Factory，不再把 Agent 配置翻译为 Inkwell 自建 `AgentRunRequest`。
 >
-> **职责约束**：`AgentDefinition` 是管理态；`AgentVersion` 是版本身份与生命周期；`AgentSnapshot` 是该版本的完整运行配置。历史版本不得反向读取当前 `AgentDefinition` 的可变字段。工具绑定在 Snapshot 中保存声明，Factory 构建时由调用方通过 `AgentBuildOptions.Tools` 提供已经解析的 `AIFunction`，避免 Factory 依赖业务 Repository。读取 Agent 时仍必须校验 `requestingUserId == OwnerUserId || IsShared`。
+> **职责约束**：`AgentDefinition` 是管理态；`AgentVersion` 是版本身份与生命周期；`AgentSnapshot` 是该版本的完整运行配置。历史版本不得反向读取当前 `AgentDefinition` 的可变字段。工具绑定以 `AgentBuildOptions.ToolBindings` 原样保存在 Snapshot；Skill 由 `IAgentBuildOptionsResolver` 解析为 Definition，并在 AgentRuntime 边界转换为 `AgentSkillsProvider`。`JsonDelegateAIFunction` 与自建工具运行时转换链已删除，Tool Binding 暂不转换为 `AIFunction`，最终接入方式等待 Agent Factory review 定稿。读取 Agent 时仍必须校验 `requestingUserId == OwnerUserId || IsShared`。
+>
+> **2026-07-16 Agent 构建用例边界 errata**：新增 `IAgentBuildService.BuildPublishedAsync(agentId, requestingUserId, cancellationToken)`，由 Core 统一编排 `IAgentVersionService` 的版本查询与访问校验、`IAgentBuildOptionsResolver` 的 Snapshot 绑定解析，以及 `IAgentFactory` 的运行时构建。`IAgentFactory` 仍只接收已确定的 `AgentVersion + AgentBuildOptions`。WebApi `RoutingAgent` 不再直接依赖版本服务、Resolver 或 Factory，只负责解析 Route / Claims 并调用该用例服务。
+>
+> **2026-07-16 模型配置聚合 errata**：`AgentModelParameters` 已重命名为 `AgentModelOptions`，并纳入逻辑 `ModelId`。`AgentSnapshot` 与 `AgentUpsertRequest` 不再分别暴露 `ModelId` / `ModelParameters`，统一使用可空的 `ModelOptions`；进入 Agent Factory 构建时，`ModelOptions.ModelId` 必须是已注册的非空模型标识。下方旧字段拆分描述保留为历史依据，不再代表当前契约。
 >
 > **2026-07-12 版本生命周期 errata**：原文“仅递增 `CurrentVersion`，版本存储 / 回滚归未来模块”的设计已失效。现行 `AgentDefinition` 仅保存 `CurrentPublishedVersionId`、`DraftVersionId` 和 `LatestPublishedVersionNumber`；运行配置全部进入 `AgentVersion.Snapshot`。每个 Agent 至多一个可编辑 Draft；发布把 Draft 固化为新的 Published 版本并原子更新当前指针；历史 Published 版本保持不可变；回滚复制历史 Snapshot 创建版本号递增的新 Published 版本，不反向修改或重新激活历史行。`IAgentVersionService` 负责草稿、发布、历史读取与回滚，`IAgentFactory.BuildAsync` 可按调用方权限构建 Draft 或 Published。下方仍引用 `CurrentVersion` 或“版本模块未起草”的段落均为被本 errata 替代的历史设计。
 >

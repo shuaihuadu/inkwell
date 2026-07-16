@@ -83,15 +83,15 @@ flowchart TD
     AUTH[H5-001 登录与锁定] --> SHELL[H5-002 公共外壳]
     SHELL --> SPACE[H5-003 Agent 空间]
     SPACE --> DESIGN[H5-004 Agent 设计]
-    AGUIBACKEND[H5-005-A 后端 AG-UI]
-    AGUIBACKEND --> CHATSDK[H5-005-B TS SDK + Ant Design X]
-    SPACE --> CHATSDK
-    CHATSDK --> CHATDATA[H5-005-C 服务端会话]
-    CHATDATA --> CHATRESILIENCE[H5-005-D 错误与锁屏恢复]
+    CHATDATA[H5-005-A 会话数据与 REST]
+    CHATDATA --> AGUIBACKEND[H5-005-B 后端 AG-UI]
+    SPACE --> CHATUI[H5-005-C TS SDK + Ant Design X]
+    AGUIBACKEND --> CHATUI
+    CHATUI --> CHATRESILIENCE[H5-005-D 错误与锁屏恢复]
     DESIGN --> VERSION[H5-006 版本管理]
-    CHATSDK --> TRACE[H5-007 调试与评测]
+    CHATUI --> TRACE[H5-007 调试与评测]
     DESIGN --> KEYS[H5-009 API Key]
-    CHATSDK --> MULTI[H5-010 多模态]
+    CHATUI --> MULTI[H5-010 多模态]
     SHELL --> ADMIN[H5-008 Admin]
     CROSS[H5-011 横切质量] -.-> SHELL
     CROSS -.-> SPACE
@@ -127,10 +127,10 @@ flowchart TD
 
 覆盖 UI-005、REQ-010 和 REQ-018 的 AG-UI 端到端路径。后端优先，正式执行前至少拆为：
 
-- H5-005-A：后端 MAF AG-UI 端点、事件契约、鉴权、心跳、错误、取消、状态兜底与集成测试。
-- H5-005-B：前端最新稳定 `@ag-ui/client` / `@ag-ui/core` + Ant Design X / XMarkdown，直接消费已验证 AG-UI 契约。
-- H5-005-C：服务端会话列表、消息加载和跨设备恢复。
-- H5-005-D：失败、取消、重试、断线兜底和锁屏期间结果累积。
+- H5-005-A：Conversation 三模型、Repository、Service、REST、原子租约与双 Provider Migration。
+- H5-005-B：真实 TypeScript SDK 发包验证 MAF AG-UI、SessionStore、HistoryProvider 与完整消息快照契约。
+- H5-005-C：Electron `@ag-ui/client` / `@ag-ui/core` + Ant Design X / XMarkdown、会话加载与跨设备恢复。
+- H5-005-D：失败、停止、重试、断线兜底、部分回复持久化和锁屏期间结果累积。
 
 ### H5-006 版本管理
 

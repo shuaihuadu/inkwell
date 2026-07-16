@@ -49,7 +49,8 @@ public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
                         TimeSpan.FromSeconds(sqlServerOptions.MaxRetryDelaySeconds),
                         errorNumbersToAdd: null)
                     .CommandTimeout(persistenceOptions.CommandTimeoutSeconds))
-                .AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
+                .AddInterceptors(sp.GetServices<ISaveChangesInterceptor>())
+                .ReplaceService<IModelCustomizer, SqlServerModelCustomizer>();
         });
 
         builder.Services.AddSingleton<IDbContextInitializer, SqlServerDbContextInitializer>();

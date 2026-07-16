@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Inkwell;
 
 /// <summary>
@@ -45,11 +43,6 @@ public sealed class InkwellOptions
     /// 获取或设置队列配置。
     /// </summary>
     public QueueOptions Queue { get; set; } = new();
-
-    /// <summary>
-    /// 获取或设置 Agent 运行配置。
-    /// </summary>
-    public AgentRunOptions AgentRuntime { get; set; } = new();
 
     /// <summary>
     /// 获取或设置向量存储配置。

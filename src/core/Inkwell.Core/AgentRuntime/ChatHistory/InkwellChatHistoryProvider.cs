@@ -14,13 +14,14 @@ namespace Inkwell;
 /// </remarks>
 internal sealed class InkwellChatHistoryProvider(
     IPersistenceProvider persistence,
-    int? maxMessagesToRetrieve = null) : ChatHistoryProvider
+    int? maxMessagesToRetrieve = null,
+    TimeProvider? timeProvider = null) : ChatHistoryProvider
 {
     internal const string SessionIdStateKey = "Inkwell.SessionId";
 
     private static readonly IReadOnlyList<string> stateKeys = [SessionIdStateKey];
 
-    private readonly IAgentSessionMessageRepository _messages = persistence.GetRepository<IAgentSessionMessageRepository>();
+    private readonly IAgentChatMessageRepository _messages = persistence.GetRepository<IAgentChatMessageRepository>();
 
     /// <inheritdoc />
     public override IReadOnlyList<string> StateKeys => stateKeys;
@@ -56,11 +57,26 @@ internal sealed class InkwellChatHistoryProvider(
             return;
         }
 
+        DateTimeOffset now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        List<AgentChatMessage> messagesToAdd = new(newMessages.Count);
+        foreach (ChatMessage message in newMessages)
+        {
+            messagesToAdd.Add(new AgentChatMessage
+            {
+                Id = Guid.CreateVersion7(),
+                ConversationId = sessionId,
+                Message = message,
+                SequenceNumber = 0,
+                CreatedTime = now,
+                UpdatedTime = now,
+            });
+        }
+
         await persistence.ExecuteInTransactionAsync(
             IsolationLevel.Serializable,
             async innerCancellationToken =>
             {
-                await this._messages.AppendMessagesAsync(sessionId, newMessages, innerCancellationToken).ConfigureAwait(false);
+                _ = await this._messages.AddMessages(messagesToAdd, innerCancellationToken).ConfigureAwait(false);
             },
             cancellationToken).ConfigureAwait(false);
     }

@@ -4,17 +4,13 @@ namespace Inkwell.Persistence.EFCore.Entities;
 
 internal sealed class AgentChatMessageEntity : IHasTimestamps
 {
-    public Guid Id { get; init; }
-
-    public Guid SessionId { get; init; }
-
-    public string Message { get; init; } = string.Empty;
-
-    public int SequenceNumber { get; init; }
-
+    public Guid Id { get; set; }
+    public Guid ConversationId { get; set; }
+    public string? RunId { get; set; }
+    public int? RunMessageIndex { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int SequenceNumber { get; set; }
     public DateTimeOffset CreatedTime { get; init; }
-
     public DateTimeOffset UpdatedTime { get; init; }
-
-    public AgentSessionEntity? Session { get; init; }
+    public AgentConversationEntity? Conversation { get; set; }
 }

@@ -21,23 +21,15 @@ internal sealed class AgentVersionService(
         AgentVersion version = await this._versions.GetVersionAsync(publishedVersionId, cancellationToken).ConfigureAwait(false);
         ValidateVersionBelongsToAgent(version, agentId);
 
-        return version.Status == AgentVersionStatus.Published
-            ? version
-            : throw new InvalidOperationException($"Current Agent version is not published: agentId={agentId}, versionId={version.Id}");
+        return version;
     }
 
-    public async Task<AgentVersion> GetPublishedVersionAsync(
+    public Task<AgentVersion> GetPublishedVersionAsync(
         Guid agentId,
         Guid versionId,
         Guid requestingUserId,
-        CancellationToken cancellationToken = default)
-    {
-        AgentVersion version = await this.GetVersionAsync(agentId, versionId, requestingUserId, cancellationToken).ConfigureAwait(false);
-
-        return version.Status == AgentVersionStatus.Published
-            ? version
-            : throw new InvalidOperationException($"Agent version is not published: agentId={agentId}, versionId={version.Id}");
-    }
+        CancellationToken cancellationToken = default) =>
+        this.GetVersionAsync(agentId, versionId, requestingUserId, cancellationToken);
 
     public async Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default)
     {
@@ -55,79 +47,35 @@ internal sealed class AgentVersionService(
         AgentDefinition agent = await this._agents.GetAgent(agentId, cancellationToken).ConfigureAwait(false);
         ValidateVisibility(agent, requestingUserId);
 
-        IReadOnlyList<AgentVersion> agentVersions = await this._versions.ListVersionsByAgentAsync(agentId, cancellationToken).ConfigureAwait(false);
-
-        return agent.OwnerUserId == requestingUserId
-            ? agentVersions
-            : [.. agentVersions.Where(version => version.Status == AgentVersionStatus.Published)];
+        return await this._versions.ListVersionsByAgentAsync(agentId, cancellationToken).ConfigureAwait(false);
     }
 
-    public Task<AgentVersion> SaveDraftAsync(
-        Guid agentId,
-        AgentSnapshot snapshot,
-        Guid actorUserId,
-        string? changeSummary = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        ValidateSnapshot(snapshot);
-
-        return persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
-        {
-            AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
-            ValidateOwnership(agent, actorUserId);
-
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-
-            if (agent.DraftVersionId is Guid draftVersionId)
-            {
-                AgentVersion draft = await this._versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
-                ValidateDraft(draft, agentId);
-
-                AgentVersion updatedDraft = draft with
-                {
-                    Snapshot = snapshot,
-                    ChangeSummary = changeSummary,
-                    UpdatedTime = now,
-                };
-
-                return await this._versions.UpdateVersionAsync(updatedDraft, innerCancellationToken).ConfigureAwait(false);
-            }
-
-            AgentVersion newDraft = CreateDraft(agent, snapshot, actorUserId, changeSummary, now);
-            AgentVersion savedDraft = await this._versions.AddVersionAsync(newDraft, innerCancellationToken).ConfigureAwait(false);
-            await this._agents.UpdateAgent(agent with { DraftVersionId = savedDraft.Id, UpdatedTime = now }, innerCancellationToken).ConfigureAwait(false);
-
-            return savedDraft;
-        }, cancellationToken);
-    }
-
-    public Task<AgentVersion> PublishDraftAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
+    public Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
         persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
         {
             AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
             ValidateOwnership(agent, actorUserId);
 
-            Guid draftVersionId = agent.DraftVersionId
-                ?? throw new InvalidOperationException($"Agent has no draft version: agentId={agentId}");
-            AgentVersion draft = await this._versions.GetVersionAsync(draftVersionId, innerCancellationToken).ConfigureAwait(false);
-            ValidateDraft(draft, agentId);
-
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            Guid versionId = Guid.CreateVersion7();
             int nextVersionNumber = checked(agent.LatestPublishedVersionNumber + 1);
-            AgentVersion published = draft with
+            AgentSnapshot snapshot = CreateSnapshot(agent);
+            AgentVersion version = new()
             {
+                Id = versionId,
+                AgentId = agentId,
                 VersionNumber = nextVersionNumber,
-                Status = AgentVersionStatus.Published,
+                Snapshot = snapshot,
+                CreatedByUserId = actorUserId,
+                CreatedTime = now,
                 UpdatedTime = now,
                 PublishedTime = now,
             };
 
-            AgentVersion savedVersion = await this._versions.UpdateVersionAsync(published, innerCancellationToken).ConfigureAwait(false);
+            AgentVersion savedVersion = await this._versions.AddVersionAsync(version, innerCancellationToken).ConfigureAwait(false);
             AgentDefinition updatedAgent = agent with
             {
                 CurrentPublishedVersionId = savedVersion.Id,
-                DraftVersionId = null,
                 LatestPublishedVersionNumber = nextVersionNumber,
                 UpdatedTime = now,
             };
@@ -147,28 +95,19 @@ internal sealed class AgentVersionService(
             AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
             ValidateOwnership(agent, actorUserId);
 
-            if (agent.DraftVersionId is not null)
-            {
-                throw new InvalidOperationException($"Agent has unpublished draft changes: agentId={agentId}");
-            }
-
             AgentVersion source = await this._versions.GetVersionAsync(sourceVersionId, innerCancellationToken).ConfigureAwait(false);
             ValidateVersionBelongsToAgent(source, agentId);
 
-            if (source.Status != AgentVersionStatus.Published)
-            {
-                throw new InvalidOperationException($"Rollback source must be published: versionId={sourceVersionId}");
-            }
-
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            Guid versionId = Guid.CreateVersion7();
             int nextVersionNumber = checked(agent.LatestPublishedVersionNumber + 1);
+            AgentSnapshot snapshot = source.Snapshot;
             AgentVersion rollbackVersion = new()
             {
-                Id = Guid.CreateVersion7(),
+                Id = versionId,
                 AgentId = agentId,
                 VersionNumber = nextVersionNumber,
-                Status = AgentVersionStatus.Published,
-                Snapshot = source.Snapshot,
+                Snapshot = snapshot,
                 CreatedByUserId = actorUserId,
                 ChangeSummary = changeSummary ?? $"Rollback from v{source.VersionNumber}",
                 CreatedTime = now,
@@ -179,6 +118,11 @@ internal sealed class AgentVersionService(
             AgentVersion savedVersion = await this._versions.AddVersionAsync(rollbackVersion, innerCancellationToken).ConfigureAwait(false);
             AgentDefinition updatedAgent = agent with
             {
+                Name = snapshot.Name,
+                AvatarUri = snapshot.AvatarUri,
+                Description = snapshot.Description,
+                Instructions = snapshot.Instructions,
+                BuildOptions = snapshot.BuildOptions,
                 CurrentPublishedVersionId = savedVersion.Id,
                 LatestPublishedVersionNumber = nextVersionNumber,
                 UpdatedTime = now,
@@ -188,33 +132,14 @@ internal sealed class AgentVersionService(
             return savedVersion;
         }, cancellationToken);
 
-    private static AgentVersion CreateDraft(
-        AgentDefinition agent,
-        AgentSnapshot snapshot,
-        Guid actorUserId,
-        string? changeSummary,
-        DateTimeOffset now) => new()
-        {
-            Id = Guid.CreateVersion7(),
-            AgentId = agent.Id,
-            VersionNumber = checked(agent.LatestPublishedVersionNumber + 1),
-            Status = AgentVersionStatus.Draft,
-            Snapshot = snapshot,
-            CreatedByUserId = actorUserId,
-            ChangeSummary = changeSummary,
-            CreatedTime = now,
-            UpdatedTime = now,
-        };
-
-    private static void ValidateDraft(AgentVersion version, Guid agentId)
+    private static AgentSnapshot CreateSnapshot(AgentDefinition agent) => new()
     {
-        ValidateVersionBelongsToAgent(version, agentId);
-
-        if (version.Status != AgentVersionStatus.Draft || version.PublishedTime is not null)
-        {
-            throw new InvalidOperationException($"Agent version is not an editable draft: versionId={version.Id}");
-        }
-    }
+        Name = agent.Name,
+        AvatarUri = agent.AvatarUri,
+        Description = agent.Description,
+        Instructions = agent.Instructions,
+        BuildOptions = agent.BuildOptions,
+    };
 
     private static void ValidateOwnership(AgentDefinition agent, Guid actorUserId)
     {
@@ -237,19 +162,6 @@ internal sealed class AgentVersionService(
         if (version.AgentId != agentId)
         {
             throw new KeyNotFoundException($"Agent version not found: agentId={agentId}, versionId={version.Id}");
-        }
-    }
-
-    private static void ValidateSnapshot(AgentSnapshot snapshot)
-    {
-        if (string.IsNullOrWhiteSpace(snapshot.Name) || snapshot.Name.Length > 50)
-        {
-            throw new ArgumentException("Agent snapshot name must be between 1 and 50 characters.", nameof(snapshot));
-        }
-
-        if (snapshot.Description is { Length: > 500 })
-        {
-            throw new ArgumentException("Agent snapshot description must not exceed 500 characters.", nameof(snapshot));
         }
     }
 }

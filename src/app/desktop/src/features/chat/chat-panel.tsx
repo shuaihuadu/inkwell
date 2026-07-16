@@ -6,10 +6,10 @@ import {
 import { Avatar, Button, Empty, Input, message, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
-import type { AgentSummary, ChatMessage } from "../../shared/network/contracts";
+import type { AgentListItem, ChatMessage } from "../../shared/network/contracts";
 
 interface ChatPanelProps {
-    agent: AgentSummary | null;
+    agent: AgentListItem | null;
 }
 
 export function ChatPanel({ agent }: ChatPanelProps) {

@@ -1,9 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-
 namespace Inkwell;
 
 /// <summary>注册 <see cref="IAgentSkillCatalogService"/> / <see cref="IAgentSkillContentResolver"/> 默认实现。</summary>

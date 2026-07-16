@@ -1,8 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
 namespace Inkwell;
@@ -69,8 +66,10 @@ public static class ModelsBuilderExtensions
         });
         builder.Services.AddSingleton<IModelRegistrySource>(serviceProvider =>
             serviceProvider.GetRequiredService<LiteLLMModelRegistrySource>());
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IModelRuntimeAgentBuilder, LiteLLMModelRuntimeAgentBuilder>());
-        builder.Services.TryAddSingleton<IAgentFactory, ModelRoutingAgentFactory>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IModelRuntimeChatClientProvider, LiteLLMModelRuntimeChatClientProvider>());
+        builder.Services.TryAddScoped<IAgentBuildOptionsResolver, AgentBuildOptionsResolver>();
+        builder.Services.TryAddScoped<IAgentFactory, ModelRoutingAgentFactory>();
+        builder.Services.TryAddScoped<IAgentBuildService, AgentBuildService>();
 
         return builder;
     }

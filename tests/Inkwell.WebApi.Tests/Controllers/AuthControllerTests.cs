@@ -3,7 +3,6 @@
 using System.Security.Claims;
 using Inkwell.WebApi.Auth;
 using Inkwell.WebApi.Controllers;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Inkwell.WebApi.Tests.Controllers;
 

@@ -27,7 +27,7 @@ import {
 import { useDeferredValue, useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
-    AgentSummary,
+    AgentListItem,
     CreateAgentRequest,
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
@@ -39,7 +39,7 @@ export function AgentWorkspace() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(search);
-    const [selectedAgent, setSelectedAgent] = useState<AgentSummary | null>(
+    const [selectedAgent, setSelectedAgent] = useState<AgentListItem | null>(
         null,
     );
     const [createOpen, setCreateOpen] = useState(false);

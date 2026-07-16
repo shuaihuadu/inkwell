@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Inkwell.Persistence.EFCore.Entities;
-
 namespace Inkwell.Persistence.EFCore.Mapping;
 
 internal static class AgentMappingExtensions
@@ -10,18 +8,24 @@ internal static class AgentMappingExtensions
     {
         ArgumentNullException.ThrowIfNull(entity);
 
+        AgentBuildOptions buildOptions = JsonSerializer.Deserialize<AgentBuildOptions>(entity.BuildOptions)
+            ?? throw new JsonException($"Agent build options are null: agentId={entity.Id}");
+
         return new AgentDefinition
         {
             Id = entity.Id,
             OwnerUserId = entity.OwnerUserId,
+            Name = entity.Name,
+            AvatarUri = entity.AvatarUri is null ? null : new Uri(entity.AvatarUri, UriKind.RelativeOrAbsolute),
+            Description = entity.Description,
+            Instructions = entity.Instructions,
+            BuildOptions = buildOptions,
             CurrentPublishedVersionId = entity.CurrentPublishedVersionId,
-            DraftVersionId = entity.DraftVersionId,
             LatestPublishedVersionNumber = entity.LatestPublishedVersionNumber,
             IsShared = entity.IsShared,
             SharedRevokedByAdminTime = entity.SharedRevokedByAdminTime,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
-            RowVersion = entity.RowVersion,
         };
     }
 
@@ -33,36 +37,18 @@ internal static class AgentMappingExtensions
         {
             Id = model.Id,
             OwnerUserId = model.OwnerUserId,
+            Name = model.Name,
+            AvatarUri = model.AvatarUri?.ToString(),
+            Description = model.Description,
+            Instructions = model.Instructions,
+            BuildOptions = JsonSerializer.Serialize(model.BuildOptions),
             CurrentPublishedVersionId = model.CurrentPublishedVersionId,
-            DraftVersionId = model.DraftVersionId,
             LatestPublishedVersionNumber = model.LatestPublishedVersionNumber,
             IsShared = model.IsShared,
             SharedRevokedByAdminTime = model.SharedRevokedByAdminTime,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
-            RowVersion = model.RowVersion,
         };
     }
 
-    /// <summary>
-    /// 将 Agent Entity 投影为业务 Model。
-    /// </summary>
-    public static IQueryable<AgentDefinition> SelectAsModel(this IQueryable<AgentEntity> source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-
-        return source.Select(entity => new AgentDefinition
-        {
-            Id = entity.Id,
-            OwnerUserId = entity.OwnerUserId,
-            CurrentPublishedVersionId = entity.CurrentPublishedVersionId,
-            DraftVersionId = entity.DraftVersionId,
-            LatestPublishedVersionNumber = entity.LatestPublishedVersionNumber,
-            IsShared = entity.IsShared,
-            SharedRevokedByAdminTime = entity.SharedRevokedByAdminTime,
-            CreatedTime = entity.CreatedTime,
-            UpdatedTime = entity.UpdatedTime,
-            RowVersion = entity.RowVersion,
-        });
-    }
 }

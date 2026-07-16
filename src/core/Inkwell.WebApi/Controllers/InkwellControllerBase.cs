@@ -1,7 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Security.Claims;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 
 namespace Inkwell.WebApi.Controllers;

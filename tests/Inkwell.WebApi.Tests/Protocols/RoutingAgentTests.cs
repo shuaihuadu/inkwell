@@ -12,22 +12,17 @@ namespace Inkwell.WebApi.Tests.Protocols;
 public sealed class RoutingAgentTests
 {
     /// <summary>
-    /// 验证已有 Session 在新版本发布后仍按创建时版本序列化和恢复。
+    /// 验证路由 Agent 只把路由和认证用户标识交给构建服务。
     /// </summary>
     [TestMethod]
-    public async Task SessionAsync_AfterNewPublish_RemainsOnOriginalVersionAsync()
+    public async Task RunAsync_ValidContext_DelegatesAgentBuildAsync()
     {
         // Arrange
         Guid agentId = Guid.CreateVersion7();
         Guid ownerUserId = Guid.CreateVersion7();
-        AgentVersion firstVersion = CreateVersion(agentId, 1);
-        AgentVersion secondVersion = CreateVersion(agentId, 2);
-        StubAgentVersionService versions = new(CreateDefinition(agentId, ownerUserId, firstVersion.Id), firstVersion, secondVersion);
-        RecordingAgentFactory factory = new();
+        RecordingAgentBuildService buildService = new();
         ServiceCollection services = new();
-        services.AddSingleton<IAgentVersionService>(versions);
-        services.AddSingleton<IAgentFactory>(factory);
-        services.AddSingleton<IAgentToolBindingResolver, EmptyToolBindingResolver>();
+        services.AddSingleton<IAgentBuildService>(buildService);
         using ServiceProvider serviceProvider = services.BuildServiceProvider();
         DefaultHttpContext httpContext = new();
         httpContext.Request.RouteValues["agentId"] = agentId.ToString();
@@ -39,58 +34,28 @@ public sealed class RoutingAgentTests
 
         // Act
         AgentSession session = await agent.CreateSessionAsync();
-        versions.Definition = CreateDefinition(agentId, ownerUserId, secondVersion.Id);
         JsonElement serializedState = await agent.SerializeSessionAsync(session);
         AgentSession restoredSession = await agent.DeserializeSessionAsync(serializedState);
+        await agent.RunAsync([new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")], restoredSession);
 
         // Assert
-        RoutingAgentSession routedSession = (RoutingAgentSession)restoredSession;
-        Assert.AreEqual(firstVersion.Id, routedSession.AgentVersionId);
-        CollectionAssert.AreEqual(
-            new[] { firstVersion.Id, firstVersion.Id, firstVersion.Id },
-            factory.BuiltVersionIds);
-        CollectionAssert.DoesNotContain(factory.BuiltVersionIds, secondVersion.Id);
+        (Guid AgentId, Guid RequestingUserId) request = buildService.Requests[0];
+        Assert.AreEqual(JsonValueKind.Object, serializedState.ValueKind);
+        Assert.HasCount(1, buildService.Requests);
+        Assert.AreEqual(agentId, request.AgentId);
+        Assert.AreEqual(ownerUserId, request.RequestingUserId);
     }
 
-    private static AgentDefinition CreateDefinition(Guid agentId, Guid ownerUserId, Guid publishedVersionId) => new()
+    private sealed class RecordingAgentBuildService : IAgentBuildService
     {
-        Id = agentId,
-        OwnerUserId = ownerUserId,
-        CurrentPublishedVersionId = publishedVersionId,
-        LatestPublishedVersionNumber = 1,
-        CreatedTime = DateTimeOffset.UtcNow,
-        UpdatedTime = DateTimeOffset.UtcNow,
-    };
+        public List<(Guid AgentId, Guid RequestingUserId)> Requests { get; } = [];
 
-    private static AgentVersion CreateVersion(Guid agentId, int versionNumber) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        AgentId = agentId,
-        VersionNumber = versionNumber,
-        Status = AgentVersionStatus.Published,
-        Snapshot = new AgentSnapshot { Name = $"agent-v{versionNumber}" },
-        CreatedByUserId = Guid.CreateVersion7(),
-        CreatedTime = DateTimeOffset.UtcNow,
-        UpdatedTime = DateTimeOffset.UtcNow,
-        PublishedTime = DateTimeOffset.UtcNow,
-    };
-
-    private sealed class EmptyToolBindingResolver : IAgentToolBindingResolver
-    {
-        public Task<IReadOnlyList<AIFunction>> ResolveAsync(IReadOnlyList<AgentToolBinding> bindings, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AIFunction>>([]);
-    }
-
-    private sealed class RecordingAgentFactory : IAgentFactory
-    {
-        public List<Guid> BuiltVersionIds { get; } = [];
-
-        public ValueTask<AIAgent> BuildAsync(
-            AgentVersion agentVersion,
-            AgentBuildOptions agentBuildOptions,
+        public ValueTask<AIAgent> BuildPublishedAsync(
+            Guid agentId,
+            Guid requestingUserId,
             CancellationToken cancellationToken = default)
         {
-            this.BuiltVersionIds.Add(agentVersion.Id);
+            this.Requests.Add((agentId, requestingUserId));
             return ValueTask.FromResult<AIAgent>(new StubAgent());
         }
     }
@@ -129,33 +94,4 @@ public sealed class RoutingAgentTests
 
     private sealed class StubAgentSession : AgentSession;
 
-    private sealed class StubAgentVersionService(
-        AgentDefinition definition,
-        params AgentVersion[] versions) : IAgentVersionService
-    {
-        public AgentDefinition Definition { get; set; } = definition;
-
-        private readonly Dictionary<Guid, AgentVersion> _versions = versions.ToDictionary(version => version.Id);
-
-        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(this._versions[this.Definition.CurrentPublishedVersionId!.Value]);
-
-        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(this._versions[versionId]);
-
-        public Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(this._versions[versionId]);
-
-        public Task<IReadOnlyList<AgentVersion>> ListVersionsAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AgentVersion> SaveDraftAsync(Guid agentId, AgentSnapshot snapshot, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AgentVersion> PublishDraftAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<AgentVersion> RollbackAsync(Guid agentId, Guid sourceVersionId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-    }
 }

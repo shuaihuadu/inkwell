@@ -1,7 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.Options;
 
 namespace Inkwell;
 

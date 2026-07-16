@@ -1,8 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-
 namespace Inkwell.WebApi.Controllers;
 
 /// <summary>

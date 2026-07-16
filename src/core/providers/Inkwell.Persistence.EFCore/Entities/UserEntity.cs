@@ -2,7 +2,7 @@
 
 namespace Inkwell.Persistence.EFCore.Entities;
 
-internal sealed class UserEntity : IHasTimestamps, IHasRowVersion
+internal sealed class UserEntity : IHasTimestamps
 {
     public Guid Id { get; init; }
 
@@ -22,5 +22,4 @@ internal sealed class UserEntity : IHasTimestamps, IHasRowVersion
 
     public DateTimeOffset UpdatedTime { get; init; }
 
-    public byte[] RowVersion { get; init; } = [];
 }

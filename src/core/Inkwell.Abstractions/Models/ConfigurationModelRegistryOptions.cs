@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Inkwell;
 
 /// <summary>配置文件模型来源；从 appsettings.json "Inkwell:Models" 段绑定。</summary>

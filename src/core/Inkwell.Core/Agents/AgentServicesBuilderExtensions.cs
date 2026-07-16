@@ -1,7 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using Microsoft.Extensions.DependencyInjection.Extensions;
-
 namespace Inkwell;
 
 /// <summary>

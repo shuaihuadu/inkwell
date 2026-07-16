@@ -1,7 +1,6 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Inkwell.WebApi.Protocols;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Inkwell.WebApi.Tests.Protocols;
 

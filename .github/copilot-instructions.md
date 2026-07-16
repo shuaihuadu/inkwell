@@ -63,8 +63,22 @@
 - 访问类成员时请使用 `this.` 前缀（主构造函数捕获的参数除外，参数本身按惯例不加 `this.`）
 - 所有异步方法的名称应以 `Async` 结尾
 - **使用显式类型，而不要使用 `var`**
+- C# 分层类型使用以下统一命名规则；名称应体现类型所属边界，不得使用 API `Request` / `Response` 类型代替领域模型或应用服务操作结果：
+  - 领域模型：`{Concept}`
+  - 持久化实体：`{Concept}Entity`
+  - API 输入：`{Concept}{Action}Request`
+  - API 通用输出：`{Concept}Response`
+  - API 列表裁剪项：`{Concept}ListItemResponse`
+  - API 详情输出：`{Concept}DetailResponse`
+  - API 分页输出：`PagedResponse<{ItemResponse}>`
+  - 应用服务操作结果：`{Concept}{Action}Result`
 - 保持代码风格一致，注意空行和缩进
 - 对于实现了 `System.IDisposable` 的类型，合理使用 `using` 关键字
+- 每个 C# 项目通过项目内的 `GlobalUsings.cs` 统一维护全局命名空间；不要在 `.csproj` 中散落 `<Using>` 项
+- `global using` 只允许用于以下两类命名空间：项目中过半源码文件稳定使用的高频基础命名空间；构成该项目基础编程模型且不会模糊模块边界的框架命名空间（例如 EF Core 项目的 `Microsoft.EntityFrameworkCore`、WebApi 项目的 MVC 基础命名空间）
+- 不追求所有源码文件“零文件级 `using`”；只被少数文件使用的专用 API 必须保留文件级 `using`，使文件依赖可直接识别，例如 EF Core Infrastructure / Metadata、Provider 专属 API、序列化、加密和反射命名空间
+- 提供扩展方法的业务或适配器命名空间原则上不得设为 `global using`，避免扩展方法对全项目隐式生效、产生解析冲突或隐藏依赖边界；例如 `Inkwell.Persistence.EFCore.Mapping` 必须由实际使用的 Repository 显式引用
+- 调整 Global Using 后必须运行对应项目的 `dotnet build`，并确保没有 `IDE0005` 冗余 using；删除文件级 using 前必须先确认命名空间已由该项目的 Global Using 覆盖
 - 合理使用 nullable 类型（项目已全局 `<Nullable>enable</Nullable>`）
 - 合理使用 `async` 操作和 `ConfigureAwait(false)`
 - 实现接口成员时合理使用 `<inheritdoc />` 继承注释，避免重复整段 XML 文档
@@ -79,6 +93,7 @@
 - 始终检查自己的代码，确保其一致性、可维护性和可测试性
 - 如果需求描述不明确或缺乏足够上下文，务必主动询问以获得澄清
 - 所有 JSON 操作仅使用 `System.Text.Json`
+- EF Core 持久化属性存储 JSON 数据时，Mapping 必须显式使用对应数据库 Provider 的原生 JSON 列类型（例如 PostgreSQL 使用 `jsonb`、SQL Server 使用 `json`），不得退化为普通文本列；属性名和列名只表达业务语义，不添加 `Json` 后缀，例如使用 `Message`、`SessionState`，不得命名为 `MessageJson`、`SessionStateJson`
 - EF Core Migration 必须通过 `dotnet ef migrations add` 由 EF Core CLI 生成，禁止手写、复制或人工创建 Migration、Designer 与 ModelSnapshot 文件；生成后仅当 EF Core CLI 无法表达必要的数据转换时，才允许对生成结果做最小调整，并必须说明原因与验证方式
 - 先确保代码质量和功能正确，最终的文档需要获取用户确认
 

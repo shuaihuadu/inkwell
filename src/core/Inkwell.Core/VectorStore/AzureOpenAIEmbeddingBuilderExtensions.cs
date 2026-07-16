@@ -3,8 +3,6 @@
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Inkwell;
 
