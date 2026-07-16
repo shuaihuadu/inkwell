@@ -8,7 +8,7 @@
 
 ## 1. 项目身份
 
-> Inkwell 基于 Microsoft Agent Framework 打造一个可直接投产、长期演进的“智能体工厂”：团队可部署给内部成员协作使用，个人以及 OPC（One Person Company）也可以独立部署给自己使用；核心能力都是自助创建 / 配置 / 使用 / 共享 LLM Agent（详见 [requirements.md §1](docs/01-requirements/requirements.md)）。
+> Inkwell 基于 Microsoft Agent Framework 打造一个可直接投产、长期演进的“智能体工作空间”：团队可部署给内部成员协作使用，个人以及 OPC（One Person Company）也可以独立部署给自己使用；核心能力都是自助创建 / 配置 / 使用 / 共享 LLM Agent（详见 [requirements.md §1](docs/01-requirements/requirements.md)）。
 
 **当前阶段**：H2（已 Approved，详见 [docs/07-reviews/2026-05-10-h2-architecture-review.md](docs/07-reviews/2026-05-10-h2-architecture-review.md)）；准备进入 H3 详细设计。
 

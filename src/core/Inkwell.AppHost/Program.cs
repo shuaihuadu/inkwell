@@ -2,6 +2,7 @@
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 int prototypePort = GetPort(builder.Configuration["Ports:Prototype"], "Ports:Prototype", 6800);
+int desktopPort = GetPort(builder.Configuration["Ports:Desktop"], "Ports:Desktop", 6888);
 int webApiPort = GetPort(builder.Configuration["Ports:WebApi"], "Ports:WebApi", 6801);
 int pgAdminPort = GetPort(builder.Configuration["Ports:PgAdmin"], "Ports:PgAdmin", 6802);
 int sqlServerPort = GetPort(builder.Configuration["Ports:SqlServer"], "Ports:SqlServer", 6803);
@@ -97,6 +98,7 @@ IResourceBuilder<ProjectResource> webApi = builder
 
 builder.AddJavaScriptApp("desktop", desktopDirectory)
     .WithRunScript("dev")
+    .WithEnvironment("INKWELL_DESKTOP_PORT", desktopPort.ToString(System.Globalization.CultureInfo.InvariantCulture))
     .WithEnvironment("INKWELL_WEBAPI_URL", webApi.GetEndpoint("http"))
     .WaitFor(webApi);
 
