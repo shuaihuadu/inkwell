@@ -3,6 +3,7 @@ import type { InkwellDesktopApi } from '../src/shared/network/contracts.js'
 
 const api: InkwellDesktopApi = {
   platform: process.platform,
+  getAppMetadata: () => ipcRenderer.invoke('inkwell:app-metadata'),
   restoreAuth: () => ipcRenderer.invoke('inkwell:restore-auth'),
   login: (request) => ipcRenderer.invoke('inkwell:login', request),
   unlock: (password) => ipcRenderer.invoke('inkwell:unlock', password),

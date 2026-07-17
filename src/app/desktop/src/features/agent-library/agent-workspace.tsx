@@ -1,6 +1,4 @@
 import {
-    AppstoreOutlined,
-    LogoutOutlined,
     PlusOutlined,
     ReloadOutlined,
     RobotOutlined,
@@ -13,14 +11,11 @@ import {
     Empty,
     Form,
     Input,
-    Layout,
     List,
-    Menu,
     Modal,
     Select,
     Skeleton,
     Tag,
-    Tooltip,
     Typography,
     message,
 } from "antd";
@@ -30,12 +25,9 @@ import type {
     AgentListItem,
     CreateAgentRequest,
 } from "../../shared/network/contracts";
-import { useAuthStore } from "../auth/auth-store";
 import { ChatPanel } from "../chat/chat-panel";
 
 export function AgentWorkspace() {
-    const identity = useAuthStore((state) => state.identity);
-    const setSnapshot = useAuthStore((state) => state.setSnapshot);
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const deferredSearch = useDeferredValue(search);
@@ -75,53 +67,10 @@ export function AgentWorkspace() {
         (model) => model.isAvailable,
     );
 
-    const logout = async (): Promise<void> => {
-        await desktopApi.logout();
-        queryClient.clear();
-        setSnapshot({ status: "anonymous", identity: null });
-    };
-
     return (
-        <Layout className="workspace-shell">
+        <>
             {contextHolder}
-            <header className="app-header">
-                <div className="app-identity">
-                    <span className="brand-mark small">I</span>
-                    <strong>Inkwell</strong>
-                </div>
-                <div className="connection-state">
-                    <span /> 服务已连接
-                </div>
-                <div className="user-actions">
-                    <Avatar>
-                        {identity?.username.slice(0, 1).toUpperCase()}
-                    </Avatar>
-                    <Typography.Text>{identity?.username}</Typography.Text>
-                    <Tooltip title="退出登录">
-                        <Button
-                            type="text"
-                            icon={<LogoutOutlined />}
-                            aria-label="退出登录"
-                            onClick={() => void logout()}
-                        />
-                    </Tooltip>
-                </div>
-            </header>
-            <Layout>
-                <aside className="app-sidebar">
-                    <Menu
-                        mode="inline"
-                        selectedKeys={["agents"]}
-                        items={[
-                            {
-                                key: "agents",
-                                icon: <AppstoreOutlined />,
-                                label: "Agent 库",
-                            },
-                        ]}
-                    />
-                </aside>
-                <main className="workspace-main">
+            <main className="workspace-main">
                     <section className="library-pane">
                         <div className="pane-heading">
                             <div>
@@ -205,8 +154,7 @@ export function AgentWorkspace() {
                         )}
                     </section>
                     <ChatPanel key={selectedAgent?.id ?? "empty"} agent={selectedAgent} />
-                </main>
-            </Layout>
+            </main>
             <Modal
                 title="新建 Agent"
                 open={createOpen}
@@ -268,6 +216,6 @@ export function AgentWorkspace() {
                     </Form.Item>
                 </Form>
             </Modal>
-        </Layout>
+        </>
     );
 }

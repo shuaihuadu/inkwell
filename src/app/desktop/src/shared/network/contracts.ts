@@ -43,6 +43,12 @@ export interface AuthSnapshot {
     identity: AuthIdentity | null;
 }
 
+export interface AppMetadata {
+    version: string;
+    buildNumber: string | null;
+    commit: string | null;
+}
+
 export interface AgentListItem {
     id: string;
     name: string;
@@ -91,6 +97,7 @@ export interface ChatRequest {
 
 export interface InkwellDesktopApi {
     platform: string;
+    getAppMetadata: () => Promise<AppMetadata>;
     restoreAuth: () => Promise<AuthSnapshot>;
     login: (request: LoginRequest) => Promise<LoginResult>;
     unlock: (password: string) => Promise<UnlockResult>;

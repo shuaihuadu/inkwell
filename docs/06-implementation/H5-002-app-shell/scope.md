@@ -9,7 +9,7 @@ authors:
 		role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-17
 upstream:
 	- NFR-001
 	- NFR-003
@@ -49,15 +49,16 @@ downstream:
 - 资源中心：工具管理、Skills 管理、模型管理三个“即将上线”占位入口。
 - 系统管理：Admin，仅 `isSuper=true` 可见。
 - 用户菜单、登出、网络状态和全局错误条。
+- 个人设置提供亮色、暗色、跟随系统，以及曜石紫、朱砂橙、碧海青三套主题色；设置在本机持久化。
 - 审计 Desktop 全部 npm 依赖，使用架构约束内的最新稳定版。
 - 升级至最新稳定的 Ant Design、`@ant-design/icons`，并完成登录/锁定页面的最小兼容调整。
-- 安装最新稳定的 Ant Design X 与 XMarkdown，但其聊天组件接线归 H5-005-B。
+- 安装最新稳定的 Ant Design X 与 XMarkdown，但其聊天组件接线归 H5-005-C。
 
 ## 5. 不做范围
 
 - Agent 卡片、搜索、删除、共享归 H5-003。
 - Agent 配置、版本、会话和 Admin 具体功能归各自实施单元。
-- Design Lab 的候选品牌主题和 mock 网络切换器不进入产品。
+- Design Lab 的 mock 网络切换器不进入产品。
 
 ## 6. 建议工程单元
 

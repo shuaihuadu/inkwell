@@ -1,6 +1,6 @@
-import { LockOutlined, LogoutOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Form, Input, Typography } from "antd";
+import { Alert, Avatar, Button, Form, Input, Space, Typography } from "antd";
 import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type { UnlockFailureCode } from "../../shared/network/contracts";
@@ -54,20 +54,20 @@ export function LockPage() {
     return (
         <main className="lock-page">
             <section className="lock-panel">
-                <div className="brand-mark small">I</div>
-                <LockOutlined className="lock-icon" />
-                <Typography.Title level={2}>Inkwell 已锁定</Typography.Title>
-                <Typography.Paragraph type="secondary">
-                    {identity?.username}，请输入密码继续。
-                </Typography.Paragraph>
-                {error && (
-                    <Alert
-                        type="error"
-                        showIcon
-                        message="无法解锁"
-                        description={error}
-                    />
-                )}
+                <Avatar
+                    size={64}
+                    icon={<UserOutlined />}
+                    className="lock-avatar"
+                />
+                <div className="lock-heading">
+                    <Typography.Title level={4}>
+                        Inkwell 已锁定
+                    </Typography.Title>
+                    <Typography.Text type="secondary">
+                        {identity?.username}，请输入密码继续
+                    </Typography.Text>
+                </div>
+                {error && <Alert type="error" showIcon message={error} />}
                 <Form<UnlockForm>
                     layout="vertical"
                     onFinish={unlock}
@@ -95,13 +95,23 @@ export function LockPage() {
                         解锁
                     </Button>
                 </Form>
-                <Button
-                    type="text"
-                    icon={<LogoutOutlined />}
-                    onClick={() => void logout()}
-                >
-                    退出登录
-                </Button>
+                <Space size={16}>
+                    <Button
+                        type="link"
+                        size="small"
+                        onClick={() => void logout()}
+                    >
+                        切换账号
+                    </Button>
+                    <Button
+                        type="link"
+                        size="small"
+                        danger
+                        onClick={() => void logout()}
+                    >
+                        登出
+                    </Button>
+                </Space>
             </section>
         </main>
     );

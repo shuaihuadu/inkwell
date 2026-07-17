@@ -4,6 +4,7 @@ import { AgentWorkspace } from './features/agent-library/agent-workspace'
 import { useAuthStore } from './features/auth/auth-store'
 import { LockPage } from './features/auth/lock-page'
 import { LoginPage } from './features/auth/login-page'
+import { WorkspaceShell } from './features/shell/workspace-shell'
 import { desktopApi } from './shared/network/desktop-api'
 
 export default function AppShell() {
@@ -52,7 +53,9 @@ export default function AppShell() {
   if (status === 'authenticated' || status === 'locked') {
     return (
       <>
-        <AgentWorkspace />
+        <WorkspaceShell>
+          <AgentWorkspace />
+        </WorkspaceShell>
         {status === 'locked' && <LockPage />}
       </>
     )
