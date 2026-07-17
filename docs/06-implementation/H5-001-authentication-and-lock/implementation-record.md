@@ -10,7 +10,7 @@ authors:
 		role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-17
 upstream:
 	- REQ-001
 	- NFR-003
@@ -37,9 +37,9 @@ downstream:
 
 ## 1. 实施状态
 
-- **结论**：主体功能已实现，验证不完整。
-- **代码基线**：当前工作区，尚未在本记录中绑定 commit。
-- **记录日期**：2026-07-15。
+- **结论**：主体功能已实现；锁定、主题化锁屏和成功解锁已有 Electron E2E，恢复边界与在途任务验证仍不完整。
+- **代码基线**：`726ebd6`。
+- **记录日期**：2026-07-17。
 
 ## 2. 上游依据
 
@@ -52,9 +52,9 @@ downstream:
 
 - `src/app/desktop/src/features/auth/login-page.tsx`：登录表单、离线状态和登录错误提示。
 - `src/app/desktop/src/features/auth/auth-store.ts`：Renderer 认证快照状态。
-- `src/app/desktop/src/features/auth/lock-page.tsx`：密码解锁和账号锁定处理。
+- `src/app/desktop/src/features/auth/lock-page.tsx`：原型对齐的主题化锁屏、密码解锁、切换账号和登出入口。
 - `src/app/desktop/src/app-shell.tsx`：认证恢复、活动上报、登录/锁定/工作区切换。
-- `src/app/desktop/electron/main.ts`：登录、会话恢复、`safeStorage` Token 持久化、登出、五分钟空闲锁定、窗口失焦锁定和系统锁屏监听。
+- `src/app/desktop/electron/main.ts`：登录、会话恢复、`safeStorage` Token 持久化、登出、五分钟空闲锁定、窗口失焦后重新计时和系统锁屏立即锁定。
 - `src/app/desktop/electron/preload.ts`：认证相关 typed IPC bridge。
 - `src/app/desktop/tests/login.spec.ts`：登录视觉基线、错误提示和登录后进入工作区的 Electron E2E。
 
@@ -62,26 +62,26 @@ downstream:
 
 | 验证项 | 命令或测试 | 结果 | 日期 |
 | --- | --- | --- | --- |
-| 登录页视觉、登录错误、成功进入工作区 | `src/app/desktop/tests/login.spec.ts` | 已有测试代码；本记录创建时未重跑 | 2026-07-15 |
+| 登录页视觉、登录错误、成功进入工作区 | `npm --prefix src/app/desktop run test:e2e` | 3 passed | 2026-07-17 |
+| 窗口失焦不立即锁定、系统锁屏、锁屏视觉和成功解锁 | `npm --prefix src/app/desktop run test:e2e` | 3 passed | 2026-07-17 |
 
 ## 5. 待补验证与实现缺口
 
 | 缺口 | 关联 AC / 风险 | 后续任务 |
 | --- | --- | --- |
 | 24 小时内重启恢复与过期边界没有独立 E2E | AC-004 | H5-001-A |
-| 自动锁定、解锁失败、账号锁定和离线解锁缺少 Electron E2E | AC-076～080 | H5-001-A |
+| 五分钟计时边界、解锁失败、账号锁定和离线解锁缺少独立 Electron E2E | AC-076～080 | H5-001-A |
 | 锁屏期间在途流、上传和转写的结果累积尚未验证 | AC-079 / OQ-017 | H5-001-B |
 | Windows 11 与 macOS 12+ Apple Silicon 矩阵尚未执行 | NFR-002 | H5-011 |
 
 ## 6. 已知偏差
 
-- `browser-window-blur` 当前立即锁定，而 NFR-003 同时描述“连续 5 分钟无操作或失焦后”；需以 ADR-011 和 UI-002 的最终语义复核。
+- 无；主窗口失焦已改为重新开始五分钟无活动计时，操作系统锁屏事件仍立即进入 UI-002。
 
 ## 7. 后续任务
 
 - 先新增 H5-001-A 测试任务，只补认证与锁定 E2E，不重写实现。
 - H5-005-D 和 H5-010 实施后，再补 H5-001-B 在途任务锁屏恢复测试。
-- 若第 4 项语义核验发现实现与 ADR-011 冲突，另开窄范围修复任务，不在 AppShell 实施中顺带修改。
 
 ## 8. 维护规则
 

@@ -9,7 +9,7 @@ authors:
         role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-17
 upstream:
     - REQ-001
     - REQ-002
@@ -56,15 +56,16 @@ downstream:
 - Agent“我的”列表、模型列表和创建 Agent 的基础调用。
 - OpenAI Chat Completions SSE 文本流。
 - 登录相关 Electron Playwright E2E。
+- Ant Design 6、Ant Design X 与 XMarkdown 依赖基线。
+- 认证后公共 AppShell、三组权限导航、占位入口和本机持久化外观设置。
 
 已知偏差：
 
 1. 新建 Agent 后立即发布，违反 REQ-015 的草稿/发布分离语义。
-2. AppShell、Agent 空间、Agent 设计和 Agent 会话尚未按已确认原型分成独立页面。
-3. 产品端仍使用 Ant Design 5；截至 2026-07-15，npm 最新稳定版为 `antd 6.5.1`、`@ant-design/icons 6.3.2`、`@ant-design/x 2.8.0`、`@ant-design/x-markdown 2.8.0`。
-4. 对话历史仅在组件内存，尚未满足 NFR-005 / AC-084。
-5. 产品端直接解析 Chat Completions chunk，尚未接入最新稳定的官方 TypeScript SDK `@ag-ui/client 0.0.57` / `@ag-ui/core 0.0.57`。
-6. 后端已经通过 MAF `MapAGUI("/agent/{agentId}", agent)` 暴露 AG-UI 端点，但与 ADR-012 中 `/api/runs` + 状态兜底端点的描述存在漂移，心跳、鉴权、错误、取消、断线兜底和集成测试尚未闭环。
+2. Agent 空间、Agent 设计和 Agent 会话尚未按已确认原型分成独立页面。
+3. 对话历史仅在组件内存，尚未满足 NFR-005 / AC-084。
+4. 产品端直接解析 Chat Completions chunk，尚未接入最新稳定的官方 TypeScript SDK `@ag-ui/client 0.0.57` / `@ag-ui/core 0.0.57`。
+5. 后端已经通过 MAF `MapAGUI("/agent/{agentId}", agent)` 暴露 AG-UI 端点，但与 ADR-012 中 `/api/runs` + 状态兜底端点的描述存在漂移，心跳、鉴权、错误、取消、断线兜底和集成测试尚未闭环。
 
 ## 3. 实施拆分原则
 
@@ -109,6 +110,8 @@ flowchart TD
 ### H5-002 公共外壳与全局体验
 
 只负责顶栏、三组两级导航、权限可见性、网络状态、全局错误条和页面容器。工具、Skills、模型入口在 v1 只显示占位，不实现管理能力。
+
+H5-002-A/B 已在 `726ebd6` 实现依赖升级、公共 AppShell、权限导航、占位入口、主题设置、关于弹层和原型对齐锁屏；H5-002-C 仅继续实现真实网络状态与全局错误映射。
 
 ### H5-003 Agent 空间与基础管理
 
