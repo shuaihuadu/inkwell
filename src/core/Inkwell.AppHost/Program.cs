@@ -38,6 +38,16 @@ IResourceBuilder<ContainerResource> observability = builder
     .WithEnvironment("GF_AUTH_ANONYMOUS_ORG_ROLE", "Admin")
     .WithEnvironment("GF_AUTH_DISABLE_LOGIN_FORM", "true");
 
+IResourceBuilder<PostgresServerResource> postgres = builder
+    .AddPostgres("postgres")
+    .WithImageTag(postgresTag)
+    .WithVolume("inkwell-postgres-data", "/var/lib/postgresql")
+    .WithPgAdmin(pgAdmin => pgAdmin
+        .WithImageTag(pgAdminTag)
+        .WithHostPort(pgAdminPort));
+IResourceBuilder<PostgresDatabaseResource> database = postgres.AddDatabase("postgres-database", "Inkwell");
+IResourceBuilder<PostgresDatabaseResource> liteLLMDatabase = postgres.AddDatabase("litellm-database", "LiteLLM");
+
 IResourceBuilder<ParameterResource> liteLLMMasterKey = builder.AddParameter("litellm-master-key", secret: true);
 IResourceBuilder<ParameterResource> seedAdminPassword = builder.AddParameter(
     "seed-admin-password",
@@ -51,15 +61,10 @@ IResourceBuilder<ContainerResource> liteLLM = builder
         "/app/config.yaml",
         isReadOnly: true)
     .WithEnvironment("LITELLM_MASTER_KEY", liteLLMMasterKey)
-    .WithArgs("--config", "/app/config.yaml");
-
-IResourceBuilder<PostgresServerResource> postgres = builder
-    .AddPostgres("postgres")
-    .WithImageTag(postgresTag)
-    .WithPgAdmin(pgAdmin => pgAdmin
-        .WithImageTag(pgAdminTag)
-        .WithHostPort(pgAdminPort));
-IResourceBuilder<PostgresDatabaseResource> database = postgres.AddDatabase("postgres-database", "Inkwell");
+    .WithEnvironment("DATABASE_URL", liteLLMDatabase.Resource.UriExpression)
+    .WithEnvironment("STORE_MODEL_IN_DB", "True")
+    .WithArgs("--config", "/app/config.yaml")
+    .WaitFor(liteLLMDatabase);
 
 IResourceBuilder<SqlServerServerResource> sqlServer = builder
     .AddSqlServer("sqlserver", port: sqlServerPort)

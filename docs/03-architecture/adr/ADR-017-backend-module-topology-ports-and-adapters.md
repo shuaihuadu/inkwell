@@ -98,9 +98,9 @@ inkwell/
 | 旧（AGENTS.md §3.1）                                                                                                                                            | 新                                                                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Inkwell.Common.*`                                                                                                                                              | `Inkwell.Abstractions`（Result / Error / Options 模型） + `Inkwell.Core`（Telemetry / Auth middleware 实现）                                                             |
-| `Inkwell.DataAccess`                                                                                                                                            | 接口 → `Inkwell.Abstractions`；实现 → `providers/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` 两 csproj                                                              |
-| `Inkwell.Cache`                                                                                                                                                 | 接口 → `Inkwell.Abstractions`；`InMemoryCacheProvider` 默认 → `Inkwell.Core`；`RedisCacheProvider` → `providers/Inkwell.Cache.Redis`                                     |
-| §队列（[ADR-018](./ADR-018-queue-abstraction-channels-default.md)）                                                                                            | 接口 `IQueueProvider` → `Inkwell.Abstractions`；`ChannelsQueueProvider` 默认 → `Inkwell.Core`；`RedisStreamQueueProvider` → `providers/Inkwell.Queue.Redis`（[OQ-A008 closed §B](../open-questions-arch.md)） |
+| `Inkwell.DataAccess`                                                                                                                                            | 接口 → `Inkwell.Abstractions`；实现 → `providers/Persistence/Inkwell.Persistence.EFCore.{SqlServer,Postgres}` 两 csproj                                                              |
+| `Inkwell.Cache`                                                                                                                                                 | 接口 → `Inkwell.Abstractions`；`InMemoryCacheProvider` 默认 → `Inkwell.Core`；`RedisCacheProvider` → `providers/Cache/Inkwell.Cache.Redis`                                     |
+| §队列（[ADR-018](./ADR-018-queue-abstraction-channels-default.md)）                                                                                            | 接口 `IQueueProvider` → `Inkwell.Abstractions`；`ChannelsQueueProvider` 默认 → `Inkwell.Core`；`RedisStreamQueueProvider` → `providers/Queue/Inkwell.Queue.Redis`（[OQ-A008 closed §B](../open-questions-arch.md)） |
 | `Inkwell.FileStorage`                                                                                                                                           | 接口 → `Inkwell.Abstractions`；`LocalFileSystemProvider` 默认 → `Inkwell.Core`；`MinIO` / `AzureBlob` → `providers/*`                                                    |
 | `Inkwell.AgentRuntime`                                                                                                                                          | **不再设置自建 Runtime facade**；`Inkwell.Abstractions` 通过 `IAgentFactory` 直接产出 MAF `AIAgent`，协议 Hosting 与 Workflow 复用同一 Agent 实例 |
 | 业务模块（Auth / Agents / Skills / KnowledgeBase / Memory / Triggers / Orchestrations / Traces / Versioning / Multimodal / Conversations / Health）             | **合进** `Inkwell.Core.<Module>` 命名空间，namespace + folder 软隔离；不再每业务一 csproj                                                                                |
@@ -251,12 +251,14 @@ grep -rn "Inkwell\.\(Auth\|Agents\|Skills\|KnowledgeBase\|Memory\|Triggers\|Orch
 >
 > | 端口 | 默认实现新位置 |
 > | --- | --- |
-> | `ICacheProvider` | `providers/Inkwell.Cache.InMemory/` |
-> | `IQueueProvider` | `providers/Inkwell.Queue.Channels/` |
-> | `IFileStorageProvider` | `providers/Inkwell.FileStorage.Local/` |
-> | Vector Store | `providers/Inkwell.VectorStore.InMemory/`（同步取代 [ADR-020](./ADR-020-vector-store-microsoft-extensions-vectordata.md) D2=C 的决定） |
+> | `ICacheProvider` | `providers/Cache/Inkwell.Cache.InMemory/` |
+> | `IQueueProvider` | `providers/Queue/Inkwell.Queue.Channels/` |
+> | `IFileStorageProvider` | `providers/FileStorage/Inkwell.FileStorage.Local/` |
+> | Vector Store | `providers/VectorStore/Inkwell.VectorStore.InMemory/`（同步取代 [ADR-020](./ADR-020-vector-store-microsoft-extensions-vectordata.md) D2=C 的决定） |
 >
 > `Inkwell.Core` 只留业务命名空间（Auth/Agents/Models/Tools/Skills/KnowledgeBase/Memory/PublicApi/Traces/Versioning/Multimodal/Conversations/Health）+ `AgentRuntime/`；不再含任何 `ICacheProvider`/`IQueueProvider`/`IFileStorageProvider`/Vector Store 的默认实现。代价：`Inkwell.WebApi`/`Inkwell.Worker`/`Inkwell.Migrator` 即便只想跑最简单的 dev 默认组合，也需要显式引用这四个新 csproj（不再有"零额外引用"的 `UseDefaults()` 捷径）。后端总 csproj 13 → 17（providers/ 8 → 12）。
+
+> **2026-07-18 errata（Provider 按能力增加一级物理目录）**：`src/core/providers/` 下的项目按 `Cache/`、`FileStorage/`、`LLM/`、`Persistence/`、`Queue/`、`VectorStore/` 六类组织。项目目录名、程序集名、命名空间和依赖方向均不改变；分类目录不构成新的模块或依赖授权。`Inkwell.LLM.LiteLLM` 随 [ADR-026](./ADR-026-model-gateway-litellm.md) 加入后，当前 Provider 为 13 个 csproj，后端总计 19 个 csproj。
 
 ## 置信度
 

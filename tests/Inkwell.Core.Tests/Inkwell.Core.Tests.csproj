@@ -8,6 +8,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\core\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\core\Inkwell.Core\Inkwell.Core.csproj" />
+        <ProjectReference Include="..\..\src\core\providers\LLM\Inkwell.LLM.LiteLLM\Inkwell.LLM.LiteLLM.csproj" />
     </ItemGroup>
 
     <ItemGroup>

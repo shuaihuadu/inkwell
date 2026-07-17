@@ -226,12 +226,12 @@ downstream: []
 - **影响范围**：[ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) `src/core/providers/` 拓扑（是否多一个 `Inkwell.Queue.Redis/` csproj）；[ADR-018](./adr/ADR-018-queue-abstraction-channels-default.md) 「接受的代价」边界；[RISK-014](./risk-analysis.md) 是否激活；H4 需要补鱼类用例的范围；[Inkwell.Triggers](../01-requirements/repo-impact-map.md) / [Inkwell.Orchestrations](../01-requirements/repo-impact-map.md) 是否能依赖「多副本 不 抢 同一任务」语义。
 - **候选答**：
   - **A**（Agent 默认推进）。**v1 不实现** `RedisStreamQueueProvider`，仅保留接口 + `ChannelsQueueProvider`。后果：ADR-018 不需重写；v1 运行时代价与当前等价；v1 范围不膊胀（[OQ-006 closed §A](../01-requirements/open-questions.md) 范围风险不加重）；HPA 开多副本时，需明确警告「同一任务可能被多副本重复拍」——该条限制进 [Inkwell.Triggers](../01-requirements/repo-impact-map.md) / [Inkwell.Orchestrations](../01-requirements/repo-impact-map.md) 的 H3 详细设计。
-  - **B**。**v1 同期实现** `RedisStreamQueueProvider`（新增 `src/core/providers/Inkwell.Queue.Redis/` csproj）。**前置条件（Owner 必须提供）**：(a) 明确 v1 触发场景（哪个 REQ / 哪个任务路径 / 哪项 SLA 在 in-process 队列下满足不了）；(b) dead-letter / retry / fairness 策略；(c) observability 指标清单。后果：RISK-014 激活；H4 补鱼 crash recovery / fairness / DLQ 用例；v1 范围膊胀。
+  - **B**。**v1 同期实现** `RedisStreamQueueProvider`（新增 `src/core/providers/Queue/Inkwell.Queue.Redis/` csproj）。**前置条件（Owner 必须提供）**：(a) 明确 v1 触发场景（哪个 REQ / 哪个任务路径 / 哪项 SLA 在 in-process 队列下满足不了）；(b) dead-letter / retry / fairness 策略；(c) observability 指标清单。后果：RISK-014 激活；H4 补鱼 crash recovery / fairness / DLQ 用例；v1 范围膊胀。
   - **C**。**现在不实现，但预起始化脚手架**（在 [Inkwell.Abstractions](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 内增补可靠性能力接口预留，如 `IDurableQueueProvider : IQueueProvider`）。后果：ADR-018 需微调 「接受的代价」；与选项 A 相比只多一个 marker 接口，运行时代价 ≈ 0。
   - **D**。其他（请显式列出）。
 - **回答**：
 
-  > 2026-05-10。接受 **B**：v1 同期实现 `RedisStreamQueueProvider`（新增 `src/core/providers/Inkwell.Queue.Redis/` csproj）。三前置条件：
+  > 2026-05-10。接受 **B**：v1 同期实现 `RedisStreamQueueProvider`（新增 `src/core/providers/Queue/Inkwell.Queue.Redis/` csproj）。三前置条件：
   >
   > - **(a) v1 触发场景**：环境对称论据——`ChannelsQueueProvider` = 开发态默认（InMemory / 单进程 / 零依赖）；`RedisStreamQueueProvider` = 集成测试 + prod 默认（与 [`IPersistenceProvider`](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) / [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) 的「InMemory dev · 真 Provider prod」拓扑对齐）。以此避免「开发期靠 Channels 跳过可靠性设计、上线才发现多副本抢同一任务」这类环境偏移 bug。
   > - **(b) dead-letter / retry / fairness 策略**：DLQ 默认 N=3 + 24h 保留期。其余依赖 [Redis Streams 内置语义](https://redis.io/docs/latest/develop/data-types/streams/)：fairness 由 [`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) consumer group 多副本公平分发；crash recovery 由 PEL（pending entries list）+ [`XCLAIM`](https://redis.io/docs/latest/commands/xclaim/) visibility timeout = 5 min 重插；retry 策略 = 指数退避 + jitter（1s 起 / max 60s）。详细实现进 [Inkwell.Queue.Redis](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 的 H3 详细设计。

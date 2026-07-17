@@ -155,7 +155,7 @@ downstream: []
 - **ADR 入口**：[ADR-022](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)
 - **status 翻转**：`proposed` → `accepted`，2026-05-11
 - **reviewers**：`[ Inkwell ]`（与 architecture.md / risk-analysis.md / tech-selection.md 一致）
-- **决策一句话**：业务命名空间通过手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`）在 `providers/Inkwell.Persistence.EFCore/Mapping/` 集中维护映射，禁外部映射库（AutoMapper / Mapperly / Mapster）。
+- **决策一句话**：业务命名空间通过手写扩展方法（`Entity.ToModel()` / `Model.ToEntity()` / `IQueryable<Entity>.SelectAsModel()`）在 `providers/Persistence/Inkwell.Persistence.EFCore/Mapping/` 集中维护映射，禁外部映射库（AutoMapper / Mapperly / Mapster）。
 - **4 条核心边界**：
   1. 业务接口（`IXxxRepository` / Service 方法）只见 Model，不见 Entity
   2. 必须三方法齐备（`ToModel` / `ToEntity` / `SelectAsModel`，后者下推为 SQL 列投影）

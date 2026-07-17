@@ -20,7 +20,7 @@ upstream:
 
 > **错误处理约定**（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) accepted by Inkwell 2026-05-11，含 [errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) 废错误码、[errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 删 `Result<T>` / `Error` 抽象）：端口层与业务层统一采用裸 `Task<T>` + .NET BCL 异常。Inkwell **不自建 `Result<T>` / `Error` 抽象** / 不自建错误码机制 / 不自建端口层异常基类；仅保留 `InkwellConfigurationException` / `InkwellBuilderException` 两个程序错误子类用于 DI 装配期校验。本 HD 与 [HD-004](HD-004-Inkwell.Abstractions-cache-port.md) 同批次起草，ADR-023 已是最终态规约，全部签名从第一版直接采用裸 `Task<T>` + BCL 异常，不存在"先 Result 后 errata"的历史包袱。
 >
-> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Queue/` 子层——`IQueueProvider` facade（4 方法：Enqueue / Dequeue / Acknowledge / NegativeAcknowledge，[ADR-018 §决策](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) 三动作最小集 + 本 HD picker 追加显式 Nack）、`MessageEnvelope<T>` DTO（含 [RISK-015](../../03-architecture/risk-analysis.md) 要求的 `TraceParent` 字段）、`QueueOptions` + Validator。**不**实现 Provider 行为（`ChannelsQueueProvider` 在 `Inkwell.Core` 独立 HD 起草；`RedisStreamQueueProvider` 在 `providers/Inkwell.Queue.Redis/` 独立 HD 起草）、**不**锁队列名命名规约（[picker Q-queuename-convention=A](#13-决策记录)：端口层只接受 `string queueName`，业务侧各自拼接，如 `kb-ingest` / `trigger-fanout`）、**不**锁重试退避算法细节（[ADR-018](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) 指数退避 1s~60s 是 `RedisStreamQueueProvider` 实现细节，留 Provider HD 决）。
+> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Queue/` 子层——`IQueueProvider` facade（4 方法：Enqueue / Dequeue / Acknowledge / NegativeAcknowledge，[ADR-018 §决策](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) 三动作最小集 + 本 HD picker 追加显式 Nack）、`MessageEnvelope<T>` DTO（含 [RISK-015](../../03-architecture/risk-analysis.md) 要求的 `TraceParent` 字段）、`QueueOptions` + Validator。**不**实现 Provider 行为（`ChannelsQueueProvider` 在 `Inkwell.Core` 独立 HD 起草；`RedisStreamQueueProvider` 在 `providers/Queue/Inkwell.Queue.Redis/` 独立 HD 起草）、**不**锁队列名命名规约（[picker Q-queuename-convention=A](#13-决策记录)：端口层只接受 `string queueName`，业务侧各自拼接，如 `kb-ingest` / `trigger-fanout`）、**不**锁重试退避算法细节（[ADR-018](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md) 指数退避 1s~60s 是 `RedisStreamQueueProvider` 实现细节，留 Provider HD 决）。
 >
 > **跨 HD 关联**：本 HD 与 [HD-001 foundation](HD-001-Inkwell.Abstractions-foundation.md)（Builder DSL / OTel 字段 / `InkwellProvidersOptions.Queue` 选择器槽位，默认值 `"Channels"`）+ [HD-004 Cache port](HD-004-Inkwell.Abstractions-cache-port.md)（同级端口模板，OTel span 命名风格对齐）形成 Abstractions 端口族的第四张 HD。**关键风险联动**：[AGENTS.md §3.4 RISK-015](../../../AGENTS.md) 要求"H4 必须补 enqueue (WebApi) → consume (Worker) → ack 跨服务集成用例"+"`MessageEnvelope` 必含 `traceparent` 字段以保 [REQ-014](../../01-requirements/requirements.md) trace 全链路跨服务不断链"——本 HD §3.2 / §5.3 / §7.3 已显式设计该字段与自动注入机制，避免成为 H4 / H5 返工点。
 
@@ -36,7 +36,7 @@ upstream:
 
 - **在内**：facade 接口 + DTO + Options
 - **不在内**：
-  - 两 Provider 实现（`ChannelsQueueProvider` 在 `Inkwell.Core` 独立 HD；`RedisStreamQueueProvider` 在 `providers/Inkwell.Queue.Redis/` 独立 HD，[ADR-018](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md)）
+  - 两 Provider 实现（`ChannelsQueueProvider` 在 `Inkwell.Core` 独立 HD；`RedisStreamQueueProvider` 在 `providers/Queue/Inkwell.Queue.Redis/` 独立 HD，[ADR-018](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md)）
   - 队列名命名规约的强制实现（`queueName` 留业务命名空间自行拼接，[picker Q-queuename-convention=A](#13-决策记录)）
   - 重试退避算法细节（指数退避 1s ~ 60s + jitter 是 `RedisStreamQueueProvider` 内部包装 [`XPENDING`](https://redis.io/docs/latest/commands/xpending/) + [`XADD`](https://redis.io/docs/latest/commands/xadd/) 的实现细节，[ADR-018](../../03-architecture/adr/ADR-018-queue-abstraction-channels-default.md)，留 Provider HD 决）
   - DLQ 消息的人工检视 / 重发管理 UI（v1 不交付，[RISK-014 残余风险](../../03-architecture/risk-analysis.md)）
@@ -239,7 +239,7 @@ src/core/Inkwell.Abstractions/
 每个 Provider csproj 提供唯一入口扩展方法：
 
 ```csharp
-// providers/Inkwell.Queue.Redis/RedisQueueBuilderExtensions.cs
+// providers/Queue/Inkwell.Queue.Redis/RedisQueueBuilderExtensions.cs
 public static class RedisQueueBuilderExtensions
 {
     public static IInkwellBuilder UseRedisQueue(
@@ -276,7 +276,7 @@ public static class ChannelsQueueBuilderExtensions
 ### 7.2 安全
 
 - `QueueOptions.EnableSensitiveDataLogging` 默认 `false`；启用后仅追加 `queue.payload_size_bytes`（大小而非内容）——**消息载荷本身永不进入 OTel**（详 [§4.3 PII 提示](#43-otel-span--字段)）
-- 凭证（Redis `ConnectionString` / 密码）由 `providers/Inkwell.Queue.Redis` 自己的子 Options 承载，**不**在本 `QueueOptions`；走 [K8s Secret](https://kubernetes.io/docs/concepts/configuration/secret/) / Compose `.env`（[OQ-A006 closed §B](../../03-architecture/open-questions-arch.md)，v1 不引 Azure Key Vault）
+- 凭证（Redis `ConnectionString` / 密码）由 `providers/Queue/Inkwell.Queue.Redis` 自己的子 Options 承载，**不**在本 `QueueOptions`；走 [K8s Secret](https://kubernetes.io/docs/concepts/configuration/secret/) / Compose `.env`（[OQ-A006 closed §B](../../03-architecture/open-questions-arch.md)，v1 不引 Azure Key Vault）
 - `MessageEnvelope.TraceParent` 是 W3C 标准公开字段（不含敏感信息，仅 trace-id / parent-id / flags），可安全跨进程传递，无需额外加密
 - Redis 端口暴露面由 [ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md) 部署拓扑约束（dev Compose 内网 / prod AKS ClusterIP 或 Azure Cache for Redis Private Endpoint），本 HD 不重复约束
 
@@ -346,9 +346,9 @@ public static class ChannelsQueueBuilderExtensions
 | Q1   | 业务命名空间禁直接 `using StackExchange.Redis`                                                                           | `rg -n -e 'using\s+StackExchange\.Redis' src/core/Inkwell.Core/` 期望 0 行                                                                                                                                                         |
 | Q2   | `IQueueProvider` 接口签名稳定                                                                                            | [PublicApiAnalyzers](https://github.com/dotnet/roslyn-analyzers/blob/main/src/PublicApiAnalyzers/PublicApiAnalyzers.Help.md) `PublicAPI.Shipped.txt` diff                                                                          |
 | Q3   | 端口层无 `Task<Result<` 残留（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)） | `rg -n -e 'Task<Result<' -e 'Task<Result>' src/core/Inkwell.Abstractions/Queue/` 期望 0 行                                                                                                                                         |
-| Q4   | 业务命名空间禁 `Result<T>` / `ErrorCodes` 引用                                                                           | `rg -n -e 'Common\.Result' -e 'Common\.Error' -e 'ErrorCodes\.' src/core/Inkwell.Core/ src/core/Inkwell.WebApi/ src/core/Inkwell.Worker/ providers/Inkwell.Queue.Redis/` 期望 0 行                                                 |
-| Q5   | 消息载荷不进 OTel（仅大小字段）                                                                                          | `rg -n -e '"queue\.payload"' -e 'queue\.payload\s*=' src/core/ providers/Inkwell.Queue.Redis/` 期望 0 行（仅 `queue.payload_size_bytes` 允许）                                                                                     |
-| Q6   | OTel span 字段名一致                                                                                                     | `rg -n -e '"queue\.provider"' -e '"queue\.name"' -e '"queue\.message_id"' -e '"queue\.consumer_group"' -e '"queue\.delivery_count"' -e '"queue\.operation_outcome"' src/core/ providers/Inkwell.Queue.Redis/` 期望全部在实现层覆盖 |
+| Q4   | 业务命名空间禁 `Result<T>` / `ErrorCodes` 引用                                                                           | `rg -n -e 'Common\.Result' -e 'Common\.Error' -e 'ErrorCodes\.' src/core/Inkwell.Core/ src/core/Inkwell.WebApi/ src/core/Inkwell.Worker/ providers/Queue/Inkwell.Queue.Redis/` 期望 0 行                                                 |
+| Q5   | 消息载荷不进 OTel（仅大小字段）                                                                                          | `rg -n -e '"queue\.payload"' -e 'queue\.payload\s*=' src/core/ providers/Queue/Inkwell.Queue.Redis/` 期望 0 行（仅 `queue.payload_size_bytes` 允许）                                                                                     |
+| Q6   | OTel span 字段名一致                                                                                                     | `rg -n -e '"queue\.provider"' -e '"queue\.name"' -e '"queue\.message_id"' -e '"queue\.consumer_group"' -e '"queue\.delivery_count"' -e '"queue\.operation_outcome"' src/core/ providers/Queue/Inkwell.Queue.Redis/` 期望全部在实现层覆盖 |
 | Q7   | `MessageEnvelope.TraceParent` 字段存在（[RISK-015](../../03-architecture/risk-analysis.md) 硬约束）                      | `rg -n 'TraceParent' src/core/Inkwell.Abstractions/Queue/MessageEnvelope.cs` 期望 ≥ 1 行                                                                                                                                           |
 
 ## 11. 待补 / 待评审

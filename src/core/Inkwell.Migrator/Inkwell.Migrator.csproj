@@ -15,8 +15,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
-        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
-        <ProjectReference Include="..\providers\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <ProjectReference Include="..\providers\Persistence\Inkwell.Persistence.EFCore.SqlServer\Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <ProjectReference Include="..\providers\Persistence\Inkwell.Persistence.EFCore.Postgres\Inkwell.Persistence.EFCore.Postgres.csproj" />
     </ItemGroup>
 
     <ItemGroup>

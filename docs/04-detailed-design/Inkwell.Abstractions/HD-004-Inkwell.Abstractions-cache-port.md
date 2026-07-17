@@ -20,7 +20,7 @@ upstream:
 
 > **错误处理约定**（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) accepted by Inkwell 2026-05-11，含 [errata·01](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata01废错误码机制改走-net-bcl-异常类型分流) 废错误码、[errata·02](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md#2026-05-11-errata02删-commonresultcs--commonerrorcs-抽象业务命名空间错误处理一律-bcl-异常) 删 `Result<T>` / `Error` 抽象）：端口层与业务层统一采用裸 `Task<T>` + .NET BCL 异常。Inkwell **不自建 `Result<T>` / `Error` 抽象** / 不自建错误码机制 / 不自建端口层异常基类；仅保留 `InkwellConfigurationException` / `InkwellBuilderException` 两个程序错误子类用于 DI 装配期校验。本 HD 起草时 ADR-023 已是最终态规约，全部签名从第一版直接采用裸 `Task<T>` + BCL 异常，不存在"先 Result 后 errata"的历史包袱。具体错误语义走 BCL 异常类型表达 + OTel [`exception.*` 五字段](https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/)，详 [HD-001 §5.3 BCL 对照表](HD-001-Inkwell.Abstractions-foundation.md#53-bcl-异常类型对照表)。
 >
-> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Cache/` 子层——`ICacheProvider` facade（7 方法：Get / Set / Remove / Exists / Increment / TryAcquireLock / ReleaseLock，[ADR-016 §决策](../../03-architecture/adr/ADR-016-cache-provider-redis.md) 列出的能力面）、`CacheEntryOptions` DTO、`CacheOptions` + Validator。**不**实现 Provider 行为（`RedisCacheProvider` 在 `providers/Inkwell.Cache.Redis/` 独立 HD 起草；`InMemoryCacheProvider` 在 `Inkwell.Core` 独立 HD 起草）、**不**锁 Key 命名规范强制机制（[picker Q-key-convention=A](#13-决策记录)：端口层只接受 `string key`，业界 `{tenant}:{module}:{purpose}:{id}` 约定留文档层建议，业务命名空间各自拼接）。
+> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Cache/` 子层——`ICacheProvider` facade（7 方法：Get / Set / Remove / Exists / Increment / TryAcquireLock / ReleaseLock，[ADR-016 §决策](../../03-architecture/adr/ADR-016-cache-provider-redis.md) 列出的能力面）、`CacheEntryOptions` DTO、`CacheOptions` + Validator。**不**实现 Provider 行为（`RedisCacheProvider` 在 `providers/Cache/Inkwell.Cache.Redis/` 独立 HD 起草；`InMemoryCacheProvider` 在 `Inkwell.Core` 独立 HD 起草）、**不**锁 Key 命名规范强制机制（[picker Q-key-convention=A](#13-决策记录)：端口层只接受 `string key`，业界 `{tenant}:{module}:{purpose}:{id}` 约定留文档层建议，业务命名空间各自拼接）。
 >
 > **跨 HD 关联**：本 HD 与 [HD-001 foundation](HD-001-Inkwell.Abstractions-foundation.md)（Builder DSL / OTel 字段 / `InkwellProvidersOptions.Cache` 选择器槽位）+ [HD-003 FileStorage port](HD-003-Inkwell.Abstractions-file-storage-port.md)（同级端口模板，OTel span 命名风格对齐）形成 Abstractions 端口族的第三张 HD。
 
@@ -36,7 +36,7 @@ upstream:
 
 - **在内**：facade 接口 + DTO + Options
 - **不在内**：
-  - 两 Provider 实现（`RedisCacheProvider` 在 `providers/Inkwell.Cache.Redis/` 独立 HD；`InMemoryCacheProvider` 在 `Inkwell.Core` 独立 HD，[ADR-016](../../03-architecture/adr/ADR-016-cache-provider-redis.md)）
+  - 两 Provider 实现（`RedisCacheProvider` 在 `providers/Cache/Inkwell.Cache.Redis/` 独立 HD；`InMemoryCacheProvider` 在 `Inkwell.Core` 独立 HD，[ADR-016](../../03-architecture/adr/ADR-016-cache-provider-redis.md)）
   - Key 命名规范的强制实现（`{tenant}:{module}:{purpose}:{id}` 留业务命名空间自行拼接，[picker Q-key-convention=A](#13-决策记录)）
   - 分布式锁续约 / 心跳机制——v1 仅 [ADR-016 §决策](../../03-architecture/adr/ADR-016-cache-provider-redis.md) 声明的 "`SET NX EX` 简单锁"，不支持锁持有期间自动延长 TTL；持锁方需在业务侧保证临界区耗时 < 锁 TTL，v2 backlog
   - Public API rate limit 的 [`PartitionedRateLimiter`](https://learn.microsoft.com/dotnet/api/system.threading.ratelimiting.partitionedratelimiter) 适配层（业务侧 `Inkwell.Core.PublicApi` HD 起草时消费本端口的 `IncrementAsync`）
@@ -238,7 +238,7 @@ src/core/Inkwell.Abstractions/
 每个 Provider csproj 提供唯一入口扩展方法：
 
 ```csharp
-// providers/Inkwell.Cache.Redis/RedisCacheBuilderExtensions.cs
+// providers/Cache/Inkwell.Cache.Redis/RedisCacheBuilderExtensions.cs
 public static class RedisCacheBuilderExtensions
 {
     public static IInkwellBuilder UseRedisCache(
@@ -276,7 +276,7 @@ public static class InMemoryCacheBuilderExtensions
 ### 7.2 安全
 
 - `CacheOptions.EnableSensitiveDataLogging` 默认 `false`；启用后仅追加 `cache.value_size_bytes`（大小而非内容）——**缓存值本身永不进入 OTel**（详 [§4.3 PII 提示](#43-otel-span--字段)）
-- 凭证（Redis `ConnectionString` / 密码）由 `providers/Inkwell.Cache.Redis` 自己的子 Options 承载，**不**在本 `CacheOptions`；走 [K8s Secret](https://kubernetes.io/docs/concepts/configuration/secret/) / Compose `.env`（[OQ-A006 closed §B](../../03-architecture/open-questions-arch.md)，v1 不引 Azure Key Vault）
+- 凭证（Redis `ConnectionString` / 密码）由 `providers/Cache/Inkwell.Cache.Redis` 自己的子 Options 承载，**不**在本 `CacheOptions`；走 [K8s Secret](https://kubernetes.io/docs/concepts/configuration/secret/) / Compose `.env`（[OQ-A006 closed §B](../../03-architecture/open-questions-arch.md)，v1 不引 Azure Key Vault）
 - 分布式锁 token 由 Provider 实现生成（建议 `Guid.CreateVersion7()`），**不可预测**——防止第三方猜测 token 抢先释放他人持有的锁
 - Redis 端口暴露面由 [ADR-005](../../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md) 部署拓扑约束（dev Compose 内网 / prod AKS ClusterIP 或 Azure Cache for Redis Private Endpoint），本 HD 不重复约束
 
@@ -345,9 +345,9 @@ public static class InMemoryCacheBuilderExtensions
 | C1   | 业务命名空间禁直接 `using StackExchange.Redis`                                                                           | `rg -n -e 'using\s+StackExchange\.Redis' src/core/Inkwell.Core/` 期望 0 行                                                                                                         |
 | C2   | `ICacheProvider` 接口签名稳定                                                                                            | [PublicApiAnalyzers](https://github.com/dotnet/roslyn-analyzers/blob/main/src/PublicApiAnalyzers/PublicApiAnalyzers.Help.md) `PublicAPI.Shipped.txt` diff                          |
 | C3   | 端口层无 `Task<Result<` 残留（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)） | `rg -n -e 'Task<Result<' -e 'Task<Result>' src/core/Inkwell.Abstractions/Cache/` 期望 0 行                                                                                         |
-| C4   | 业务命名空间禁 `Result<T>` / `ErrorCodes` 引用                                                                           | `rg -n -e 'Common\.Result' -e 'Common\.Error' -e 'ErrorCodes\.' src/core/Inkwell.Core/ src/core/Inkwell.WebApi/ src/core/Inkwell.Worker/ providers/Inkwell.Cache.Redis/` 期望 0 行 |
-| C5   | 缓存值不进 OTel（仅大小字段）                                                                                            | `rg -n -e '"cache\.value"' -e 'cache\.value\s*=' src/core/ providers/Inkwell.Cache.Redis/` 期望 0 行（仅 `cache.value_size_bytes` 允许）                                           |
-| C6   | OTel span 字段名一致                                                                                                     | `rg -n -e '"cache\.provider"' -e '"cache\.key"' -e '"cache\.ttl_seconds"' -e '"cache\.operation_outcome"' src/core/ providers/Inkwell.Cache.Redis/` 期望全部在实现层覆盖           |
+| C4   | 业务命名空间禁 `Result<T>` / `ErrorCodes` 引用                                                                           | `rg -n -e 'Common\.Result' -e 'Common\.Error' -e 'ErrorCodes\.' src/core/Inkwell.Core/ src/core/Inkwell.WebApi/ src/core/Inkwell.Worker/ providers/Cache/Inkwell.Cache.Redis/` 期望 0 行 |
+| C5   | 缓存值不进 OTel（仅大小字段）                                                                                            | `rg -n -e '"cache\.value"' -e 'cache\.value\s*=' src/core/ providers/Cache/Inkwell.Cache.Redis/` 期望 0 行（仅 `cache.value_size_bytes` 允许）                                           |
+| C6   | OTel span 字段名一致                                                                                                     | `rg -n -e '"cache\.provider"' -e '"cache\.key"' -e '"cache\.ttl_seconds"' -e '"cache\.operation_outcome"' src/core/ providers/Cache/Inkwell.Cache.Redis/` 期望全部在实现层覆盖           |
 
 ## 11. 待补 / 待评审
 

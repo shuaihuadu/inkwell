@@ -11,6 +11,7 @@ dotnet/.config
 *.user
 *.userosscache
 *.sln.docstates
+src/core/Inkwell.AppHost/appsettings.Development.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

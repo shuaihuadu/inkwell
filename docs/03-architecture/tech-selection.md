@@ -85,7 +85,7 @@ downstream:
 
 ## 4. 数据存储（ADR-004 + ADR-020 + ADR-021）
 
-- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 18）采用 Code First + EF Migration；EFCore family 物理布局为 3 csproj（1 共享 base + 2 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `providers/Inkwell.VectorStore.InMemory/`。
+- **选择**：`IPersistenceProvider` 抽象 + EF Core 10 + 两 Provider 实现（SQL Server 2025 / PostgreSQL 18）采用 Code First + EF Migration；EFCore family 物理布局为 3 csproj（1 共享 base + 2 final adapter）— [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)；向量数据：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data) 抽象，prod = [Qdrant 1.x](https://qdrant.tech/) 独立服务 (`providers/VectorStore/Inkwell.VectorStore.Qdrant/`)，dev / unit test = `providers/VectorStore/Inkwell.VectorStore.InMemory/`。
 - **为什么**：与 [Q-A4](./open-questions-arch.md) 决策一致；关系层与向量层解耦避免 Provider 切换时的“最小公倍数”约束放大；Qdrant 在 Compose / AKS 部署成熟；v1 两 Provider 抽象与 [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) 一同形成 Provider 家族模式；ADR-020 复用 M.E.VectorData 与 [ADR-003 MAF](./adr/ADR-003-agent-engine-microsoft-agent-framework.md) 生态对齐，避免重复发明轮子；ADR-021 在不重费 Migration tooling 的前提下，Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在共享 base csproj，避免两 final adapter 各自依样实体带来的语义漂移。
 - **替代方案**：两引擎都做向量 / 仅 PostgreSQL + pgvector / Azure AI Search；Inkwell 自定义 IVectorStore / 仅 Qdrant 不交付 InMemoryVectorStore；EFCore family csproj 布局备选 A-E 共 5 种（详见 [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。
 - **放弃理由**：详见 [ADR-004 §备选项](./adr/ADR-004-data-store-provider-switchable-ef-core.md) + [ADR-020 §备选项](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) + [ADR-021 §备选项](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)。
@@ -219,7 +219,7 @@ downstream:
 
 ## 20. 后端队列抽象（ADR-018）
 
-- **选择**：`IQueueProvider` 接口位于 `Inkwell.Abstractions`；**环境对称双 Provider**——`ChannelsQueueProvider`（基于 [`System.Threading.Channels`](https://learn.microsoft.com/dotnet/core/extensions/channels)，in-process）位于 `Inkwell.Core`作为 dev / unit test 默认；`RedisStreamQueueProvider`（基于 [Redis 8 Streams](https://redis.io/docs/latest/develop/data-types/streams/) consumer group）位于 `providers/Inkwell.Queue.Redis/` 独立 csproj作为 integration test / prod 默认。锁定默认：DLQ N=3 + 24h 保留；Redis Streams 内置语义（[`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) / [`XCLAIM`](https://redis.io/docs/latest/commands/xclaim/) visibility timeout = 5 min / 指数退避 1s/max 60s）；observability v1 必发 `queue_depth`。
+- **选择**：`IQueueProvider` 接口位于 `Inkwell.Abstractions`；**环境对称双 Provider**——`ChannelsQueueProvider`（基于 [`System.Threading.Channels`](https://learn.microsoft.com/dotnet/core/extensions/channels)，in-process）位于 `Inkwell.Core`作为 dev / unit test 默认；`RedisStreamQueueProvider`（基于 [Redis 8 Streams](https://redis.io/docs/latest/develop/data-types/streams/) consumer group）位于 `providers/Queue/Inkwell.Queue.Redis/` 独立 csproj作为 integration test / prod 默认。锁定默认：DLQ N=3 + 24h 保留；Redis Streams 内置语义（[`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) / [`XCLAIM`](https://redis.io/docs/latest/commands/xclaim/) visibility timeout = 5 min / 指数退避 1s/max 60s）；observability v1 必发 `queue_depth`。
 - **为什么**：（1）**环境对称原则**与其他三 Provider 家族（[`IPersistenceProvider`](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [`ICacheProvider`](./adr/ADR-016-cache-provider-redis.md) / [`IFileStorageProvider`](./adr/ADR-015-object-storage-provider-switchable.md)）一致，避免「开发期靠 in-process 跳过可靠性设计、上线才发现多副本抢同一任务」环境偏移 bug；（2）[Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) consumer group + XCLAIM 是业界成熟实践（[Sidekiq](https://github.com/sidekiq/sidekiq) / [Bull](https://github.com/OptimalBits/bull) 等众多实现都遵此拓扑），v1 不需自创可靠性抽象；（3）Owner 立场与语义一致。
 - **替代方案**：（A）不引入 `IQueueProvider`，维持 [`System.Threading.Channels`](https://learn.microsoft.com/dotnet/core/extensions/channels) + [`Microsoft.Agents.AI.DurableTask`](../../../microsoft/agent-framework/dotnet/src/Microsoft.Agents.AI.DurableTask/) 现状；（B）`IQueueProvider` 接口 + 仅 `ChannelsQueueProvider`，Redis 实现挂 OQ-A008 推迟；（D）`IQueueProvider` 包装 DurableTask 作为 thin wrapper。
 - **放弃理由**：详见 [ADR-018 §备选项](./adr/ADR-018-queue-abstraction-channels-default.md)。汇总：A 与 Owner 环境对称论据冲突；B 推迟 Redis 到 OQ 会造成 H3 期间业务代码隐含「单进程」偏见；D 是 Adapter 装饰无业务价值 + 丢失 DurableTask 的 sub-orchestration / replay 能力。
@@ -352,11 +352,11 @@ downstream:
 
 ### 21.14 模型网关（ADR-026）
 
-- **选择**：自托管 LiteLLM Proxy 作为默认模型网关；Inkwell Model Registry 聚合 LiteLLM 自动发现与 appsettings 原生模型，Agent Runtime 按 `RuntimeId` 选择连接器。
+- **选择**：自托管 LiteLLM Proxy 作为 v1 模型与路由事实源；Inkwell 通过 `ILLMProvider` 实时发现模型，通过能力分接口创建模型客户端。
 - **为什么**：把厂商 SDK、Endpoint、Deployment、API Key、重试、fallback、限流和预算从 Inkwell 核心代码中移出，同时保留 REQ-005 / REQ-006 所需的 UI 展示、能力校验、Agent 版本快照和 trace 语义。
 - **替代方案**：Inkwell 逐厂商直连 / Envoy AI Gateway / Bifrost / 直接把 LiteLLM 模型列表暴露给客户端。
 - **放弃理由**：逐厂商直连维护面最大；Envoy 更偏 Kubernetes 流量治理；Bifrost 当前采用度与运维经验需继续观察；LiteLLM 路由配置缺少 Inkwell 产品元数据，不能直接成为客户端契约。
-- **团队维护影响**：新增 LiteLLM 配置、部署和升级职责；必须维护 Registry `RemoteModelId` 与 LiteLLM `model_name` 的一致性检查和 OpenAI-compatible 协议契约测试。
+- **团队维护影响**：新增 LiteLLM 配置、部署和升级职责；必须维护模型发现、分类和 OpenAI-compatible 协议契约测试，不在 Inkwell 维护第二份模型映射。
 - **成本/性能/安全/交付**：成本中（新增关键服务和一次网络跳转）；性能影响需压测；厂商 Secret 暴露面缩小；交付中（streaming / tool calling / structured output / 取消 / 错误映射必须先通过端到端门禁）。
 
 ## 22. 自检

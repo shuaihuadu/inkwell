@@ -18,6 +18,7 @@ const api: InkwellDesktopApi = {
   },
   listAgents: () => ipcRenderer.invoke('inkwell:list-agents'),
   listModels: () => ipcRenderer.invoke('inkwell:list-models'),
+  testModel: (modelId) => ipcRenderer.invoke('inkwell:test-model', modelId),
   createAgent: (request) => ipcRenderer.invoke('inkwell:create-agent', request),
   chat: (request) => ipcRenderer.invoke('inkwell:chat', request),
   onChatDelta: (listener) => {

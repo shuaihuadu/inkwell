@@ -24,11 +24,21 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 
 本机需安装 .NET 10 SDK 和 Docker Desktop。运行 Aspire AppHost 即可启动本地开发环境：
 
+首次启动前，使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥。密钥必须以 `sk-` 开头：
+
+```bash
+dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
+```
+
+然后启动完整本地开发环境：
+
 ```bash
 git clone https://github.com/shuaihuadu/inkwell.git
 cd inkwell
 dotnet run --project src/core/Inkwell.AppHost
 ```
+
+启动后访问 LiteLLM Portal（<http://localhost:6804/ui>），使用用户名 `admin` 和上面配置的管理员密钥登录，然后在 Portal 中添加模型和供应商凭据。Portal 模型保存在独立的 LiteLLM PostgreSQL 数据库中，Inkwell 会自动发现并允许其用于基础对话；未配置能力覆盖的模型默认不声明视觉、工具调用或结构化输出能力。
 
 启动后可通过 Aspire Dashboard 查看和管理各项本地服务。默认管理员账号和密码均为 `admin`。
 

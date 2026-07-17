@@ -3,22 +3,22 @@
 namespace Inkwell.WebApi.Controllers;
 
 /// <summary>
-/// 提供模型注册表只读查询 API。
+/// 提供当前 LLM Provider 的实时模型查询和测试 API。
 /// </summary>
 [Route("api/models")]
 [Authorize(Policy = AuthorizationPolicies.RequireAuthenticatedUser)]
-public sealed class ModelsController(IModelRegistryService modelRegistry) : InkwellControllerBase
+public sealed class ModelsController(ILLMProvider llmProvider) : InkwellControllerBase
 {
     /// <summary>
-    /// 获取所有已配置或自动发现的模型。
+    /// 获取当前 Provider 可访问的全部模型。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>包含发布方、家族、能力和可用性的模型列表。</returns>
+    /// <returns>实时模型列表。</returns>
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<ModelDefinition>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<ModelDefinition>>> ListAsync(CancellationToken cancellationToken)
+    [ProducesResponseType<IReadOnlyList<LLMModel>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LLMModel>>> ListAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<ModelDefinition> models = await modelRegistry
+        IReadOnlyList<LLMModel> models = await llmProvider
             .ListModelsAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -28,17 +28,37 @@ public sealed class ModelsController(IModelRegistryService modelRegistry) : Inkw
     /// <summary>
     /// 获取指定模型。
     /// </summary>
-    /// <param name="modelId">业务模型标识。</param>
+    /// <param name="modelId">模型标识。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>模型定义。</returns>
     [HttpGet("{modelId}")]
-    [ProducesResponseType<ModelDefinition>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<ModelDefinition>> GetAsync(string modelId, CancellationToken cancellationToken)
+    [ProducesResponseType<LLMModel>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<LLMModel>> GetAsync(string modelId, CancellationToken cancellationToken)
     {
-        ModelDefinition model = await modelRegistry
+        LLMModel model = await llmProvider
             .GetModelAsync(modelId, cancellationToken)
             .ConfigureAwait(false);
 
         return this.Ok(model);
+    }
+
+    /// <summary>
+    /// 测试指定模型的连通性。
+    /// </summary>
+    /// <param name="modelId">模型标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>脱敏后的连通性测试结果。</returns>
+    [HttpPost("{modelId}/test")]
+    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [ProducesResponseType<LLMModelTestResult>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<LLMModelTestResult>> TestAsync(
+        string modelId,
+        CancellationToken cancellationToken)
+    {
+        LLMModelTestResult result = await llmProvider
+            .TestModelAsync(modelId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return this.Ok(result);
     }
 }

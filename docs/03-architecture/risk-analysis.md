@@ -49,7 +49,7 @@ downstream:
 | [RISK-016](#risk-016-inmemoryvectorstore-与-qdrant-语义偏移-microsoftextensionsvectordata-上游变化)        | 环境差异 / 上游依赖     | vector contract 用例包 + M.E.VectorData NuGet 锁定 + Qdrant only feature 标注 | 中     | [ADR-020](./adr/ADR-020-vector-store-microsoft-extensions-vectordata.md) / [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md)            |
 | [RISK-017](#risk-017-efcore-family-幂等-dataseed--schema-最小公倍数--family-例外蔓延)        | 数据层 / 依赖拓扑     | DataSeed 幂等性 + EFCore-Conditional schema + family 例外锁定 | 中     | [ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) / [ADR-004](./adr/ADR-004-data-store-provider-switchable-ef-core.md) / [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md)            |
 | [RISK-018](#risk-018-mixin-体系演进扫漏手写-mapper-模式下)        | 技术债 / 静态检查     | `MissingMixinFieldAnalyzer` 未激活占位 | 低     | [ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md) / HD-009            |
-| [RISK-019](#risk-019-litellm-关键依赖与模型目录路由漂移)        | 可用性 / 配置一致性   | 网关单点 + Model Registry 与路由双配置漂移 | 中     | [ADR-026](./adr/ADR-026-model-gateway-litellm.md) / HD-019                    |
+| [RISK-019](#risk-019-litellm-关键依赖与模型目录路由漂移)        | 可用性 / 配置一致性   | 网关单点 + 同名模型路由变更 | 中     | [ADR-026](./adr/ADR-026-model-gateway-litellm.md) / HD-019                    |
 
 ## RISK-001 Microsoft Agent Framework 成熟度
 
@@ -264,7 +264,7 @@ downstream:
 
 - **类别**：数据层 / 依赖拓扑
 - **触发条件**：[ADR-021](./adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 EFCore family = 3 csproj（1 共享 base + 2 final adapter）后，三个风险同时插足：（1）`InkwellSeeder.SeedAsync()` 默认 startup 运行，若幂等判定错误（多副本 WebApi 同时启动 / pod restart 圈 / dev 环境多次重启）会造成 seed 重复插入、唯一索引冲突、或升级版本后 seed 与 Migration 版本错位；（2）Entity 在共享 base 集中后，`OnModelCreating` 需同时兼容 SqlServer 2025 与 PostgreSQL 18 两套列型 / 索引 / 并发控制，最小公倍数 schema 会让特定引擎能力（`rowversion` / `jsonb` / `tsvector` / `xmin`）被险隐；（3）[ADR-017 §3.2](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) 依赖规则为 EFCore family 破例后，其他 family（FileStorage / Cache / Queue / VectorStore）可能提出同类诉求的 “shared base + final adapter” 软价 PR，如果没有明确准入机制会蔓延为“provider 互相引用的跳板”，最终压垮 [ADR-017](./adr/ADR-017-backend-module-topology-ports-and-adapters.md) Ports & Adapters 边界。
-- **影响范围**：[REQ-001](../01-requirements/requirements.md) ~ [REQ-017](../01-requirements/requirements.md) 全部依赖数据存储的模块（`Inkwell.Core.Auth` / `.Agents` / `.Conversations` / `.KnowledgeBase` / `.Memory` / `.Versioning` / `.Traces` 等）；`providers/Inkwell.Persistence.EFCore/` 共享 base 代码以及 SqlServer / Postgres final adapter Migration 文件；H3 [Inkwell.Abstractions HD](../04-detailed-design/) 中 `IPersistenceProvider` 接口容量化程度。
+- **影响范围**：[REQ-001](../01-requirements/requirements.md) ~ [REQ-017](../01-requirements/requirements.md) 全部依赖数据存储的模块（`Inkwell.Core.Auth` / `.Agents` / `.Conversations` / `.KnowledgeBase` / `.Memory` / `.Versioning` / `.Traces` 等）；`providers/Persistence/Inkwell.Persistence.EFCore/` 共享 base 代码以及 SqlServer / Postgres final adapter Migration 文件；H3 [Inkwell.Abstractions HD](../04-detailed-design/) 中 `IPersistenceProvider` 接口容量化程度。
 - **缓解方案（可执行）**：
   1. **幂等详细设计位**：H3 `Inkwell.Core.Persistence.Bootstrap` HD 中为 `InkwellSeeder` 明列以下三点：（i）每条 seed 记录必须按**业务唯一键**（如 `User.Email` / `Agent.Name + Owner` / `Tool.PublicName + Version`）调用 [`UPSERT` 语义](https://learn.microsoft.com/ef/core/saving/transactions)，不重建 Id；（ii）seed 与 Migration 版本一体化，所有 `Migrations/` 下含初始数据的 Migration 只面向一个版本区间，跨版本增量走 [`HasData()`](https://learn.microsoft.com/ef/core/modeling/data-seeding) + Migration；（iii）[`MigrationRunner`](https://learn.microsoft.com/ef/core/managing-schemas/migrations/applying) 启动时使用 Postgres `pg_advisory_lock` / SqlServer `sp_getapplock` 互斥锁避免多副本同时 seed。
   2. **EFCore-Conditional schema 设计公约**：H3 `InkwellDbContext.OnModelCreating` HD 中明列公约——默认只用两引擎都支持的能力（[`ConcurrencyToken`](https://learn.microsoft.com/ef/core/modeling/concurrency) / [`HasIndex().IsUnique()`](https://learn.microsoft.com/ef/core/modeling/indexes) / `nvarchar`）；如需引擎特定能力（`jsonb` / `tsvector` / `rowversion`）必须走 [`Database.IsSqlServer()` / `IsNpgsql()` 分支](https://learn.microsoft.com/ef/core/providers/) + Provider-specific extension method；该公约在 H3 [Inkwell.Core.Persistence HD](../04-detailed-design/) 中锁定，PR 走 [h3-detailed-design-reviewer](../../.he/agents/detailed-design-reviewer/) 机械化核查。
@@ -282,7 +282,7 @@ downstream:
 
 - **类别**：技术债 / 静态检查
 - **触发条件**：[ADR-022](./adr/ADR-022-entity-domain-mapper-selection.md) 锁定 Entity ↔ Model 手写 Extensions 映射后，mixin 与 mapping 文件间存在"实现某 mixin 但 mapping 未提及对应字段"的可能手误。v1 不强制落 Roslyn analyzer——未来若增加新 mixin（如 `IHasTenantId` 多租户）时，~18 个 mapper 文件需逐一 +字段 +测试——PR review 容易漏，造成运行期“某些 Entity 能存但 mapper 丢字段”隐藏错误。
-- **影响范围**：`providers/Inkwell.Persistence.EFCore/Mapping/` 下全部 `<TypeName>MappingExtensions.cs`；上游 18 个业务命名空间的 Model / `IXxxRepository` 接口。
+- **影响范围**：`providers/Persistence/Inkwell.Persistence.EFCore/Mapping/` 下全部 `<TypeName>MappingExtensions.cs`；上游 18 个业务命名空间的 Model / `IXxxRepository` 接口。
 - **缓解方案（可执行）**：
   1. **HD-009 锁定纯手动公约**：§3.9 mapping 模板明确要求每个 `<TypeName>MappingExtensions` 同时覆盖 `IHasTimestamps` / `IHasRowVersion` / `IHasOwner` 三 mixin 的全部字段；§10 C1/C2 grep 趋动化扫描 `ToModel` / `ToEntity` / `SelectAsModel` 三方法齐备。
   2. **占位 Roslyn analyzer**：`MissingMixinFieldAnalyzer`——扫描某 Entity 实现某 mixin 但 `<TypeName>MappingExtensions.ToModel` / `.ToEntity` 未提及对应字段时编译报警；analyzer 源码起 H5 任务落实，v1 不阻塞。
@@ -295,14 +295,14 @@ downstream:
 ## RISK-019 LiteLLM 关键依赖与模型目录路由漂移
 
 - **类别**：可用性 / 配置一致性
-- **触发条件**：（1）LiteLLM 不可用、过载或升级后出现协议回归，全部 Agent 模型调用被阻断；（2）Inkwell Model Registry 中 `RuntimeId=litellm` 的 `RemoteModelId` 在 LiteLLM 中不存在；（3）运维修改同名路由后，已发布 Agent 的后续调用落到不同上游模型。
+- **触发条件**：（1）LiteLLM 不可用、过载或升级后出现协议回归，模型发现和全部 Agent 模型调用被阻断；（2）Agent 保存的 `ModelId` 已从 LiteLLM 删除或改名；（3）运维修改同名路由后，已发布 Agent 的后续调用落到不同上游模型。
 - **影响范围**：所有经过 MAF Agent Factory 发起的文本、多模态、tool calling 和 structured output 调用；REQ-005 / REQ-006 / REQ-014。
 - **缓解方案（可执行）**：
-  1. 部署前检查每个可用 LiteLLM 模型的 `RemoteModelId` 均存在于 LiteLLM 发现结果，并拒绝重复或空模型标识。
+  1. 部署前通过 `ILLMProvider` 检查 Agent 使用的 `ModelId` 均存在于 LiteLLM 发现结果，并拒绝空模型标识。
   2. H4 增加 streaming、tool calling、structured output、图片、取消、429/5xx/fallback、token usage 和模型标识的端到端契约矩阵。
   3. LiteLLM 配置进入版本控制；生产路由变更必须关联发布记录并支持回滚，禁止控制台无审计热改。
   4. 配置 readiness / liveness、请求超时、并发上限和脱敏日志；压测后决定生产副本数与共享预算存储。
-  5. trace 同时记录 Inkwell `ModelId`、`SourceId`、`RuntimeId`、`RemoteModelId`、实际上游模型标识和网关请求标识（可获得时），定位 fallback 与路由漂移。
+  5. trace 记录 Agent `ModelId`、LiteLLM 返回的实际上游模型标识和网关请求标识（可获得时），定位 fallback 与路由漂移。
 - **残余风险**：v1 不复制完整 LiteLLM 路由到 Agent 快照，同名路由变化后历史 Agent 不能保证逐次完全重放；网关本身仍是新增供应链和运行时依赖。
 
 ## 1. 自检

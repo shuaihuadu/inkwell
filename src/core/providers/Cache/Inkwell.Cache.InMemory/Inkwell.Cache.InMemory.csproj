@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.Cache.InMemory</RootNamespace>
+    <AssemblyName>Inkwell.Cache.InMemory</AssemblyName>
+    <!--
+      dev / unit test 默认 ICacheProvider 实现，进程内 ConcurrentDictionary，零外部依赖（ADR-016）。
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

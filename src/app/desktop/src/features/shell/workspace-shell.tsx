@@ -33,6 +33,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
+import { ModelManagement } from "../models/model-management";
 import {
     type AppearanceMode,
     useAppearanceStore,
@@ -84,7 +85,6 @@ const navigationGroups: NavigationGroup[] = [
                 key: "models",
                 label: "模型管理",
                 icon: <ApiOutlined />,
-                placeholder: true,
             },
         ],
     },
@@ -298,7 +298,14 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     >
                         {children}
                     </div>
-                    {activeNavigation !== "agents" && (
+                    <div
+                        className="workspace-route"
+                        hidden={activeNavigation !== "models"}
+                    >
+                        <ModelManagement canTest={identity?.isSuper === true} />
+                    </div>
+                    {activeNavigation !== "agents" &&
+                        activeNavigation !== "models" && (
                         <main className="placeholder-page">
                             <Empty
                                 image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -314,7 +321,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                                 }
                             />
                         </main>
-                    )}
+                        )}
                 </div>
             </div>
 

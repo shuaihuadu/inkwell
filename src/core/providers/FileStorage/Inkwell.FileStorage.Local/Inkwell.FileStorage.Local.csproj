@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Inkwell.FileStorage.Local</RootNamespace>
+    <AssemblyName>Inkwell.FileStorage.Local</AssemblyName>
+    <!--
+      dev / unit test 默认 IFileStorageProvider 实现，本地磁盘 + sidecar 元数据文件，零外部依赖（ADR-015）。
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Inkwell.Abstractions\Inkwell.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+</Project>

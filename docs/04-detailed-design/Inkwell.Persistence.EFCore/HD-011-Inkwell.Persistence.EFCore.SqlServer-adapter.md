@@ -22,7 +22,7 @@ upstream:
 downstream: []
 ---
 
-> **范围切片**：本 HD 锁定 `providers/Inkwell.Persistence.EFCore.SqlServer/` final adapter csproj——[`Microsoft.EntityFrameworkCore.SqlServer`](https://learn.microsoft.com/ef/core/providers/sql-server/) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UseSqlServer(connectionString, configure?)`（签名已由 [HD-002 §6](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#6-builder-dsl-衔接hd-001-63) 锁定，本 HD 只实现不改签名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、SqlServer 专属 `SqlServerPersistenceOptions`（连接重试参数）、Provider 自有 `Migrations/` 目录约定。
+> **范围切片**：本 HD 锁定 `providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/` final adapter csproj——[`Microsoft.EntityFrameworkCore.SqlServer`](https://learn.microsoft.com/ef/core/providers/sql-server/) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UseSqlServer(connectionString, configure?)`（签名已由 [HD-002 §6](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md#6-builder-dsl-衔接hd-001-63) 锁定，本 HD 只实现不改签名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、SqlServer 专属 `SqlServerPersistenceOptions`（连接重试参数）、Provider 自有 `Migrations/` 目录约定。
 >
 > **不**覆盖：`Inkwell.Persistence.EFCore` shared base 的任何内容（Entity / Mapping / Repository / `EfCorePersistenceProvider` / `AuditingSaveChangesInterceptor` / `InkwellSeeder` / `MigrationRunner` 均已由 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 锁定，本 HD 只消费不重复）；Postgres final adapter → HD-012（待起草）；跨 Provider 契约测试 → HD-013（待起草）。
 >
@@ -50,13 +50,13 @@ downstream: []
 - `SqlServerDbContextInitializer.cs`（适配）——详 §3.3
 - `Migrations/`（目录，无 H3 阶段代码——详 §7）
 
-物理布局参 [file-structure.md §providers/Inkwell.Persistence.EFCore.SqlServer](../file-structure.md)。
+物理布局参 [file-structure.md §providers/Persistence/Inkwell.Persistence.EFCore.SqlServer](../file-structure.md)。
 
 ## 3. 程序文件设计
 
 ### 3.0 Inkwell.Persistence.EFCore.SqlServer.csproj
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj`
 - **职责**：声明 SqlServer final adapter 的依赖与目标框架 + Migration tooling 配置
 - **对外接口**：无（csproj 配置）
 - **内部函数或类**：无
@@ -74,7 +74,7 @@ downstream: []
 
 ### 3.1 DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs`
 - **职责**：`IInkwellBuilder` 的唯一入口扩展——注册 SqlServer `DbContextOptions`（含重试 / 超时 / MigrationsAssembly）+ base 服务 + `IDbContextInitializer` 实现 + `SqlServerPersistenceOptions`
 - **对外接口**：
   - `public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions`
@@ -103,7 +103,7 @@ downstream: []
 **完整代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs
+// src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs
 namespace Inkwell.Persistence.EFCore.SqlServer.DependencyInjection;
 
 using Microsoft.EntityFrameworkCore;
@@ -169,7 +169,7 @@ public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
 
 ### 3.2 SqlServerPersistenceOptions.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/SqlServerPersistenceOptions.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/SqlServerPersistenceOptions.cs`
 - **职责**：SqlServer 专属配置——连接重试参数；从 `appsettings.json` `"Inkwell:Persistence:SqlServer"` 段绑定（author 判断的显而易见项，非 Owner 拍板：新增专属 Options 类，比照 [HD-008 `QdrantVectorStoreOptions` / `AzureOpenAIEmbeddingOptions`](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例，不回填到共享 `PersistenceOptions`——避免跨三 Provider 共享一个只有 SqlServer / Postgres 关系型 Provider 用得到的字段）
 - **对外接口**：`public sealed class SqlServerPersistenceOptions { [Range(0, 20)] public int MaxRetryCount { get; init; } = 6; [Range(1, 300)] public int MaxRetryDelaySeconds { get; init; } = 30; }`
 - **内部函数或类**：无（纯 DTO + DataAnnotations）
@@ -186,7 +186,7 @@ public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
 
 ### 3.3 SqlServerDbContextInitializer.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/SqlServerDbContextInitializer.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/SqlServerDbContextInitializer.cs`
 - **职责**：实现 [HD-009 §3.6 `IDbContextInitializer`](HD-009-Inkwell.Persistence.EFCore-base.md#36-idbcontextinitializercs)——SqlServer 场景下走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)（应用全部待处理 Migration，含建库）
 - **对外接口**：`internal sealed class SqlServerDbContextInitializer : IDbContextInitializer` + `public Task InitializeAsync(InkwellDbContext db, CancellationToken ct = default)`
 - **内部函数或类**：无（单一方法直接委托 `db.Database.MigrateAsync(ct)`）
@@ -205,7 +205,7 @@ public static class InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions
 **完整代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore.SqlServer/SqlServerDbContextInitializer.cs
+// src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/SqlServerDbContextInitializer.cs
 namespace Inkwell.Persistence.EFCore.SqlServer;
 
 using Microsoft.EntityFrameworkCore;
@@ -253,7 +253,7 @@ internal sealed class SqlServerDbContextInitializer : IDbContextInitializer
 
 ## 7. Migrations/ 目录约定
 
-- **物理路径**：`src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Migrations/`
+- **物理路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/Migrations/`
 - **生成方式**：H5 编码任务执行期通过 [`dotnet ef migrations add Init -p Inkwell.Persistence.EFCore.SqlServer -s Inkwell.WebApi`](https://learn.microsoft.com/ef/core/cli/dotnet#dotnet-ef-migrations-add) 生成，**本 HD 不预先编写任何 Migration `.cs` 文件**——Migration 内容依赖最终锁定的全部 ~30 个 Entity（[HD-009 §3.7](HD-009-Inkwell.Persistence.EFCore-base.md#37-entitiesentityentitycs-模板--agententity-示例) 起，各业务 HD 逐步补齐），H3 阶段 Entity 尚未全部起草，生成 Migration 为时过早
 - **命名约定**：`dotnet ef migrations add` 默认产出 `<yyyyMMddHHmmss>_<Name>.cs` + `<yyyyMMddHHmmss>_<Name>.Designer.cs` + 更新 `InkwellDbContextModelSnapshot.cs`（三者均由工具生成，不手工编辑）
 - **`MigrationsAssembly`**：显式设为 `"Inkwell.Persistence.EFCore.SqlServer"`（§3.1 完整代码），确保 Migration 编译产物落在本 csproj 而非 shared base（[ADR-021 §`IPersistenceProvider` 实现唯一性](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 已给出示例代码）
@@ -299,8 +299,8 @@ builder.Services
 
 ### 11.1 测试 csproj 拓扑
 
-- 单元测试：`tests/core/providers/Inkwell.Persistence.EFCore.SqlServer.Tests/`（[MSTest.Sdk 4.x](https://github.com/microsoft/testfx) + MTP runner，与 [HD-009 §8.1](HD-009-Inkwell.Persistence.EFCore-base.md#81-测试-csproj-拓扑) 同构）——覆盖 §3.1 DI 装配 + §3.2 Options 校验（不依赖真实 SQL Server）
-- 集成测试：`tests/core/providers/Inkwell.Persistence.EFCore.SqlServer.IntegrationTests/`（[Testcontainers for .NET `mssql` 模块](https://dotnet.testcontainers.org/modules/mssql/)）——覆盖 §3.3 `MigrateAsync` + 瞬时故障重试 + §4 RowVersion 原生并发冲突场景
+- 单元测试：`tests/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer.Tests/`（[MSTest.Sdk 4.x](https://github.com/microsoft/testfx) + MTP runner，与 [HD-009 §8.1](HD-009-Inkwell.Persistence.EFCore-base.md#81-测试-csproj-拓扑) 同构）——覆盖 §3.1 DI 装配 + §3.2 Options 校验（不依赖真实 SQL Server）
+- 集成测试：`tests/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer.IntegrationTests/`（[Testcontainers for .NET `mssql` 模块](https://dotnet.testcontainers.org/modules/mssql/)）——覆盖 §3.3 `MigrateAsync` + 瞬时故障重试 + §4 RowVersion 原生并发冲突场景
 
 ### 11.2 单测分组
 
@@ -331,7 +331,7 @@ builder.Services
 CI（GitHub Actions）在 `dotnet build` 之后执行：
 
 ```bash
-ROOT=src/core/providers/Inkwell.Persistence.EFCore.SqlServer
+ROOT=src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer
 
 # C1：不引用 Inkwell.Core
 grep -rn 'ProjectReference.*Inkwell\.Core\b' "$ROOT/Inkwell.Persistence.EFCore.SqlServer.csproj" \
@@ -386,5 +386,5 @@ echo "HD-011 automation checks passed."
 
 ## 17. 同步追加跨模块文件
 
-- [`docs/04-detailed-design/file-structure.md`](../file-structure.md) — 本 HD 同会话追加 `## providers/Inkwell.Persistence.EFCore.SqlServer` 一级章节
+- [`docs/04-detailed-design/file-structure.md`](../file-structure.md) — 本 HD 同会话追加 `## providers/Persistence/Inkwell.Persistence.EFCore.SqlServer` 一级章节
 - 本 HD **不**追加 `database-design.md`（SqlServer 不引入新表结构，schema 沿用 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 已锁定的 Entity 定义）/ **不**追加 `api-design.md`（本 HD 不含 HTTP/RPC 端点）

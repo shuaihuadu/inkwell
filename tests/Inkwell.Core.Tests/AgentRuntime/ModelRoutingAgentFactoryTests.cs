@@ -1,72 +1,53 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Microsoft.Extensions.Options;
+
 namespace Inkwell.Core.Tests.AgentRuntime;
 
 /// <summary>
-/// 验证模型 Registry 到 MAF 运行时连接器的路由行为。
+/// 验证 LLM Provider 到 MAF Agent 的构建行为。
 /// </summary>
 [TestClass]
 public sealed class ModelRoutingAgentFactoryTests
 {
     /// <summary>
-    /// 验证可用模型会按 RuntimeId 路由到对应连接器。
+    /// 验证 Chat 模型使用同一模型标识创建聊天客户端。
     /// </summary>
     [TestMethod]
-    public async Task BuildAsync_WithAvailableModel_RoutesByRuntimeIdAsync()
+    public async Task BuildAsync_WithChatModel_CreatesChatClientAsync()
     {
         // Arrange
-        ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: true);
-        StubModelRuntimeChatClientProvider azureRuntime = new("azure-openai");
-        StubModelRuntimeChatClientProvider liteLLMRuntime = new("litellm");
-        ModelRoutingAgentFactory factory = CreateFactory(model, [azureRuntime, liteLLMRuntime]);
-        AgentVersion version = CreateVersion(model.Id);
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        StubChatLLMProvider chatProvider = new();
+        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
-        AIAgent agent = await factory.BuildAsync(version);
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
 
         // Assert
         Assert.IsNotNull(agent);
-        Assert.IsFalse(azureRuntime.WasCalled);
-        Assert.IsTrue(liteLLMRuntime.WasCalled);
-        Assert.AreSame(model, liteLLMRuntime.Model);
+        Assert.AreEqual(model.Id, chatProvider.ModelId);
+        Assert.AreEqual(1, chatProvider.CallCount);
     }
 
     /// <summary>
-    /// 验证已发现但元数据未补齐的模型不会进入 MAF 调用层。
+    /// 验证非 Chat 分类不会进入聊天客户端创建层。
     /// </summary>
     [TestMethod]
-    public async Task BuildAsync_WithUnavailableModel_ThrowsBeforeRuntimeAsync()
+    public async Task BuildAsync_WithNonChatCategory_ThrowsBeforeCreatingClientAsync()
     {
         // Arrange
-        ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: false);
-        StubModelRuntimeChatClientProvider runtime = new("litellm");
-        ModelRoutingAgentFactory factory = CreateFactory(model, [runtime]);
+        LLMModel model = CreateModel("text-embedding-3-large", LLMModelCategory.Embedding);
+        StubChatLLMProvider chatProvider = new();
+        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => factory.BuildAsync(CreateVersion(model.Id)).AsTask());
 
         // Assert
-        StringAssert.Contains(exception.Message, "metadata is incomplete");
-        Assert.IsFalse(runtime.WasCalled);
-    }
-
-    /// <summary>
-    /// 验证模型声明了未注册的 RuntimeId 时返回明确错误。
-    /// </summary>
-    [TestMethod]
-    public async Task BuildAsync_WithUnknownRuntime_ThrowsAsync()
-    {
-        // Arrange
-        ModelDefinition model = CreateModel("claude", "anthropic-native", isAvailable: true);
-        ModelRoutingAgentFactory factory = CreateFactory(model, []);
-
-        // Act
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => factory.BuildAsync(CreateVersion(model.Id)).AsTask());
-
-        // Assert
-        StringAssert.Contains(exception.Message, "anthropic-native");
+        StringAssert.Contains(exception.Message, "category is 'Embedding'");
+        Assert.AreEqual(0, chatProvider.CallCount);
     }
 
     /// <summary>
@@ -76,18 +57,17 @@ public sealed class ModelRoutingAgentFactoryTests
     public async Task BuildAsync_WithSkillDefinitions_ResolvesRuntimeObjectsAsync()
     {
         // Arrange
-        ModelDefinition model = CreateModel("qwen", "litellm", isAvailable: true);
-        StubModelRuntimeChatClientProvider runtime = new("litellm");
-        ModelRoutingAgentFactory factory = CreateFactory(model, [runtime]);
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        StubChatLLMProvider chatProvider = new();
+        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
         AgentBuildOptions buildOptions = new()
         {
             ModelOptions = new AgentModelOptions { ModelId = model.Id },
             Skills = [CreateSkillDefinition()],
         };
-        AgentVersion version = CreateVersion(model.Id, buildOptions);
 
         // Act
-        AIAgent agent = await factory.BuildAsync(version);
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id, buildOptions));
 
         // Assert
         ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
@@ -96,21 +76,15 @@ public sealed class ModelRoutingAgentFactoryTests
         Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
     }
 
-    private static ModelDefinition CreateModel(string id, string runtimeId, bool isAvailable) => new()
+    private static LLMModel CreateModel(string id, LLMModelCategory category) => new()
     {
         Id = id,
-        DisplayName = id,
-        SourceId = runtimeId == "litellm" ? "litellm" : "configuration",
-        RuntimeId = runtimeId,
-        RemoteModelId = id,
-        IsAvailable = isAvailable,
-        UnavailableReason = isAvailable ? null : "Model metadata is incomplete.",
+        Category = category,
+        ProviderMode = category == LLMModelCategory.Chat ? "chat" : "embedding",
     };
 
-    private static ModelRoutingAgentFactory CreateFactory(
-        ModelDefinition model,
-        IEnumerable<IModelRuntimeChatClientProvider> runtimeClientProviders) =>
-        new(new StubModelRegistryService(model), runtimeClientProviders, new StubPersistenceProvider());
+    private static ModelRoutingAgentFactory CreateFactory(LLMModel model, StubChatLLMProvider chatProvider) =>
+        new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider());
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
@@ -149,33 +123,42 @@ public sealed class ModelRoutingAgentFactoryTests
         };
     }
 
-    private sealed class StubModelRegistryService(ModelDefinition model) : IModelRegistryService
+    private sealed class StubLLMProvider(LLMModel model) : ILLMProvider
     {
-        public Task<IReadOnlyList<ModelDefinition>> ListModelsAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ModelDefinition>>([model]);
+        public Task<IReadOnlyList<LLMModel>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LLMModel>>([model]);
 
-        public Task<ModelDefinition> GetModelAsync(string modelId, CancellationToken cancellationToken = default) =>
+        public Task<LLMModel> GetModelAsync(string modelId, CancellationToken cancellationToken = default) =>
             Task.FromResult(model);
+
+        public Task<LLMModelTestResult> TestModelAsync(
+            string modelId,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
-    private sealed class StubModelRuntimeChatClientProvider(string runtimeId) : IModelRuntimeChatClientProvider
+    private sealed class StubChatLLMProvider : IChatLLMProvider
     {
-        public string RuntimeId => runtimeId;
-
-        public bool WasCalled { get; private set; }
-
-        public ModelDefinition? Model { get; private set; }
-
-        public IChatClient GetChatClient(ModelDefinition model)
+        private static readonly HttpClient client = new()
         {
-            this.WasCalled = true;
-            this.Model = model;
-            AzureOpenAIModelRuntimeChatClientProvider provider = new(new AzureOpenAICredential
-            {
-                Endpoint = "https://example.openai.azure.com",
-                ApiKey = "test-api-key",
-            });
-            return provider.GetChatClient(model);
+            BaseAddress = new Uri("https://litellm.example/"),
+        };
+
+        public int CallCount { get; private set; }
+
+        public string? ModelId { get; private set; }
+
+        public IChatClient CreateChatClient(string modelId)
+        {
+            this.CallCount++;
+            this.ModelId = modelId;
+            LiteLLMProvider provider = new(
+                client,
+                Options.Create(new LiteLLMOptions
+                {
+                    Endpoint = new Uri("https://litellm.example/"),
+                    ApiKey = "test-key",
+                }));
+            return provider.CreateChatClient(modelId);
         }
     }
 

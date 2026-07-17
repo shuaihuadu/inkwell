@@ -39,8 +39,8 @@ public sealed class InkwellProvidersOptions
     public string VectorStore { get; set; } = "InMemory";
 
     /// <summary>
-    /// 获取或设置 Agent Runtime Provider 名称。
+    /// 获取或设置 LLM Provider 名称。
     /// </summary>
     [Required]
-    public string AgentRuntime { get; set; } = "AzureOpenAI";
+    public string LLM { get; set; } = "LiteLLM";
 }

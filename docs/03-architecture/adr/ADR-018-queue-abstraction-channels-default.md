@@ -77,7 +77,7 @@ public sealed record QueueMessage<T>(string Id, T Payload, int DeliveryCount);
 
 ### 分布式实现：`RedisStreamQueueProvider`（v1 同期出 csproj）
 
-`providers/Inkwell.Queue.Redis/` **v1 同期出 csproj**（[OQ-A008 closed §B](../open-questions-arch.md)）。锁定设计点（实现详细留 H3 HD）：
+`providers/Queue/Inkwell.Queue.Redis/` **v1 同期出 csproj**（[OQ-A008 closed §B](../open-questions-arch.md)）。锁定设计点（实现详细留 H3 HD）：
 
 - **底层**：[Redis 8 Streams](https://redis.io/docs/latest/develop/data-types/streams/) + consumer group；与 [ADR-016 ICacheProvider](./ADR-016-cache-provider-redis.md) **可复用同一 Redis 实例**（不同 db number）也可独立部署。具体由 H3 [Inkwell.Queue.Redis](./ADR-017-backend-module-topology-ports-and-adapters.md) HD 决。
 - **默认 DLQ**：N=3（消费失败三次后转入 `<queueName>:dlq` stream）；保留 24h；DLQ 消息走 [`MAXLEN ~ N`](https://redis.io/docs/latest/commands/xadd/) trim。
@@ -131,7 +131,7 @@ public sealed record QueueMessage<T>(string Id, T Payload, int DeliveryCount);
 ### 负面
 
 - v1 同期交付 `RedisStreamQueueProvider` 带来附加工作量：
-  1. 新增 `providers/Inkwell.Queue.Redis/` csproj + `tests/core/providers/Inkwell.Queue.Redis.Tests/`。
+  1. 新增 `providers/Queue/Inkwell.Queue.Redis/` csproj + `tests/core/providers/Queue/Inkwell.Queue.Redis.Tests/`。
   2. [RISK-014](../risk-analysis.md) 从「占位」激活为「已激活」；observability 指标仅 v1 发 `queue_depth`，其余（`queue_consume_latency_p95` / `queue_dlq_count` / `queue_consumer_lag` / `queue_redelivery_count` / `queue_consumer_active`）进残余风险，prod 上线前补齐。
   3. [`ADR-005`](./ADR-005-deployment-docker-compose-aks.md) Compose / AKS 需明确 Redis 实例是否复用（与 [ADR-016 cache](./ADR-016-cache-provider-redis.md) 同一 Redis 不同 db number） vs 各自独立部署——H3 [Inkwell.Queue.Redis](./ADR-017-backend-module-topology-ports-and-adapters.md) HD 决。
   4. [`ADR-013`](./ADR-013-observability-otel-self-hosted-grafana.md) metrics 需补 `inkwell_queue_depth`（v1 必发），其余同上。

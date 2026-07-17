@@ -89,7 +89,6 @@
         <File Path="docs/04-detailed-design/Inkwell.Core/HD-015-Inkwell.Core.Agents.md" />
         <File Path="docs/04-detailed-design/Inkwell.Core/HD-016-Inkwell.Core.Tools.md" />
         <File Path="docs/04-detailed-design/Inkwell.Core/HD-017-Inkwell.Core.Conversations.md" />
-        <File Path="docs/04-detailed-design/Inkwell.Core/HD-019-Inkwell.Core.Models.md" />
         <File Path="docs/04-detailed-design/Inkwell.Core/HD-020-Inkwell.Core.Skills.md" />
     </Folder>
     <Folder Name="/docs/04-detailed-design/Inkwell.Persistence.EFCore/">
@@ -130,19 +129,30 @@
         <Project Path="src/core/Inkwell.WebApi/Inkwell.WebApi.csproj" />
         <Project Path="src/core/Inkwell.Worker/Inkwell.Worker.csproj" />
     </Folder>
-    <Folder Name="/src/core/providers/">
-        <Project Path="src/core/providers/Inkwell.Cache.InMemory/Inkwell.Cache.InMemory.csproj" />
-        <Project Path="src/core/providers/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.Local/Inkwell.FileStorage.Local.csproj" />
-        <Project Path="src/core/providers/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
-        <Project Path="src/core/providers/Inkwell.Persistence.EFCore/Inkwell.Persistence.EFCore.csproj" />
-        <Project Path="src/core/providers/Inkwell.Queue.Channels/Inkwell.Queue.Channels.csproj" />
-        <Project Path="src/core/providers/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
-        <Project Path="src/core/providers/Inkwell.VectorStore.InMemory/Inkwell.VectorStore.InMemory.csproj" />
-        <Project Path="src/core/providers/Inkwell.VectorStore.Qdrant/Inkwell.VectorStore.Qdrant.csproj" />
+    <Folder Name="/src/core/providers/Cache/">
+        <Project Path="src/core/providers/Cache/Inkwell.Cache.InMemory/Inkwell.Cache.InMemory.csproj" />
+        <Project Path="src/core/providers/Cache/Inkwell.Cache.Redis/Inkwell.Cache.Redis.csproj" />
+    </Folder>
+    <Folder Name="/src/core/providers/FileStorage/">
+        <Project Path="src/core/providers/FileStorage/Inkwell.FileStorage.AzureBlob/Inkwell.FileStorage.AzureBlob.csproj" />
+        <Project Path="src/core/providers/FileStorage/Inkwell.FileStorage.Local/Inkwell.FileStorage.Local.csproj" />
+        <Project Path="src/core/providers/FileStorage/Inkwell.FileStorage.MinIO/Inkwell.FileStorage.MinIO.csproj" />
+    </Folder>
+    <Folder Name="/src/core/providers/LLM/">
+        <Project Path="src/core/providers/LLM/Inkwell.LLM.LiteLLM/Inkwell.LLM.LiteLLM.csproj" />
+    </Folder>
+    <Folder Name="/src/core/providers/Persistence/">
+        <Project Path="src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj" />
+        <Project Path="src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/Inkwell.Persistence.EFCore.SqlServer.csproj" />
+        <Project Path="src/core/providers/Persistence/Inkwell.Persistence.EFCore/Inkwell.Persistence.EFCore.csproj" />
+    </Folder>
+    <Folder Name="/src/core/providers/Queue/">
+        <Project Path="src/core/providers/Queue/Inkwell.Queue.Channels/Inkwell.Queue.Channels.csproj" />
+        <Project Path="src/core/providers/Queue/Inkwell.Queue.Redis/Inkwell.Queue.Redis.csproj" />
+    </Folder>
+    <Folder Name="/src/core/providers/VectorStore/">
+        <Project Path="src/core/providers/VectorStore/Inkwell.VectorStore.InMemory/Inkwell.VectorStore.InMemory.csproj" />
+        <Project Path="src/core/providers/VectorStore/Inkwell.VectorStore.Qdrant/Inkwell.VectorStore.Qdrant.csproj" />
     </Folder>
 
     <Folder Name="/tests/">

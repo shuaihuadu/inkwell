@@ -63,8 +63,8 @@ export function AgentWorkspace() {
             .toLocaleLowerCase()
             .includes(deferredSearch.trim().toLocaleLowerCase()),
     );
-    const availableModels = (modelsQuery.data ?? []).filter(
-        (model) => model.isAvailable,
+    const chatModels = (modelsQuery.data ?? []).filter(
+        (model) => model.category === "Chat",
     );
 
     return (
@@ -192,13 +192,13 @@ export function AgentWorkspace() {
                         <Select
                             loading={modelsQuery.isLoading}
                             placeholder={
-                                availableModels.length
+                                chatModels.length
                                     ? "选择模型"
                                     : "暂无可用模型"
                             }
-                            options={availableModels.map((model) => ({
+                            options={chatModels.map((model) => ({
                                 value: model.id,
-                                label: `${model.displayName} · ${model.publisherDisplayName ?? model.sourceId}`,
+                                label: `${model.id} · ${model.ownedBy ?? "未知来源"}`,
                             }))}
                         />
                     </Form.Item>

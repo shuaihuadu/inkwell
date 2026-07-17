@@ -7,7 +7,7 @@ authors:
     role: agent
 reviewers: []
 created: 2026-07-13
-updated: 2026-07-13
+updated: 2026-07-17
 upstream:
   - REQ-005
   - REQ-006
@@ -19,163 +19,125 @@ downstream:
   - HD-019
 ---
 
-# ADR-026 模型网关：LiteLLM Proxy
+# ADR-026 模型接入端口与 LiteLLM Provider
 
 ## 上下文
 
-Inkwell 需要支持 Azure OpenAI，并为 OpenAI、Anthropic、Qwen、智谱等模型厂商保留接入能力。原设计让 `Inkwell.Core.AgentRuntime` 直接装配各厂商客户端，同时由 Inkwell 配置 Endpoint、Deployment、API Key、重试和降级顺序。该方案会把厂商 SDK、认证方式、限流语义和故障转移逻辑持续引入 Agent Runtime。
+Inkwell 的模型管理页、Agent 设计页和 Agent 执行都需要使用同一份实时模型信息。模型的 Endpoint、Deployment、API Key、路由、重试、fallback 和预算由 LiteLLM Portal 管理；Inkwell 不应再保存一份模型目录或上游连接配置。
 
-[HD-019](../../04-detailed-design/Inkwell.Core/HD-019-Inkwell.Core.Models.md) 已定义配置驱动的模型目录。该目录还承担 UI 模型选择、能力校验、Agent 版本快照和 trace 展示职责，不能由基础设施网关配置直接替代。
+同时，未来可能需要不经过 LiteLLM，直接接入 Azure OpenAI、Anthropic 或 Qwen。业务代码不能依赖某个厂商 SDK，也不能把 Chat、Embedding、图片生成和视频生成强塞进一个只有 Chat 语义的接口。
 
 ## 决策
 
-**Inkwell v1 默认使用自托管 LiteLLM Proxy 作为模型网关，并保留显式配置的原生运行时连接作为例外路径。`IModelRegistryService` 聚合 LiteLLM 自动发现与 appsettings 原生模型；MAF `IAgentFactory` 根据模型的 `RuntimeId` 选择连接器并执行实际调用。**
+**在 `Inkwell.Abstractions` 定义 `ILLMProvider` 模型发现端口，并按执行能力拆分 `IChatLLMProvider`、`IEmbeddingLLMProvider`、`IImageGenerationLLMProvider` 和 `IVideoGenerationLLMProvider`。v1 只注册 `LiteLLMProvider`；模型列表实时读取 LiteLLM，Agent 仅持久化 `modelId`。**
 
 ```mermaid
 flowchart LR
-    Registry["Inkwell Model Registry<br/>多来源聚合与产品元数据"]
-    LiteSource["LiteLLM /v1/models<br/>自动发现"]
-    ConfigSource["appsettings<br/>原生模型"]
-    Snapshot["AgentVersion Snapshot<br/>逻辑 ModelId + 参数"]
-    Runtime["MAF Agent Factory<br/>按 RuntimeId 路由"]
-    Gateway["LiteLLM Proxy<br/>路由 / 重试 / fallback / 限流"]
-    Native["显式原生连接<br/>例如 Azure OpenAI"]
-    Providers["Azure OpenAI / OpenAI / Anthropic<br/>Qwen / 智谱等 Provider"]
+    Portal["LiteLLM Portal<br/>模型与路由事实源"]
+    API["ModelsController<br/>只读列表 / 连通性测试"]
+    Design["Agent 设计<br/>保存 modelId"]
+    Factory["MAF Agent Factory"]
+    Port["ILLMProvider<br/>能力分接口"]
+    Lite["LiteLLMProvider"]
+    Upstream["Azure OpenAI / Anthropic / Qwen"]
 
-    LiteSource --> Registry
-    ConfigSource --> Registry
-    Registry --> Snapshot
-    Snapshot --> Runtime
-    Runtime --> Gateway
-    Runtime --> Native
-    Gateway --> Providers
-    Native --> Providers
+    Portal --> Lite
+    API --> Port
+    Design --> API
+    Design --> Factory
+    Factory --> Port
+    Port --> Lite
+    Lite --> Upstream
 ```
 
-### Inkwell 保留的模型职责
+### 事实源和持久化
 
-- `IModelRegistryService` 和多来源只读模型注册表。
-- 稳定的逻辑 `ModelId`，例如 `general-fast`、`general-reasoning`。
-- `SourceId`（配置来源）、`RuntimeId`（执行连接）与 `RemoteModelId`（远端模型名）三个独立维度。
-- Publisher / Family 的标识与显示名称，以及 UI 展示名称、可用状态和不可用原因。
-- 模型能力元数据：视觉、工具调用、结构化输出，以及上下文窗口等产品校验所需信息。
-- Agent 草稿和已发布版本中的 `AgentModelOptions`，统一承载逻辑 `ModelId` 与模型调用参数。
-- 实际逻辑模型、参数、token 用量、网关返回的上游模型标识和错误分类等 trace 字段。
+- LiteLLM Portal/数据库是 v1 唯一模型与路由事实源。
+- Inkwell 不持久化模型目录、能力、Provider、Endpoint、Deployment 或 API Key。
+- Agent 草稿和版本只保存 `AgentModelOptions.ModelId` 与调用参数。`modelId` 是对外部模型的引用，不是 Inkwell 模型实体主键。
+- 模型被删除或改名后，旧 Agent 执行由 Provider 返回明确错误；不自动切换到其他模型。
 
-这些信息属于 Inkwell 产品契约。LiteLLM 的配置文件不是客户端 API，也不是 Agent 历史版本的事实源。
+### Provider 端口
 
-### LiteLLM 接管的职责
+- `ILLMProvider`：列出当前模型、按 ID 获取模型、测试模型连通性。
+- `IChatLLMProvider`：为 Chat 类模型创建 `Microsoft.Extensions.AI.IChatClient`。
+- `IEmbeddingLLMProvider`：创建 `IEmbeddingGenerator<string, Embedding<float>>`。
+- 图片和视频生成使用独立的请求、结果和异步任务端口；不要求不支持该能力的 Provider 抛 `NotSupportedException`。
+- `IAgentFactory` 继续负责 Instructions、Tools、Skills、History 和 MAF `AIAgent` 组装；LLM Provider 不构建 Agent。
 
-- 厂商 Endpoint、Deployment 和 API Key。
-- LiteLLM `model_name` 到一个或多个上游模型的映射。
-- Provider SDK 适配、认证、负载均衡、重试、fallback、限流和预算控制。
-- Provider 错误到 OpenAI-compatible 错误响应的归一化。
+每个部署只注册一个 `ILLMProvider`。未来可整体替换为 `AzureOpenAILLMProvider`、`AnthropicLLMProvider` 或 `QwenLLMProvider`；若未来需要同一部署同时直连多个 Provider，应另行设计组合 Provider，不在 v1 预留多来源 Registry。
 
-默认 LiteLLM 路径的厂商凭据只注入 LiteLLM。`Inkwell.WebApi` 和 `Inkwell.Worker` 仅持有 LiteLLM 内部地址及网关访问凭据；只有显式注册原生 Runtime 时，对应进程才持有该原生连接所需的凭据。
+### 模型分类
 
-### Registry 来源与自动发现
+公共 `LLMModel` 同时包含：
 
-- `ConfigurationModelRegistrySource` 从 `Inkwell:Models` 读取原生模型，显式配置 Publisher、Family、`RuntimeId`、`RemoteModelId`、能力和可用性。
-- `LiteLLMModelRegistrySource` 使用带 Bearer 凭据的 `GET /v1/models` 自动发现当前凭据可调用的 LiteLLM `model_name`；v1 不依赖 BETA Management API 或数据库模式。
-- LiteLLM 新模型即使没有 Inkwell 元数据也会出现在 Registry 中，但标记为不可用；补齐 Publisher、Family、能力并显式启用后，才允许构建 Agent。
-- 所有来源的业务 `ModelId` 在聚合后按大小写不敏感全局唯一；跨来源重名直接失败，不采用隐式覆盖优先级。
-- 配置来源和 LiteLLM 业务元数据均在进程启动期校验；列表项 DataAnnotations、空标识和大小写不敏感重复 ID 必须在开始服务请求前失败。
-- `GET /api/models` 向已认证客户端返回聚合后的 `ModelDefinition`，不透传 LiteLLM 原始响应或凭据。
+- `Category`：Inkwell 归一化产品分类，首期支持 `Unknown`、`Chat`、`Embedding`、`ImageGeneration`、`VideoGeneration`。
+- `ProviderMode`：Provider 返回的原始开放字符串，未知值不得丢失。
+- token 上限和工具、视觉、结构化输出、推理能力；无法确定时使用 `null`，不得误报为 `false`。
 
-### 运行时路由
+LiteLLM mode 映射：
 
-- 删除 `ModelProviderKind` 封闭枚举；Publisher、Family、Source 与 Runtime 均使用可扩展字符串标识。
-- `ModelRoutingAgentFactory` 先通过 Registry 解析业务 `ModelId`，拒绝不可用模型，再按 `RuntimeId` 选择连接器。
-- `RuntimeId=litellm` 使用 OpenAI SDK 的自定义 `/v1/` endpoint 创建 Chat Client，并通过 MAF `.AsAIAgent(...)` 执行。
-- 配置来源可声明 `RuntimeId=azure-openai` 等显式原生连接。原生连接是特定能力需求的配置选择，不是 LiteLLM 故障时的自动旁路。
-- MAF 始终拥有 Agent 执行与模型调用；Registry 只负责发现、元数据、校验和路由选择，不引入负责聊天调用的 `ILLMService`。
+| LiteLLM mode | Inkwell category |
+| --- | --- |
+| `chat`、`responses`、`completion` | `Chat` |
+| `embedding` | `Embedding` |
+| `image_generation`、`image_edit` | `ImageGeneration` |
+| `video_generation` | `VideoGeneration` |
+| 其他或缺失 | `Unknown` |
 
-LiteLLM `/v1/models` 只承担发现，不单独成为产品事实源：Publisher / Family、中文展示、能力与启用状态仍由 Inkwell 元数据控制；LiteLLM 私有配置形状不得泄漏到 Agent、客户端或持久化契约。
+Vision 是 Chat 模型的输入能力，不等于图片生成类别。Chat Completions 与 Responses 是调用协议，不是模型类别。
 
-### 版本与路由可追溯性
+### LiteLLM Provider
 
-已发布 Agent 继续保存逻辑 `ModelId`。每次运行的 trace 额外记录：
+- `GET /v1/models` 决定当前凭据可访问的模型。
+- `GET /model_group/info` 提供 mode、token 上限和聚合能力；按 `model_group` 与模型 ID 合并。
+- Provider 原始响应只在适配器内部使用，不向产品 API 泄漏 API Key、Endpoint、deployment Provider 等私有配置。
+- v1 Chat 执行返回统一 `IChatClient`。具体使用 Chat Completions 或 Responses 由 `LiteLLMProvider` 内部决定，Agent Factory 不感知协议。
+- 模型连通性测试由 Provider 按类别执行低成本检查；视频和图片不默认生成收费内容。
 
-- Inkwell `ModelId`。
-- 解析后的 `SourceId`、`RuntimeId` 与 `RemoteModelId`。
-- LiteLLM 返回的实际上游模型标识（可获得时）。
-- 模型参数、token 用量、fallback 是否发生和网关请求标识（可获得时）。
+### 2026-07-17 协议验证证据
 
-v1 不把 LiteLLM 完整路由配置复制进 Agent 快照。运维修改同名路由可能改变后续调用的实际模型，因此路由配置必须版本控制；生产变更需关联发布记录。若未来要求逐次完全重放，再引入不可变路由版本并写入 Agent 快照。
+使用当前 Aspire 运行的 LiteLLM 实例验证：
 
-### 部署和故障边界
-
-- 本地开发：ADR-025 Aspire AppHost 增加 LiteLLM 容器，WebApi 和 Worker 等待其健康后启动。
-- 生产：同一 Helm release 增加 LiteLLM Deployment/Service；模型厂商 Secret 只挂载到 LiteLLM Pod。
-- WebApi 与 Worker 通过集群内部 Service 调用 LiteLLM，不对客户端暴露 LiteLLM；仅持有 LiteLLM 访问凭据。
-- LiteLLM 模型不可因网关故障自动改走原生连接；返回结构化模型不可用错误并保留可重试语义。显式配置为原生 Runtime 的模型不受该故障边界约束。
-- v1 可先单副本运行，但生产就绪检查必须覆盖健康探针、超时、并发上限、日志脱敏和配置回滚；高可用副本与共享预算存储按压测结果启用。
-
-### 协议验证门禁
-
-正式接入必须通过以下端到端用例：
-
-- 非流式与流式文本响应。
-- tool calling 及工具结果回传。
-- structured output。
-- 图片输入与不支持视觉时的调用前拒绝。
-- 客户端取消向上游传播。
-- 429、超时、5xx、fallback 和认证失败的错误映射。
-- token usage 与实际模型标识进入 trace，且 prompt、API Key 不进入基础设施日志。
-
-## 备选项
-
-### 备选 A：Inkwell 直接接入所有模型厂商
-
-放弃。该方案减少一个网络跳转，但会让 Provider SDK、凭据、重试、fallback 和预算控制进入 Inkwell 核心代码，长期维护成本最高。
-
-### 备选 B：Envoy AI Gateway
-
-暂不采用。其 Kubernetes Gateway API 与流量治理能力更强，但 Inkwell 当前更需要广泛的模型 Provider 适配、模型别名、预算和 fallback。未来若边缘流量治理成为主要矛盾，可在 LiteLLM 前增加 Envoy，或重新评估替换。
-
-### 备选 C：Bifrost
-
-暂不采用。其 Go 实现和性能方向值得持续评估，但当前 Provider 覆盖、社区采用度和运维经验不如 LiteLLM 更符合 v1 风险偏好。通过 OpenAI-compatible 边界保留替换可能。
-
-### 备选 D：直接把 LiteLLM 原始模型列表暴露给客户端
-
-放弃。它会把基础设施路由配置变成产品契约，并丢失 Inkwell 的能力校验、展示和版本语义。
+- `/v1/models` 返回 Portal 模型 `gpt-5.4`，`owned_by=openai`。
+- `/model_group/info` 返回 `mode=chat`、`max_input_tokens=1050000`、`max_output_tokens=128000`，工具、视觉和推理能力为 `true`。
+- `/v1/chat/completions` 返回 HTTP 200 和预期文本 `chat-ok`。
+- `/v1/responses` 返回 HTTP 200、`status=completed` 和预期文本 `responses-ok`。
+- 当前 LiteLLM 运行版本的内置模型元数据包含 `chat`、`responses`、`embedding`、`image_generation`、`video_generation` 等 mode；未知 mode 必须保留原值并归类为 `Unknown`。
 
 ## 后果
 
 ### 正面
 
-- 默认模型接入集中在一个 OpenAI-compatible 调用路径，特定能力仍可显式使用原生连接。
-- 新增或切换模型厂商主要通过 LiteLLM 配置完成，不需要增加 Inkwell Provider SDK。
-- 厂商凭据集中在网关，缩小 WebApi/Worker 的 Secret 暴露面。
-- 路由、重试、fallback、限流和预算策略集中治理。
-- Inkwell 的模型目录保持稳定，可独立演进产品能力和替换网关。
+- LiteLLM Portal 添加模型后，模型管理页和 Agent 设计页立即看到同一模型，不需要 Inkwell 二次配置。
+- 业务层只依赖稳定端口和 `Microsoft.Extensions.AI` 抽象。
+- 删除多来源 Registry、metadata 覆盖、`RuntimeId` 路由和原生连接旁路，降低状态不一致风险。
+- 模型类别可以服务 Chat Agent、Embedding、图片和视频等不同产品入口。
 
 ### 负面
 
-- Agent 调用链增加一个网络跳转和新的关键运行组件。
-- LiteLLM 发现结果与 Inkwell 业务元数据存在一致性风险；未补齐元数据的模型会被安全地标记为不可用。
-- LiteLLM 的 streaming、tool calling、structured output 和 Provider 差异需要持续做契约测试。
-- 同名网关路由被修改后，历史 Agent 的后续执行可能发生变化；v1 依赖配置版本控制与 trace 缓解，尚不具备完全可重放性。
+- 更换整个 LLM Provider 时，旧 Agent 的 `modelId` 可能不被新 Provider 识别，需要迁移或保持同名别名。
+- 各 Provider 的模型发现能力不完全对称，缺失字段必须允许为 `null`。
+- LiteLLM 是 v1 模型调用关键依赖，其不可用会阻断模型列表和执行。
 
-### 中性
+## 不采用方案
 
-- MAF 仍是 Agent 执行引擎；LiteLLM 只替换模型 Provider 接入层，不替代 ADR-003。
-- Azure Speech、Embedding Generator 和 Qdrant 不自动纳入本 ADR。Embedding 是否通过 LiteLLM 统一路由需单独验证 `Microsoft.Extensions.AI.IEmbeddingGenerator` 兼容性后决策。
-- REQ-005/REQ-006 与 UI 模型选择保持不变，变化发生在后端实现边界。
+### 多来源 Model Registry
 
-## 迁移路径
+不采用。当前产品不需要同时聚合 appsettings 原生模型和 LiteLLM 模型；该设计引入 `SourceId`、`RuntimeId`、`RemoteModelId`、重复 ID 和 metadata 门禁，却没有用户价值。
 
-1. 更新 HD-019：将 Catalog 重构为多来源 Registry，删除 `ModelProviderKind`，新增 Publisher / Family / Source / Runtime / RemoteModelId 和能力字段。
-2. 在 Aspire AppHost 与 Helm 拓扑加入 LiteLLM，并通过 Secret 注入上游厂商凭据。
-3. 将 Agent Factory 改为 Registry 驱动的 Runtime 路由，LiteLLM 为默认连接，原生连接显式注册。
-4. 使用 `/v1/models` 自动发现 LiteLLM 模型，对缺失业务元数据的条目实施不可用门禁。
-5. 完成协议验证门禁后，删除默认 LiteLLM 路径遗留在 WebApi/Worker 中的厂商凭据；显式原生 Runtime 的凭据与连接代码按配置保留。
+### 单个巨型 Provider 接口
+
+不采用。Chat、Embedding、图片和视频的同步/异步语义不同，巨型接口会迫使部分 Provider 对不支持的方法抛异常。
+
+### Inkwell 保存 LiteLLM 配置副本
+
+不采用。它会产生双事实源并扩大凭据暴露面。
 
 ## 状态
 
-`proposed`。待 Owner 审阅后人工翻转状态。
+`proposed`。`status` 与 `reviewers` 由 Owner 人工维护。
 
 ## 置信度
 
-`medium`。架构边界明确，但 LiteLLM 与当前 MAF OpenAI/Responses/AG-UI 路径的 streaming、tool calling、structured output 和取消传播尚需端到端验证。
+`high`。模型发现、Chat Completions 和 Responses 已在当前 LiteLLM 实例完成真实验证；Embedding、图片和视频执行端口留到对应功能实施时做端到端验证。

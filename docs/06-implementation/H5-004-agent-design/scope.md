@@ -67,7 +67,7 @@ downstream:
 | H5-004-B | 工具与 Skills 绑定及校验 | Tools/Skills API | AC-025～032 |
 | H5-004-C | 知识库与长期记忆配置 | KB/Memory API | AC-033～037 |
 | H5-004-D | 草稿、发布、权限和修改状态 | Version API | AC-056、AC-096 |
-| H5-004-E | 配置页内嵌对话面板 | H5-005-B | 共享状态机回归 |
+| H5-004-E | 配置页内嵌对话面板 | H5-005-C | 共享状态机回归 |
 
 每个子任务执行前必须根据 `implementation-task-brief.template.md` 创建独立 `ai-task-brief.md`。
 

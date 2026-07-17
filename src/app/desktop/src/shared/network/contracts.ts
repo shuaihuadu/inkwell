@@ -66,15 +66,31 @@ export interface AgentDefinition {
     latestPublishedVersionNumber: number;
 }
 
-export interface ModelDefinition {
+export type LLMModelCategory =
+    | "Unknown"
+    | "Chat"
+    | "Embedding"
+    | "ImageGeneration"
+    | "VideoGeneration";
+
+export interface LLMModel {
     id: string;
-    displayName: string;
-    publisherDisplayName: string | null;
-    familyDisplayName: string | null;
-    sourceId: string;
-    runtimeId: string;
-    isAvailable: boolean;
-    unavailableReason: string | null;
+    category: LLMModelCategory;
+    providerMode: string | null;
+    ownedBy: string | null;
+    maxInputTokens: number | null;
+    maxOutputTokens: number | null;
+    supportsVision: boolean | null;
+    supportsTools: boolean | null;
+    supportsStructuredOutput: boolean | null;
+    supportsReasoning: boolean | null;
+}
+
+export interface LLMModelTestResult {
+    modelId: string;
+    isSuccess: boolean;
+    latency: string;
+    errorMessage: string | null;
 }
 
 export interface CreateAgentRequest {
@@ -107,7 +123,8 @@ export interface InkwellDesktopApi {
         listener: (snapshot: AuthSnapshot) => void,
     ) => () => void;
     listAgents: () => Promise<AgentListItem[]>;
-    listModels: () => Promise<ModelDefinition[]>;
+    listModels: () => Promise<LLMModel[]>;
+    testModel: (modelId: string) => Promise<LLMModelTestResult>;
     createAgent: (request: CreateAgentRequest) => Promise<AgentDefinition>;
     chat: (request: ChatRequest) => Promise<void>;
     onChatDelta: (

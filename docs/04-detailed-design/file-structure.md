@@ -109,7 +109,7 @@ src/core/Inkwell.Abstractions/
   VectorStore/                          # HD-008 锁定（type-alias + Builder DSL 钩子，不重新发明 IVectorStore）
 ```
 
-> **关于 Entity 类的归属**：[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity（`AgentEntity` / `ConversationEntity` / 等）**集中在 `providers/Inkwell.Persistence.EFCore/Entities/`**，不在 `Inkwell.Abstractions/`。HD-002 在 `Persistence/` 子目录仅定义抽象（facade + IRepository marker + mixin + Options），具名 `IXxxRepository` 与业务 Model（默认无后缀 / 撞名降级 `XxxDefinition`，详 [HD-002 §4.1.2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）由各业务命名空间 HD 起草时在 `Persistence/<Module>/` 追加。示例（仅 HD-002 锁定模板，具体文件由对应业务 HD 创建）：
+> **关于 Entity 类的归属**：[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity（`AgentEntity` / `ConversationEntity` / 等）**集中在 `providers/Persistence/Inkwell.Persistence.EFCore/Entities/`**，不在 `Inkwell.Abstractions/`。HD-002 在 `Persistence/` 子目录仅定义抽象（facade + IRepository marker + mixin + Options），具名 `IXxxRepository` 与业务 Model（默认无后缀 / 撞名降级 `XxxDefinition`，详 [HD-002 §4.1.2](Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md)）由各业务命名空间 HD 起草时在 `Persistence/<Module>/` 追加。示例（仅 HD-002 锁定模板，具体文件由对应业务 HD 创建）：
 >
 > ```text
 > src/core/Inkwell.Abstractions/Persistence/
@@ -248,12 +248,12 @@ src/core/Inkwell.Core/FileStorage/
   LocalFileSystemFileStorageOptions.cs               # RootPath + 子目录策略 + sidecar 元数据格式
   LocalFileSystemBuilderExtensions.cs                # UseLocalFileSystemFileStorage()
 
-providers/Inkwell.FileStorage.MinIO/
+providers/FileStorage/Inkwell.FileStorage.MinIO/
   MinIOFileStorageProvider.cs                        # MinIO SDK 实现（独立 HD）
   MinIOFileStorageOptions.cs                         # Endpoint / AccessKey / SecretKey / UseSsl / BucketAutoCreate
   MinIOFileStorageBuilderExtensions.cs               # UseMinIOFileStorage(IConfigurationSection)
 
-providers/Inkwell.FileStorage.AzureBlob/
+providers/FileStorage/Inkwell.FileStorage.AzureBlob/
   AzureBlobFileStorageProvider.cs                    # Azure.Storage.Blobs SDK 实现（独立 HD）
   AzureBlobFileStorageOptions.cs                     # ConnectionString | (AccountName + AccountKey) | (AccountName + ManagedIdentity)
   AzureBlobFileStorageBuilderExtensions.cs           # UseAzureBlobFileStorage(IConfigurationSection)
@@ -288,7 +288,7 @@ src/core/Inkwell.Core/Cache/
   InMemoryCacheOptions.cs                            # 无额外字段（占位，进程内实现无需连接配置）
   InMemoryCacheBuilderExtensions.cs                  # UseInMemoryCache()
 
-providers/Inkwell.Cache.Redis/
+providers/Cache/Inkwell.Cache.Redis/
   RedisCacheProvider.cs                              # StackExchange.Redis SDK 实现（独立 HD）
   RedisCacheOptions.cs                               # ConnectionString
   RedisCacheBuilderExtensions.cs                     # UseRedisCache(string connectionString)
@@ -323,7 +323,7 @@ src/core/Inkwell.Core/Queue/
   ChannelsQueueOptions.cs                            # 无额外必填字段（占位，进程内实现无需连接配置）
   ChannelsQueueBuilderExtensions.cs                  # UseChannelsQueue()；未显式调用时 InkwellBuilder.Build() 默认自动注册（ADR-018）
 
-providers/Inkwell.Queue.Redis/
+providers/Queue/Inkwell.Queue.Redis/
   RedisStreamQueueProvider.cs                        # StackExchange.Redis Streams SDK 实现（独立 HD）
   RedisQueueOptions.cs                               # ConnectionString
   RedisQueueBuilderExtensions.cs                     # UseRedisQueue(string connectionString)
@@ -393,7 +393,7 @@ src/core/Inkwell.Core/VectorStore/                          # 独立 HD（无独
   AzureOpenAIEmbeddingOptions.cs                             # Endpoint / ApiKey / DeploymentName
   AzureOpenAIEmbeddingBuilderExtensions.cs                   # UseAzureOpenAIEmbeddings(...)
 
-providers/Inkwell.VectorStore.Qdrant/                        # 独立 HD（[HD-008 §1.3 Q2-qdrant-options-loc](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-关键决策摘要)）
+providers/VectorStore/Inkwell.VectorStore.Qdrant/                        # 独立 HD（[HD-008 §1.3 Q2-qdrant-options-loc](Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md#13-关键决策摘要)）
   QdrantVectorStoreOptions.cs                                # Host / Port / ApiKey / UseHttps
   QdrantVectorStoreBuilderExtensions.cs                      # UseQdrantVectorStore(...)
 ```
@@ -431,7 +431,7 @@ src/core/Inkwell.Core/
     AuthBuilderExtensions.cs              # UseDefaultAuthService()
 ```
 
-> `Persistence/Auth/User.cs` + `IUserRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Auth 小节](#persistenceauthhd-014-落地2026-07-06)）；`UserEntity` / `UserMappingExtensions` / `EfCoreUserRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
+> `Persistence/Auth/User.cs` + `IUserRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Auth 小节](#persistenceauthhd-014-落地2026-07-06)）；`UserEntity` / `UserMappingExtensions` / `EfCoreUserRepository` 的 EFCore 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
 
 ## Inkwell.Abstractions.Agents
 
@@ -464,7 +464,7 @@ src/core/Inkwell.Core/
 
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）= 8 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
 
-> `Persistence/Agents/AgentDefinition.cs` + `IAgentRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Agents 小节](#persistenceagentshd-015-落地2026-07-06)）；`AgentEntity` / `AgentMappingExtensions` / `EfCoreAgentRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
+> `Persistence/Agents/AgentDefinition.cs` + `IAgentRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Agents 小节](#persistenceagentshd-015-落地2026-07-06)）；`AgentEntity` / `AgentMappingExtensions` / `EfCoreAgentRepository` 的 EFCore 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。
 
 ## Inkwell.Abstractions.Tools
 
@@ -496,7 +496,7 @@ src/core/Inkwell.Core/
 
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）5（HD-014）+ 3（HD-015）+ 4（HD-016）= **12** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体；2026-07-08 订正：`Tools/` 实际只有 4 个文件，此前误列 6 个，详见 design-review-report.md §26.2 N-1/C-3）。
 
-> `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
+> `Persistence/Tools/ToolDefinition.cs` + `IToolRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 [§Persistence/Tools 小节](#persistencetoolshd-016-落地2026-07-07)）；`ToolEntity` / `ToolMappingExtensions` / `EfCoreToolRepository` 的 EFCore 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。同 [HD-015 §3.4 errata](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)：已 reviewed 的 `Inkwell.Core.Agents.AgentInvocationService`（`src/core/Inkwell.Core/Agents/AgentInvocationService.cs`，见 [§Inkwell.Abstractions.Agents](#inkwellabstractionsagents)）构造函数新增 `IToolBindingResolver` 依赖，文件本身不新增，不重复计数。
 
 ## Inkwell.Abstractions.Skills
 
@@ -529,7 +529,7 @@ src/core/Inkwell.Core/
 
 `Inkwell.Core.csproj` 累计（HD-014 起首次出现物理文件）21（HD-014~HD-019）+ 3（HD-020）= **24** 个 `*.cs` + 1 个 `.csproj`（HD-014 已创建，本 HD 不重复计 csproj 本体）。
 
-> `Persistence/Skills/SkillDefinition.cs` + `ISkillRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 §Persistence/Skills 小节，HD-020 落地）；`SkillEntity` / `SkillMappingExtensions` / `EfCoreSkillRepository` 的 EFCore 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**跨 HD 已知缺口**（本 HD 不代为修改已 reviewed 文件）：`Inkwell.Core.Agents.AgentInvocationService`（[HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)）与 `Inkwell.Abstractions.AgentRuntime.AgentRunRequest`（[HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)）当前均**未**接入本 HD 的 `ISkillContentResolver`，详见 [HD-020 §7](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#7-跨-hd-已知缺口消费方尚无接线点)。
+> `Persistence/Skills/SkillDefinition.cs` + `ISkillRepository.cs`（业务 Model + 具名 Repository，[HD-002 §Inkwell.Abstractions 已预留模板](#inkwellabstractions) 追加）由本 HD 起草并落地（见 §Persistence/Skills 小节，HD-020 落地）；`SkillEntity` / `SkillMappingExtensions` / `EfCoreSkillRepository` 的 EFCore 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），**本 HD 不改写已 reviewed 的 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)**，该实现留待后续 errata 追加。**跨 HD 已知缺口**（本 HD 不代为修改已 reviewed 文件）：`Inkwell.Core.Agents.AgentInvocationService`（[HD-015 §3.4](Inkwell.Core/HD-015-Inkwell.Core.Agents.md#34-agentsiagentinvocationservicecs)）与 `Inkwell.Abstractions.AgentRuntime.AgentRunRequest`（[HD-006 §3.2](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md#32-agentruntimeagentrunrequestcs)）当前均**未**接入本 HD 的 `ISkillContentResolver`，详见 [HD-020 §7](Inkwell.Core/HD-020-Inkwell.Core.Skills.md#7-跨-hd-已知缺口消费方尚无接线点)。
 
 ## Inkwell.Abstractions.Conversations
 
@@ -564,60 +564,58 @@ src/core/Inkwell.Core/
 
 `Inkwell.Core.Conversations` 当前贡献 2 个文件；Session Store 与 History Provider 两个适配器计入 `Inkwell.Core.AgentRuntime`。旧累计计数由本 errata 取代，最终以 H5 实际文件清单为准。
 
-> `Persistence/Conversations/` 的 3 个 Model + 3 个具名 Repository 接口由本 HD 锁定；EFCore Entity / Configuration / Mapping / Repository 实现物理位置仍是 `providers/Inkwell.Persistence.EFCore/{Entities,Configurations,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。`Inkwell.Core.AgentRuntime` 适配器通过业务 Service、MAF conversation key 或标准 `RunAgentInput.forwardedProps.inkwell` 的服务端覆盖值访问显式上下文，不读取 `HttpContext`，也不把 `threadId` 或客户端 `runId` 当作授权凭证。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
+> `Persistence/Conversations/` 的 3 个 Model + 3 个具名 Repository 接口由本 HD 锁定；EFCore Entity / Configuration / Mapping / Repository 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Configurations,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。`Inkwell.Core.AgentRuntime` 适配器通过业务 Service、MAF conversation key 或标准 `RunAgentInput.forwardedProps.inkwell` 的服务端覆盖值访问显式上下文，不读取 `HttpContext`，也不把 `threadId` 或客户端 `runId` 当作授权凭证。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
 >
 > **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../01-requirements/requirements.md)）。本节原 `## Inkwell.Abstractions.AuditLogs`（HD-018 `IAuditLogger` 唯一实现 + `Persistence/AuditLogs/` + `Audit/` 追加文件）已随 HD-007 / HD-018 一并删除；下游章节的累计文件计数不再包含该段贡献，具体数值以各自 HD 文档最终版为准，不在此处逐一重算。
 
-## Inkwell.Abstractions.Models
+## Inkwell.Abstractions.LLM
 
-> 由 [HD-019 替代性 errata](Inkwell.Core/HD-019-Inkwell.Core.Models.md) 与 [ADR-026](../03-architecture/adr/ADR-026-model-gateway-litellm.md) 锁定。`IModelRegistryService` 是模型管理业务门面，独立落 `Models/` 子目录。模型注册表不是持久化实体，本模块不新增 `Persistence/Models/`、具名 Repository 或数据库表。
+> 由 [HD-019](Inkwell.Core/HD-019-Inkwell.Core.Models.md) 与 [ADR-026](../03-architecture/adr/ADR-026-model-gateway-litellm.md) 锁定。`ILLMProvider` 是模型发现端口，具体实现独立位于 `providers/LLM/Inkwell.LLM.*`。Inkwell 不新增模型持久化实体、Repository 或数据库表。
 >
-> **2026-07-13 ADR-026 更新**：删除 `ModelProviderKind`；`ModelDefinition` 分离 Publisher、Family、`SourceId`、`RuntimeId` 与 `RemoteModelId`，并保留 UI / Agent 校验所需的能力元数据。LiteLLM 厂商凭据与私有响应不进入公共契约。
+> **2026-07-17 ADR-026 更新**：公共 `LLMModel` 只保留模型 ID、归一化分类、原始 Provider mode 和非敏感能力；LiteLLM 厂商凭据、路由与私有响应不进入公共契约。
 
 ```text
 src/core/Inkwell.Abstractions/
-  Models/
-    IModelRegistryService.cs                 # 多来源模型注册表门面
-    ModelDefinition.cs                       # 产品模型定义与运行时路由标识
-    ConfigurationModelRegistryOptions.cs     # appsettings 模型来源配置
-    ConfigurationModelRegistryOptionsValidator.cs
+  LLM/
+    ILLMProvider.cs                          # 实时发现、详情与连通性测试端口
+    IChatLLMProvider.cs                      # Chat Client 创建能力端口
+    LLMModel.cs                              # 公共模型信息与非敏感能力
+    LLMModelCategory.cs                      # 归一化模型分类
+    LLMModelTestResult.cs                    # 连通性测试结果
 ```
 
-**文件计数**：HD-019 在 `Models/` 新增 4 个 `*.cs`（累计基线不再含已删除的 `## Inkwell.Abstractions.AuditLogs` 章节贡献，具体累计值以各 HD 文档最终版为准，不在此处重算）。
+**文件计数**：HD-019 在 `LLM/` 新增 5 个 `*.cs`（累计基线不再含已删除的 `## Inkwell.Abstractions.AuditLogs` 章节贡献，具体累计值以各 HD 文档最终版为准，不在此处重算）。
 
-**对接 `Inkwell.Core.Models` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) / [HD-017](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 单实现拓扑）：
+**LiteLLM Provider 与 Agent Runtime 对接**：
 
 ```text
-src/core/Inkwell.Core/
-  Models/
-    IModelRegistrySource.cs                 # 内部模型来源契约
-    ModelRegistryService.cs                 # 聚合来源并拒绝重复 ModelId
-    ConfigurationModelRegistrySource.cs     # appsettings 来源
-    ModelsBuilderExtensions.cs              # Registry / LiteLLM 装配
-    LiteLLM/
-      LiteLLMModelRegistrySource.cs          # GET /v1/models 自动发现
-      LiteLLMModelRegistryOptions.cs         # LiteLLM 连接与元数据配置
-      LiteLLMModelRegistryOptionsValidator.cs # 启动期递归校验与重复 ID 检查
-      LiteLLMModelMetadataOptions.cs         # 产品元数据覆盖
-      LiteLLMModelsResponse.cs               # 私有协议响应 DTO
-  AgentRuntime/
-    IModelRuntimeChatClientProvider.cs       # 运行时 Chat Client 提供契约
-    ModelRoutingAgentFactory.cs              # Registry 驱动的 MAF Agent Factory
-    LiteLLMModelRuntimeChatClientProvider.cs  # OpenAI-compatible LiteLLM Chat Client Provider
+src/core/providers/LLM/Inkwell.LLM.LiteLLM/
+  Inkwell.LLM.LiteLLM.csproj                # 独立 Provider adapter
+  LiteLLMOptions.cs                         # Endpoint 与 API Key 配置
+  LiteLLMBuilderExtensions.cs               # UseLiteLLM() DI 装配
+  LiteLLMProvider.cs                        # 实时发现、分类、测试与 Chat Client 创建
+  LiteLLMModelResponse.cs                   # /v1/models 私有响应 DTO
+  LiteLLMModelsResponse.cs
+  LiteLLMModelGroupResponse.cs              # /model_group/info 私有响应 DTO
+  LiteLLMModelGroupsResponse.cs
+  GlobalUsings.cs
+src/core/Inkwell.Core/AgentRuntime/
+  AgentRuntimeBuilderExtensions.cs          # UseDefaultAgentRuntime() 装配
+  ModelRoutingAgentFactory.cs               # 公共 Provider 驱动的 MAF Agent Factory
 ```
 
-`Inkwell.Core.csproj` 累计 19（HD-014~HD-018）+ 2（HD-019）= **21** 个 `*.cs` + 1 个 `.csproj`。
+`Inkwell.LLM.LiteLLM` 当前包含 8 个职责文件、1 个 `GlobalUsings.cs` 和 1 个 `.csproj`；不依赖 `Inkwell.Core`。
 
-> `Inkwell.Core.Agents`（HD-015）不直接依赖 `Inkwell.Core.Models`。Agent 构建时由 `ModelRoutingAgentFactory` 通过公共 `IModelRegistryService` 解析 `ModelId`，再按 `RuntimeId` 选择连接器；WebApi 的模型列表与详情端点也只依赖同一公共门面。
+> `Inkwell.Core.Agents`（HD-015）不直接依赖具体模型 Provider。Agent 构建时由 `ModelRoutingAgentFactory` 通过公共 `ILLMProvider` 验证 `ModelId` 分类，再通过 `IChatLLMProvider` 创建客户端；WebApi 的模型列表、详情和测试端点也只依赖公共端口。
 
-## providers/Inkwell.Persistence.EFCore
+## providers/Persistence/Inkwell.Persistence.EFCore
 
 > 由 [HD-009](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md) 锁定。
 >
 > [ADR-022 §决策](../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁手写 `XxxMappingExtensions` 静态类扩展方法三件套（`ToModel()` / `ToEntity()` / `SelectAsModel()`）；具名 Repository 在 `Repositories/` 中以 `internal sealed class XxxRepository : IXxxRepository` 实现 6 个具名动词方法。
 
 ```text
-providers/Inkwell.Persistence.EFCore/
+providers/Persistence/Inkwell.Persistence.EFCore/
   Inkwell.Persistence.EFCore.csproj   # 依赖 Microsoft.EntityFrameworkCore + Inkwell.Abstractions
   Entities/                           # 集中的 EF Entity 类（~30 个）
     AgentEntity.cs
@@ -687,12 +685,12 @@ providers/Inkwell.Persistence.EFCore/
 >
 > **2026-07-06 errata（[HD-009 §13.12](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#1312-2026-07-06-errata第十二轮治理修正1311-范围声明失实记述更正与-inkwellseeder-默认管理员账号-seed-落地)，治理修正）**：`InkwellSeeder.cs` 新增默认管理员账号 seed 逻辑已落地——`InkwellSeeder` 依 [AGENTS.md §3.2](../AGENTS.md) 禁止引用 `Inkwell.Core`（含 `PasswordHasher`）的约束真实存在，Owner 明确表示"Seed 的数据可以 hardcode 一个值就行了，通过 `PasswordHasher` 计算后的内容直接使用"——离线预先计算好的哈希字符串作为字面量硬编码进 `InkwellSeeder`，不产生跨层依赖，无需发起新 ADR。此前本节记述"Owner 拍板将其上升为 Migration + Seed 是否容器化的独立 ADR 议题"系失实内容（HD-009 §13.11 原文的编造记述），现已一并更正。[HD-014 §6.2](Inkwell.Core/HD-014-Inkwell.Core.Auth.md#62-待后续-hd-处理的契约缺口) 该条待办已解决。
 
-## providers/Inkwell.Persistence.EFCore.SqlServer
+## providers/Persistence/Inkwell.Persistence.EFCore.SqlServer
 
 > 由 [HD-011](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md) 锁定。SqlServer final adapter——integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 SqlServer 原生 `rowversion` 类型自动生成，不需要拦截器。
 
 ```text
-providers/Inkwell.Persistence.EFCore.SqlServer/
+providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/
   Inkwell.Persistence.EFCore.SqlServer.csproj   # 依赖 Microsoft.EntityFrameworkCore.SqlServer + Microsoft.EntityFrameworkCore.Design（工具期）+ Inkwell.Persistence.EFCore（base）+ Inkwell.Abstractions
   DependencyInjection/
     InkwellPersistenceEfCoreSqlServerServiceCollectionExtensions.cs  # Builder DSL：UseSqlServer(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)
@@ -703,14 +701,14 @@ providers/Inkwell.Persistence.EFCore.SqlServer/
 
 > **计数估算**：3 个 `*.cs` + 1 个 `.csproj`（HD-011 锁定）；`Migrations/` 目录本身不计入文件数（内容由 H5 编码任务用 `dotnet ef migrations add` 生成）。不创建 `SqlServerInkwellDbContext` 子类（理由详 [HD-011 §6](Inkwell.Persistence.EFCore/HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#6-为什么本-hd-不创建-sqlserverinkwelldbcontext-子类)），与 base 8 个 `*.cs`（HD-009）各自独立计数，不做跨 csproj 累加。
 >
-> **2026-07-06 errata（HD-011 起草，同步修 HD-009）**：本节由 HD-011 从「未起草」→「已起草」翻面；三个文件均为 HD-011 落地新增。HD-011 起草期发现 SqlServer `EnableRetryOnFailure` 与 [HD-009 §3.2 `ExecuteInTransactionAsync`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) 手动事务运行时不兼容，已同步在 [HD-009 §13.7 errata·第七轮](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 修正（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装），HD-009 `providers/Inkwell.Persistence.EFCore` 一节文件数与代码结构不变，仅内部实现细节调整，本节不重复列出。
+> **2026-07-06 errata（HD-011 起草，同步修 HD-009）**：本节由 HD-011 从「未起草」→「已起草」翻面；三个文件均为 HD-011 落地新增。HD-011 起草期发现 SqlServer `EnableRetryOnFailure` 与 [HD-009 §3.2 `ExecuteInTransactionAsync`](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#32-efcorepersistenceprovidercs) 手动事务运行时不兼容，已同步在 [HD-009 §13.7 errata·第七轮](Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md#137-2026-07-06-errata第七轮hd-011-起草期发现executeintransactionasync-包-createexecutionstrategy-以兼容-sqlserver-enableretryonfailure) 修正（`ExecuteInTransactionAsync` 改用 `CreateExecutionStrategy().ExecuteAsync` 包装），HD-009 `providers/Persistence/Inkwell.Persistence.EFCore` 一节文件数与代码结构不变，仅内部实现细节调整，本节不重复列出。
 
-## providers/Inkwell.Persistence.EFCore.Postgres
+## providers/Persistence/Inkwell.Persistence.EFCore.Postgres
 
 > 由 [HD-012](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md) 锁定。Postgres final adapter——dev docker-compose 默认 Provider（[ADR-005](../03-architecture/adr/ADR-005-deployment-docker-compose-aks.md)），也是 integration test / prod 候选 Provider 之一，支持 Migration（[ADR-021 D3](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)），走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)；RowVersion 由 `PostgresRowVersionInterceptor` 应用层手动模拟（Owner picker 2026-07-06 拍板放弃 Npgsql 官方推荐的原生 `xmin` 方案，理由详 [HD-012 §4](Inkwell.Persistence.EFCore/HD-012-Inkwell.Persistence.EFCore.Postgres-adapter.md#4-rowversion-在-postgres-下的真实行为三-provider-对照含-owner-picker-决策记录)）。
 
 ```text
-providers/Inkwell.Persistence.EFCore.Postgres/
+providers/Persistence/Inkwell.Persistence.EFCore.Postgres/
   Inkwell.Persistence.EFCore.Postgres.csproj   # 依赖 Npgsql.EntityFrameworkCore.PostgreSQL + Microsoft.EntityFrameworkCore.Design（工具期）+ Inkwell.Persistence.EFCore（base）+ Inkwell.Abstractions
   DependencyInjection/
     InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs  # Builder DSL：UsePostgres(this IInkwellBuilder builder, string connectionString, Action<PersistenceOptions>? configure = null)

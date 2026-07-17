@@ -26,7 +26,6 @@
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Azure.AI.OpenAI" />
   </ItemGroup>
 

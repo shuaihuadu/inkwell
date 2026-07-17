@@ -26,7 +26,7 @@ _ = providerName switch
 };
 
 // Inkwell.Migrator 只装配 IPersistenceProvider 这一个端口，不调用 IInkwellBuilder.Build()——
-// Build() 会强制校验 FileStorage/Cache/Queue/AgentRuntime 全部端口均已注册（IInkwellBuilder.Build()
+// Build() 会强制校验 FileStorage/Cache/Queue/LLM 全部端口均已注册（IInkwellBuilder.Build()
 // 的 EnsureRequiredPortRegistered 系列检查），Migrator 不需要也不装配这四个端口。
 using IHost host = hostBuilder.Build();
 using IServiceScope scope = host.Services.CreateScope();

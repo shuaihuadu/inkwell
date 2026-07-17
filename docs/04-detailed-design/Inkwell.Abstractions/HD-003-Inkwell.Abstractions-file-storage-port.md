@@ -25,7 +25,7 @@ upstream:
 >
 > **2026-05-11 errata·第一轮**（[design-review-report §7](../design-review-report.md#7-hd-003-filestorage-port-增量评审2026-05-11)）：Owner 2026-05-11 picker 拍板五项 errata：(1) **B3=A** 测试包路径统一走 `tests/core/Inkwell.Providers.Contract/FileStorage/`（§3.1 / §8.3 / §10 同步）；(2) **B4=B** HD-003 保留 `metadata` / `keyPrefix` 参数名，[ADR-015](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) 同步追加 errata 块声明接口草图由 H3 精化；(3) **N7** §1.4 偏离表补 ADR-015 接口形态 2 行；(4) **N8** §10 F1 / F5 `rg` 命令改多 `-e` flag避免 shell escape 失效；(5) **N9** [file-structure.md "端口接口文件"建议段](../file-structure.md) 添 errata 行指向 §Inkwell.Abstractions.FileStorage 完整章节。本轮 errata 后 HD-003 仍 `status: draft`，Owner 另行翻 `reviewed` + 填 `reviewers`。
 >
-> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/FileStorage/` 子层——`IFileStorageProvider` facade、4 个 DTO（`FileMetadata` / `FileUploadResult` / `FileDownloadResponse` / `FileObjectInfo`）、`FileStorageOptions` + Validator、`ErrorCodes.FileStore` 段。**不**定义容器名常量集（[picker Q3=B](#13-关键决策摘要)：业务命名空间各自传字符串，留到业务 HD 起草）、**不**实现 Provider 行为（三 Provider 实现在 `providers/Inkwell.FileStorage.MinIO/` / `Inkwell.FileStorage.AzureBlob/` / `Inkwell.Core` 的 `LocalFileSystemFileStorageProvider` 各自独立 HD 起草）。
+> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/FileStorage/` 子层——`IFileStorageProvider` facade、4 个 DTO（`FileMetadata` / `FileUploadResult` / `FileDownloadResponse` / `FileObjectInfo`）、`FileStorageOptions` + Validator、`ErrorCodes.FileStore` 段。**不**定义容器名常量集（[picker Q3=B](#13-关键决策摘要)：业务命名空间各自传字符串，留到业务 HD 起草）、**不**实现 Provider 行为（三 Provider 实现在 `providers/FileStorage/Inkwell.FileStorage.MinIO/` / `Inkwell.FileStorage.AzureBlob/` / `Inkwell.Core` 的 `LocalFileSystemFileStorageProvider` 各自独立 HD 起草）。
 >
 > **跨 HD 关联**：本 HD 与 [HD-001 foundation](HD-001-Inkwell.Abstractions-foundation.md)（Result / Builder / OTel 字段）+ [HD-002 persistence port](HD-002-Inkwell.Abstractions-persistence-port.md)（同级端口模板）+ [HD-009 EFCore base](../Inkwell.Persistence.EFCore/HD-009-Inkwell.Persistence.EFCore-base.md)（兄弟 base，命名风格对齐）形成 Abstractions 三连环。
 
@@ -45,7 +45,7 @@ upstream:
   - 三 Provider 实现（[ADR-015](../../03-architecture/adr/ADR-015-object-storage-provider-switchable.md) LocalFileSystem / AzureBlob / MinIO 各自独立 HD）
   - 客户端直传逻辑（[ADR-009 多模态](../../03-architecture/adr/ADR-009-multimodal-azure-speech.md)）
   - 容器名常量集 / 业务侧 PII 脱敏规则（前者按 [picker Q3=B](#13-关键决策摘要) 留业务 HD；后者留业务方自行定义）
-  - Helm bucket 初始化 / Migration（由 `providers/Inkwell.FileStorage.MinIO/` HD + Helm chart 起草）
+  - Helm bucket 初始化 / Migration（由 `providers/FileStorage/Inkwell.FileStorage.MinIO/` HD + Helm chart 起草）
   - 内容类型探测 / 病毒扫描 / OCR 抽取（业务侧 `Inkwell.KnowledgeBase` HD）
 
 ### 1.3 关键决策摘要
@@ -328,7 +328,7 @@ src/core/Inkwell.Abstractions/
 每个 Provider csproj 提供唯一入口扩展方法：
 
 ```csharp
-// providers/Inkwell.FileStorage.MinIO/MinIOFileStorageBuilderExtensions.cs
+// providers/FileStorage/Inkwell.FileStorage.MinIO/MinIOFileStorageBuilderExtensions.cs
 public static class MinIOFileStorageBuilderExtensions
 {
     public static IInkwellBuilder UseMinIOFileStorage(
@@ -336,7 +336,7 @@ public static class MinIOFileStorageBuilderExtensions
         IConfigurationSection section);
 }
 
-// providers/Inkwell.FileStorage.AzureBlob/AzureBlobFileStorageBuilderExtensions.cs
+// providers/FileStorage/Inkwell.FileStorage.AzureBlob/AzureBlobFileStorageBuilderExtensions.cs
 public static class AzureBlobFileStorageBuilderExtensions
 {
     public static IInkwellBuilder UseAzureBlobFileStorage(

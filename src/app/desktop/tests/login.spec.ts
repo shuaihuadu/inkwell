@@ -81,6 +81,7 @@ test("shows authentication errors and enters the workspace after login", async (
     browserName,
 }, testInfo) => {
     let loginAttempts = 0;
+    let modelTestAttempts = 0;
     const server = createServer((request, response) => {
         if (request.url === "/api/auth/login") {
             loginAttempts += 1;
@@ -106,12 +107,59 @@ test("shows authentication errors and enters the workspace after login", async (
             return;
         }
 
-        if (
-            request.url === "/api/agents/mine" ||
-            request.url === "/api/models"
-        ) {
+        if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
             response.end("[]");
+            return;
+        }
+
+        if (request.url === "/api/models") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify([
+                    {
+                        id: "gpt-5.4",
+                        category: "Chat",
+                        providerMode: "chat",
+                        ownedBy: "openai",
+                        maxInputTokens: 1_050_000,
+                        maxOutputTokens: 128_000,
+                        supportsVision: true,
+                        supportsTools: true,
+                        supportsStructuredOutput: true,
+                        supportsReasoning: true,
+                    },
+                    {
+                        id: "text-embedding-3-large",
+                        category: "Embedding",
+                        providerMode: "embedding",
+                        ownedBy: "openai",
+                        maxInputTokens: 8_191,
+                        maxOutputTokens: null,
+                        supportsVision: null,
+                        supportsTools: null,
+                        supportsStructuredOutput: null,
+                        supportsReasoning: null,
+                    },
+                ]),
+            );
+            return;
+        }
+
+        if (
+            request.url === "/api/models/gpt-5.4/test" &&
+            request.method === "POST"
+        ) {
+            modelTestAttempts += 1;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    modelId: "gpt-5.4",
+                    isSuccess: true,
+                    latency: "00:00:00.1250000",
+                    errorMessage: null,
+                }),
+            );
             return;
         }
 
@@ -218,6 +266,34 @@ test("shows authentication errors and enters the workspace after login", async (
             "background-color",
             "rgb(23, 20, 19)",
         );
+
+        await page
+            .getByRole("button", { name: "模型管理" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("heading", { name: "模型管理" }),
+        ).toBeVisible();
+        await expect(page.getByText("gpt-5.4", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("text-embedding-3-large", { exact: true }),
+        ).toBeVisible();
+        const modelTable = page.getByRole("table");
+        await expect(modelTable.getByText("对话", { exact: true })).toBeVisible();
+        await expect(modelTable.getByText("嵌入", { exact: true })).toBeVisible();
+        await page
+            .getByRole("button", { name: "测试 gpt-5.4 连接" })
+            .dispatchEvent("click");
+        await expect(page.getByText("gpt-5.4 连接正常")).toBeVisible();
+        expect(modelTestAttempts).toBe(1);
+        await expect(page.locator(".ant-dropdown")).toBeHidden();
+        await page.setViewportSize({ width: 1080, height: 720 });
+        expect(
+            await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(1080);
+        await page.screenshot({
+            path: testInfo.outputPath("model-management-dark-1080x720.png"),
+            fullPage: true,
+        });
 
         await page.getByRole("button", { name: /工具管理/ }).click();
         await expect(

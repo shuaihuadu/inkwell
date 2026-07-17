@@ -4,6 +4,7 @@ title: Agent Conversation 数据与 REST 基座 · AI 任务简报
 stage: H5
 document_type: task-brief
 status: reviewed
+implementation_state: superseded
 authors:
   - name: GitHub Copilot
     role: agent
@@ -31,6 +32,8 @@ downstream:
 
 # H5-005-A · Agent Conversation 数据与 REST 基座任务简报
 
+> **当前状态**：本简报对应的三模型、Repository、Service、REST 和双 Provider Mapping 已经实现。HD-017 于 2026-07-17 移除了 Run Lease 与 fencing，实际代码也不再包含相关字段和端口；因此本文件仅保留为历史任务输入，不得再次交给编码 Agent 执行。当前事实与剩余验证见同目录 `implementation-record.md`。
+>
 > 本文件严格按照 `docs/_templates/implementation-task-brief.template.md` 编写，可在人工确认范围后交给 `h5-coding-executor`。
 >
 > `status` / `reviewers` 由 Owner 人工维护，Agent 不代签。
@@ -91,12 +94,12 @@ downstream:
 - `src/core/Inkwell.Core/Conversations/**`
 - `src/core/Inkwell.Core/AgentRuntime/Sessions/AgentSessionRuntime.cs`（仅删除旧运行时或移除其注册引用）
 - `src/core/Inkwell.Core/DependencyInjection/**`
-- `src/core/providers/Inkwell.Persistence.EFCore/Entities/**`
-- `src/core/providers/Inkwell.Persistence.EFCore/Configurations/**`
-- `src/core/providers/Inkwell.Persistence.EFCore/Mapping/**`
-- `src/core/providers/Inkwell.Persistence.EFCore/Repositories/**`
-- `src/core/providers/Inkwell.Persistence.EFCore/InkwellDbContext.cs`
-- `src/core/providers/Inkwell.Persistence.EFCore/DependencyInjection/**`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/Entities/**`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/Configurations/**`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/Mapping/**`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/Repositories/**`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/InkwellDbContext.cs`
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore/DependencyInjection/**`
 - `src/core/Inkwell.WebApi/Conversations/**`
 - `src/core/Inkwell.WebApi/Controllers/**`
 - `src/core/Inkwell.WebApi/Program.cs`（仅 Conversation REST 注册）
@@ -110,7 +113,7 @@ downstream:
 ## 7. 禁止修改
 
 - `docs/01-requirements/**`、`docs/03-architecture/**`、`docs/04-detailed-design/**` 的 `status` / `reviewers` 及 `AGENTS.md` §1/§3。
-- `src/core/providers/Inkwell.Persistence.EFCore.SqlServer/Migrations/**` 与 `src/core/providers/Inkwell.Persistence.EFCore.Postgres/Migrations/**`；当前阶段不得生成 Migration、Designer 或 ModelSnapshot。
+- `src/core/providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/Migrations/**` 与 `src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Migrations/**`；当前阶段不得生成 Migration、Designer 或 ModelSnapshot。
 - `src/core/Inkwell.WebApi/Protocols/**`、MAF AG-UI Hosting、RoutingAgent、SessionStore/HistoryProvider 新实现。
 - `src/app/**`、`prototypes/**`、Traces、Multimodal、Tools、Skills 与无关 Provider。
 - 不新增包或升级依赖；若编译证明当前依赖无法实现已锁定设计，阻塞返回并附证据。

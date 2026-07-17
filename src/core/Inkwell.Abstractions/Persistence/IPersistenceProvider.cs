@@ -6,7 +6,7 @@ namespace Inkwell;
 
 /// <summary>
 /// 持久化端口 facade：提供具名 Repository 获取和事务边界。
-/// 唯一实现 <c>EfCorePersistenceProvider</c>（providers/Inkwell.Persistence.EFCore）。
+/// 唯一实现 <c>EfCorePersistenceProvider</c>（providers/Persistence/Inkwell.Persistence.EFCore）。
 /// </summary>
 public interface IPersistenceProvider
 {

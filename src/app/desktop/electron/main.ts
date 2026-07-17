@@ -19,7 +19,8 @@ import type {
     CreateAgentRequest,
     LoginRequest,
     LoginResult,
-    ModelDefinition,
+    LLMModel,
+    LLMModelTestResult,
     UnlockResult,
 } from "../src/shared/network/contracts.js";
 
@@ -302,7 +303,14 @@ const registerApiHandlers = (): void => {
     });
     ipcMain.handle("inkwell:list-models", () => {
         requireAuthenticated();
-        return request<ModelDefinition[]>("/api/models");
+        return request<LLMModel[]>("/api/models");
+    });
+    ipcMain.handle("inkwell:test-model", (_event, modelId: string) => {
+        requireAuthenticated();
+        return request<LLMModelTestResult>(
+            `/api/models/${encodeURIComponent(modelId)}/test`,
+            { method: "POST" },
+        );
     });
     ipcMain.handle(
         "inkwell:create-agent",

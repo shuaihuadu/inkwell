@@ -520,8 +520,8 @@ var app = builder.Build();
 | ------------------------------------------------ | ---------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `src/core/Inkwell.Abstractions/`                 | `Inkwell.Abstractions`       | **`Inkwell`**                    | `Common/Pagination.cs` 内 `namespace Inkwell;`（不是 `Inkwell.Abstractions.Common`）                                   |
 | `src/core/Inkwell.Core/`                         | `Inkwell.Core`               | **`Inkwell`**                    | `Auth/AuthService.cs` 内 `namespace Inkwell;`（不是 `Inkwell.Core.Auth`）                                              |
-| `src/core/providers/Inkwell.Persistence.EFCore/` | `Inkwell.Persistence.EFCore` | **`Inkwell.Persistence.EFCore`** | `Entities/AgentEntity.cs` 内 `namespace Inkwell.Persistence.EFCore;`（**不**是 `Inkwell.Persistence.EFCore.Entities`） |
-| `src/core/providers/Inkwell.FileStorage.MinIO/`  | `Inkwell.FileStorage.MinIO`  | **`Inkwell.FileStorage.MinIO`**  | 任意子目录都平平落 `namespace Inkwell.FileStorage.MinIO;`                                                              |
+| `src/core/providers/Persistence/Inkwell.Persistence.EFCore/` | `Inkwell.Persistence.EFCore` | **`Inkwell.Persistence.EFCore`** | `Entities/AgentEntity.cs` 内 `namespace Inkwell.Persistence.EFCore;`（**不**是 `Inkwell.Persistence.EFCore.Entities`） |
+| `src/core/providers/FileStorage/Inkwell.FileStorage.MinIO/`  | `Inkwell.FileStorage.MinIO`  | **`Inkwell.FileStorage.MinIO`**  | 任意子目录都平平落 `namespace Inkwell.FileStorage.MinIO;`                                                              |
 | `src/core/Inkwell.WebApi/`                       | `Inkwell.WebApi`             | **`Inkwell.WebApi`**             | 不受子目录影响                                                                                                         |
 | `src/core/Inkwell.Worker/`                       | `Inkwell.Worker`             | **`Inkwell.Worker`**             | 同上                                                                                                                   |
 

@@ -17,9 +17,6 @@ using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-AzureOpenAICredential azureOpenAICredential = builder.Configuration
-    .GetSection("Inkwell:AzureOpenAI")
-    .Get<AzureOpenAICredential>() ?? new AzureOpenAICredential();
 
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("inkwell-webapi"))
@@ -50,14 +47,8 @@ IInkwellBuilder inkwellBuilder = builder.Services.AddInkwell(builder.Configurati
     .UseDefaultConversationService()
     .UseDefaultToolService()
     .UseDefaultSkillService()
-    .AddModelRegistry()
-    .AddLiteLLMModelRegistrySource();
-
-if (!string.IsNullOrWhiteSpace(azureOpenAICredential.Endpoint)
-    && !string.IsNullOrWhiteSpace(azureOpenAICredential.ApiKey))
-{
-    inkwellBuilder.UseAzureOpenAIModelRuntime(azureOpenAICredential);
-}
+    .UseDefaultAgentRuntime()
+    .UseLiteLLM();
 
 inkwellBuilder.Build();
 

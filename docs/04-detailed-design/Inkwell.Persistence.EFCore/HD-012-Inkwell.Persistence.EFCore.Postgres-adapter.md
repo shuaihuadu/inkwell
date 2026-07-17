@@ -23,7 +23,7 @@ upstream:
 downstream: []
 ---
 
-> **范围切片**：本 HD 锁定 `providers/Inkwell.Persistence.EFCore.Postgres/` final adapter csproj——[`Npgsql.EntityFrameworkCore.PostgreSQL`](https://www.npgsql.org/efcore/index.html) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UsePostgres(connectionString, configure?)`（方法名沿用 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 已预先锁定的名字，本 HD 只实现不改名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、Postgres 专属 `PostgresPersistenceOptions`（连接重试参数）、Postgres 专属 `PostgresRowVersionInterceptor`（并发令牌手动模拟，详 §4）、Provider 自有 `Migrations/` 目录约定。
+> **范围切片**：本 HD 锁定 `providers/Persistence/Inkwell.Persistence.EFCore.Postgres/` final adapter csproj——[`Npgsql.EntityFrameworkCore.PostgreSQL`](https://www.npgsql.org/efcore/index.html) 的 `DbContextOptionsBuilder` 配置、Builder DSL 入口 `UsePostgres(connectionString, configure?)`（方法名沿用 [ADR-021 §Builder DSL 形状](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) + [HD-009 §12](HD-009-Inkwell.Persistence.EFCore-base.md#12-待补--后续-hd-衔接) + [HD-002 §4.1.2](../Inkwell.Abstractions/HD-002-Inkwell.Abstractions-persistence-port.md) + [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#9-builder-dsl-衔接与使用示例) 已预先锁定的名字，本 HD 只实现不改名）、`IDbContextInitializer` 的 `MigrateAsync` 实现、Postgres 专属 `PostgresPersistenceOptions`（连接重试参数）、Postgres 专属 `PostgresRowVersionInterceptor`（并发令牌手动模拟，详 §4）、Provider 自有 `Migrations/` 目录约定。
 >
 > **不**覆盖：`Inkwell.Persistence.EFCore` shared base 的任何内容（Entity / Mapping / Repository / `EfCorePersistenceProvider` / `AuditingSaveChangesInterceptor` / `InkwellSeeder` / `MigrationRunner` 均已由 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 锁定，本 HD 只消费不重复）；SqlServer final adapter → [HD-011](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md)（已 reviewed）；跨 Provider 契约测试 → HD-013（待起草）。
 >
@@ -48,13 +48,13 @@ downstream: []
 - `Interceptors/PostgresRowVersionInterceptor.cs`（适配）——详 §3.4
 - `Migrations/`（目录，无 H3 阶段代码——详 §7）
 
-物理布局参 [file-structure.md §providers/Inkwell.Persistence.EFCore.Postgres](../file-structure.md)。
+物理布局参 [file-structure.md §providers/Persistence/Inkwell.Persistence.EFCore.Postgres](../file-structure.md)。
 
 ## 3. 程序文件设计
 
 ### 3.0 Inkwell.Persistence.EFCore.Postgres.csproj
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Inkwell.Persistence.EFCore.Postgres.csproj`
 - **职责**：声明 Postgres final adapter 的依赖与目标框架 + Migration tooling 配置
 - **对外接口**：无（csproj 配置）
 - **内部函数或类**：无
@@ -72,7 +72,7 @@ downstream: []
 
 ### 3.1 DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs`
 - **职责**：`IInkwellBuilder` 的唯一入口扩展——注册 Postgres `DbContextOptions`（含重试 / 超时 / MigrationsAssembly）+ base 服务 + `PostgresRowVersionInterceptor` + `IDbContextInitializer` 实现 + `PostgresPersistenceOptions`
 - **对外接口**：
   - `public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions`
@@ -102,7 +102,7 @@ downstream: []
 **完整代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore.Postgres/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs
+// src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/DependencyInjection/InkwellPersistenceEfCorePostgresServiceCollectionExtensions.cs
 namespace Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 
 using Microsoft.EntityFrameworkCore;
@@ -170,7 +170,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 
 ### 3.2 PostgresPersistenceOptions.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/PostgresPersistenceOptions.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/PostgresPersistenceOptions.cs`
 - **职责**：Postgres 专属配置——连接重试参数；从 `appsettings.json` `"Inkwell:Persistence:Postgres"` 段绑定（author 判断的显而易见项，非 Owner 拍板：与 [HD-011 §3.2 `SqlServerPersistenceOptions`](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#32-sqlserverpersistenceoptionscs) 同构，比照 [HD-008](../Inkwell.Abstractions/HD-008-Inkwell.Abstractions-vector-store-type-alias.md) Provider 专属 Options 先例）
 - **对外接口**：`public sealed class PostgresPersistenceOptions { [Range(0, 20)] public int MaxRetryCount { get; init; } = 6; [Range(1, 300)] public int MaxRetryDelaySeconds { get; init; } = 30; }`
 - **内部函数或类**：无（纯 DTO + DataAnnotations）
@@ -187,7 +187,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 
 ### 3.3 PostgresDbContextInitializer.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/PostgresDbContextInitializer.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/PostgresDbContextInitializer.cs`
 - **职责**：实现 [HD-009 §3.6 `IDbContextInitializer`](HD-009-Inkwell.Persistence.EFCore-base.md#36-idbcontextinitializercs)——Postgres 场景下走 [`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync)，实现与 [HD-011 §3.3 `SqlServerDbContextInitializer`](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#33-sqlserverdbcontextinitializercs) 完全对称（关系型 Provider 共同路径，[`MigrateAsync`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.relationaldatabasefacadeextensions.migrateasync) 是 `Microsoft.EntityFrameworkCore.Relational` 通用 API，非 Provider 特有）
 - **对外接口**：`internal sealed class PostgresDbContextInitializer : IDbContextInitializer` + `public Task InitializeAsync(InkwellDbContext db, CancellationToken ct = default)`
 - **内部函数或类**：无（单一方法直接委托 `db.Database.MigrateAsync(ct)`）
@@ -206,7 +206,7 @@ public static class InkwellPersistenceEfCorePostgresServiceCollectionExtensions
 **完整代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore.Postgres/PostgresDbContextInitializer.cs
+// src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/PostgresDbContextInitializer.cs
 namespace Inkwell.Persistence.EFCore.Postgres;
 
 using Microsoft.EntityFrameworkCore;
@@ -221,7 +221,7 @@ internal sealed class PostgresDbContextInitializer : IDbContextInitializer
 
 ### 3.4 Interceptors/PostgresRowVersionInterceptor.cs
 
-- **文件路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/Interceptors/PostgresRowVersionInterceptor.cs`
+- **文件路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Interceptors/PostgresRowVersionInterceptor.cs`
 - **职责**（2026-07-06 Owner picker，详本文件顶部 callout + §4）：在 `SaveChangesAsync` 前为 `Added` / `Modified` 且实现 `IHasRowVersion` 的 Entity 手动生成新 `RowVersion`——采用 8 字节大端计数器递增策略；并发冲突检测本身（比较 `OriginalValue` 与当前存储值）由 EF Core 通用管线负责，与 Provider 无关，不需要本拦截器重复实现
 - **对外接口**：
   - `internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor`（继承 [`Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.diagnostics.savechangesinterceptor)）
@@ -242,7 +242,7 @@ internal sealed class PostgresDbContextInitializer : IDbContextInitializer
 **完整代码**：
 
 ```csharp
-// src/core/providers/Inkwell.Persistence.EFCore.Postgres/Interceptors/PostgresRowVersionInterceptor.cs
+// src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Interceptors/PostgresRowVersionInterceptor.cs
 namespace Inkwell.Persistence.EFCore.Postgres.Interceptors;
 
 using System.Buffers.Binary;
@@ -294,7 +294,7 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 - **⚠️ 未验证的技术假设（design-review-report.md §21 B20，2026-07-06）**：本 HD 设计的手动模拟方案存在未验证的技术假设（详 [design-review-report.md §21 B20](../design-review-report.md#b20postgresrowversioninterceptor-手动赋值与isrowversion-存储生成语义的兼容性未经验证c116)）——`PostgresRowVersionInterceptor`（§3.4）手动赋值 `CurrentValue` 之后，这个新值是否真的被 Npgsql 持久化写入数据库、乐观并发冲突是否真的能被正确捕获，从未经过实测验证。**H5 编码任务启动前必须先完成 Testcontainers PostgreSQL spike 验证，spike 结果作为本节最终实现依据**（Owner picker，2026-07-06，真实拍板选定**选项 3**：先 spike 再定，不预先在数据库触发器方案与 Application-managed 覆写方案之间选择）。
   - **spike 需要验证什么**：①验证 `PostgresRowVersionInterceptor` 手动赋的 `bytea` 新值是否真的被 Npgsql 写入数据库（而非被 EF Core 排除在 INSERT/UPDATE 列表外、依赖 `RETURNING` 读回原值覆盖）；②验证乐观并发冲突（两个并发事务修改同一行）是否真的能被 [`DbUpdateConcurrencyException`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.dbupdateconcurrencyexception) 正确捕获。
   - **通过标准**：若①②皆是，选项 1（手动模拟，即本节当前设计）成立，方案不变；若任一为否，需切到触发器方案（选项 1'：数据库触发器）或 Application-managed 覆写（选项 2：`ValueGeneratedNever`，可能推翻 §6「不建子类」结论）。
-  - **spike 落地位置**：`tests/core/providers/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（§11.1 已锁定的集成测试 csproj），复用 [Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)；spike 结论回填本节并同步更新 §6 / §11 / §14（硬性前置任务标注见 §16.0）。
+  - **spike 落地位置**：`tests/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（§11.1 已锁定的集成测试 csproj），复用 [Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)；spike 结论回填本节并同步更新 §6 / §11 / §14（硬性前置任务标注见 §16.0）。
 - **两 Provider 对照**（按能力逐项列出，不用表格以规避 [markdownlint MD060](https://github.com/DavidAnson/markdownlint/blob/main/doc/md060.md) 中英文混排对齐问题）：
   - **并发令牌 CLR 类型**：SqlServer（HD-011）= `byte[]`；Postgres（本 HD）= `byte[]`（与 Npgsql 官方推荐的 `uint` 不同）
   - **值生成方式**：SqlServer = 数据库引擎原生生成 `rowversion`；Postgres = `PostgresRowVersionInterceptor`（应用层手动模拟）
@@ -331,7 +331,7 @@ internal sealed class PostgresRowVersionInterceptor : SaveChangesInterceptor
 
 ## 7. Migrations/ 目录约定
 
-- **物理路径**：`src/core/providers/Inkwell.Persistence.EFCore.Postgres/Migrations/`
+- **物理路径**：`src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres/Migrations/`
 - **生成方式**：H5 编码任务执行期通过 [`dotnet ef migrations add Init -p Inkwell.Persistence.EFCore.Postgres -s Inkwell.WebApi`](https://learn.microsoft.com/ef/core/cli/dotnet#dotnet-ef-migrations-add) 生成，**本 HD 不预先编写任何 Migration `.cs` 文件**——与 [HD-011 §7](HD-011-Inkwell.Persistence.EFCore.SqlServer-adapter.md#7-migrations-目录约定) 同款理由（全部 Entity 尚未起草齐）
 - **命名约定**：`dotnet ef migrations add` 默认产出 `<yyyyMMddHHmmss>_<Name>.cs` + `<yyyyMMddHHmmss>_<Name>.Designer.cs` + 更新 `InkwellDbContextModelSnapshot.cs`（工具生成，不手工编辑）
 - **`MigrationsAssembly`**：显式设为 `"Inkwell.Persistence.EFCore.Postgres"`（§3.1 完整代码），确保 Migration 编译产物落在本 csproj
@@ -375,8 +375,8 @@ builder.Services
 
 ### 11.1 测试 csproj 拓扑
 
-- 单元测试：`tests/core/providers/Inkwell.Persistence.EFCore.Postgres.Tests/`（[MSTest.Sdk 4.x](https://github.com/microsoft/testfx) + MTP runner）——覆盖 §3.1 DI 装配 + §3.2 Options 校验 + §3.4 `PostgresRowVersionInterceptor` 计数逻辑（不依赖真实 Postgres）
-- 集成测试：`tests/core/providers/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（[Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)）——覆盖 §3.3 `MigrateAsync` + 瞬时故障重试 + §3.4 并发冲突场景
+- 单元测试：`tests/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres.Tests/`（[MSTest.Sdk 4.x](https://github.com/microsoft/testfx) + MTP runner）——覆盖 §3.1 DI 装配 + §3.2 Options 校验 + §3.4 `PostgresRowVersionInterceptor` 计数逻辑（不依赖真实 Postgres）
+- 集成测试：`tests/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres.IntegrationTests/`（[Testcontainers for .NET `postgresql` 模块](https://dotnet.testcontainers.org/modules/postgresql/)）——覆盖 §3.3 `MigrateAsync` + 瞬时故障重试 + §3.4 并发冲突场景
 
 ### 11.2 单测分组
 
@@ -408,7 +408,7 @@ builder.Services
 CI（GitHub Actions）在 `dotnet build` 之后执行：
 
 ```bash
-ROOT=src/core/providers/Inkwell.Persistence.EFCore.Postgres
+ROOT=src/core/providers/Persistence/Inkwell.Persistence.EFCore.Postgres
 
 # C1：不引用 Inkwell.Core
 grep -rn 'ProjectReference.*Inkwell\.Core\b' "$ROOT/Inkwell.Persistence.EFCore.Postgres.csproj" \
@@ -479,5 +479,5 @@ echo "HD-012 automation checks passed."
 
 ## 17. 同步追加跨模块文件
 
-- [`docs/04-detailed-design/file-structure.md`](../file-structure.md) — 本 HD 同会话追加 `## providers/Inkwell.Persistence.EFCore.Postgres` 一级章节
+- [`docs/04-detailed-design/file-structure.md`](../file-structure.md) — 本 HD 同会话追加 `## providers/Persistence/Inkwell.Persistence.EFCore.Postgres` 一级章节
 - 本 HD **不**追加 `database-design.md`（Postgres 不引入新表结构，schema 沿用 [HD-009](HD-009-Inkwell.Persistence.EFCore-base.md) 已锁定的 Entity 定义）/ **不**追加 `api-design.md`（本 HD 不含 HTTP/RPC 端点）

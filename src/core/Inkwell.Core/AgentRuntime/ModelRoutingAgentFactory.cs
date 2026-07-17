@@ -7,11 +7,11 @@ using Microsoft.Extensions.AI;
 namespace Inkwell;
 
 /// <summary>
-/// 通过模型注册表选择运行时连接并构建 MAF Agent。
+/// 通过当前 LLM Provider 构建 MAF Agent。
 /// </summary>
 internal sealed class ModelRoutingAgentFactory(
-    IModelRegistryService modelRegistry,
-    IEnumerable<IModelRuntimeChatClientProvider> runtimeClientProviders,
+    ILLMProvider llmProvider,
+    IChatLLMProvider chatLLMProvider,
     IPersistenceProvider persistence) : IAgentFactory
 {
     /// <inheritdoc />
@@ -60,19 +60,11 @@ internal sealed class ModelRoutingAgentFactory(
             throw new InvalidOperationException("Agent ModelId is required.");
         }
 
-        ModelDefinition model = await modelRegistry.GetModelAsync(modelId, cancellationToken).ConfigureAwait(false);
-        if (!model.IsAvailable)
+        LLMModel model = await llmProvider.GetModelAsync(modelId, cancellationToken).ConfigureAwait(false);
+        if (model.Category != LLMModelCategory.Chat)
         {
             throw new InvalidOperationException(
-                $"Model '{model.Id}' is unavailable: {model.UnavailableReason ?? "No reason was provided."}");
-        }
-
-        IModelRuntimeChatClientProvider? runtimeClientProvider = runtimeClientProviders.FirstOrDefault(
-            provider => string.Equals(provider.RuntimeId, model.RuntimeId, StringComparison.OrdinalIgnoreCase));
-        if (runtimeClientProvider is null)
-        {
-            throw new InvalidOperationException(
-                $"No model runtime is registered for RuntimeId '{model.RuntimeId}' used by model '{model.Id}'.");
+                $"Model '{model.Id}' cannot be used by a chat agent because its category is '{model.Category}'.");
         }
 
         AgentModelOptions modelOptions = buildOptions.ModelOptions;
@@ -83,7 +75,7 @@ internal sealed class ModelRoutingAgentFactory(
             Description = description,
             ChatOptions = new ChatOptions
             {
-                ModelId = model.RemoteModelId,
+                ModelId = model.Id,
                 Instructions = instructions,
                 Temperature = (float?)modelOptions.Temperature,
                 TopP = (float?)modelOptions.TopP,
@@ -93,7 +85,7 @@ internal sealed class ModelRoutingAgentFactory(
             AIContextProviders = CreateContextProviders(buildOptions.Skills),
         };
 
-        IChatClient chatClient = runtimeClientProvider.GetChatClient(model);
+        IChatClient chatClient = chatLLMProvider.CreateChatClient(model.Id);
         return chatClient.AsAIAgent(options);
     }
 

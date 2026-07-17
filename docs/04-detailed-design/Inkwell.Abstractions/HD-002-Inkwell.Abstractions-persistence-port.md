@@ -24,9 +24,9 @@ upstream:
 >
 > **2026-05-11 errata·第二+三+四轮**（[ADR-023 三轮翻新](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md) accepted by Inkwell）：本 HD 同步翻签名 / 删错误码库 / 删 `Result<T>` 引用 / 重写 BCL 对照表。受影响章节：§1.1 / §1.2 / §1.3 Q6 / §2 / §3.1 / §3.2 / §3.3 / §3.7 / §3.8 / §3.9 / §3.10 整段删除 / §4.1.3 示例 / §4.2 / §4.3 / §4.4 / §7 / §9。详 §13 errata。§3 文件数从 9 个减为 8 个（§3.10 作为“已废”锁位保留不重用，§3.1 ~ §3.9 编号不调整以保追溯不断）。
 >
-> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Persistence/` 子层——`IPersistenceProvider` facade、`IRepository<TModel, TKey>` marker base（§3.2）、`IUnitOfWork`、interface mixin（`IHasTimestamps` / `IHasRowVersion`）、`PagedResult<T>`、`PersistenceOptions` + Validator。**不**定义具名 `IXxxRepository` 与业务 Model（由各业务命名空间 HD 起草时在 `Abstractions/Persistence/<Module>/` 追加），**不**定义 Entity 类（由 [HD-009 `providers/Inkwell.Persistence.EFCore`](../) 起草，[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity 居所）。
+> **范围切片**：本 HD 覆盖 `Inkwell.Abstractions/Persistence/` 子层——`IPersistenceProvider` facade、`IRepository<TModel, TKey>` marker base（§3.2）、`IUnitOfWork`、interface mixin（`IHasTimestamps` / `IHasRowVersion`）、`PagedResult<T>`、`PersistenceOptions` + Validator。**不**定义具名 `IXxxRepository` 与业务 Model（由各业务命名空间 HD 起草时在 `Abstractions/Persistence/<Module>/` 追加），**不**定义 Entity 类（由 [HD-009 `providers/Persistence/Inkwell.Persistence.EFCore`](../) 起草，[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity 居所）。
 >
-> **拓扑张力**：[ADR-021 §备选 B](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity 在 `providers/`；[AGENTS.md §3.2](../../../AGENTS.md) 锁定业务命名空间只能依赖 `Inkwell.Abstractions` + BCL。**二者叠加**：业务命名空间无法直接 query Entity 类。本 HD 选 **picker Q1=C facade only** 路径——`IPersistenceProvider` 仅暴露事务 / SaveChanges 高层 facade；具名 `IXxxRepository`（每个返回 Model，Model 也在 Abstractions）由各业务 HD 起草，`providers/Inkwell.Persistence.EFCore` 同时实现 `IPersistenceProvider` 与所有具名 Repository（HD-009）。
+> **拓扑张力**：[ADR-021 §备选 B](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 锁定 Entity 在 `providers/`；[AGENTS.md §3.2](../../../AGENTS.md) 锁定业务命名空间只能依赖 `Inkwell.Abstractions` + BCL。**二者叠加**：业务命名空间无法直接 query Entity 类。本 HD 选 **picker Q1=C facade only** 路径——`IPersistenceProvider` 仅暴露事务 / SaveChanges 高层 facade；具名 `IXxxRepository`（每个返回 Model，Model 也在 Abstractions）由各业务 HD 起草，`providers/Persistence/Inkwell.Persistence.EFCore` 同时实现 `IPersistenceProvider` 与所有具名 Repository（HD-009）。
 >
 > **2026-05-11 errata（F6 + ADR-022 + B 路径）**：§3.2 `IRepository<TModel, TKey>` 重定位为纯 marker interface（零成员）；具名 `IXxxRepository` 不再继承泛型 CRUD，独立定义具名动词方法（§4.1.3 动词白名单）；Model 默认无后缀（§4.1.2），撞名场景降级 `XxxDefinition`。
 
@@ -39,7 +39,7 @@ upstream:
 - 顶层 facade `IPersistenceProvider`：提供事务包装 + SaveChanges + Repository 工厂查询能力
 - `IRepository<TModel, TKey>` marker base（§3.2）：所有具名 Repository 接口必须继承该 marker（零成员，仅锁 `TModel` / `TKey` 类型参数 + 与 BannedSymbols 配套为禁 `Store` / `Dao` / `Gateway` 后缀的正向锚点）；具名动词方法由具名接口独立定义（§4.1.3）
 - `IUnitOfWork`：事务作用域抽象
-- 三个 mixin interface（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`）：Model 按需实现，`providers/Inkwell.Persistence.EFCore` 在 `OnModelCreating` 中按 mixin 自动配置 EF 行为
+- 三个 mixin interface（`IHasTimestamps` / `IHasRowVersion` / `IHasOwner`）：Model 按需实现，`providers/Persistence/Inkwell.Persistence.EFCore` 在 `OnModelCreating` 中按 mixin 自动配置 EF 行为
 - `PagedResult<T>`：列表分页返回 DTO
 - `PersistenceOptions` + `PersistenceOptionsValidator`：配置入口
 
@@ -59,10 +59,10 @@ upstream:
 
 - 具名 `IAgentRepository` / `IConversationRepository` / `IRunRepository` / 等 ~13 个具名 Repository → 各业务命名空间 HD 起草（`Inkwell.Core.Agents` / `.Conversations` / 等）
 - 业务 Model（默认无后缀、撞名降级 `XxxDefinition`，详§4.1.2）→ 各业务 HD 起草
-- Entity 类（`AgentEntity` / `ConversationEntity` / 等）→ HD-009 `providers/Inkwell.Persistence.EFCore`
+- Entity 类（`AgentEntity` / `ConversationEntity` / 等）→ HD-009 `providers/Persistence/Inkwell.Persistence.EFCore`
 - `InkwellDbContext` / `OnModelCreating` / `IEntityTypeConfiguration<>` → HD-009
 - `EfCorePersistenceProvider` 实现 → HD-009
-- 具名 Mapping 扩展（`AgentMappingExtensions` / 等 ~30 个）→ HD-009 `providers/Inkwell.Persistence.EFCore/Mapping/`（[ADR-022](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁手写 Extensions 模式）
+- 具名 Mapping 扩展（`AgentMappingExtensions` / 等 ~30 个）→ HD-009 `providers/Persistence/Inkwell.Persistence.EFCore/Mapping/`（[ADR-022](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁手写 Extensions 模式）
 - `InkwellSeeder` → HD-009
 - `MigrationRunner` → HD-009
 - 两 final adapter csproj（`Inkwell.Persistence.EFCore.{SqlServer,Postgres}`）→ HD-011 / HD-012
@@ -206,7 +206,7 @@ src/core/Inkwell.Abstractions/
 | 字段         | 内容                                                                                                                                                                                                                                                      |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Mixins/IHasTimestamps.cs`                                                                                                                                                                                      |
-| 职责         | 标记 mixin；Model 实现该接口表示需要 `CreatedTime` / `UpdatedTime` 字段；`providers/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）扫描该 mixin 自动配置 EF 行为（`SaveChangesInterceptor` 自动填充 / 更新）                                   |
+| 职责         | 标记 mixin；Model 实现该接口表示需要 `CreatedTime` / `UpdatedTime` 字段；`providers/Persistence/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）扫描该 mixin 自动配置 EF 行为（`SaveChangesInterceptor` 自动填充 / 更新）                                   |
 | 对外接口     | `public interface IHasTimestamps { DateTimeOffset CreatedTime { get; } DateTimeOffset UpdatedTime { get; } }`                                                                                                                                             |
 | 内部函数或类 | 仅 readonly 属性；setter 由具名 Model 实现决定（`init` 或 `private set`）                                                                                                                                                                                 |
 | 输入数据     | 实现方：Provider 写入时设置 `CreatedTime = DateTimeOffset.UtcNow`，更新时设置 `UpdatedTime = DateTimeOffset.UtcNow`                                                                                                                                       |
@@ -221,7 +221,7 @@ src/core/Inkwell.Abstractions/
 | 字段         | 内容                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Mixins/IHasRowVersion.cs`                                                                                                                                                                                                                                                                                                           |
-| 职责         | 标记 mixin；Model 实现该接口表示需要乐观并发控制；`providers/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）自动调 [`IsRowVersion()`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.metadatabuilders.propertybuilder.isrowversion)                                                                                                           |
+| 职责         | 标记 mixin；Model 实现该接口表示需要乐观并发控制；`providers/Persistence/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）自动调 [`IsRowVersion()`](https://learn.microsoft.com/dotnet/api/microsoft.entityframeworkcore.metadatabuilders.propertybuilder.isrowversion)                                                                                                           |
 | 对外接口     | `public interface IHasRowVersion { byte[] RowVersion { get; } }`                                                                                                                                                                                                                                                                                                               |
 | 内部函数或类 | 仅 readonly 属性；`byte[]` 由 EF Core 自动管理（SqlServer = `rowversion`；Postgres = 应用层拦截器手动递增）                                                                                                                                                                                                                                                                    |
 | 输入数据     | 实现方：Provider SaveChanges 时 EF Core 自动填充与校验                                                                                                                                                                                                                                                                                                                         |
@@ -236,7 +236,7 @@ src/core/Inkwell.Abstractions/
 | 字段         | 内容                                                                                                                                                                                                                                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 文件路径     | `src/core/Inkwell.Abstractions/Persistence/Mixins/IHasOwner.cs`                                                                                                                                                                                                                             |
-| 职责         | 标记 mixin；Model 实现该接口表示需要 `OwnerUserId` 字段（[REQ-002 Agent 创建者](../../01-requirements/requirements.md) / [REQ-006 对话归属](../../01-requirements/requirements.md)）；`providers/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）自动配置该列为 `NOT NULL` + 索引 |
+| 职责         | 标记 mixin；Model 实现该接口表示需要 `OwnerUserId` 字段（[REQ-002 Agent 创建者](../../01-requirements/requirements.md) / [REQ-006 对话归属](../../01-requirements/requirements.md)）；`providers/Persistence/Inkwell.Persistence.EFCore` 在 `OnModelCreating`（HD-009）自动配置该列为 `NOT NULL` + 索引 |
 | 对外接口     | `public interface IHasOwner { Guid OwnerUserId { get; } }`                                                                                                                                                                                                                                  |
 | 内部函数或类 | 仅 readonly 属性                                                                                                                                                                                                                                                                            |
 | 输入数据     | 实现方：业务在 `AddXxx` 前设置；Provider 不自动填充（强制业务显式赋值，避免错误归属）                                                                                                                                                                                                       |
@@ -402,7 +402,7 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 
 - **`Provider` 选择上移到 `Inkwell:Providers:Persistence`**（F9）：二值白名单 `"SqlServer"` / `"PostgreSQL"` 由 [HD-001 §3.11.1 `InkwellProvidersOptions`](HD-001-Inkwell.Abstractions-foundation.md) 锁定（[ADR-004 §决策](../../03-architecture/adr/ADR-004-data-store-provider-switchable-ef-core.md)）—— v1 范围严格；新增 Provider 须新 ADR
 - **`AutoSeedOnStartup` 默认 true**（[ADR-021 D2](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）—— Builder DSL `.AutoSeedOnStartup(false)` 由 final adapter csproj 提供（HD-011 / HD-012）
-- **`Inkwell.Abstractions/Persistence/` 不得**引入任何 EF Core 包；EF 实现严格隔离在 `providers/Inkwell.Persistence.EFCore/`（[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
+- **`Inkwell.Abstractions/Persistence/` 不得**引入任何 EF Core 包；EF 实现严格隔离在 `providers/Persistence/Inkwell.Persistence.EFCore/`（[ADR-021](../../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）
 - **业务命名空间不得**直接 inject `IUnitOfWork`；只能通过 `IPersistenceProvider.ExecuteInTransactionAsync` 在 lambda 内访问—— `IUnitOfWork` 实例不允许跨事务边界外漏
 
 ### 5.1 EFCore 配置公开约定（2026-05-10 errata）
@@ -427,13 +427,13 @@ T:Inkwell.Abstractions.Persistence.IXxxGateway; Use I<TypeName>Repository instea
 HD-002 不直接定义 `Use*` 扩展方法；`UseSqlServer` / `UsePostgres` 由 final adapter csproj 提供（HD-011 / HD-012）。本 HD 锁定它们的契约：
 
 ```csharp
-// providers/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/UseSqlServer.cs (HD-011)
+// providers/Persistence/Inkwell.Persistence.EFCore.SqlServer/DependencyInjection/UseSqlServer.cs (HD-011)
 public static IInkwellBuilder UseSqlServer(
     this IInkwellBuilder builder,
     string connectionString,
     Action<PersistenceOptions>? configure = null);
 
-// providers/Inkwell.Persistence.EFCore/DependencyInjection/AutoSeedOnStartup.cs (HD-009)
+// providers/Persistence/Inkwell.Persistence.EFCore/DependencyInjection/AutoSeedOnStartup.cs (HD-009)
 public static IInkwellBuilder AutoSeedOnStartup(
     this IInkwellBuilder builder,
     bool enabled);
@@ -507,7 +507,7 @@ public static IInkwellBuilder AutoSeedOnStartup(
 
 - **对 HD-001 §3.11 InkwellOptions.cs 的精化**：HD-001 §3.11 内的占位类 `public sealed class PersistenceOptions { }` 由本 HD §3.5 完整定义并搬到 `Persistence/PersistenceOptions.cs`；`InkwellOptions.cs` 引用从 `using Inkwell.Abstractions.Persistence;` 解析。**对 HD-001 reviewer**：本 HD 并非"覆盖" HD-001，而是 HD-001 §3.11 显式让出的"由 HD-002 ~ HD-007 各自补全"职责的兑现
 - 具名 `IXxxRepository` 接口由各业务命名空间 HD 起草（每个业务 HD 在自己的 §X 同步追加 `Inkwell.Abstractions/Persistence/<Module>/IXxxRepository.cs` + `<Module>/<TypeName>.cs`，`<TypeName>` 默认与模块同根字（如 `Agent.cs`），撞名时降级 `<TypeName>Definition.cs`，详见 §4.1.2）
-- Entity 类（`AgentEntity` 等）+ DbContext + EfCorePersistenceProvider + Seeder + MigrationRunner → HD-009 `providers/Inkwell.Persistence.EFCore` shared base
+- Entity 类（`AgentEntity` 等）+ DbContext + EfCorePersistenceProvider + Seeder + MigrationRunner → HD-009 `providers/Persistence/Inkwell.Persistence.EFCore` shared base
 - 两 final adapter（`UseSqlServer` / `UsePostgres`）→ HD-011 / HD-012
 - 跨 Provider 契约用例包 `tests/core/Inkwell.Providers.Contract/Persistence/` → 起草于 HD-013（独立 HD，覆盖全部 4 端口家族契约测试）
 - **本 HD 不锁定业务命名空间错误语义**：错误处理全走 [.NET BCL 异常类型](https://learn.microsoft.com/dotnet/standard/exceptions/)表达 + OTel [`exception.*` 五字段](https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/)（§4.3 BCL 对照表）；零 `Result<T>` / `Error` 抽象、零错误码表；需返回多项错误场景（如批量校验）走 [`ValidationResult`](https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.validationresult) / `IEnumerable<string>` 等 BCL 对症抽象
@@ -539,7 +539,7 @@ public static IInkwellBuilder AutoSeedOnStartup(
 本批 errata 落地 [ADR-022 entity-domain-mapper-selection](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md) 锁定的术语 + Repository 形态 + 命名规则：
 
 - **术语 Domain → Model 全文翻面**：全 H3 / `database-design.md` / `file-structure.md` 中 `XxxDomain` / `<Entity>Domain` / `TDomain` / `BaseDomain` 一律改为 `Xxx` / `<TypeName>` / `TModel` / `Base Model`。Mapping 扩展方法 `ToDomain()` 改为 `ToModel()`；selector `SelectAsDomain()` 改为 `SelectAsModel()`。`Inkwell.Abstractions/Persistence/<Module>/` 子目录下的 Model 文件命名从 `XxxDomain.cs` 改为 `<TypeName>.cs`（默认与模块同根字，如 `Agent.cs`）。
-- **F6 Mapping 扩展模式锁定**（[ADR-022 §决策](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）：所有 Entity ↔ Model 转换走手写 `XxxMappingExtensions` 静态类的扩展方法三件套（`ToModel()` / `ToEntity()` / `SelectAsModel()`）；禁止引入 AutoMapper / Mapster / Riok.Mapperly 等运行时或 SourceGen 框架。具名 Mapping 扩展物理位置：`providers/Inkwell.Persistence.EFCore/Mapping/`（HD-009 起草）。
+- **F6 Mapping 扩展模式锁定**（[ADR-022 §决策](../../03-architecture/adr/ADR-022-entity-domain-mapper-selection.md)）：所有 Entity ↔ Model 转换走手写 `XxxMappingExtensions` 静态类的扩展方法三件套（`ToModel()` / `ToEntity()` / `SelectAsModel()`）；禁止引入 AutoMapper / Mapster / Riok.Mapperly 等运行时或 SourceGen 框架。具名 Mapping 扩展物理位置：`providers/Persistence/Inkwell.Persistence.EFCore/Mapping/`（HD-009 起草）。
 - **§4.1.2 Model 命名规则**：业务 Model 默认无后缀（`Agent` / `Conversation` / `KnowledgeBase` / 等）；与 MAF `Microsoft.Agents.AI.AIAgent` 等外部类型撞名时降级为 `<TypeName>Definition`。当前已知降级：`AgentDefinition` / `ToolDefinition` / `SkillDefinition` / `TriggerDefinition`（语义上是"配置元数据 / 反射加载 / 代码生成"类型，与运行时实例区分）。**禁止** `XxxModel` 后缀（与 ML / MVVM 业界惯例冲突）；冷僻语义 `XxxRecord` / `XxxSnapshot` / `XxxOptions` 仅在显式语义匹配时允许。
 - **§3.2 IRepository<TModel, TKey> 形态 = 纯 marker**：`IRepository<TModel, TKey>` 退化为零成员的标记接口，仅锁定 `TModel : class` / `TKey : notnull` 类型参数 + 配合 `BannedSymbols.txt` 禁用 `IXxxStore` / `IXxxDao` / `IXxxGateway` 等后缀的正向锚点。**取消**泛型 CRUD 方法（原 `AddAsync` / `UpdateAsync` / `GetAsync` / `DeleteAsync` / `ListAsync`）；具名 `IXxxRepository` 接口在自己内独立声明 6 个具名动词方法（详 §4.1.3）。本变更动机：业务方法签名差异大（Agent 按 owner 找、Conversation 按 user 找、Trace 按 traceId 找），泛型 CRUD 在实战中几乎全部需要 overload，反而成噪音。
 - **§4.1.3 Repository 动词白名单**：所有具名 `IXxxRepository` 方法名必须以 `Add` / `Update` / `Get` / `Delete` / `List` / `Find` 之一开头，禁用 `Query` / `Fetch` / `Retrieve` / `Save` / `Persist` 等同义词；CI 通过 Roslyn analyzer 或代码评审强制（实现细节由 HD-013 起草）。**异步后缀例外**：具名 Repository 方法**不**带 `Async` 后缀（因 6 个动词本身已足够清晰、且全 Repository 方法都是异步、`Async` 重复信息）；其他抽象路径（`IPersistenceProvider` / `IUnitOfWork` / 业务 service）仍遵循 `Async` 后缀规约。

@@ -21,7 +21,7 @@ downstream:
 
 # ADR-004 数据存储：EF Core Provider 可切换 + Qdrant 向量库
 
-> **2026-05-10 增量更新**：本 ADR §决策 line 43 “`Inkwell.VectorStore` 模块封装” 表述已被 [ADR-020 向量存储抽象](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 精化（refinement，不 supersede）为：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)；Qdrant 实现抽到 `providers/Inkwell.VectorStore.Qdrant/`；`Inkwell.Core/` 加 `InMemoryVectorStore` 默认实现（与 [ADR-018](./ADR-018-queue-abstraction-channels-default.md) 环境对称原则一致）。csproj 11 → 12。
+> **2026-05-10 增量更新**：本 ADR §决策 line 43 “`Inkwell.VectorStore` 模块封装” 表述已被 [ADR-020 向量存储抽象](./ADR-020-vector-store-microsoft-extensions-vectordata.md) 精化（refinement，不 supersede）为：复用 [Microsoft.Extensions.VectorData](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vector-data)；Qdrant 实现抽到 `providers/VectorStore/Inkwell.VectorStore.Qdrant/`；`Inkwell.Core/` 加 `InMemoryVectorStore` 默认实现（与 [ADR-018](./ADR-018-queue-abstraction-channels-default.md) 环境对称原则一致）。csproj 11 → 12。
 >
 > **2026-05-10 增量更新·第二轮**：本 ADR §决策 line 39 “三 Provider 实现” 表述已被 [ADR-021 EFCore Persistence 共享层](./ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md) 精化（refinement，不 supersede）为：EFCore family = 4 csproj（`Inkwell.Persistence.EFCore` base + InMemory / SqlServer / Postgres 三 final adapter）。Entity / `OnModelCreating` / `EfCorePersistenceProvider` / DataSeed 集中在 base；Migration SQL 文本为 Provider-specific，在 SqlServer / Postgres final adapter 各自 `Migrations/`；InMemory 不支持 Migration 仅走 `EnsureCreated`。csproj 12 → 13。
 >
