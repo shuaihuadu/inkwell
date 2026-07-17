@@ -7,7 +7,7 @@ namespace Inkwell;
 /// <summary>
 /// 表示 LiteLLM OpenAI-compatible 模型项。
 /// </summary>
-internal sealed class LiteLLMModelResponse
+internal sealed class LiteLLMModelDataItem
 {
     /// <summary>
     /// 获取 LiteLLM model_name。

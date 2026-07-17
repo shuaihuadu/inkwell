@@ -110,7 +110,7 @@ public sealed class AuthControllerTests
         public Task UnlockAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<AuthAccountSummary>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default) =>
+        public Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }

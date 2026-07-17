@@ -5,13 +5,13 @@ using System.Text.Json.Serialization;
 namespace Inkwell;
 
 /// <summary>
-/// 表示 LiteLLM 模型组能力响应。
+/// 表示 LiteLLM OpenAI-compatible 模型列表响应。
 /// </summary>
-internal sealed class LiteLLMModelGroupsResponse
+internal sealed class LiteLLMModels
 {
     /// <summary>
-    /// 获取模型组列表。
+    /// 获取模型列表。
     /// </summary>
     [JsonPropertyName("data")]
-    public IReadOnlyList<LiteLLMModelGroupResponse> Data { get; init; } = [];
+    public IReadOnlyList<LiteLLMModelDataItem> Data { get; init; } = [];
 }

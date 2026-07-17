@@ -19,15 +19,15 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
     /// <inheritdoc />
     public async Task<IReadOnlyList<LLMModel>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
-        LiteLLMModelsResponse response = await httpClient
-            .GetFromJsonAsync<LiteLLMModelsResponse>("v1/models", cancellationToken)
+        LiteLLMModels response = await httpClient
+            .GetFromJsonAsync<LiteLLMModels>("v1/models", cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException("LiteLLM returned an empty model list response.");
-        LiteLLMModelGroupsResponse groupsResponse = await httpClient
-            .GetFromJsonAsync<LiteLLMModelGroupsResponse>("model_group/info", cancellationToken)
+        LiteLLMModelGroups groupsResponse = await httpClient
+            .GetFromJsonAsync<LiteLLMModelGroups>("model_group/info", cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException("LiteLLM returned an empty model group response.");
-        Dictionary<string, LiteLLMModelGroupResponse> groupsById = groupsResponse.Data
+        Dictionary<string, LiteLLMModelGroupDataItem> groupsById = groupsResponse.Data
             .ToDictionary(group => group.ModelGroup, StringComparer.OrdinalIgnoreCase);
 
         return [.. response.Data
@@ -128,10 +128,10 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
     }
 
     private static LLMModel MapModel(
-        LiteLLMModelResponse model,
-        Dictionary<string, LiteLLMModelGroupResponse> groupsById)
+        LiteLLMModelDataItem model,
+        Dictionary<string, LiteLLMModelGroupDataItem> groupsById)
     {
-        _ = groupsById.TryGetValue(model.Id, out LiteLLMModelGroupResponse? group);
+        _ = groupsById.TryGetValue(model.Id, out LiteLLMModelGroupDataItem? group);
 
         return new LLMModel
         {
@@ -157,7 +157,7 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
         _ => LLMModelCategory.Unknown,
     };
 
-    private static bool? GetSupportsStructuredOutput(LiteLLMModelGroupResponse? group)
+    private static bool? GetSupportsStructuredOutput(LiteLLMModelGroupDataItem? group)
     {
         if (group?.SupportsResponseSchema is not null)
         {

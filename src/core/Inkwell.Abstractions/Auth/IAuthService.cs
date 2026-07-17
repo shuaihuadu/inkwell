@@ -49,5 +49,5 @@ public interface IAuthService
     /// <param name="isLocked">锁定状态筛选条件；未指定时返回全部账号。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>账号摘要列表。</returns>
-    Task<IReadOnlyList<AuthAccountSummary>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default);
+    Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default);
 }

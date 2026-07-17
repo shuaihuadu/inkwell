@@ -162,7 +162,7 @@ internal sealed class AuthService(
         }, ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<AuthAccountSummary>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default)
+    public async Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default)
     {
         if (isLocked is not null)
         {
@@ -178,7 +178,7 @@ internal sealed class AuthService(
         return [.. all.Select(ToAccountSummary)];
     }
 
-    private static AuthAccountSummary ToAccountSummary(User user) =>
+    private static UserListItem ToAccountSummary(User user) =>
         new(user.Id, user.Username, user.IsSuper, user.IsLocked, user.LastLoginTime, user.CreatedTime);
 
     private static string BuildSessionCacheKey(string token) => $"auth:session:{token}";

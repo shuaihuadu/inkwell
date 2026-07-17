@@ -7,7 +7,7 @@ namespace Inkwell;
 /// <summary>
 /// 表示 LiteLLM 模型组能力项。
 /// </summary>
-internal sealed class LiteLLMModelGroupResponse
+internal sealed class LiteLLMModelGroupDataItem
 {
     /// <summary>
     /// 获取 LiteLLM model_name。
