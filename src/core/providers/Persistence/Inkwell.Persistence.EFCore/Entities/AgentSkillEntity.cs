@@ -23,8 +23,6 @@ internal sealed class AgentSkillEntity : IHasOwner, IHasTimestamps
     /// <summary>序列化的 <c>IReadOnlyList&lt;Uri&gt;</c>；默认空数组。</summary>
     public string ScriptFileUris { get; init; } = "[]";
 
-    public byte[] RowVersion { get; init; } = [];
-
     public DateTimeOffset CreatedTime { get; init; }
 
     public DateTimeOffset UpdatedTime { get; init; }

@@ -58,8 +58,7 @@ public sealed class AgentSkillCatalogServiceTests
         AgentSkillUpdateRequest request = new(
             "updated-name",
             "Updated description.",
-            "# Updated",
-            existing.RowVersion);
+            "# Updated");
 
         // Act
         AgentSkillDefinition result = await service.UpdateSkillAsync(
@@ -88,8 +87,7 @@ public sealed class AgentSkillCatalogServiceTests
         AgentSkillUpdateRequest request = new(
             existing.Name,
             existing.Description,
-            existing.Content,
-            existing.RowVersion);
+            existing.Content);
 
         // Act
         Task ActAsync() => service.UpdateSkillAsync(
@@ -113,7 +111,6 @@ public sealed class AgentSkillCatalogServiceTests
         Name = "contract-review",
         Description = "Reviews contracts.",
         Content = "# Contract review",
-        RowVersion = Guid.CreateVersion7().ToByteArray(),
         CreatedTime = DateTimeOffset.UtcNow,
         UpdatedTime = DateTimeOffset.UtcNow,
     };
@@ -129,12 +126,8 @@ public sealed class AgentSkillCatalogServiceTests
             CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            AgentSkillDefinition created = skill with
-            {
-                RowVersion = Guid.CreateVersion7().ToByteArray(),
-            };
-            this._skills.Add(created.Id, created);
-            return Task.FromResult(created);
+            this._skills.Add(skill.Id, skill);
+            return Task.FromResult(skill);
         }
 
         public Task<AgentSkillDefinition> UpdateSkill(

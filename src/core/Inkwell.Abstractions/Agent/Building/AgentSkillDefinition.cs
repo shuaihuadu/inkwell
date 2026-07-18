@@ -46,11 +46,6 @@ public sealed record class AgentSkillDefinition : IHasOwner, IHasTimestamps
     public IReadOnlyList<Uri> ScriptFileUris { get; init; } = [];
 
     /// <summary>
-    /// 获取乐观并发版本。
-    /// </summary>
-    public byte[] RowVersion { get; init; } = [];
-
-    /// <summary>
     /// 获取 Skill 创建时间。
     /// </summary>
     public required DateTimeOffset CreatedTime { get; init; }

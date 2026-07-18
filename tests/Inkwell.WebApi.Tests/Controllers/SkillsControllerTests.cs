@@ -56,8 +56,7 @@ public sealed class SkillsControllerTests
         AgentSkillUpdateRequest request = new(
             "updated",
             "Updated description.",
-            "# Updated",
-            new byte[16]);
+            "# Updated");
 
         // Act
         _ = await controller.UpdateAsync(Guid.CreateVersion7(), request, CancellationToken.None);
@@ -140,7 +139,6 @@ public sealed class SkillsControllerTests
             Name = "contract-review",
             Description = "Reviews contracts.",
             Content = "# Contract review",
-            RowVersion = new byte[16],
             CreatedTime = DateTimeOffset.UtcNow,
             UpdatedTime = DateTimeOffset.UtcNow,
         };

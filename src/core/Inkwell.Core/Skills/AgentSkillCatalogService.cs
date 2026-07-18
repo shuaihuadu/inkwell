@@ -81,7 +81,6 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
             Name = request.Name,
             Description = request.Description,
             Content = request.Content,
-            RowVersion = request.RowVersion,
             UpdatedTime = DateTimeOffset.UtcNow,
         };
 

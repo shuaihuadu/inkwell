@@ -115,7 +115,6 @@ export interface AgentSkillDefinition {
     referenceFileUris: string[];
     assetFileUris: string[];
     scriptFileUris: string[];
-    rowVersion: string;
     createdTime: string;
     updatedTime: string;
 }
@@ -124,7 +123,6 @@ export interface AgentSkillUpdateRequest {
     name: string;
     description: string;
     content: string;
-    rowVersion: string;
 }
 
 export interface AgentSkillUploadFile {

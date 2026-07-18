@@ -10,10 +10,7 @@ internal sealed class AgentSkillRepository(InkwellDbContext db) : IAgentSkillRep
     {
         ArgumentNullException.ThrowIfNull(skill);
 
-        AgentSkillEntity entity = (skill with
-        {
-            RowVersion = Guid.CreateVersion7().ToByteArray(),
-        }).ToEntity();
+        AgentSkillEntity entity = skill.ToEntity();
 
         db.Set<AgentSkillEntity>().Add(entity);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -27,12 +24,8 @@ internal sealed class AgentSkillRepository(InkwellDbContext db) : IAgentSkillRep
     {
         ArgumentNullException.ThrowIfNull(skill);
 
-        AgentSkillEntity entity = (skill with
-        {
-            RowVersion = Guid.CreateVersion7().ToByteArray(),
-        }).ToEntity();
+        AgentSkillEntity entity = skill.ToEntity();
         db.Set<AgentSkillEntity>().Attach(entity);
-        db.Entry(entity).Property(item => item.RowVersion).OriginalValue = skill.RowVersion;
         db.Entry(entity).State = EntityState.Modified;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 

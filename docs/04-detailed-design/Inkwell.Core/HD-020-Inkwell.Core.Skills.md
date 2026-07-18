@@ -23,9 +23,9 @@ upstream:
 >
 > **2026-07-18 替代性 errata（Skill 所有权、编辑与删除）**：Owner 已将 UI-011 从占位页升级为正式 Skill 管理页。本文后续所有“Skill 无 Owner”“不提供 Update/Delete”“上传后只读”的描述均被本 errata 取代；scripts 的接收与执行边界以紧随其后的“上传元数据与 scripts 保留”errata 为准。
 >
-> - `AgentSkillDefinition` 新增 `Guid OwnerUserId` 与 `byte[] RowVersion`；上传者为 Owner。名称、描述和 Markdown `Content` 可编辑，`ReferenceFileUris` / `AssetFileUris` 首期只读；不新增启停字段。
-> - 新增 `AgentSkillUpdateRequest(string Name, string Description, string Content, byte[] RowVersion)`；Service 暴露 `UpdateSkillAsync` 与 `DeleteSkillAsync`。Owner 可管理自己的 Skill，Admin 可管理全部，其他 Member 只读；业务所有权校验必须在 Service 完成，不能只依赖 UI 隐藏按钮。
-> - `IAgentSkillRepository` 新增 `UpdateSkill` 与幂等 `DeleteSkill`；更新使用 `RowVersion` 做乐观并发。数据库增加 `OwnerUserId` 索引与外键；删除 User 时 Skill 的归属处理遵循 User 删除仍不在 v1 范围，因此不新增级联删除行为。
+> - `AgentSkillDefinition` 新增 `Guid OwnerUserId`；上传者为 Owner。名称、描述和 Markdown `Content` 可编辑，`ReferenceFileUris` / `AssetFileUris` 首期只读；不新增启停字段，也不重新引入已从当前实现移除的 `RowVersion`。
+> - 新增 `AgentSkillUpdateRequest(string Name, string Description, string Content)`；Service 暴露 `UpdateSkillAsync` 与 `DeleteSkillAsync`。Owner 可管理自己的 Skill，Admin 可管理全部，其他 Member 只读；业务所有权校验必须在 Service 完成，不能只依赖 UI 隐藏按钮。
+> - `IAgentSkillRepository` 新增 `UpdateSkill` 与幂等 `DeleteSkill`。数据库增加 `OwnerUserId` 索引与外键；删除 User 时 Skill 的归属处理遵循 User 删除仍不在 v1 范围，因此不新增级联删除行为。
 > - 保存 Agent 草稿时 Skill 的名称、描述、Markdown 内容与资源引用进入 `AgentDefinition.BuildOptions.Skills`，发布时随 BuildOptions 复制到版本 Snapshot；目录后续编辑或删除不影响已保存版本，重新编辑 Agent 并保存后才采用新内容。
 > - 删除需二次确认。删除后，新配置无法再挂载该 Skill；已保存草稿和已发布版本直接使用各自 BuildOptions / Snapshot 中的定义，不产生目录缺失警告。EX-008 仍覆盖 Snapshot 内资源缺失、内容损坏或旧版本兼容失败等真实加载异常。
 

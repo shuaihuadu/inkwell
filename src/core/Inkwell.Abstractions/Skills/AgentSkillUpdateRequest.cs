@@ -8,9 +8,7 @@ namespace Inkwell;
 /// <param name="Name">Skill 名称。</param>
 /// <param name="Description">Skill 描述。</param>
 /// <param name="Content">SKILL.md Markdown 内容。</param>
-/// <param name="RowVersion">乐观并发版本。</param>
 public sealed record class AgentSkillUpdateRequest(
     string Name,
     string Description,
-    string Content,
-    byte[] RowVersion);
+    string Content);
