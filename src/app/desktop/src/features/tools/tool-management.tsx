@@ -111,7 +111,7 @@ export function ToolManagement() {
             tableScrollX={800}
             totalLabel={(total) => `共 ${total} 个 Tool`}
             loading={toolsQuery.isLoading}
-            errorMessage={toolsQuery.isError ? "无法读取工具目录，请重试" : undefined}
+            errorMessage={toolsQuery.isError ? "工具列表加载失败，请稍后重试" : undefined}
             onRetry={() => void toolsQuery.refetch()}
             emptyText="当前没有已注册的工具"
             filteredEmptyText="没有匹配的工具，请清除搜索条件"
