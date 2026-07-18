@@ -25,13 +25,13 @@ internal sealed class LiteLLMModelGroupDataItem
     /// 获取最大输入 token 数。
     /// </summary>
     [JsonPropertyName("max_input_tokens")]
-    public int? MaxInputTokens { get; init; }
+    public double? MaxInputTokens { get; init; }
 
     /// <summary>
     /// 获取最大输出 token 数。
     /// </summary>
     [JsonPropertyName("max_output_tokens")]
-    public int? MaxOutputTokens { get; init; }
+    public double? MaxOutputTokens { get; init; }
 
     /// <summary>
     /// 获取是否支持函数调用。

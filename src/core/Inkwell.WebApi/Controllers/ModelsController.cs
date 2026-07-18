@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace Inkwell.WebApi.Controllers;
 
 /// <summary>
@@ -9,6 +11,15 @@ namespace Inkwell.WebApi.Controllers;
 [Authorize(Policy = AuthorizationPolicies.RequireAuthenticatedUser)]
 public sealed class ModelsController(ILLMProvider llmProvider) : InkwellControllerBase
 {
+    /// <summary>
+    /// 获取当前 Provider 可公开的管理入口。
+    /// </summary>
+    /// <returns>Provider 管理信息。</returns>
+    [HttpGet("management")]
+    [ProducesResponseType<LLMProviderManagementInfo>(StatusCodes.Status200OK)]
+    public ActionResult<LLMProviderManagementInfo> GetManagementInfo() =>
+        this.Ok(llmProvider.GetManagementInfo());
+
     /// <summary>
     /// 获取当前 Provider 可访问的全部模型。
     /// </summary>
@@ -49,7 +60,7 @@ public sealed class ModelsController(ILLMProvider llmProvider) : InkwellControll
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>脱敏后的连通性测试结果。</returns>
     [HttpPost("{modelId}/test")]
-    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [EnableRateLimiting(AuthorizationPolicies.ModelTestRateLimiterPolicy)]
     [ProducesResponseType<LLMModelTestResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<LLMModelTestResult>> TestAsync(
         string modelId,

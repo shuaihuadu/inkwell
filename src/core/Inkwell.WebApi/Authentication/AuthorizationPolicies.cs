@@ -13,4 +13,7 @@ public static class AuthorizationPolicies
 
     /// <summary>登录 / 解锁等密码校验端点使用的按 IP 限流策略名称。</summary>
     public const string AuthRateLimiterPolicy = "Auth";
+
+    /// <summary>模型连通性测试使用的按用户限流策略名称。</summary>
+    public const string ModelTestRateLimiterPolicy = "ModelTest";
 }

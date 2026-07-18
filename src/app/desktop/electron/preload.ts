@@ -18,7 +18,11 @@ const api: InkwellDesktopApi = {
   },
   listAgents: () => ipcRenderer.invoke('inkwell:list-agents'),
   listModels: () => ipcRenderer.invoke('inkwell:list-models'),
+  getModelManagementInfo: () => ipcRenderer.invoke('inkwell:model-management-info'),
   testModel: (modelId) => ipcRenderer.invoke('inkwell:test-model', modelId),
+  openExternal: (url) => ipcRenderer.invoke('inkwell:open-external', url),
+  listAccounts: () => ipcRenderer.invoke('inkwell:list-accounts'),
+  unlockAccount: (userId) => ipcRenderer.invoke('inkwell:unlock-account', userId),
   createAgent: (request) => ipcRenderer.invoke('inkwell:create-agent', request),
   chat: (request) => ipcRenderer.invoke('inkwell:chat', request),
   onChatDelta: (listener) => {

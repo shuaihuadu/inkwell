@@ -17,6 +17,12 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
     private readonly OpenAIClient _openAIClient = CreateOpenAIClient(httpClient, options);
 
     /// <inheritdoc />
+    public LLMProviderManagementInfo GetManagementInfo() => new()
+    {
+        DashboardUrl = options.Value.DashboardUrl,
+    };
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<LLMModel>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
         LiteLLMModels response = await httpClient
@@ -139,8 +145,8 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
             Category = MapCategory(group?.Mode),
             ProviderMode = group?.Mode,
             OwnedBy = model.OwnedBy,
-            MaxInputTokens = group?.MaxInputTokens,
-            MaxOutputTokens = group?.MaxOutputTokens,
+            MaxInputTokens = NormalizeTokenLimit(group?.MaxInputTokens),
+            MaxOutputTokens = NormalizeTokenLimit(group?.MaxOutputTokens),
             SupportsVision = group?.SupportsVision,
             SupportsTools = group?.SupportsFunctionCalling,
             SupportsStructuredOutput = GetSupportsStructuredOutput(group),
@@ -156,6 +162,15 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
         "video_generation" => LLMModelCategory.VideoGeneration,
         _ => LLMModelCategory.Unknown,
     };
+
+    private static int? NormalizeTokenLimit(double? value) =>
+        value is double tokenLimit &&
+        double.IsFinite(tokenLimit) &&
+        tokenLimit >= 0 &&
+        tokenLimit <= int.MaxValue &&
+        tokenLimit == Math.Truncate(tokenLimit)
+            ? (int)tokenLimit
+            : null;
 
     private static bool? GetSupportsStructuredOutput(LiteLLMModelGroupDataItem? group)
     {

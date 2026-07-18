@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Security.Claims;
+using System.Reflection;
 using Inkwell.WebApi.Auth;
 using Inkwell.WebApi.Controllers;
 
@@ -67,6 +68,66 @@ public sealed class AuthControllerTests
         Assert.AreEqual(StatusCodes.Status423Locked, lockedResult.StatusCode);
     }
 
+    /// <summary>
+    /// 验证账号列表筛选条件传递给认证服务。
+    /// </summary>
+    [TestMethod]
+    public async Task ListAccountsAsync_ReturnsServiceAccountsAsync()
+    {
+        // Arrange
+        UserListItem account = new(userId, "admin", true, true, null, DateTimeOffset.UtcNow);
+        StubAuthService authService = new() { Accounts = [account] };
+        AuthController controller = CreateController(authService);
+
+        // Act
+        ActionResult<IReadOnlyList<UserListItem>> result = await controller.ListAccountsAsync(true, CancellationToken.None);
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        IReadOnlyList<UserListItem> accounts = (IReadOnlyList<UserListItem>)okResult.Value!;
+
+        // Assert
+        Assert.AreSame(authService.Accounts, accounts);
+        Assert.IsTrue(authService.RequestedIsLocked);
+    }
+
+    /// <summary>
+    /// 验证解封账号使用路由目标和当前管理员标识。
+    /// </summary>
+    [TestMethod]
+    public async Task UnlockAccountAsync_UsesCurrentAdministratorAsync()
+    {
+        // Arrange
+        Guid targetUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        StubAuthService authService = new();
+        AuthController controller = CreateController(authService);
+
+        // Act
+        IActionResult result = await controller.UnlockAccountAsync(targetUserId, CancellationToken.None);
+
+        // Assert
+        Assert.IsInstanceOfType<NoContentResult>(result);
+        Assert.AreEqual(targetUserId, authService.UnlockedUserId);
+        Assert.AreEqual(userId, authService.UnlockActorUserId);
+    }
+
+    /// <summary>
+    /// 验证账号管理端点要求超级管理员策略。
+    /// </summary>
+    [TestMethod]
+    public void AccountManagementEndpoints_RequireSuperUserPolicy()
+    {
+        // Arrange
+        MethodInfo listMethod = typeof(AuthController).GetMethod(nameof(AuthController.ListAccountsAsync))!;
+        MethodInfo unlockMethod = typeof(AuthController).GetMethod(nameof(AuthController.UnlockAccountAsync))!;
+
+        // Act
+        string? listPolicy = listMethod.GetCustomAttribute<AuthorizeAttribute>()?.Policy;
+        string? unlockPolicy = unlockMethod.GetCustomAttribute<AuthorizeAttribute>()?.Policy;
+
+        // Assert
+        Assert.AreEqual(AuthorizationPolicies.RequireSuperUser, listPolicy);
+        Assert.AreEqual(AuthorizationPolicies.RequireSuperUser, unlockPolicy);
+    }
+
     private static AuthController CreateController(IAuthService authService)
     {
         ClaimsPrincipal user = new(new ClaimsIdentity(
@@ -85,6 +146,14 @@ public sealed class AuthControllerTests
 
     private sealed class StubAuthService : IAuthService
     {
+        public IReadOnlyList<UserListItem> Accounts { get; init; } = [];
+
+        public bool? RequestedIsLocked { get; private set; }
+
+        public Guid? UnlockedUserId { get; private set; }
+
+        public Guid? UnlockActorUserId { get; private set; }
+
         public Exception? VerifyException { get; init; }
 
         public Guid? VerifiedUserId { get; private set; }
@@ -107,10 +176,17 @@ public sealed class AuthControllerTests
                 : Task.FromException(this.VerifyException);
         }
 
-        public Task UnlockAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default) =>
-            throw new NotSupportedException();
+        public Task UnlockAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default)
+        {
+            this.UnlockedUserId = targetUserId;
+            this.UnlockActorUserId = actorUserId;
+            return Task.CompletedTask;
+        }
 
-        public Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default) =>
-            throw new NotSupportedException();
+        public Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default)
+        {
+            this.RequestedIsLocked = isLocked;
+            return Task.FromResult(this.Accounts);
+        }
     }
 }

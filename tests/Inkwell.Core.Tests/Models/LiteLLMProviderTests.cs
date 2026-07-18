@@ -103,6 +103,27 @@ public sealed class LiteLLMProviderTests
     }
 
     /// <summary>
+    /// 验证 LiteLLM 以带小数点的 JSON number 返回 token 上限时仍能映射为整数。
+    /// </summary>
+    [TestMethod]
+    public async Task ListModelsAsync_WithDecimalTokenLimits_MapsIntegralValuesAsync()
+    {
+        // Arrange
+        using StubHttpMessageHandler handler = new(
+            """{"data":[{"id":"decimal-limit-model","owned_by":"custom"}]}""",
+            """{"data":[{"model_group":"decimal-limit-model","mode":"chat","max_input_tokens":1050000.0,"max_output_tokens":128000.0}]}""");
+        using HttpClient httpClient = CreateHttpClient(handler);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
+
+        // Act
+        LLMModel model = (await provider.ListModelsAsync()).Single();
+
+        // Assert
+        Assert.AreEqual(1_050_000, model.MaxInputTokens);
+        Assert.AreEqual(128_000, model.MaxOutputTokens);
+    }
+
+    /// <summary>
     /// 验证按 ID 查询使用大小写不敏感匹配。
     /// </summary>
     [TestMethod]

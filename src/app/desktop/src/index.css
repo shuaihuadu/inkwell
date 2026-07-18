@@ -425,45 +425,90 @@ textarea {
     place-items: center;
     background: var(--shell-bg);
 }
-.model-management {
+.inkwell-data-list-page {
     width: 100%;
     min-width: 0;
-    max-width: 100%;
     height: 100%;
-    overflow: auto;
     padding: 24px 28px;
+    overflow: auto;
     background: var(--shell-bg);
 }
-.model-management-header {
+.inkwell-data-list-header,
+.inkwell-data-list-toolbar {
     display: flex;
     align-items: center;
+    gap: 12px;
+}
+.inkwell-data-list-header {
     justify-content: space-between;
-    gap: 20px;
     margin-bottom: 20px;
 }
-.model-management-header h3.ant-typography {
-    margin: 0 0 2px;
-    font-size: 22px;
+.inkwell-data-list-header h4.ant-typography {
+    margin: 0 0 4px;
 }
-.model-table {
-    width: 100%;
+.inkwell-data-list-page > .ant-alert {
+    margin-bottom: 16px;
+}
+.inkwell-data-list-toolbar {
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.inkwell-data-list-actions {
+    margin-left: auto;
+}
+.inkwell-data-list-actions .ant-input-affix-wrapper {
+    width: 280px;
+}
+.inkwell-data-list-table {
     max-width: 100%;
-    margin-top: 18px;
+    overflow: hidden;
 }
-.model-table .ant-table-content {
-    overflow-x: auto !important;
+.inkwell-data-list-table .ant-skeleton {
+    padding: 16px;
 }
-.model-name-cell {
-    display: grid;
-    gap: 2px;
+.inkwell-data-list-table .inkwell-action-column {
+    padding-inline: 12px !important;
 }
-.model-source-status {
+.inkwell-data-list-pagination {
     display: flex;
+    min-height: 48px;
     align-items: center;
-    gap: 7px;
-    margin-top: 14px;
-    color: var(--shell-muted);
-    font-size: 12px;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 16px;
+}
+.inkwell-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.model-id-link.ant-btn {
+    height: auto;
+    padding: 0;
+}
+.model-capability-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+@media (max-width: 760px) {
+    .inkwell-data-list-header {
+        align-items: flex-start;
+    }
+    .inkwell-data-list-toolbar > .ant-space:first-child,
+    .inkwell-data-list-toolbar > .ant-space:first-child .ant-select {
+        width: 100% !important;
+    }
+    .inkwell-data-list-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+    .inkwell-data-list-actions .ant-space-item:last-child,
+    .inkwell-data-list-actions .ant-input-affix-wrapper {
+        width: 100% !important;
+        flex: 1;
+    }
 }
 .about-heading {
     padding-top: 8px;

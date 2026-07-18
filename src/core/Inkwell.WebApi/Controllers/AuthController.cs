@@ -126,4 +126,43 @@ public sealed class AuthController(IAuthService authService) : InkwellController
             return this.StatusCode(StatusCodes.Status423Locked);
         }
     }
+
+    /// <summary>
+    /// 获取部署内的账号列表。
+    /// </summary>
+    /// <param name="isLocked">锁定状态筛选条件；未指定时返回全部账号。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>账号摘要列表。</returns>
+    [HttpGet("accounts")]
+    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [ProducesResponseType<IReadOnlyList<UserListItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<UserListItem>>> ListAccountsAsync(
+        bool? isLocked,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<UserListItem> accounts = await authService
+            .ListAccountsAsync(isLocked, cancellationToken)
+            .ConfigureAwait(false);
+
+        return this.Ok(accounts);
+    }
+
+    /// <summary>
+    /// 解封指定账号。
+    /// </summary>
+    /// <param name="userId">目标用户标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>无响应正文。</returns>
+    [HttpPost("accounts/{userId:guid}/unlock")]
+    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UnlockAccountAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await authService
+            .UnlockAccountAsync(userId, this.GetRequiredUserId(), cancellationToken)
+            .ConfigureAwait(false);
+
+        return this.NoContent();
+    }
 }

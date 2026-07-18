@@ -2,6 +2,7 @@
 
 using System.Reflection;
 using Inkwell.WebApi.Controllers;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Inkwell.WebApi.Tests.Controllers;
 
@@ -73,7 +74,25 @@ public sealed class ModelsControllerTests
     }
 
     /// <summary>
-    /// 验证模型 API 要求登录，模型测试端点额外要求超级管理员。
+    /// 验证管理元数据由 Provider 返回且不暴露私有连接配置。
+    /// </summary>
+    [TestMethod]
+    public void GetManagementInfo_ReturnsProviderDashboardUrl()
+    {
+        // Arrange
+        ModelsController controller = new(new StubLLMProvider([]));
+
+        // Act
+        ActionResult<LLMProviderManagementInfo> result = controller.GetManagementInfo();
+        OkObjectResult okResult = (OkObjectResult)result.Result!;
+        LLMProviderManagementInfo managementInfo = (LLMProviderManagementInfo)okResult.Value!;
+
+        // Assert
+        Assert.AreEqual(new Uri("https://litellm.example/"), managementInfo.DashboardUrl);
+    }
+
+    /// <summary>
+    /// 验证模型 API 要求登录，模型测试端点使用独立的用户级限流。
     /// </summary>
     [TestMethod]
     public void Controller_DefinesExpectedAuthorizationPolicies()
@@ -87,14 +106,15 @@ public sealed class ModelsControllerTests
             .Cast<AuthorizeAttribute>()
             .Single()
             .Policy;
-        string? testPolicy = testMethod.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
-            .Cast<AuthorizeAttribute>()
-            .Single()
-            .Policy;
+        EnableRateLimitingAttribute rateLimiting = testMethod
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: true)
+            .Cast<EnableRateLimitingAttribute>()
+            .Single();
 
         // Assert
         Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, controllerPolicy);
-        Assert.AreEqual(AuthorizationPolicies.RequireSuperUser, testPolicy);
+        Assert.IsEmpty(testMethod.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true));
+        Assert.AreEqual(AuthorizationPolicies.ModelTestRateLimiterPolicy, rateLimiting.PolicyName);
     }
 
     private static LLMModel CreateModel(string id, LLMModelCategory category) => new()
@@ -108,6 +128,11 @@ public sealed class ModelsControllerTests
 
     private sealed class StubLLMProvider(IReadOnlyList<LLMModel> models) : ILLMProvider
     {
+        public LLMProviderManagementInfo GetManagementInfo() => new()
+        {
+            DashboardUrl = new Uri("https://litellm.example/"),
+        };
+
         public Task<IReadOnlyList<LLMModel>> ListModelsAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

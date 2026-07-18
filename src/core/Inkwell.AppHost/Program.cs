@@ -7,6 +7,7 @@ int webApiPort = GetPort(builder.Configuration["Ports:WebApi"], "Ports:WebApi", 
 int pgAdminPort = GetPort(builder.Configuration["Ports:PgAdmin"], "Ports:PgAdmin", 6802);
 int sqlServerPort = GetPort(builder.Configuration["Ports:SqlServer"], "Ports:SqlServer", 6803);
 int liteLLMPort = GetPort(builder.Configuration["Ports:LiteLLM"], "Ports:LiteLLM", 6804);
+string liteLLMDashboardUrl = $"http://localhost:{liteLLMPort.ToString(System.Globalization.CultureInfo.InvariantCulture)}/ui";
 int grafanaPort = GetPort(builder.Configuration["Ports:Grafana"], "Ports:Grafana", 6805);
 int prometheusPort = GetPort(builder.Configuration["Ports:Prometheus"], "Ports:Prometheus", 6806);
 int tempoPort = GetPort(builder.Configuration["Ports:Tempo"], "Ports:Tempo", 6807);
@@ -92,6 +93,7 @@ IResourceBuilder<ProjectResource> webApi = builder
     .WithEnvironment("ConnectionStrings__Inkwell", database.Resource.ConnectionStringExpression)
     .WithEnvironment("Inkwell__LiteLLM__Endpoint", liteLLM.GetEndpoint("http"))
     .WithEnvironment("Inkwell__LiteLLM__ApiKey", liteLLMMasterKey)
+    .WithEnvironment("Inkwell__LiteLLM__DashboardUrl", liteLLMDashboardUrl)
     .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", observability.GetEndpoint("otlp-grpc"))
     .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")

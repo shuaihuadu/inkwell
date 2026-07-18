@@ -20,8 +20,10 @@ import type {
     LoginRequest,
     LoginResult,
     LLMModel,
+    LLMProviderManagementInfo,
     LLMModelTestResult,
     UnlockResult,
+    UserListItem,
 } from "../src/shared/network/contracts.js";
 
 const apiBaseUrl = (
@@ -161,6 +163,13 @@ const requireAuthenticated = (): void => {
                 ? "Client is locked."
                 : "Authentication is required.",
         );
+    }
+};
+
+const requireSuperUser = (): void => {
+    requireAuthenticated();
+    if (!authSnapshot.identity?.isSuper) {
+        throw new Error("Super user authorization is required.");
     }
 };
 
@@ -305,6 +314,10 @@ const registerApiHandlers = (): void => {
         requireAuthenticated();
         return request<LLMModel[]>("/api/models");
     });
+    ipcMain.handle("inkwell:model-management-info", () => {
+        requireAuthenticated();
+        return request<LLMProviderManagementInfo>("/api/models/management");
+    });
     ipcMain.handle("inkwell:test-model", (_event, modelId: string) => {
         requireAuthenticated();
         return request<LLMModelTestResult>(
@@ -312,6 +325,29 @@ const registerApiHandlers = (): void => {
             { method: "POST" },
         );
     });
+    ipcMain.handle("inkwell:open-external", async (_event, url: string) => {
+        requireAuthenticated();
+        const externalUrl = new URL(url);
+        if (externalUrl.protocol !== "https:" && externalUrl.protocol !== "http:") {
+            throw new Error("Only HTTP and HTTPS URLs can be opened externally.");
+        }
+
+        await shell.openExternal(externalUrl.toString());
+    });
+    ipcMain.handle("inkwell:list-accounts", () => {
+        requireSuperUser();
+        return request<UserListItem[]>("/api/auth/accounts");
+    });
+    ipcMain.handle(
+        "inkwell:unlock-account",
+        (_event, userId: string) => {
+            requireSuperUser();
+            return request<void>(
+                `/api/auth/accounts/${encodeURIComponent(userId)}/unlock`,
+                { method: "POST" },
+            );
+        },
+    );
     ipcMain.handle(
         "inkwell:create-agent",
         async (_event, input: CreateAgentRequest): Promise<AgentDefinition> => {

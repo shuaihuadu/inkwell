@@ -21,4 +21,9 @@ public sealed class LiteLLMOptions
     [Required]
     [MinLength(1)]
     public required string ApiKey { get; set; }
+
+    /// <summary>
+    /// 获取或设置供用户在系统浏览器中打开的 LiteLLM Dashboard 地址。
+    /// </summary>
+    public Uri? DashboardUrl { get; set; }
 }

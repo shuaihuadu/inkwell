@@ -125,6 +125,8 @@ public sealed class AgentFactoryTests
 
     private sealed class StubLLMProvider(LLMModel model) : ILLMProvider
     {
+        public LLMProviderManagementInfo GetManagementInfo() => new();
+
         public Task<IReadOnlyList<LLMModel>> ListModelsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<LLMModel>>([model]);
 

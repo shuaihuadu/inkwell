@@ -8,6 +8,12 @@ namespace Inkwell;
 public interface ILLMProvider
 {
     /// <summary>
+    /// 获取当前 Provider 可公开的管理入口。
+    /// </summary>
+    /// <returns>Provider 管理信息。</returns>
+    LLMProviderManagementInfo GetManagementInfo();
+
+    /// <summary>
     /// 获取当前 Provider 可访问的模型。
     /// </summary>
     /// <param name="cancellationToken">取消令牌。</param>

@@ -93,6 +93,19 @@ export interface LLMModelTestResult {
     errorMessage: string | null;
 }
 
+export interface LLMProviderManagementInfo {
+    dashboardUrl: string | null;
+}
+
+export interface UserListItem {
+    userId: string;
+    username: string;
+    isSuper: boolean;
+    isLocked: boolean;
+    lastLoginTime: string | null;
+    createdTime: string;
+}
+
 export interface CreateAgentRequest {
     name: string;
     description: string;
@@ -124,7 +137,11 @@ export interface InkwellDesktopApi {
     ) => () => void;
     listAgents: () => Promise<AgentListItem[]>;
     listModels: () => Promise<LLMModel[]>;
+    getModelManagementInfo: () => Promise<LLMProviderManagementInfo>;
     testModel: (modelId: string) => Promise<LLMModelTestResult>;
+    openExternal: (url: string) => Promise<void>;
+    listAccounts: () => Promise<UserListItem[]>;
+    unlockAccount: (userId: string) => Promise<void>;
     createAgent: (request: CreateAgentRequest) => Promise<AgentDefinition>;
     chat: (request: ChatRequest) => Promise<void>;
     onChatDelta: (

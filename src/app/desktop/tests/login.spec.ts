@@ -82,6 +82,8 @@ test("shows authentication errors and enters the workspace after login", async (
 }, testInfo) => {
     let loginAttempts = 0;
     let modelTestAttempts = 0;
+    let accountLocked = true;
+    let accountUnlockAttempts = 0;
     const server = createServer((request, response) => {
         if (request.url === "/api/auth/login") {
             loginAttempts += 1;
@@ -146,6 +148,14 @@ test("shows authentication errors and enters the workspace after login", async (
             return;
         }
 
+        if (request.url === "/api/models/management") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({ dashboardUrl: "https://litellm.example/" }),
+            );
+            return;
+        }
+
         if (
             request.url === "/api/models/gpt-5.4/test" &&
             request.method === "POST"
@@ -160,6 +170,43 @@ test("shows authentication errors and enters the workspace after login", async (
                     errorMessage: null,
                 }),
             );
+            return;
+        }
+
+        if (request.url === "/api/auth/accounts") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify([
+                    {
+                        userId: "0198a96d-19e4-7000-8000-000000000001",
+                        username: "admin",
+                        isSuper: true,
+                        isLocked: false,
+                        lastLoginTime: "2026-07-18T14:56:00Z",
+                        createdTime: "2026-05-01T09:00:00Z",
+                    },
+                    {
+                        userId: "0198a96d-19e4-7000-8000-000000000002",
+                        username: "bob",
+                        isSuper: false,
+                        isLocked: accountLocked,
+                        lastLoginTime: "2026-07-17T18:20:00Z",
+                        createdTime: "2026-05-03T10:15:00Z",
+                    },
+                ]),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                "/api/auth/accounts/0198a96d-19e4-7000-8000-000000000002/unlock" &&
+            request.method === "POST"
+        ) {
+            accountUnlockAttempts += 1;
+            accountLocked = false;
+            response.statusCode = 204;
+            response.end();
             return;
         }
 
@@ -213,7 +260,9 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(page.getByText("工作区", { exact: true })).toBeVisible();
         await expect(page.getByText("资源中心", { exact: true })).toBeVisible();
         await expect(page.getByText("系统管理", { exact: true })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Admin" })).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "用户管理" }),
+        ).toBeVisible();
 
         await page.getByRole("button", { name: "关于 Inkwell" }).click();
         await expect(
@@ -268,22 +317,69 @@ test("shows authentication errors and enters the workspace after login", async (
         );
 
         await page
-            .getByRole("button", { name: "模型管理" })
+            .locator(".app-sidebar .nav-item", { hasText: "模型" })
             .dispatchEvent("click");
         await expect(
-            page.getByRole("heading", { name: "模型管理" }),
+            page.getByRole("heading", { name: "模型", exact: true }),
         ).toBeVisible();
+        await expect(
+            page
+                .locator(".inkwell-data-list-header")
+                .getByRole("button", { name: "模型管理" }),
+        ).toBeEnabled();
         await expect(page.getByText("gpt-5.4", { exact: true })).toBeVisible();
         await expect(
             page.getByText("text-embedding-3-large", { exact: true }),
         ).toBeVisible();
         const modelTable = page.getByRole("table");
+        for (const column of [
+            "模型标识",
+            "模型类型",
+            "提供方",
+            "Token 上限",
+            "视觉",
+            "工具",
+            "结构化",
+            "推理",
+            "连通性",
+        ]) {
+            await expect(
+                modelTable.getByRole("columnheader", { name: column }),
+            ).toBeVisible();
+        }
         await expect(modelTable.getByText("对话", { exact: true })).toBeVisible();
         await expect(modelTable.getByText("嵌入", { exact: true })).toBeVisible();
+        const listCapabilityTag = modelTable.locator(".ant-tag-success").first();
+        await expect(listCapabilityTag).toHaveCSS(
+            "background-color",
+            "rgb(32, 43, 36)",
+        );
+        await expect(listCapabilityTag).toHaveCSS("border-radius", "6px");
+        await expect(listCapabilityTag).toHaveCSS("font-size", "12px");
+        await expect(listCapabilityTag).toHaveCSS("line-height", "20px");
         await page
-            .getByRole("button", { name: "测试 gpt-5.4 连接" })
+            .getByRole("button", { name: "gpt-5.4", exact: true })
             .dispatchEvent("click");
-        await expect(page.getByText("gpt-5.4 连接正常")).toBeVisible();
+        const modelDetails = page.getByRole("dialog", { name: "模型详情" });
+        await expect(modelDetails).toBeVisible();
+        await expect(
+            modelDetails.getByText(
+                /最大输入 1,050,000 个令牌，最大输出 128,000 个令牌/,
+            ),
+        ).toBeVisible();
+        await expect(
+            modelDetails.locator(".ant-tag-success").first(),
+        ).toHaveCSS("background-color", "rgb(32, 43, 36)");
+        await modelDetails
+            .locator(".ant-drawer-close")
+            .dispatchEvent("click");
+        await expect(modelDetails).toBeHidden();
+        await page
+            .getByRole("button", { name: "测试 gpt-5.4" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByText("gpt-5.4 对话最小请求成功 · 125 ms"),
+        ).toBeVisible();
         expect(modelTestAttempts).toBe(1);
         await expect(page.locator(".ant-dropdown")).toBeHidden();
         await page.setViewportSize({ width: 1080, height: 720 });
@@ -294,6 +390,27 @@ test("shows authentication errors and enters the workspace after login", async (
             path: testInfo.outputPath("model-management-dark-1080x720.png"),
             fullPage: true,
         });
+
+        await page
+            .getByRole("button", { name: "用户管理" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("heading", { name: "用户管理" }),
+        ).toBeVisible();
+        await expect(page.getByText("bob", { exact: true })).toBeVisible();
+        await expect(page.getByText("已锁定", { exact: true })).toBeVisible();
+        await page
+            .getByRole("button", { name: "解封 bob" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("dialog", { name: "解封账号 bob" }),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "确认解封" })
+            .dispatchEvent("click");
+        await expect(page.getByText("bob 已解封")).toBeVisible();
+        expect(accountUnlockAttempts).toBe(1);
+        await expect(page.getByText("正常", { exact: true })).toHaveCount(2);
 
         await page.getByRole("button", { name: /工具管理/ }).click();
         await expect(
@@ -357,6 +474,8 @@ test("shows authentication errors and enters the workspace after login", async (
 test("hides system administration navigation from regular users", async ({
     browserName,
 }, testInfo) => {
+    let memberModelTestAttempts = 0;
+    let memberModelManagementAttempts = 0;
     const server = createServer((request, response) => {
         if (request.url === "/api/auth/login") {
             response.setHeader("Content-Type", "application/json");
@@ -372,12 +491,54 @@ test("hides system administration navigation from regular users", async ({
             return;
         }
 
-        if (
-            request.url === "/api/agents/mine" ||
-            request.url === "/api/models"
-        ) {
+        if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
             response.end("[]");
+            return;
+        }
+
+        if (request.url === "/api/models") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify([
+                    {
+                        id: "gpt-5.4",
+                        category: "Chat",
+                        providerMode: "chat",
+                        ownedBy: "openai",
+                        maxInputTokens: 1_050_000,
+                        maxOutputTokens: 128_000,
+                        supportsVision: true,
+                        supportsTools: true,
+                        supportsStructuredOutput: true,
+                        supportsReasoning: true,
+                    },
+                ]),
+            );
+            return;
+        }
+
+        if (request.url === "/api/models/management") {
+            memberModelManagementAttempts += 1;
+            response.setHeader("Content-Type", "application/json");
+            response.end(JSON.stringify({ dashboardUrl: null }));
+            return;
+        }
+
+        if (
+            request.url === "/api/models/gpt-5.4/test" &&
+            request.method === "POST"
+        ) {
+            memberModelTestAttempts += 1;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    modelId: "gpt-5.4",
+                    isSuccess: true,
+                    latency: "00:00:00.1250000",
+                    errorMessage: null,
+                }),
+            );
             return;
         }
 
@@ -415,10 +576,24 @@ test("hides system administration navigation from regular users", async ({
         await expect(page.getByText("系统管理", { exact: true })).toHaveCount(
             0,
         );
-        await expect(page.getByRole("button", { name: "Admin" })).toHaveCount(
-            0,
-        );
+        await expect(
+            page.getByRole("button", { name: "用户管理" }),
+        ).toHaveCount(0);
         await expect(page.getByText("资源中心", { exact: true })).toBeVisible();
+        await page
+            .locator(".app-sidebar .nav-item", { hasText: "模型" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("button", { name: "模型管理" }),
+        ).toHaveCount(0);
+        expect(memberModelManagementAttempts).toBe(0);
+        await page
+            .getByRole("button", { name: "测试 gpt-5.4" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByText("gpt-5.4 对话最小请求成功 · 125 ms"),
+        ).toBeVisible();
+        expect(memberModelTestAttempts).toBe(1);
         await page
             .getByRole("button", { name: "打开用户菜单" })
             .dispatchEvent("click");

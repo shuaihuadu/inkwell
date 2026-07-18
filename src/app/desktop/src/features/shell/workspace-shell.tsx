@@ -34,6 +34,7 @@ import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
 import { ModelManagement } from "../models/model-management";
+import { UserManagement } from "../users/user-management";
 import {
     type AppearanceMode,
     useAppearanceStore,
@@ -83,7 +84,7 @@ const navigationGroups: NavigationGroup[] = [
             },
             {
                 key: "models",
-                label: "模型管理",
+                label: "模型",
                 icon: <ApiOutlined />,
             },
         ],
@@ -94,7 +95,7 @@ const navigationGroups: NavigationGroup[] = [
         items: [
             {
                 key: "admin",
-                label: "Admin",
+                label: "用户管理",
                 icon: <SafetyCertificateOutlined />,
                 requiresSuper: true,
             },
@@ -302,25 +303,32 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                         className="workspace-route"
                         hidden={activeNavigation !== "models"}
                     >
-                        <ModelManagement canTest={identity?.isSuper === true} />
+                        <ModelManagement />
+                    </div>
+                    <div
+                        className="workspace-route"
+                        hidden={activeNavigation !== "admin"}
+                    >
+                        {identity?.isSuper && <UserManagement />}
                     </div>
                     {activeNavigation !== "agents" &&
-                        activeNavigation !== "models" && (
-                        <main className="placeholder-page">
-                            <Empty
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description={
-                                    <div className="placeholder-copy">
-                                        <Typography.Title level={4}>
-                                            {activeItem?.label}
-                                        </Typography.Title>
-                                        <Typography.Text type="secondary">
-                                            即将上线
-                                        </Typography.Text>
-                                    </div>
-                                }
-                            />
-                        </main>
+                        activeNavigation !== "models" &&
+                        activeNavigation !== "admin" && (
+                            <main className="placeholder-page">
+                                <Empty
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                    description={
+                                        <div className="placeholder-copy">
+                                            <Typography.Title level={4}>
+                                                {activeItem?.label}
+                                            </Typography.Title>
+                                            <Typography.Text type="secondary">
+                                                即将上线
+                                            </Typography.Text>
+                                        </div>
+                                    }
+                                />
+                            </main>
                         )}
                 </div>
             </div>

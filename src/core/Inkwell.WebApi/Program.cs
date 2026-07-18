@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Inkwell;
 using Inkwell.Cache.InMemory;
 using Inkwell.FileStorage.Local;
@@ -69,6 +71,17 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.QueueLimit = 0;
     });
+    options.AddPolicy(AuthorizationPolicies.ModelTestRateLimiterPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
 });
 
 WebApplication app = builder.Build();
