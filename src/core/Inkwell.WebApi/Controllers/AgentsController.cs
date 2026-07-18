@@ -112,6 +112,20 @@ public sealed class AgentsController(IAgentService agentService) : InkwellContro
         return this.NoContent();
     }
 
+    /// <summary>管理员撤销指定 Agent 的团队共享。</summary>
+    /// <param name="agentId">Agent 标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>无响应正文。</returns>
+    [HttpPost("{agentId:guid}/share/revoke")]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> RevokeShareAsync(Guid agentId, CancellationToken cancellationToken)
+    {
+        await agentService.RevokeShareAsync(agentId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+
+        return this.NoContent();
+    }
+
     /// <summary>克隆指定 Agent。</summary>
     /// <param name="agentId">Agent 标识。</param>
     /// <param name="cancellationToken">取消令牌。</param>

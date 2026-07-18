@@ -187,7 +187,12 @@ export interface InkwellDesktopApi {
     onAuthStateChanged: (
         listener: (snapshot: AuthSnapshot) => void,
     ) => () => void;
-    listAgents: () => Promise<AgentListItem[]>;
+    listMyAgents: () => Promise<AgentListItem[]>;
+    listSharedAgents: () => Promise<AgentListItem[]>;
+    deleteAgent: (agentId: string) => Promise<void>;
+    shareAgent: (agentId: string) => Promise<void>;
+    unshareAgent: (agentId: string) => Promise<void>;
+    revokeAgentShare: (agentId: string) => Promise<void>;
     listTools: () => Promise<AgentToolDefinition[]>;
     listSkills: () => Promise<AgentSkillDefinition[]>;
     uploadSkill: (file: AgentSkillUploadFile) => Promise<AgentSkillDefinition>;

@@ -42,6 +42,7 @@ public sealed class ControllerRoutingTests
         Assert.Contains("api/agents/shared", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}/share", routePatterns);
+        Assert.Contains("api/agents/{agentId:guid}/share/revoke", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}/clone", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}/versions", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}/versions/{versionId:guid}", routePatterns);
@@ -102,12 +103,19 @@ public sealed class ControllerRoutingTests
         string? versionsRoute = versionsController.GetCustomAttributes(typeof(RouteAttribute), inherit: true).Cast<RouteAttribute>().Single().Template;
         string? agentsPolicy = agentsController.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true).Cast<AuthorizeAttribute>().Single().Policy;
         string? versionsPolicy = versionsController.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true).Cast<AuthorizeAttribute>().Single().Policy;
+        string? revokeSharePolicy = agentsController
+            .GetMethod(nameof(AgentsController.RevokeShareAsync))?
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .Single()
+            .Policy;
 
         // Assert
         Assert.AreEqual("api/agents", agentsRoute);
         Assert.AreEqual("api/agents/{agentId:guid}", versionsRoute);
         Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, agentsPolicy);
         Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, versionsPolicy);
+        Assert.AreEqual(AuthorizationPolicies.RequireAdmin, revokeSharePolicy);
     }
 
     /// <summary>

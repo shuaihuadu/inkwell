@@ -1,221 +1,551 @@
 import {
+    ArrowLeftOutlined,
+    DeleteOutlined,
+    EditOutlined,
+    EllipsisOutlined,
     PlusOutlined,
     ReloadOutlined,
-    RobotOutlined,
+    SafetyCertificateOutlined,
     SearchOutlined,
+    ShareAltOutlined,
+    StopOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Avatar,
     Button,
+    Card,
+    Col,
+    Dropdown,
     Empty,
-    Form,
     Input,
-    List,
     Modal,
-    Select,
+    Pagination,
+    Row,
+    Segmented,
     Skeleton,
+    Space,
+    Tabs,
     Tag,
+    Tooltip,
     Typography,
     message,
 } from "antd";
+import type { ModalFuncProps } from "antd";
 import { useDeferredValue, useState } from "react";
+import type { ReactNode } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
-import type {
-    AgentListItem,
-    CreateAgentRequest,
-} from "../../shared/network/contracts";
+import type { AgentListItem } from "../../shared/network/contracts";
+import { useAuthStore } from "../auth/auth-store";
 import { ChatPanel } from "../chat/chat-panel";
 
-export function AgentWorkspace() {
+type AgentTab = "mine" | "shared";
+type AgentStatusFilter = "all" | "published" | "draft";
+type AgentAction = "delete" | "share" | "unshare" | "revoke";
+
+const AgentsPerPage = 20;
+const AvatarColors = ["#5760cb", "#1677ff", "#00875a", "#d46b08"];
+
+interface AgentWorkspaceProps {
+    onCreateAgent?: () => void;
+    onEditAgent?: (agentId: string) => void;
+}
+
+export function AgentWorkspace({
+    onCreateAgent,
+    onEditAgent,
+}: AgentWorkspaceProps) {
+    const identity = useAuthStore((state) => state.identity);
     const queryClient = useQueryClient();
-    const [search, setSearch] = useState("");
-    const deferredSearch = useDeferredValue(search);
-    const [selectedAgent, setSelectedAgent] = useState<AgentListItem | null>(
-        null,
+    const [activeTab, setActiveTab] = useState<AgentTab>("mine");
+    const [statusFilter, setStatusFilter] =
+        useState<AgentStatusFilter>("all");
+    const [searchText, setSearchText] = useState("");
+    const deferredSearch = useDeferredValue(
+        searchText.trim().toLocaleLowerCase(),
     );
-    const [createOpen, setCreateOpen] = useState(false);
-    const [form] = Form.useForm<CreateAgentRequest>();
-    const [messageApi, contextHolder] = message.useMessage();
-    const agentsQuery = useQuery({
-        queryKey: ["agents"],
-        queryFn: desktopApi.listAgents,
+    const [page, setPage] = useState(1);
+    const [chatAgent, setChatAgent] = useState<AgentListItem | null>(null);
+    const [modalApi, modalContextHolder] = Modal.useModal();
+    const [messageApi, messageContextHolder] = message.useMessage();
+    const mineQuery = useQuery({
+        queryKey: ["agents", "mine"],
+        queryFn: desktopApi.listMyAgents,
     });
-    const modelsQuery = useQuery({
-        queryKey: ["models"],
-        queryFn: desktopApi.listModels,
+    const sharedQuery = useQuery({
+        queryKey: ["agents", "shared"],
+        queryFn: desktopApi.listSharedAgents,
     });
-    const createMutation = useMutation({
-        mutationFn: desktopApi.createAgent,
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["agents"] });
-            setCreateOpen(false);
-            form.resetFields();
-            messageApi.success("Agent 已创建并发布");
+    const actionMutation = useMutation({
+        mutationFn: async ({
+            action,
+            agentId,
+        }: {
+            action: AgentAction;
+            agentId: string;
+        }) => {
+            if (action === "delete") await desktopApi.deleteAgent(agentId);
+            if (action === "share") await desktopApi.shareAgent(agentId);
+            if (action === "unshare") await desktopApi.unshareAgent(agentId);
+            if (action === "revoke")
+                await desktopApi.revokeAgentShare(agentId);
         },
-        onError: (reason) =>
+        onSuccess: async (_result, variables) => {
+            await queryClient.invalidateQueries({ queryKey: ["agents"] });
+            const successMessages: Record<AgentAction, string> = {
+                delete: "Agent 已删除",
+                share: "Agent 已共享给团队",
+                unshare: "已撤销团队共享",
+                revoke: "已由管理员撤销共享",
+            };
+            messageApi.success(successMessages[variables.action]);
+        },
+        onError: (reason) => {
             messageApi.error(
-                reason instanceof Error ? reason.message : "创建 Agent 失败。",
-            ),
+                reason instanceof Error ? reason.message : "Agent 操作失败。",
+            );
+        },
     });
-    const agents = (agentsQuery.data ?? []).filter((agent) =>
-        agent.name
-            .toLocaleLowerCase()
-            .includes(deferredSearch.trim().toLocaleLowerCase()),
+
+    const currentQuery = activeTab === "mine" ? mineQuery : sharedQuery;
+    const scopedAgents = currentQuery.data ?? [];
+    const publishedCount = scopedAgents.filter(isPublished).length;
+    const draftCount = scopedAgents.length - publishedCount;
+    const filteredAgents = scopedAgents
+        .filter((agent) => {
+            if (activeTab !== "mine" || statusFilter === "all") return true;
+            return statusFilter === "published"
+                ? isPublished(agent)
+                : !isPublished(agent);
+        })
+        .filter((agent) =>
+            agent.name.toLocaleLowerCase().includes(deferredSearch),
+        )
+        .sort(
+            (left, right) =>
+                Date.parse(right.updatedTime) - Date.parse(left.updatedTime),
+        );
+    const lastPage = Math.max(
+        1,
+        Math.ceil(filteredAgents.length / AgentsPerPage),
     );
-    const chatModels = (modelsQuery.data ?? []).filter(
-        (model) => model.category === "Chat",
+    const currentPage = Math.min(page, lastPage);
+    const pageAgents = filteredAgents.slice(
+        (currentPage - 1) * AgentsPerPage,
+        currentPage * AgentsPerPage,
     );
 
-    return (
-        <>
-            {contextHolder}
-            <main className="workspace-main">
-                    <section className="library-pane">
-                        <div className="pane-heading">
-                            <div>
-                                <Typography.Title level={3}>
-                                    Agent 库
-                                </Typography.Title>
-                                <Typography.Text type="secondary">
-                                    我的 Agent
-                                </Typography.Text>
-                            </div>
-                            <Button
-                                type="primary"
-                                icon={<PlusOutlined />}
-                                onClick={() => setCreateOpen(true)}
-                            >
-                                新建
-                            </Button>
-                        </div>
-                        <Input
-                            allowClear
-                            prefix={<SearchOutlined />}
-                            placeholder="搜索 Agent"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                        />
-                        {agentsQuery.isLoading ? (
-                            <Skeleton active />
-                        ) : agentsQuery.isError ? (
-                            <Empty description="无法读取 Agent">
-                                <Button
-                                    icon={<ReloadOutlined />}
-                                    onClick={() => void agentsQuery.refetch()}
-                                >
-                                    重试
-                                </Button>
-                            </Empty>
-                        ) : (
-                            <List
-                                className="agent-list"
-                                dataSource={agents}
-                                locale={{
-                                    emptyText: (
-                                        <Empty description="还没有 Agent" />
-                                    ),
-                                }}
-                                renderItem={(agent) => (
-                                    <List.Item
-                                        className={
-                                            selectedAgent?.id === agent.id
-                                                ? "selected"
-                                                : ""
-                                        }
-                                        onClick={() => setSelectedAgent(agent)}
-                                    >
-                                        <List.Item.Meta
-                                            avatar={
-                                                <Avatar
-                                                    className="agent-avatar"
-                                                    icon={<RobotOutlined />}
-                                                />
-                                            }
-                                            title={
-                                                <div className="agent-title">
-                                                    <span>{agent.name}</span>
-                                                    <Tag>
-                                                        v
-                                                        {
-                                                            agent.latestPublishedVersionNumber
-                                                        }
-                                                    </Tag>
-                                                </div>
-                                            }
-                                            description={
-                                                agent.descriptionExcerpt ||
-                                                "暂无描述"
-                                            }
-                                        />
-                                    </List.Item>
-                                )}
-                            />
-                        )}
-                    </section>
-                    <ChatPanel key={selectedAgent?.id ?? "empty"} agent={selectedAgent} />
+    if (chatAgent) {
+        return (
+            <main className="agent-chat-workspace">
+                <Button
+                    className="agent-chat-back"
+                    type="text"
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => setChatAgent(null)}
+                >
+                    返回 Agent 空间
+                </Button>
+                <ChatPanel key={chatAgent.id} agent={chatAgent} />
             </main>
-            <Modal
-                title="新建 Agent"
-                open={createOpen}
-                okText="创建并发布"
-                cancelText="取消"
-                confirmLoading={createMutation.isPending}
-                onCancel={() => setCreateOpen(false)}
-                onOk={() =>
-                    void form
-                        .validateFields()
-                        .then((values) => createMutation.mutate(values))
-                }
-            >
-                <Form form={form} layout="vertical" requiredMark={false}>
-                    <Form.Item
-                        label="名称"
-                        name="name"
-                        rules={[
-                            { required: true, message: "请输入 Agent 名称" },
-                        ]}
-                    >
-                        <Input placeholder="例如：研发助手" maxLength={80} />
-                    </Form.Item>
-                    <Form.Item label="描述" name="description">
-                        <Input
-                            placeholder="这个 Agent 适合做什么"
-                            maxLength={200}
+        );
+    }
+
+    const openEditor = (agentId?: string): void => {
+        if (agentId && onEditAgent) {
+            onEditAgent(agentId);
+            return;
+        }
+        if (!agentId && onCreateAgent) {
+            onCreateAgent();
+            return;
+        }
+        messageApi.info("Agent 配置页将在下一项工作中接入。");
+    };
+    const openAgent = (agent: AgentListItem): void => {
+        if (isPublished(agent)) setChatAgent(agent);
+        else openEditor(agent.id);
+    };
+    const requestAction = (action: AgentAction, agent: AgentListItem): void => {
+        modalApi.confirm({
+            ...getActionDialog(action, agent.name),
+            onOk: async () =>
+                actionMutation.mutateAsync({ action, agentId: agent.id }),
+        });
+    };
+    const refresh = (): void => {
+        void currentQuery.refetch();
+    };
+    const changeTab = (key: string): void => {
+        setActiveTab(key as AgentTab);
+        setStatusFilter("all");
+        setSearchText("");
+        setPage(1);
+    };
+
+    return (
+        <main className="agent-space-page">
+            {modalContextHolder}
+            {messageContextHolder}
+            <header className="agent-space-header">
+                <Typography.Title level={4}>Agent 空间</Typography.Title>
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => openEditor()}
+                >
+                    新建 Agent
+                </Button>
+            </header>
+
+            <section className="agent-space-toolbar">
+                <Tabs
+                    activeKey={activeTab}
+                    onChange={changeTab}
+                    items={[
+                        { key: "mine", label: "我的" },
+                        { key: "shared", label: "团队共享" },
+                    ]}
+                />
+                <Space wrap>
+                    <Tooltip title="刷新">
+                        <Button
+                            aria-label="刷新 Agent"
+                            icon={<ReloadOutlined />}
+                            loading={currentQuery.isFetching}
+                            onClick={refresh}
                         />
-                    </Form.Item>
-                    <Form.Item
-                        label="模型"
-                        name="modelId"
-                        rules={[{ required: true, message: "请选择可用模型" }]}
-                    >
-                        <Select
-                            loading={modelsQuery.isLoading}
-                            placeholder={
-                                chatModels.length
-                                    ? "选择模型"
-                                    : "暂无可用模型"
-                            }
-                            options={chatModels.map((model) => ({
-                                value: model.id,
-                                label: `${model.id} · ${model.ownedBy ?? "未知来源"}`,
-                            }))}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        label="系统指令"
-                        name="instructions"
-                        rules={[{ required: true, message: "请输入系统指令" }]}
-                    >
-                        <Input.TextArea
-                            rows={5}
-                            placeholder="描述 Agent 的角色、目标和回答边界"
-                            maxLength={4000}
-                            showCount
-                        />
-                    </Form.Item>
-                </Form>
-            </Modal>
-        </>
+                    </Tooltip>
+                    <Input
+                        allowClear
+                        maxLength={50}
+                        prefix={<SearchOutlined />}
+                        placeholder="搜索 Agent"
+                        value={searchText}
+                        onChange={(event) => {
+                            setSearchText(event.target.value);
+                            setPage(1);
+                        }}
+                    />
+                </Space>
+            </section>
+
+            {activeTab === "mine" && (
+                <Segmented<AgentStatusFilter>
+                    className="agent-status-filter"
+                    value={statusFilter}
+                    onChange={(value) => {
+                        setStatusFilter(value);
+                        setPage(1);
+                    }}
+                    options={[
+                        { value: "all", label: `全部 ${scopedAgents.length}` },
+                        {
+                            value: "published",
+                            label: `已发布 ${publishedCount}`,
+                        },
+                        { value: "draft", label: `草稿 ${draftCount}` },
+                    ]}
+                />
+            )}
+
+            <section className="agent-space-canvas">
+                {currentQuery.isLoading ? (
+                    <AgentGridSkeleton />
+                ) : currentQuery.isError ? (
+                    <AgentGridEmpty
+                        description="加载失败，请检查网络后重试"
+                        action={<Button onClick={refresh}>重试</Button>}
+                    />
+                ) : pageAgents.length === 0 ? (
+                    <AgentGridEmpty
+                        description={getEmptyDescription(
+                            activeTab,
+                            Boolean(deferredSearch),
+                            statusFilter,
+                        )}
+                    />
+                ) : (
+                    <Row gutter={[12, 12]} align="stretch">
+                        {pageAgents.map((agent) => (
+                            <Col
+                                className="agent-space-column"
+                                key={agent.id}
+                                flex="0 0 20%"
+                            >
+                                <AgentCard
+                                    agent={agent}
+                                    activeTab={activeTab}
+                                    currentUserId={identity?.userId}
+                                    isAdmin={identity?.isAdmin === true}
+                                    isPending={actionMutation.isPending}
+                                    onOpen={() => openAgent(agent)}
+                                    onEdit={() => openEditor(agent.id)}
+                                    onAction={(action) =>
+                                        requestAction(action, agent)
+                                    }
+                                />
+                            </Col>
+                        ))}
+                    </Row>
+                )}
+            </section>
+
+            {filteredAgents.length > 0 && (
+                <footer className="agent-space-pagination">
+                    <Typography.Text type="secondary">
+                        共 {filteredAgents.length} 个 Agent
+                    </Typography.Text>
+                    <Pagination
+                        size="small"
+                        current={currentPage}
+                        pageSize={AgentsPerPage}
+                        total={filteredAgents.length}
+                        showSizeChanger={false}
+                        onChange={setPage}
+                    />
+                </footer>
+            )}
+        </main>
     );
+}
+
+function AgentCard({
+    agent,
+    activeTab,
+    currentUserId,
+    isAdmin,
+    isPending,
+    onOpen,
+    onEdit,
+    onAction,
+}: {
+    agent: AgentListItem;
+    activeTab: AgentTab;
+    currentUserId?: string;
+    isAdmin: boolean;
+    isPending: boolean;
+    onOpen: () => void;
+    onEdit: () => void;
+    onAction: (action: AgentAction) => void;
+}) {
+    const isOwner = agent.ownerUserId === currentUserId;
+    const actionItems =
+        activeTab === "mine" && isOwner
+            ? [
+                  { key: "edit", label: "编辑", icon: <EditOutlined /> },
+                  agent.isShared
+                      ? {
+                            key: "unshare",
+                            label: "撤销共享",
+                            icon: <StopOutlined />,
+                        }
+                      : {
+                            key: "share",
+                            label: "共享给团队",
+                            icon: <ShareAltOutlined />,
+                        },
+                  {
+                      key: "delete",
+                      label: "删除",
+                      icon: <DeleteOutlined />,
+                      danger: true,
+                  },
+              ]
+            : activeTab === "shared" && isAdmin
+              ? [
+                    {
+                        key: "revoke",
+                        label: "管理员撤销共享",
+                        icon: <SafetyCertificateOutlined />,
+                        danger: true,
+                    },
+                ]
+              : [];
+
+    return (
+        <Card
+            hoverable
+            className="agent-space-card"
+            onClick={onOpen}
+            styles={{ body: { padding: 14 } }}
+        >
+            {actionItems.length > 0 && (
+                <Dropdown
+                    trigger={["click"]}
+                    menu={{
+                        items: actionItems,
+                        onClick: ({ key, domEvent }) => {
+                            domEvent.stopPropagation();
+                            if (key === "edit") onEdit();
+                            else onAction(key as AgentAction);
+                        },
+                    }}
+                >
+                    <Button
+                        className="agent-card-actions"
+                        type="text"
+                        size="small"
+                        aria-label={`管理 ${agent.name}`}
+                        icon={<EllipsisOutlined />}
+                        loading={isPending}
+                        onClick={(event) => event.stopPropagation()}
+                    />
+                </Dropdown>
+            )}
+            <div className="agent-card-heading">
+                <Avatar
+                    src={agent.avatarUri ?? undefined}
+                    style={{ background: getAvatarColor(agent.name) }}
+                >
+                    {agent.name.slice(0, 1).toUpperCase()}
+                </Avatar>
+                <div>
+                    <Space size={6}>
+                        <Typography.Text strong ellipsis>
+                            {agent.name}
+                        </Typography.Text>
+                        {!isPublished(agent) && <Tag color="warning">草稿</Tag>}
+                    </Space>
+                    <Typography.Text type="secondary" ellipsis>
+                        {activeTab === "shared"
+                            ? `Owner ${shortId(agent.ownerUserId)} · `
+                            : ""}
+                        {isPublished(agent)
+                            ? `v${agent.latestPublishedVersionNumber}`
+                            : "未发布"}
+                        {` · ${formatRelativeTime(agent.updatedTime)}`}
+                    </Typography.Text>
+                </div>
+            </div>
+            <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }}>
+                {agent.descriptionExcerpt || "暂无描述"}
+            </Typography.Paragraph>
+            {agent.isShared && <Tag color="processing">团队共享</Tag>}
+        </Card>
+    );
+}
+
+function AgentGridSkeleton() {
+    return (
+        <Row gutter={[12, 12]}>
+            {Array.from({ length: 8 }, (_, index) => (
+                <Col
+                    className="agent-space-column"
+                    key={index}
+                    flex="0 0 20%"
+                >
+                    <Card
+                        className="agent-space-card"
+                        styles={{ body: { padding: 14 } }}
+                    >
+                        <Skeleton
+                            active
+                            avatar
+                            paragraph={{ rows: 2 }}
+                            title={{ width: "55%" }}
+                        />
+                    </Card>
+                </Col>
+            ))}
+        </Row>
+    );
+}
+
+function AgentGridEmpty({
+    description,
+    action,
+}: {
+    description: string;
+    action?: ReactNode;
+}) {
+    return (
+        <div className="agent-space-empty">
+            <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={description}
+            >
+                {action}
+            </Empty>
+        </div>
+    );
+}
+
+function isPublished(agent: AgentListItem): boolean {
+    return agent.latestPublishedVersionNumber > 0;
+}
+
+function getEmptyDescription(
+    activeTab: AgentTab,
+    hasSearch: boolean,
+    statusFilter: AgentStatusFilter,
+): string {
+    if (hasSearch || statusFilter !== "all") return "没有符合条件的 Agent";
+    return activeTab === "mine"
+        ? '还没有自己的 Agent，点击“新建 Agent”开始'
+        : "团队成员还没有共享 Agent";
+}
+
+function getActionDialog(
+    action: AgentAction,
+    agentName: string,
+): ModalFuncProps {
+    if (action === "delete") {
+        return {
+            title: `删除「${agentName}」`,
+            content: "删除后不可恢复，确认删除？",
+            okText: "确认删除",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+        };
+    }
+    if (action === "unshare") {
+        return {
+            title: `撤销「${agentName}」的共享`,
+            content: "撤销共享后，已使用过的成员将无法继续访问该 Agent。确认？",
+            okText: "确认撤销",
+            cancelText: "取消",
+        };
+    }
+    if (action === "revoke") {
+        return {
+            title: `撤销「${agentName}」的共享`,
+            content: "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
+            okText: "确认撤销",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+        };
+    }
+    return {
+        title: `共享「${agentName}」`,
+        content: "共享后，团队成员可以查看并使用该 Agent 的已发布版本。",
+        okText: "确认共享",
+        cancelText: "取消",
+    };
+}
+
+function getAvatarColor(name: string): string {
+    const hash = Array.from(name).reduce(
+        (result, character) => result + (character.codePointAt(0) ?? 0),
+        0,
+    );
+    return AvatarColors[hash % AvatarColors.length];
+}
+
+function shortId(value: string): string {
+    return value.slice(0, 8);
+}
+
+function formatRelativeTime(value: string): string {
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) return "刚刚更新";
+    const elapsedMinutes = Math.max(
+        0,
+        Math.floor((Date.now() - time) / 60_000),
+    );
+    if (elapsedMinutes < 1) return "刚刚更新";
+    if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
+    const elapsedHours = Math.floor(elapsedMinutes / 60);
+    if (elapsedHours < 24) return `${elapsedHours} 小时前`;
+    return `${Math.floor(elapsedHours / 24)} 天前`;
 }

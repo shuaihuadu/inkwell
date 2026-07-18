@@ -49,6 +49,40 @@ const skillsResponse = JSON.stringify([
         updatedTime: "2026-07-17T02:08:00Z",
     },
 ]);
+const myAgentsResponse = JSON.stringify([
+    {
+        id: "0198a96d-19e4-7000-8000-000000000301",
+        name: "研发助手",
+        avatarUri: null,
+        descriptionExcerpt: "帮助团队分析代码并整理研发任务。",
+        ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
+        isShared: true,
+        latestPublishedVersionNumber: 3,
+        updatedTime: "2026-07-18T12:00:00Z",
+    },
+    {
+        id: "0198a96d-19e4-7000-8000-000000000302",
+        name: "产品草稿",
+        avatarUri: null,
+        descriptionExcerpt: "尚未发布的产品分析 Agent。",
+        ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
+        isShared: false,
+        latestPublishedVersionNumber: 0,
+        updatedTime: "2026-07-18T13:00:00Z",
+    },
+]);
+const sharedAgentsResponse = JSON.stringify([
+    {
+        id: "0198a96d-19e4-7000-8000-000000000303",
+        name: "合同审查助手",
+        avatarUri: null,
+        descriptionExcerpt: "识别合同风险并输出分级建议。",
+        ownerUserId: "0198a96d-19e4-7000-8000-000000000002",
+        isShared: true,
+        latestPublishedVersionNumber: 2,
+        updatedTime: "2026-07-17T10:00:00Z",
+    },
+]);
 
 test("renders the prototype-aligned login experience", async ({
     browserName,
@@ -131,6 +165,7 @@ test("shows authentication errors and enters the workspace after login", async (
     let modelTestAttempts = 0;
     let accountLocked = true;
     let accountUnlockAttempts = 0;
+    let agentShareRevocations = 0;
     const server = createServer((request, response) => {
         if (request.url === "/api/auth/login") {
             loginAttempts += 1;
@@ -159,7 +194,24 @@ test("shows authentication errors and enters the workspace after login", async (
 
         if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
-            response.end("[]");
+            response.end(myAgentsResponse);
+            return;
+        }
+
+        if (request.url === "/api/agents/shared") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(sharedAgentsResponse);
+            return;
+        }
+
+        if (
+            request.url ===
+                "/api/agents/0198a96d-19e4-7000-8000-000000000303/share/revoke" &&
+            request.method === "POST"
+        ) {
+            agentShareRevocations += 1;
+            response.statusCode = 204;
+            response.end();
             return;
         }
 
@@ -317,8 +369,36 @@ test("shows authentication errors and enters the workspace after login", async (
         await password.fill("correct-password");
         await submit.click();
         await expect(
-            page.getByRole("heading", { name: "Agent 库" }),
+            page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
+        await expect(page.getByRole("tab", { name: "我的" })).toBeVisible();
+        await expect(
+            page.getByRole("tab", { name: "团队共享" }),
+        ).toBeVisible();
+        await expect(page.getByRole("radio", { name: "全部 2" })).toBeChecked();
+        await expect(page.getByText("已发布 1", { exact: true })).toBeVisible();
+        await expect(page.getByText("草稿 1", { exact: true })).toBeVisible();
+        await expect(page.getByText("研发助手", { exact: true })).toBeVisible();
+        await expect(page.getByText("产品草稿", { exact: true })).toBeVisible();
+
+        await page.getByPlaceholder("搜索 Agent").fill("研发");
+        await expect(page.getByText("研发助手", { exact: true })).toBeVisible();
+        await expect(page.getByText("产品草稿", { exact: true })).toHaveCount(0);
+        await page.getByRole("tab", { name: "团队共享" }).click();
+        await expect(
+            page.getByText("合同审查助手", { exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "管理 合同审查助手" })
+            .dispatchEvent("click");
+        await page
+            .getByText("管理员撤销共享", { exact: true })
+            .dispatchEvent("click");
+        await page
+            .getByRole("button", { name: "确认撤销" })
+            .dispatchEvent("click");
+        await expect(page.getByText("已由管理员撤销共享")).toBeVisible();
+        expect(agentShareRevocations).toBe(1);
         await expect(page.getByText("工作区", { exact: true })).toBeVisible();
         await expect(page.getByText("资源中心", { exact: true })).toBeVisible();
         await expect(page.getByText("系统管理", { exact: true })).toBeVisible();
@@ -388,7 +468,7 @@ test("shows authentication errors and enters the workspace after login", async (
             "data-appearance",
             "dark",
         );
-        await expect(page.locator(".library-pane")).toHaveCSS(
+        await expect(page.locator(".agent-space-page")).toHaveCSS(
             "background-color",
             "rgb(23, 20, 19)",
         );
@@ -462,7 +542,9 @@ test("shows authentication errors and enters the workspace after login", async (
             page.getByText("gpt-5.4 对话最小请求成功 · 125 ms"),
         ).toBeVisible();
         expect(modelTestAttempts).toBe(1);
-        await expect(page.locator(".ant-dropdown")).toBeHidden();
+        await expect(
+            page.locator(".ant-dropdown:not(.ant-dropdown-hidden)"),
+        ).toHaveCount(0);
         await page.setViewportSize({ width: 1080, height: 720 });
         expect(
             await page.evaluate(() => document.documentElement.scrollWidth),
@@ -631,7 +713,7 @@ test("shows authentication errors and enters the workspace after login", async (
 
         await page.getByRole("button", { name: "Agent 空间" }).click();
         await expect(
-            page.getByRole("heading", { name: "Agent 库" }),
+            page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
         await page.setViewportSize({ width: 1080, height: 720 });
         expect(
@@ -646,7 +728,7 @@ test("shows authentication errors and enters the workspace after login", async (
             app.emit("browser-window-blur", {} as never, null as never);
         });
         await expect(
-            page.getByRole("heading", { name: "Agent 库" }),
+            page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "Inkwell 已锁定" }),
@@ -672,7 +754,7 @@ test("shows authentication errors and enters the workspace after login", async (
         await page.getByPlaceholder("密码").fill("correct-password");
         await page.keyboard.press("Enter");
         await expect(
-            page.getByRole("heading", { name: "Agent 库" }),
+            page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
     } finally {
         await application.close();
@@ -704,7 +786,13 @@ test("hides system administration navigation from regular users", async ({
 
         if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
-            response.end("[]");
+            response.end(myAgentsResponse);
+            return;
+        }
+
+        if (request.url === "/api/agents/shared") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(sharedAgentsResponse);
             return;
         }
 
@@ -788,7 +876,7 @@ test("hides system administration navigation from regular users", async ({
         await page.getByRole("button", { name: /登\s*录/ }).click();
 
         await expect(
-            page.getByRole("heading", { name: "Agent 库" }),
+            page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
         await expect(page.getByText("系统管理", { exact: true })).toHaveCount(
             0,

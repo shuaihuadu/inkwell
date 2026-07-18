@@ -17,7 +17,12 @@ const api: InkwellDesktopApi = {
     ipcRenderer.on('inkwell:auth-state-changed', handler)
     return () => ipcRenderer.removeListener('inkwell:auth-state-changed', handler)
   },
-  listAgents: () => ipcRenderer.invoke('inkwell:list-agents'),
+  listMyAgents: () => ipcRenderer.invoke('inkwell:list-my-agents'),
+  listSharedAgents: () => ipcRenderer.invoke('inkwell:list-shared-agents'),
+  deleteAgent: (agentId) => ipcRenderer.invoke('inkwell:delete-agent', agentId),
+  shareAgent: (agentId) => ipcRenderer.invoke('inkwell:share-agent', agentId),
+  unshareAgent: (agentId) => ipcRenderer.invoke('inkwell:unshare-agent', agentId),
+  revokeAgentShare: (agentId) => ipcRenderer.invoke('inkwell:revoke-agent-share', agentId),
   listTools: () => ipcRenderer.invoke('inkwell:list-tools'),
   listSkills: () => ipcRenderer.invoke('inkwell:list-skills'),
   uploadSkill: (file) => ipcRenderer.invoke('inkwell:upload-skill', file),

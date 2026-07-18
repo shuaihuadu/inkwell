@@ -611,7 +611,7 @@ textarea {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    gap: 16px;
 }
 .pane-heading h3.ant-typography {
     margin: 0 0 2px;
@@ -647,6 +647,133 @@ textarea {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+}
+.agent-space-page {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: 24px 28px;
+    overflow: auto;
+    background: var(--shell-bg);
+}
+.agent-space-header,
+.agent-space-toolbar,
+.agent-space-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+.agent-space-header {
+    margin-bottom: 16px;
+}
+.agent-space-header h4.ant-typography {
+    margin: 0 0 3px;
+}
+.agent-space-toolbar {
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.agent-space-toolbar .ant-tabs-nav {
+    margin: 0;
+}
+.agent-space-toolbar .ant-input-affix-wrapper {
+    width: 220px;
+}
+.agent-status-filter {
+    width: 320px;
+    margin-bottom: 12px;
+}
+.agent-space-canvas {
+    position: relative;
+    min-height: 548px;
+}
+.agent-space-column {
+    max-width: 20%;
+}
+.agent-space-card.ant-card {
+    position: relative;
+    height: 138px;
+    overflow: hidden;
+    border-radius: 6px;
+}
+.agent-space-card .ant-card-body {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+}
+.agent-card-actions.ant-btn {
+    position: absolute;
+    z-index: 1;
+    top: 7px;
+    right: 7px;
+    opacity: 0;
+}
+.agent-space-card:hover .agent-card-actions,
+.agent-card-actions:focus-visible {
+    opacity: 1;
+}
+.agent-card-heading {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 10px;
+    padding-right: 24px;
+}
+.agent-card-heading > div {
+    min-width: 0;
+    flex: 1;
+}
+.agent-card-heading .ant-space {
+    display: flex;
+    min-width: 0;
+}
+.agent-card-heading .ant-space-item:first-child {
+    min-width: 0;
+    flex: 1;
+}
+.agent-card-heading .ant-tag {
+    margin: 0;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 16px;
+}
+.agent-card-heading > div > .ant-typography {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+}
+.agent-space-card .ant-typography.ant-typography-secondary.ant-typography-ellipsis {
+    margin: 7px 0 0;
+    font-size: 12px;
+}
+.agent-space-card > .ant-card-body > .ant-tag {
+    width: fit-content;
+    margin-top: auto;
+    margin-right: 0;
+    font-size: 10px;
+    line-height: 18px;
+}
+.agent-space-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+}
+.agent-space-pagination {
+    min-height: 48px;
+    padding-top: 16px;
+}
+.agent-chat-workspace {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.agent-chat-back.ant-btn {
+    position: absolute;
+    z-index: 2;
+    top: 20px;
+    right: 22px;
 }
 .chat-panel {
     display: grid;
@@ -739,5 +866,44 @@ textarea {
 @media (max-width: 1120px) {
     .workspace-main {
         grid-template-columns: minmax(300px, 44%) 1fr;
+    }
+    .agent-space-page {
+        padding: 20px;
+    }
+    .agent-space-column {
+        max-width: 25%;
+        flex-basis: 25% !important;
+    }
+}
+@media (max-width: 900px) {
+    .agent-space-column {
+        max-width: 33.3333%;
+        flex-basis: 33.3333% !important;
+    }
+}
+@media (max-width: 760px) {
+    .agent-space-header,
+    .agent-space-toolbar,
+    .agent-space-pagination {
+        align-items: flex-start;
+    }
+    .agent-space-header,
+    .agent-space-pagination {
+        flex-direction: column;
+    }
+    .agent-space-toolbar > .ant-space,
+    .agent-space-toolbar .ant-input-affix-wrapper,
+    .agent-status-filter {
+        width: 100%;
+    }
+    .agent-space-column {
+        max-width: 50%;
+        flex-basis: 50% !important;
+    }
+}
+@media (max-width: 520px) {
+    .agent-space-column {
+        max-width: 100%;
+        flex-basis: 100% !important;
     }
 }

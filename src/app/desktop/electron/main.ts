@@ -338,9 +338,40 @@ const registerApiHandlers = (): void => {
     );
 
     ipcMain.on("inkwell:activity", scheduleIdleLock);
-    ipcMain.handle("inkwell:list-agents", () => {
+    ipcMain.handle("inkwell:list-my-agents", () => {
         requireAuthenticated();
         return request<AgentListItem[]>("/api/agents/mine");
+    });
+    ipcMain.handle("inkwell:list-shared-agents", () => {
+        requireAuthenticated();
+        return request<AgentListItem[]>("/api/agents/shared");
+    });
+    ipcMain.handle("inkwell:delete-agent", (_event, agentId: string) => {
+        requireAuthenticated();
+        return request<void>(`/api/agents/${encodeURIComponent(agentId)}`, {
+            method: "DELETE",
+        });
+    });
+    ipcMain.handle("inkwell:share-agent", (_event, agentId: string) => {
+        requireAuthenticated();
+        return request<void>(
+            `/api/agents/${encodeURIComponent(agentId)}/share`,
+            { method: "POST" },
+        );
+    });
+    ipcMain.handle("inkwell:unshare-agent", (_event, agentId: string) => {
+        requireAuthenticated();
+        return request<void>(
+            `/api/agents/${encodeURIComponent(agentId)}/share`,
+            { method: "DELETE" },
+        );
+    });
+    ipcMain.handle("inkwell:revoke-agent-share", (_event, agentId: string) => {
+        requireAdmin();
+        return request<void>(
+            `/api/agents/${encodeURIComponent(agentId)}/share/revoke`,
+            { method: "POST" },
+        );
     });
     ipcMain.handle("inkwell:list-tools", () => {
         requireAuthenticated();
