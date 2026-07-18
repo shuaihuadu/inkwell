@@ -5,10 +5,11 @@ namespace Inkwell;
 /// <summary>登录 / 会话校验成功后返回给调用方的会话信息 DTO。</summary>
 /// <param name="UserId">用户标识。</param>
 /// <param name="Username">用户名。</param>
-/// <param name="IsSuper">是否为超级管理员。</param>
+/// <param name="IsAdmin">是否为管理员。</param>
+/// <param name="MustChangePassword">是否必须在继续使用工作区前修改密码。</param>
 /// <param name="SessionToken">会话令牌。</param>
 /// <param name="ExpiresAt">会话过期时间。</param>
-public sealed record class AuthSession(Guid UserId, string Username, bool IsSuper, string SessionToken, DateTimeOffset ExpiresAt)
+public sealed record class AuthSession(Guid UserId, string Username, bool IsAdmin, bool MustChangePassword, string SessionToken, DateTimeOffset ExpiresAt)
 {
     /// <summary>
     /// 获取用户标识。

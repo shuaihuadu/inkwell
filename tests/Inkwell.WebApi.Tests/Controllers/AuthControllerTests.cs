@@ -75,18 +75,18 @@ public sealed class AuthControllerTests
     public async Task ListAccountsAsync_ReturnsServiceAccountsAsync()
     {
         // Arrange
-        UserListItem account = new(userId, "admin", true, true, null, DateTimeOffset.UtcNow);
+        UserListItem account = new(userId, "admin", true, true, false, null, DateTimeOffset.UtcNow);
         StubAuthService authService = new() { Accounts = [account] };
         AuthController controller = CreateController(authService);
 
         // Act
-        ActionResult<IReadOnlyList<UserListItem>> result = await controller.ListAccountsAsync(true, CancellationToken.None);
+        ActionResult<IReadOnlyList<UserListItem>> result = await controller.ListAccountsAsync(CancellationToken.None);
         OkObjectResult okResult = (OkObjectResult)result.Result!;
         IReadOnlyList<UserListItem> accounts = (IReadOnlyList<UserListItem>)okResult.Value!;
 
         // Assert
         Assert.AreSame(authService.Accounts, accounts);
-        Assert.IsTrue(authService.RequestedIsLocked);
+        Assert.AreEqual(userId, authService.ListAccountsActorUserId);
     }
 
     /// <summary>
@@ -110,22 +110,24 @@ public sealed class AuthControllerTests
     }
 
     /// <summary>
-    /// 验证账号管理端点要求超级管理员策略。
+    /// 验证账号管理端点要求管理员策略，且不提供管理员主动锁定端点。
     /// </summary>
     [TestMethod]
-    public void AccountManagementEndpoints_RequireSuperUserPolicy()
+    public void AccountManagementEndpoints_RequireAdminPolicy()
     {
         // Arrange
         MethodInfo listMethod = typeof(AuthController).GetMethod(nameof(AuthController.ListAccountsAsync))!;
         MethodInfo unlockMethod = typeof(AuthController).GetMethod(nameof(AuthController.UnlockAccountAsync))!;
+        MethodInfo? lockMethod = typeof(AuthController).GetMethod("LockAccountAsync");
 
         // Act
         string? listPolicy = listMethod.GetCustomAttribute<AuthorizeAttribute>()?.Policy;
         string? unlockPolicy = unlockMethod.GetCustomAttribute<AuthorizeAttribute>()?.Policy;
 
         // Assert
-        Assert.AreEqual(AuthorizationPolicies.RequireSuperUser, listPolicy);
-        Assert.AreEqual(AuthorizationPolicies.RequireSuperUser, unlockPolicy);
+        Assert.AreEqual(AuthorizationPolicies.RequireAdmin, listPolicy);
+        Assert.AreEqual(AuthorizationPolicies.RequireAdmin, unlockPolicy);
+        Assert.IsNull(lockMethod);
     }
 
     private static AuthController CreateController(IAuthService authService)
@@ -148,7 +150,7 @@ public sealed class AuthControllerTests
     {
         public IReadOnlyList<UserListItem> Accounts { get; init; } = [];
 
-        public bool? RequestedIsLocked { get; private set; }
+        public Guid? ListAccountsActorUserId { get; private set; }
 
         public Guid? UnlockedUserId { get; private set; }
 
@@ -176,6 +178,12 @@ public sealed class AuthControllerTests
                 : Task.FromException(this.VerifyException);
         }
 
+        public Task<AuthSession> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, string sessionToken, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IssuedCredential> CreateAccountAsync(string username, bool isAdmin, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task UnlockAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default)
         {
             this.UnlockedUserId = targetUserId;
@@ -183,9 +191,18 @@ public sealed class AuthControllerTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<UserListItem>> ListAccountsAsync(bool? isLocked, CancellationToken ct = default)
+        public Task DisableAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task EnableAccountAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IssuedCredential> ResetPasswordAsync(Guid targetUserId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<UserListItem>> ListAccountsAsync(Guid actorUserId, CancellationToken ct = default)
         {
-            this.RequestedIsLocked = isLocked;
+            this.ListAccountsActorUserId = actorUserId;
             return Task.FromResult(this.Accounts);
         }
     }

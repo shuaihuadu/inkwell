@@ -56,7 +56,7 @@ public sealed class ControllerRoutingTests
     }
 
     /// <summary>
-    /// 验证登录匿名开放，而 Auth Controller 的其余操作要求有效登录态。
+    /// 验证登录匿名开放，而 Auth Controller 的其余操作要求基础登录态，并提供改密入口。
     /// </summary>
     [TestMethod]
     public void AuthController_DefinesExpectedAuthorization()
@@ -73,10 +73,17 @@ public sealed class ControllerRoutingTests
             .GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true)
             .Cast<AllowAnonymousAttribute>()
             .SingleOrDefault();
+        HttpPostAttribute? changePasswordRoute = typeof(AuthController)
+            .GetMethod(nameof(AuthController.ChangePasswordAsync))?
+            .GetCustomAttributes(typeof(HttpPostAttribute), inherit: true)
+            .Cast<HttpPostAttribute>()
+            .SingleOrDefault();
 
         // Assert
-        Assert.AreEqual(AuthorizationPolicies.RequireAuthenticatedUser, authorization?.Policy);
+        Assert.IsNotNull(authorization);
+        Assert.IsNull(authorization.Policy);
         Assert.IsNotNull(allowAnonymous);
+        Assert.AreEqual("password", changePasswordRoute?.Template);
         Assert.AreEqual("api/auth", controllerType.GetCustomAttributes(typeof(RouteAttribute), inherit: true).Cast<RouteAttribute>().Single().Template);
     }
 

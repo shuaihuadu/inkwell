@@ -92,7 +92,7 @@ public sealed class SkillsController(
                 skillId,
                 request,
                 this.GetRequiredUserId(),
-                this.GetRequiredIsSuper(),
+                this.GetRequiredIsAdmin(),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -113,7 +113,7 @@ public sealed class SkillsController(
             .DeleteSkillAsync(
                 skillId,
                 this.GetRequiredUserId(),
-                this.GetRequiredIsSuper(),
+                this.GetRequiredIsAdmin(),
                 cancellationToken)
             .ConfigureAwait(false);
 

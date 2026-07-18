@@ -2,6 +2,7 @@ import { Spin } from 'antd'
 import { useEffect } from 'react'
 import { AgentWorkspace } from './features/agent-library/agent-workspace'
 import { useAuthStore } from './features/auth/auth-store'
+import { ChangePasswordModal } from './features/auth/change-password-modal'
 import { LockPage } from './features/auth/lock-page'
 import { LoginPage } from './features/auth/login-page'
 import { WorkspaceShell } from './features/shell/workspace-shell'
@@ -9,6 +10,7 @@ import { desktopApi } from './shared/network/desktop-api'
 
 export default function AppShell() {
   const status = useAuthStore((state) => state.status)
+  const identity = useAuthStore((state) => state.identity)
   const setSnapshot = useAuthStore((state) => state.setSnapshot)
 
   useEffect(() => {
@@ -51,6 +53,10 @@ export default function AppShell() {
   }
 
   if (status === 'authenticated' || status === 'locked') {
+    if (identity?.mustChangePassword) {
+      return <main className="auth-state-page"><ChangePasswordModal open required /></main>
+    }
+
     return (
       <>
         <WorkspaceShell>

@@ -68,14 +68,14 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
         Guid skillId,
         AgentSkillUpdateRequest request,
         Guid actorUserId,
-        bool actorIsSuper,
+        bool actorIsAdmin,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateEditableFields(request.Name, request.Description, request.Content);
 
         AgentSkillDefinition skill = await this._skills.GetSkill(skillId, ct).ConfigureAwait(false);
-        ValidateManagementPermission(skill, actorUserId, actorIsSuper);
+        ValidateManagementPermission(skill, actorUserId, actorIsAdmin);
         AgentSkillDefinition updated = skill with
         {
             Name = request.Name,
@@ -92,12 +92,12 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
     public async Task<bool> DeleteSkillAsync(
         Guid skillId,
         Guid actorUserId,
-        bool actorIsSuper,
+        bool actorIsAdmin,
         CancellationToken ct = default) =>
         await persistence.ExecuteInTransactionAsync(async innerCt =>
         {
             AgentSkillDefinition skill = await this._skills.GetSkill(skillId, innerCt).ConfigureAwait(false);
-            ValidateManagementPermission(skill, actorUserId, actorIsSuper);
+            ValidateManagementPermission(skill, actorUserId, actorIsAdmin);
             return await this._skills.DeleteSkill(skillId, innerCt).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
 
@@ -192,9 +192,9 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
     private static void ValidateManagementPermission(
         AgentSkillDefinition skill,
         Guid actorUserId,
-        bool actorIsSuper)
+        bool actorIsAdmin)
     {
-        if (!actorIsSuper && skill.OwnerUserId != actorUserId)
+        if (!actorIsAdmin && skill.OwnerUserId != actorUserId)
         {
             throw new UnauthorizedAccessException(
                 $"User '{actorUserId}' cannot manage skill '{skill.Id}'.");

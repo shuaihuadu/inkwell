@@ -3,6 +3,7 @@ using System;
 using Inkwell.Persistence.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Inkwell.Persistence.EFCore.Postgres.Migrations
 {
     [DbContext(typeof(InkwellDbContext))]
-    partial class InkwellDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260718163613_AddUserManagement")]
+    partial class AddUserManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -412,10 +415,6 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_unlock_attempts");
 
-                    b.Property<bool>("IsAdmin")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_admin");
-
                     b.Property<bool>("IsDisabled")
                         .HasColumnType("boolean")
                         .HasColumnName("is_disabled");
@@ -423,6 +422,10 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                     b.Property<bool>("IsLocked")
                         .HasColumnType("boolean")
                         .HasColumnName("is_locked");
+
+                    b.Property<bool>("IsSuper")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_super");
 
                     b.Property<DateTimeOffset?>("LastLoginTime")
                         .HasColumnType("timestamp with time zone")

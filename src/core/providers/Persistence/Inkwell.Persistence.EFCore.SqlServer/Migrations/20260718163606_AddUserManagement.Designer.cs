@@ -4,6 +4,7 @@ using Inkwell.Persistence.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
 {
     [DbContext(typeof(InkwellDbContext))]
-    partial class InkwellDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260718163606_AddUserManagement")]
+    partial class AddUserManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -326,13 +329,13 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                     b.Property<int>("FailedUnlockAttempts")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsAdmin")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsDisabled")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsLocked")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSuper")
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LastLoginTime")

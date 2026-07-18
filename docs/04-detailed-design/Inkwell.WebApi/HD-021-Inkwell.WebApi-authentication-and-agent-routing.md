@@ -57,17 +57,17 @@ AG-UI 挂载路径待 ADR-012 errata 或 Owner 明确拍板；无论最终路径
 
 TypeScript SDK 的实际 JSON 契约如下；后端必须通过锁定 MAF/`AGUI.Abstractions` 版本的 `RunAgentInput` 直接接收，不复制同名 DTO：
 
-| JSON 字段 | SDK 0.0.57 来源 | Inkwell 处理 |
-| --- | --- | --- |
-| `threadId` | `HttpAgent.threadId` | 必须为已存在的 `AgentConversation.Id`；用于定位，不用于授权 |
-| `runId` | `runAgent({ runId })` 或 SDK 自动生成 UUID | 仅作为 AG-UI 协议关联 ID；不作为租约持有者或数据库幂等键 |
-| `parentRunId` | 协议可选字段 | v1 不用于产品会话分支；存在时按 MAF 标准模型接收，不赋予授权语义 |
-| `state` | `HttpAgent.state` 完整克隆 | 作为不可信客户端状态交给 MAF；不得覆盖服务端 `AgentSessionState` 真值 |
-| `messages` | `HttpAgent.messages` 完整克隆并过滤 `role = activity` | 按标准 `Message` 联合类型接收；后端从数据库历史去重/校验后确定本轮新增输入 |
-| `tools` | `runAgent({ tools })`，默认 `[]` | 仅表示客户端工具声明；服务端工具授权仍由绑定版本配置决定 |
-| `context` | `runAgent({ context })`，默认 `[]` | 不可信协议上下文，不承载 Owner、AgentVersion 或权限 |
-| `forwardedProps` | `runAgent({ forwardedProps })`，默认 `{}` | 客户端内容不可信；filter 删除并覆盖保留键 `inkwell` 后才可供内部 Agent 使用 |
-| `resume` | `runAgent({ resume })` 可选 | v1 按 MAF 模型接收；具体 HITL 恢复能力不在 H5-005 范围内 |
+| JSON 字段        | SDK 0.0.57 来源                                       | Inkwell 处理                                                                |
+| ---------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| `threadId`       | `HttpAgent.threadId`                                  | 必须为已存在的 `AgentConversation.Id`；用于定位，不用于授权                 |
+| `runId`          | `runAgent({ runId })` 或 SDK 自动生成 UUID            | 仅作为 AG-UI 协议关联 ID；不作为租约持有者或数据库幂等键                    |
+| `parentRunId`    | 协议可选字段                                          | v1 不用于产品会话分支；存在时按 MAF 标准模型接收，不赋予授权语义            |
+| `state`          | `HttpAgent.state` 完整克隆                            | 作为不可信客户端状态交给 MAF；不得覆盖服务端 `AgentSessionState` 真值       |
+| `messages`       | `HttpAgent.messages` 完整克隆并过滤 `role = activity` | 按标准 `Message` 联合类型接收；后端从数据库历史去重/校验后确定本轮新增输入  |
+| `tools`          | `runAgent({ tools })`，默认 `[]`                      | 仅表示客户端工具声明；服务端工具授权仍由绑定版本配置决定                    |
+| `context`        | `runAgent({ context })`，默认 `[]`                    | 不可信协议上下文，不承载 Owner、AgentVersion 或权限                         |
+| `forwardedProps` | `runAgent({ forwardedProps })`，默认 `{}`             | 客户端内容不可信；filter 删除并覆盖保留键 `inkwell` 后才可供内部 Agent 使用 |
+| `resume`         | `runAgent({ resume })` 可选                           | v1 按 MAF 模型接收；具体 HITL 恢复能力不在 H5-005 范围内                    |
 
 请求使用 `POST application/json`，`Accept: text/event-stream`，Bearer token 由 `HttpAgent.headers` 注入。SDK 的 `runAgent` 参数不能替换 `threadId`、`messages` 或 `state`；调用方应在创建/恢复 `HttpAgent` 时设置 `threadId`、通过 `setMessages` 恢复 REST 历史、通过 `addMessage` 追加新输入，然后运行。
 
@@ -106,13 +106,14 @@ TypeScript SDK 的实际 JSON 契约如下；后端必须通过锁定 MAF/`AGUI.
 **在内**：
 
 - `Authentication/AuthenticationDefaults.cs` / `SessionAuthenticationOptions.cs` / `SessionClaimTypes.cs` / `AuthorizationPolicies.cs` / `SessionAuthenticationHandler.cs` / `AuthenticationBuilderExtensions.cs`
+- `Controllers/AuthController.cs` 及 `Auth/*Request.cs` 的登录、会话、改密与 Admin 用户管理 HTTP 适配
 - `Conversations/AgentConversationEndpoints.cs` / `Conversations/AgentConversationRunEndpointFilter.cs` / `Conversations/ConversationRunLeaseResult.cs`
 - `Program.cs` 对上述两块能力的 DI 注册 + endpoint filter / 端点挂载
 
 **不在内**（明确排除）：
 
 - OpenAI ChatCompletions / Responses / Conversations 协议端点的具体挂载——[ADR-012](../../03-architecture/adr/ADR-012-client-server-protocol-rest-agui.md) 目前只锁定"REST + AG-UI"，本文档只搭好可扩展的壳子（`UseAgentEndpoints` 内部可追加对应 `Map*` 调用），不越权臆造尚未拍板的协议端点具体路由/鉴权细节
-- Agent / 工具 / 技能等非 Conversation REST CRUD 端点——留待后续任务补齐；Conversation REST 已由 §0 锁定
+- Agent / 工具 / 技能等非 Conversation REST CRUD 端点——留待后续任务补齐；Auth REST 端点与 Conversation REST 已落地
 - `Inkwell.Core.AgentRuntime.RoutingAgent`/`AgentResponseMapper`/`AgentEndpointRouteBuilderExtensions` 的内部实现细节——物理文件位于 `Inkwell.Core`，已在 [HD-006 2026-07-10 errata](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) 提及，本文档只记录 `Inkwell.WebApi` 侧的消费方式（`UseAgentEndpoints(...)` 一行调用），不重复其内部设计
 
 ## 2. 文件结构
@@ -122,16 +123,41 @@ src/core/Inkwell.WebApi/
   Authentication/                        # 新增子目录（本 HD）
     AuthenticationDefaults.cs            # 鉴权方案名称常量
     SessionAuthenticationOptions.cs       # AuthenticationSchemeOptions 具体类型占位
-    SessionClaimTypes.cs                  # 自定义 Claim 类型（IsSuper）
-    AuthorizationPolicies.cs             # 授权策略名称常量（RequireSuperUser）
+    SessionClaimTypes.cs                  # 自定义 Claim 类型（IsAdmin / MustChangePassword）
+    AuthorizationPolicies.cs             # 授权策略名称常量（RequireAuthenticatedUser / RequireAdmin）
     SessionAuthenticationHandler.cs       # AuthenticationHandler<SessionAuthenticationOptions> 实现
     AuthenticationBuilderExtensions.cs    # AddSessionAuthentication() DI 注册入口
   Conversations/
     AgentConversationEndpoints.cs         # 产品会话 REST CRUD；只做 HTTP 适配与 Service 调用
     AgentConversationRunEndpointFilter.cs # 从已绑定 RunAgentInput 授权、占用租约并覆盖 forwardedProps.inkwell
     ConversationRunLeaseResult.cs         # 包装 SSE IResult，在 ExecuteAsync finally 释放租约
+  Controllers/
+    AuthController.cs                     # 登录、会话、解锁、改密与 Admin 用户管理端点
   Program.cs                             # 已有文件，本 HD 追加鉴权 + Agent 端点两处调用
 ```
+
+### 2.1 认证 Claims 与授权策略
+
+- `SessionAuthenticationHandler` 通过 `IAuthService.ValidateSessionAsync` 校验 Bearer Session Token，并签发用户标识、`IsAdmin` 与 `MustChangePassword` Claims。
+- `RequireAuthenticatedUser` 要求已认证且 `MustChangePassword=false`，用于工作区功能；`RequireAdmin` 在此基础上额外要求 `IsAdmin=true`。
+- `MustChangePassword=true` 的会话仍可调用 `/api/auth/session`、`/logout`、`/unlock` 与 `/password`，但不能访问工作区或账号管理端点。
+- WebApi policy 负责 HTTP 边界授权；`IAuthService` 的创建账号、列表、解锁、禁用、启用和重置密码方法仍通过 `actorUserId` 在 Core 复核 Admin 身份与账号可用状态。
+
+### 2.2 Auth 路由授权矩阵
+
+| 方法 | 路由                                         | 授权                                                       |
+| ---- | -------------------------------------------- | ---------------------------------------------------------- |
+| POST | `/api/auth/login`                            | 匿名；应用 Auth rate limiter                               |
+| POST | `/api/auth/logout`                           | 有效基础会话                                               |
+| GET  | `/api/auth/session`                          | 有效基础会话                                               |
+| POST | `/api/auth/unlock`                           | 有效基础会话；应用 Auth rate limiter                       |
+| POST | `/api/auth/password`                         | 有效基础会话；允许强制改密用户调用；应用 Auth rate limiter |
+| GET  | `/api/auth/accounts`                         | `RequireAdmin`                                             |
+| POST | `/api/auth/accounts`                         | `RequireAdmin`                                             |
+| POST | `/api/auth/accounts/{userId}/unlock`         | `RequireAdmin`                                             |
+| POST | `/api/auth/accounts/{userId}/disable`        | `RequireAdmin`                                             |
+| POST | `/api/auth/accounts/{userId}/enable`         | `RequireAdmin`                                             |
+| POST | `/api/auth/accounts/{userId}/reset-password` | `RequireAdmin`                                             |
 
 ## 3. 关键决策记录
 
@@ -145,7 +171,7 @@ src/core/Inkwell.WebApi/
 
 - `Authorization` 头缺失 → `NoResult()`（未鉴权，非攻击信号）；token 无效/过期 → `Fail()` → 401；两种情况均不泄漏"用户名是否存在"等信息（沿用 [HD-014 `AuthService.LoginAsync`](HD-014-Inkwell.Core.Auth.md) 已有的计时侧信道防护原则）。
 - `RoutingAgent`（详见 [HD-006 errata](../Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md)）内部 `ResolveCallerUserId` 若取不到有效 `ClaimTypes.NameIdentifier` 直接抛 `UnauthorizedAccessException`，不允许匿名调用；AG-UI 端点已 `RequireAuthorization()`。
-- **未决问题**（不在本文档回答，留待后续 REST API 整体设计时处理）：`agentId` 对应的 Agent 是否属于 `callerUserId`（授权校验）目前完全依赖 [HD-015 `AgentInvocationService.ValidateInvocationAccess`](HD-015-Inkwell.Core.Agents.md) 在业务层拦截，`Inkwell.WebApi` 层不重复校验——与 [HD-014 §1.2](HD-014-Inkwell.Core.Auth.md) 已确立的"WebApi 层不重复校验 `IsSuper`，交给业务层"先例一致。
+- **未决问题**（不在本文档回答，留待后续 REST API 整体设计时处理）：`agentId` 对应的 Agent 是否属于 `callerUserId`（授权校验）目前完全依赖 [HD-015 `AgentInvocationService.ValidateInvocationAccess`](HD-015-Inkwell.Core.Agents.md) 在业务层拦截；管理员身份使用 `IsAdmin` Claim。
 
 ## 5. 待确认的问题
 

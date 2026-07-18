@@ -8,6 +8,7 @@ import {
     Divider,
     Dropdown,
     Empty,
+    Form,
     Input,
     Modal,
     Pagination,
@@ -32,6 +33,7 @@ import {
     DownOutlined,
     EditOutlined,
     GithubOutlined,
+    KeyOutlined,
     LockOutlined,
     LogoutOutlined,
     MoonFilled,
@@ -57,6 +59,12 @@ import ToolListPage from "./ToolListPage";
 import SkillListPage from "./SkillListPage";
 import ModelListPage from "./ModelListPage";
 import UserManagementPage from "./UserManagementPage";
+
+interface ChangePasswordFormValues {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}
 
 // ─── Types（对齐 ui-spec.md §0.2 / §11） ──────────────────────────────────────
 
@@ -111,7 +119,7 @@ const NAV_GROUPS: {
         key: NavKey;
         label: string;
         icon: React.ReactNode;
-        requiresSuper?: boolean;
+        requiresAdmin?: boolean;
     }[];
 }[] = [
     {
@@ -150,7 +158,7 @@ const NAV_GROUPS: {
                 key: "admin",
                 label: "用户管理",
                 icon: <SafetyCertificateOutlined />,
-                requiresSuper: true,
+                requiresAdmin: true,
             },
         ],
     },
@@ -249,14 +257,14 @@ function AgentLibraryMock({
     onSelectAgent,
     onCreateAgent,
     onEditAgent,
-    isSuper,
+    isAdmin,
 }: {
     activeTab: string;
     onTabChange: (key: string) => void;
     onSelectAgent: (agent: { name: string; published: boolean }) => void;
     onCreateAgent: () => void;
     onEditAgent: (name: string) => void;
-    isSuper: boolean;
+    isAdmin: boolean;
 }) {
     const { token } = antdTheme.useToken();
     const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>("all");
@@ -447,7 +455,7 @@ function AgentLibraryMock({
                                         />
                                     </Tooltip>
                                 )}
-                                {activeTab === "shared" && isSuper && (
+                                {activeTab === "shared" && isAdmin && (
                                     <Tooltip title="撤销共享">
                                         <Button
                                             className="inkwell-agent-card-edit-btn"
@@ -612,7 +620,7 @@ export default function AppShellExplorer() {
         setAppearanceMode,
         setIsDark,
     } = useDesign();
-    const [isSuper, setIsSuper] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(true);
     const [network, setNetwork] = useState<NetworkStatus>("online");
     const [errorScenario, setErrorScenario] = useState<ErrorScenario>("none");
     const [activeNav, setActiveNav] = useState<NavKey>("library");
@@ -622,6 +630,8 @@ export default function AppShellExplorer() {
     const [chattingAgent, setChattingAgent] = useState<string | null>(null);
     const [aboutOpen, setAboutOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+    const [changePasswordForm] = Form.useForm<ChangePasswordFormValues>();
     const [locked, setLocked] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
         () => new Set(NAV_GROUPS.map((group) => group.key)),
@@ -638,11 +648,12 @@ export default function AppShellExplorer() {
     const showAgentChat = activeNav === "library" && chattingAgent !== null;
     const visibleNavGroups = NAV_GROUPS.map((group) => ({
         ...group,
-        items: group.items.filter((item) => !item.requiresSuper || isSuper),
+        items: group.items.filter((item) => !item.requiresAdmin || isAdmin),
     })).filter((group) => group.items.length > 0);
 
     const userMenuItems = [
         { key: "settings", icon: <SettingOutlined />, label: "个人设置" },
+        { key: "change-password", icon: <KeyOutlined />, label: "修改密码" },
         { type: "divider" as const },
         // UI-002 锁定页（ui-spec.md §2）的模拟入口——真实产品里这个页面主要由 5
         // 分钟无操作/主窗口失焦自动触发（NFR-003），但很多真实产品也会在用户菜单里附带一个
@@ -650,6 +661,13 @@ export default function AppShellExplorer() {
         { key: "lock", icon: <LockOutlined />, label: "锁定" },
         { key: "logout", icon: <LogoutOutlined />, label: "登出" },
     ];
+
+    const changePassword = async () => {
+        await changePasswordForm.validateFields();
+        message.success("密码已修改");
+        changePasswordForm.resetFields();
+        setChangePasswordOpen(false);
+    };
 
     return (
         <div
@@ -707,9 +725,9 @@ export default function AppShellExplorer() {
                 <Space size={6}>
                     <Switch
                         size="small"
-                        checked={isSuper}
+                        checked={isAdmin}
                         onChange={(checked) => {
-                            setIsSuper(checked);
+                            setIsAdmin(checked);
                             if (!checked && activeNav === "admin") {
                                 setActiveNav("library");
                             }
@@ -870,6 +888,8 @@ export default function AppShellExplorer() {
                                 onClick: ({ key }) => {
                                     if (key === "settings")
                                         setSettingsOpen(true);
+                                    if (key === "change-password")
+                                        setChangePasswordOpen(true);
                                     if (key === "lock") setLocked(true);
                                 },
                             }}
@@ -935,21 +955,12 @@ export default function AppShellExplorer() {
                                             <div
                                                 onClick={() =>
                                                     setExpandedGroups(
-                                                        (prev) => {
-                                                            const next =
-                                                                new Set(prev);
-                                                            if (
-                                                                next.has(
-                                                                    group.key,
-                                                                )
-                                                            ) {
-                                                                next.delete(
-                                                                    group.key,
-                                                                );
+                                                        (previous) => {
+                                                            const next = new Set(previous);
+                                                            if (next.has(group.key)) {
+                                                                next.delete(group.key);
                                                             } else {
-                                                                next.add(
-                                                                    group.key,
-                                                                );
+                                                                next.add(group.key);
                                                             }
                                                             return next;
                                                         },
@@ -958,8 +969,7 @@ export default function AppShellExplorer() {
                                                 style={{
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    justifyContent:
-                                                        "space-between",
+                                                    justifyContent: "space-between",
                                                     padding: "4px 12px",
                                                     cursor: "pointer",
                                                     userSelect: "none",
@@ -967,10 +977,7 @@ export default function AppShellExplorer() {
                                             >
                                                 <Typography.Text
                                                     type="secondary"
-                                                    style={{
-                                                        fontSize: 11,
-                                                        fontWeight: 600,
-                                                    }}
+                                                    style={{ fontSize: 11, fontWeight: 600 }}
                                                 >
                                                     {group.label}
                                                 </Typography.Text>
@@ -978,8 +985,7 @@ export default function AppShellExplorer() {
                                                     style={{
                                                         fontSize: 9,
                                                         color: token.colorTextTertiary,
-                                                        transition:
-                                                            "transform 0.15s",
+                                                        transition: "transform 0.15s",
                                                         transform: isExpanded
                                                             ? "rotate(90deg)"
                                                             : "rotate(0deg)",
@@ -989,18 +995,13 @@ export default function AppShellExplorer() {
                                         )}
                                         {isExpanded &&
                                             group.items.map((item) => {
-                                                const active =
-                                                    activeNav === item.key;
+                                                const active = activeNav === item.key;
                                                 return (
                                                     <Tooltip key={item.key} title="" placement="right">
                                                         <div
                                                             onClick={() => {
-                                                                setActiveNav(
-                                                                    item.key,
-                                                                );
-                                                                setSelectedAgent(
-                                                                    null,
-                                                                );
+                                                                setActiveNav(item.key);
+                                                                setSelectedAgent(null);
                                                                 setCreatingAgent(
                                                                     false,
                                                                 );
@@ -1111,13 +1112,13 @@ export default function AppShellExplorer() {
                                     onEditAgent={(name) =>
                                         setSelectedAgent(name)
                                     }
-                                    isSuper={isSuper}
+                                    isAdmin={isAdmin}
                                 />
                             )
                         ) : activeNav === "tools" ? (
                             <ToolListPage />
                         ) : activeNav === "skills" ? (
-                            <SkillListPage isSuper={isSuper} />
+                            <SkillListPage isAdmin={isAdmin} />
                         ) : activeNav === "models" ? (
                             <ModelListPage />
                         ) : (
@@ -1218,7 +1219,7 @@ export default function AppShellExplorer() {
                 </div>
             </Modal>
 
-            {/* 个人设置弹层：外观模式（亮色/暗色/跟随系统）+ 主题色 */}
+            {/* 个人设置弹层：仅管理外观 */}
             <Modal
                 open={settingsOpen}
                 onCancel={() => setSettingsOpen(false)}
@@ -1234,35 +1235,11 @@ export default function AppShellExplorer() {
                     <Segmented
                         block
                         value={appearanceMode}
-                        onChange={(v) => setAppearanceMode(v as AppearanceMode)}
+                        onChange={(value) => setAppearanceMode(value as AppearanceMode)}
                         options={[
-                            {
-                                value: "light",
-                                label: (
-                                    <Space size={4}>
-                                        <BulbOutlined />
-                                        亮色
-                                    </Space>
-                                ),
-                            },
-                            {
-                                value: "dark",
-                                label: (
-                                    <Space size={4}>
-                                        <BulbFilled />
-                                        暗色
-                                    </Space>
-                                ),
-                            },
-                            {
-                                value: "system",
-                                label: (
-                                    <Space size={4}>
-                                        <DesktopOutlined />
-                                        跟随系统
-                                    </Space>
-                                ),
-                            },
+                            { value: "light", label: <Space size={4}><BulbOutlined />亮色</Space> },
+                            { value: "dark", label: <Space size={4}><BulbFilled />暗色</Space> },
+                            { value: "system", label: <Space size={4}><DesktopOutlined />跟随系统</Space> },
                         ]}
                     />
                 </div>
@@ -1273,9 +1250,9 @@ export default function AppShellExplorer() {
                     <Segmented
                         block
                         value={themeName}
-                        onChange={(v) => setThemeName(v as typeof themeName)}
-                        options={THEME_NAMES.map((n) => ({
-                            value: n,
+                        onChange={(value) => setThemeName(value as typeof themeName)}
+                        options={THEME_NAMES.map((name) => ({
+                            value: name,
                             label: (
                                 <Space size={4}>
                                     <span
@@ -1284,16 +1261,82 @@ export default function AppShellExplorer() {
                                             width: 8,
                                             height: 8,
                                             borderRadius: "50%",
-                                            background: THEMES[n].primaryColor,
+                                            background: THEMES[name].primaryColor,
                                             flexShrink: 0,
                                         }}
                                     />
-                                    {THEMES[n].label}
+                                    {THEMES[name].label}
                                 </Space>
                             ),
                         }))}
                     />
                 </div>
+            </Modal>
+
+            <Modal
+                open={changePasswordOpen}
+                onCancel={() => {
+                    setChangePasswordOpen(false);
+                    changePasswordForm.resetFields();
+                }}
+                footer={null}
+                centered
+                width={440}
+                title="修改密码"
+            >
+                <Form<ChangePasswordFormValues>
+                    form={changePasswordForm}
+                    layout="vertical"
+                    onFinish={() => void changePassword()}
+                    requiredMark="optional"
+                >
+                    <Form.Item
+                        name="currentPassword"
+                        label="当前密码"
+                        rules={[{ required: true, message: "请输入当前密码" }]}
+                    >
+                        <Input.Password autoComplete="current-password" placeholder="输入当前密码" />
+                    </Form.Item>
+                    <Form.Item
+                        name="newPassword"
+                        label="新密码"
+                        extra="使用 8–128 个字符，且不能与当前密码相同。"
+                        dependencies={["currentPassword"]}
+                        rules={[
+                            { required: true, message: "请输入新密码" },
+                            { min: 8, max: 128, message: "密码长度应为 8–128 个字符" },
+                            ({ getFieldValue }) => ({
+                                validator: (_, value: string | undefined) =>
+                                    value && value === getFieldValue("currentPassword")
+                                        ? Promise.reject(new Error("新密码不能与当前密码相同"))
+                                        : Promise.resolve(),
+                            }),
+                        ]}
+                    >
+                        <Input.Password autoComplete="new-password" placeholder="输入新密码" />
+                    </Form.Item>
+                    <Form.Item
+                        name="confirmPassword"
+                        label="确认新密码"
+                        dependencies={["newPassword"]}
+                        rules={[
+                            { required: true, message: "请再次输入新密码" },
+                            ({ getFieldValue }) => ({
+                                validator: (_, value: string | undefined) =>
+                                    value && value !== getFieldValue("newPassword")
+                                        ? Promise.reject(new Error("两次输入的新密码不一致"))
+                                        : Promise.resolve(),
+                            }),
+                        ]}
+                    >
+                        <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+                    </Form.Item>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Button type="primary" htmlType="submit">
+                            修改密码
+                        </Button>
+                    </div>
+                </Form>
             </Modal>
         </div>
     );

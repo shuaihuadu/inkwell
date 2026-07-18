@@ -20,7 +20,10 @@ import type {
     AuthSnapshot,
     AuthStatus,
     ChatRequest,
+    ChangePasswordRequest,
+    CreateAccountRequest,
     CreateAgentRequest,
+    IssuedCredential,
     LoginRequest,
     LoginResult,
     LLMModel,
@@ -170,11 +173,15 @@ const requireAuthenticated = (): void => {
                 : "Authentication is required.",
         );
     }
+
+    if (authSnapshot.identity?.mustChangePassword) {
+        throw new Error("Password change is required.");
+    }
 };
 
-const requireSuperUser = (): void => {
+const requireAdmin = (): void => {
     requireAuthenticated();
-    if (!authSnapshot.identity?.isSuper) {
+    if (!authSnapshot.identity?.isAdmin) {
         throw new Error("Super user authorization is required.");
     }
 };
@@ -204,7 +211,8 @@ const restoreAuthentication = async (): Promise<AuthSnapshot> => {
 const toAuthIdentity = (session: InternalAuthSession): AuthIdentity => ({
     userId: session.userId,
     username: session.username,
-    isSuper: session.isSuper,
+    isAdmin: session.isAdmin,
+    mustChangePassword: session.mustChangePassword,
     expiresAt: session.expiresAt,
 });
 
@@ -311,6 +319,24 @@ const registerApiHandlers = (): void => {
         }
     });
 
+    ipcMain.handle(
+        "inkwell:change-password",
+        async (_event, input: ChangePasswordRequest): Promise<AuthIdentity> => {
+            if (!sessionToken || !authSnapshot.identity) {
+                throw new Error("Authentication is required.");
+            }
+
+            const session = await request<InternalAuthSession>(
+                "/api/auth/password",
+                { method: "POST", body: JSON.stringify(input) },
+            );
+            const identity = toAuthIdentity(session);
+            setAuthState("authenticated", identity);
+            scheduleIdleLock();
+            return identity;
+        },
+    );
+
     ipcMain.on("inkwell:activity", scheduleIdleLock);
     ipcMain.handle("inkwell:list-agents", () => {
         requireAuthenticated();
@@ -381,15 +407,49 @@ const registerApiHandlers = (): void => {
         await shell.openExternal(externalUrl.toString());
     });
     ipcMain.handle("inkwell:list-accounts", () => {
-        requireSuperUser();
+        requireAdmin();
         return request<UserListItem[]>("/api/auth/accounts");
     });
     ipcMain.handle(
+        "inkwell:create-account",
+        (_event, input: CreateAccountRequest) => {
+            requireAdmin();
+            return request<IssuedCredential>("/api/auth/accounts", {
+                method: "POST",
+                body: JSON.stringify(input),
+            });
+        },
+    );
+    ipcMain.handle(
         "inkwell:unlock-account",
         (_event, userId: string) => {
-            requireSuperUser();
+            requireAdmin();
             return request<void>(
                 `/api/auth/accounts/${encodeURIComponent(userId)}/unlock`,
+                { method: "POST" },
+            );
+        },
+    );
+    ipcMain.handle("inkwell:disable-account", (_event, userId: string) => {
+        requireAdmin();
+        return request<void>(
+            `/api/auth/accounts/${encodeURIComponent(userId)}/disable`,
+            { method: "POST" },
+        );
+    });
+    ipcMain.handle("inkwell:enable-account", (_event, userId: string) => {
+        requireAdmin();
+        return request<void>(
+            `/api/auth/accounts/${encodeURIComponent(userId)}/enable`,
+            { method: "POST" },
+        );
+    });
+    ipcMain.handle(
+        "inkwell:reset-account-password",
+        (_event, userId: string) => {
+            requireAdmin();
+            return request<IssuedCredential>(
+                `/api/auth/accounts/${encodeURIComponent(userId)}/reset-password`,
                 { method: "POST" },
             );
         },

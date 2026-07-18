@@ -27,15 +27,15 @@ public abstract class InkwellControllerBase : ControllerBase
     }
 
     /// <summary>
-    /// 获取当前已认证用户是否为超级管理员。
+    /// 获取当前已认证用户是否为管理员。
     /// </summary>
-    /// <returns>当前用户是超级管理员时返回 <see langword="true"/>。</returns>
-    protected bool GetRequiredIsSuper()
+    /// <returns>当前用户是管理员时返回 <see langword="true"/>。</returns>
+    protected bool GetRequiredIsAdmin()
     {
-        string? value = this.User.FindFirstValue(SessionClaimTypes.IsSuper);
+        string? value = this.User.FindFirstValue(SessionClaimTypes.IsAdmin);
 
-        return bool.TryParse(value, out bool isSuper)
-            ? isSuper
+        return bool.TryParse(value, out bool isAdmin)
+            ? isAdmin
             : throw new UnauthorizedAccessException("Authenticated user role is missing or invalid.");
     }
 

@@ -99,7 +99,7 @@ const INITIAL_SKILLS: SkillItem[] = [
     ),
 ];
 
-export default function SkillListPage({ isSuper }: { isSuper: boolean }) {
+export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
     const [skills, setSkills] = useState(INITIAL_SKILLS);
     const [searchText, setSearchText] = useState("");
     const [owner, setOwner] = useState("all");
@@ -112,7 +112,7 @@ export default function SkillListPage({ isSuper }: { isSuper: boolean }) {
     const [modalApi, modalContextHolder] = Modal.useModal();
 
     const canManage = (skill: SkillItem) =>
-        isSuper || skill.owner === CURRENT_USER;
+        isAdmin || skill.owner === CURRENT_USER;
     const filteredSkills = skills.filter((skill) => {
         const matchesText = `${skill.name} ${skill.description} ${skill.owner}`
             .toLowerCase()

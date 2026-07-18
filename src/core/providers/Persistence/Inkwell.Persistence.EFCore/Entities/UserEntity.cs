@@ -10,9 +10,15 @@ internal sealed class UserEntity : IHasTimestamps
 
     public string PasswordHash { get; init; } = "";
 
-    public bool IsSuper { get; init; }
+    public bool IsAdmin { get; init; }
 
     public bool IsLocked { get; init; }
+
+    public bool IsDisabled { get; init; }
+
+    public bool MustChangePassword { get; init; }
+
+    public int SessionVersion { get; init; }
 
     public int FailedUnlockAttempts { get; init; }
 

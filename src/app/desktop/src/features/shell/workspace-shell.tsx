@@ -6,6 +6,7 @@ import {
     DesktopOutlined,
     DownOutlined,
     GithubOutlined,
+    KeyOutlined,
     LogoutOutlined,
     MoonFilled,
     ReadOutlined,
@@ -33,6 +34,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
+import { ChangePasswordModal } from "../auth/change-password-modal";
 import { ModelManagement } from "../models/model-management";
 import { SkillManagement } from "../skills/skill-management";
 import { ToolManagement } from "../tools/tool-management";
@@ -50,7 +52,7 @@ interface NavigationItem {
     key: NavigationKey;
     label: string;
     icon: ReactNode;
-    requiresSuper?: boolean;
+    requiresAdmin?: boolean;
     placeholder?: boolean;
 }
 
@@ -97,7 +99,7 @@ const navigationGroups: NavigationGroup[] = [
                 key: "admin",
                 label: "用户管理",
                 icon: <SafetyCertificateOutlined />,
-                requiresSuper: true,
+                requiresAdmin: true,
             },
         ],
     },
@@ -120,6 +122,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         useState<NavigationKey>("agents");
     const [aboutOpen, setAboutOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [changePasswordOpen, setChangePasswordOpen] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
         () => new Set(navigationGroups.map((group) => group.key)),
     );
@@ -127,7 +130,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         .map((group) => ({
             ...group,
             items: group.items.filter(
-                (item) => !item.requiresSuper || identity?.isSuper,
+                (item) => !item.requiresAdmin || identity?.isAdmin,
             ),
         }))
         .filter((group) => group.items.length > 0);
@@ -197,7 +200,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                                     icon: <SettingOutlined />,
                                     label: "个人设置",
                                 },
-                                ...(identity?.isSuper
+                                {
+                                    key: "change-password",
+                                    icon: <KeyOutlined />,
+                                    label: "修改密码",
+                                },
+                                ...(identity?.isAdmin
                                     ? [
                                           {
                                               key: "admin",
@@ -217,6 +225,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                             ],
                             onClick: ({ key }) => {
                                 if (key === "settings") setSettingsOpen(true);
+                                if (key === "change-password")
+                                    setChangePasswordOpen(true);
                                 if (key === "admin")
                                     setActiveNavigation("admin");
                                 if (key === "logout") void logout();
@@ -321,7 +331,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                         className="workspace-route"
                         hidden={activeNavigation !== "admin"}
                     >
-                        {identity?.isSuper && <UserManagement />}
+                        {identity?.isAdmin && <UserManagement />}
                     </div>
                     {activeNavigation !== "agents" &&
                         activeNavigation !== "tools" &&
@@ -485,6 +495,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     }))}
                 />
             </Modal>
+            <ChangePasswordModal
+                open={changePasswordOpen}
+                onClose={() => setChangePasswordOpen(false)}
+            />
         </div>
     );
 }

@@ -394,7 +394,7 @@ src/core/Inkwell.Core/
 - **背景**：[§1 顶部范围核实结论](#1-模块概述) 依据 requirements.md / ui-spec.md 现有文本判断 v1 只需"只读目录 + Seed 写入"，但 [REQ-017](../../01-requirements/requirements.md) Admin 最小管理页范围本身在 [HD-014](HD-014-Inkwell.Core.Auth.md) / [HD-015](HD-015-Inkwell.Core.Agents.md) 起草时也未提及"工具管理"，无法排除是遗漏而非明确排除。
 - **候选**：
   - **A. 维持本 HD 现有设计**——只读目录 + `InkwellSeeder` 硬编码维护，不提供运行期增删改 API；新增/下线工具需要改代码 + 重新部署
-  - **B. 补充最小 Admin CRUD API**（`CreateToolAsync`/`UpdateToolAsync`/`DeleteToolAsync`，比照 [HD-014](HD-014-Inkwell.Core.Auth.md) `IsSuper` 权限模型），对应需要在 [ui-spec.md](../../01-requirements/ui-spec.md) 补一个管理界面，属于新的产品范围，需要另行走 H1 补充需求 / UI 设计
+  - **B. 补充最小 Admin CRUD API**（`CreateToolAsync`/`UpdateToolAsync`/`DeleteToolAsync`，比照 [HD-014](HD-014-Inkwell.Core.Auth.md) `IsAdmin` 权限模型），对应需要在 [ui-spec.md](../../01-requirements/ui-spec.md) 补一个管理界面，属于新的产品范围，需要另行走 H1 补充需求 / UI 设计
   - **C. 其他折中方案**（如仅支持"禁用/启用工具"而不支持"新增自定义工具"）
 
 **已解决（2026-07-07）**：Owner 在对话中直接明确确认——维持候选 A： Tool 目录 v1 保持只读，不补充运行期管理 API；新增/下线工具继续通过修改 `InkwellSeeder` Seed 数据 + 重新部署完成，不引入 Admin 管理界面。本决议**未改变现有设计**（[§1.3 Q2](#13-关键决策摘要) / [§3.2 `IToolRepository`](#32-persistencetoolsitoolrepositorycs) 方法集维持不变），仅将确认状态从"未拍板"更新为"已确认"。

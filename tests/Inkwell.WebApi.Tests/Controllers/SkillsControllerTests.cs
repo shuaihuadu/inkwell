@@ -20,7 +20,7 @@ public sealed class SkillsControllerTests
         // Arrange
         Guid userId = Guid.CreateVersion7();
         StubAgentSkillCatalogService service = new(userId);
-        SkillsController controller = CreateController(service, userId, isSuper: false);
+        SkillsController controller = CreateController(service, userId, isAdmin: false);
         byte[] content = """
             ---
             name: contract-review
@@ -52,7 +52,7 @@ public sealed class SkillsControllerTests
         // Arrange
         Guid userId = Guid.CreateVersion7();
         StubAgentSkillCatalogService service = new(userId);
-        SkillsController controller = CreateController(service, userId, isSuper: true);
+        SkillsController controller = CreateController(service, userId, isAdmin: true);
         AgentSkillUpdateRequest request = new(
             "updated",
             "Updated description.",
@@ -63,18 +63,18 @@ public sealed class SkillsControllerTests
 
         // Assert
         Assert.AreEqual(userId, service.UpdateActorUserId);
-        Assert.IsTrue(service.UpdateActorIsSuper);
+        Assert.IsTrue(service.UpdateActorIsAdmin);
     }
 
     private static SkillsController CreateController(
         StubAgentSkillCatalogService service,
         Guid userId,
-        bool isSuper)
+        bool isAdmin)
     {
         ClaimsIdentity identity = new(
             [
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-                new Claim(SessionClaimTypes.IsSuper, isSuper.ToString()),
+                new Claim(SessionClaimTypes.IsAdmin, isAdmin.ToString()),
             ],
             "Test");
         SkillsController controller = new(service, new RejectingFileStorageProvider())
@@ -94,7 +94,7 @@ public sealed class SkillsControllerTests
 
         public Guid? UpdateActorUserId { get; private set; }
 
-        public bool UpdateActorIsSuper { get; private set; }
+        public bool UpdateActorIsAdmin { get; private set; }
 
         public Task<IReadOnlyList<AgentSkillDefinition>> ListAvailableSkillsAsync(
             CancellationToken ct = default) =>
@@ -118,18 +118,18 @@ public sealed class SkillsControllerTests
             Guid skillId,
             AgentSkillUpdateRequest request,
             Guid actorUserId,
-            bool actorIsSuper,
+            bool actorIsAdmin,
             CancellationToken ct = default)
         {
             this.UpdateActorUserId = actorUserId;
-            this.UpdateActorIsSuper = actorIsSuper;
+            this.UpdateActorIsAdmin = actorIsAdmin;
             return Task.FromResult(this.CreateSkill(skillId));
         }
 
         public Task<bool> DeleteSkillAsync(
             Guid skillId,
             Guid actorUserId,
-            bool actorIsSuper,
+            bool actorIsAdmin,
             CancellationToken ct = default) => Task.FromResult(true);
 
         private AgentSkillDefinition CreateSkill(Guid id) => new()

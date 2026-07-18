@@ -21,14 +21,29 @@ public sealed record class User : IHasTimestamps
     public required string PasswordHash { get; init; }
 
     /// <summary>
-    /// 获取用户是否为超级管理员。
+    /// 获取用户是否为管理员。
     /// </summary>
-    public bool IsSuper { get; init; }
+    public bool IsAdmin { get; init; }
 
     /// <summary>
     /// 获取账号是否已锁定。
     /// </summary>
     public bool IsLocked { get; init; }
+
+    /// <summary>
+    /// 获取账号是否已被管理员禁用。
+    /// </summary>
+    public bool IsDisabled { get; init; }
+
+    /// <summary>
+    /// 获取用户是否必须在继续使用工作区前修改密码。
+    /// </summary>
+    public bool MustChangePassword { get; init; }
+
+    /// <summary>
+    /// 获取会话版本；账号安全状态变化时递增，以使既有会话失效。
+    /// </summary>
+    public int SessionVersion { get; init; }
 
     /// <summary>
     /// 获取连续密码验证失败次数（登录与客户端解锁场景共用同一计数）。

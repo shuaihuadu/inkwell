@@ -70,7 +70,7 @@ const formatLatency = (value: string): string => {
 };
 
 export function ModelManagement() {
-    const isSuper = useAuthStore((state) => state.identity?.isSuper === true);
+    const isAdmin = useAuthStore((state) => state.identity?.isAdmin === true);
     const [category, setCategory] = useState<ModelCategoryFilter>("All");
     const [searchText, setSearchText] = useState("");
     const [selectedModel, setSelectedModel] = useState<LLMModel | null>(null);
@@ -83,7 +83,7 @@ export function ModelManagement() {
     const managementQuery = useQuery({
         queryKey: ["model-management-info"],
         queryFn: desktopApi.getModelManagementInfo,
-        enabled: isSuper,
+        enabled: isAdmin,
     });
     const testMutation = useMutation({
         mutationFn: desktopApi.testModel,
@@ -131,7 +131,7 @@ export function ModelManagement() {
         <DataListPage<LLMModel>
             title="模型"
             description="查看 LiteLLM 实时发现的模型与能力。此列表只读，模型配置在 LiteLLM 中维护。"
-            primaryAction={isSuper ? (
+            primaryAction={isAdmin ? (
                 <Button
                     type="primary"
                     ghost

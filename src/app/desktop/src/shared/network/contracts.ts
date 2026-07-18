@@ -27,8 +27,14 @@ export type UnlockResult =
 export interface AuthIdentity {
     userId: string;
     username: string;
-    isSuper: boolean;
+    isAdmin: boolean;
+    mustChangePassword: boolean;
     expiresAt: string;
+}
+
+export interface ChangePasswordRequest {
+    currentPassword: string;
+    newPassword: string;
 }
 
 export type AuthStatus =
@@ -133,10 +139,22 @@ export interface AgentSkillUploadFile {
 export interface UserListItem {
     userId: string;
     username: string;
-    isSuper: boolean;
+    isAdmin: boolean;
     isLocked: boolean;
+    isDisabled: boolean;
     lastLoginTime: string | null;
     createdTime: string;
+}
+
+export interface CreateAccountRequest {
+    username: string;
+    isAdmin: boolean;
+}
+
+export interface IssuedCredential {
+    userId: string;
+    username: string;
+    temporaryPassword: string;
 }
 
 export interface CreateAgentRequest {
@@ -163,6 +181,7 @@ export interface InkwellDesktopApi {
     restoreAuth: () => Promise<AuthSnapshot>;
     login: (request: LoginRequest) => Promise<LoginResult>;
     unlock: (password: string) => Promise<UnlockResult>;
+    changePassword: (request: ChangePasswordRequest) => Promise<AuthIdentity>;
     logout: () => Promise<void>;
     reportActivity: () => void;
     onAuthStateChanged: (
@@ -182,7 +201,11 @@ export interface InkwellDesktopApi {
     testModel: (modelId: string) => Promise<LLMModelTestResult>;
     openExternal: (url: string) => Promise<void>;
     listAccounts: () => Promise<UserListItem[]>;
+    createAccount: (request: CreateAccountRequest) => Promise<IssuedCredential>;
     unlockAccount: (userId: string) => Promise<void>;
+    disableAccount: (userId: string) => Promise<void>;
+    enableAccount: (userId: string) => Promise<void>;
+    resetAccountPassword: (userId: string) => Promise<IssuedCredential>;
     createAgent: (request: CreateAgentRequest) => Promise<AgentDefinition>;
     chat: (request: ChatRequest) => Promise<void>;
     onChatDelta: (

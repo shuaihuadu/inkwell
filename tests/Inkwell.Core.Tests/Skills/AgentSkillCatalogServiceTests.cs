@@ -65,7 +65,7 @@ public sealed class AgentSkillCatalogServiceTests
             existing.Id,
             request,
             ownerUserId,
-            actorIsSuper: false);
+            actorIsAdmin: false);
 
         // Assert
         Assert.AreEqual("updated-name", result.Name);
@@ -94,7 +94,7 @@ public sealed class AgentSkillCatalogServiceTests
             existing.Id,
             request,
             Guid.CreateVersion7(),
-            actorIsSuper: false);
+            actorIsAdmin: false);
 
         // Assert
         await Assert.ThrowsAsync<UnauthorizedAccessException>(ActAsync);

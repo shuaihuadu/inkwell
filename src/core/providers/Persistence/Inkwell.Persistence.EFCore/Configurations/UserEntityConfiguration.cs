@@ -13,5 +13,6 @@ internal sealed class UserEntityConfiguration : IEntityTypeConfiguration<UserEnt
         b.Property(x => x.Username).IsRequired().HasMaxLength(100);
         b.Property(x => x.PasswordHash).IsRequired();
         b.HasIndex(x => x.IsLocked);
+        b.HasIndex(x => x.IsDisabled);
     }
 }

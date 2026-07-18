@@ -61,7 +61,8 @@ internal sealed class SessionAuthenticationHandler(
         [
             new Claim(ClaimTypes.NameIdentifier, session.UserId.ToString()),
             new Claim(ClaimTypes.Name, session.Username),
-            new Claim(SessionClaimTypes.IsSuper, session.IsSuper ? "true" : "false"),
+            new Claim(SessionClaimTypes.IsAdmin, session.IsAdmin ? "true" : "false"),
+            new Claim(SessionClaimTypes.MustChangePassword, session.MustChangePassword ? "true" : "false"),
         ];
 
         ClaimsIdentity identity = new(claims, this.Scheme.Name);

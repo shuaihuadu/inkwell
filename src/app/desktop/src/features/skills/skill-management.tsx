@@ -125,7 +125,7 @@ export function SkillManagement() {
     });
     const normalizedSearch = searchText.trim().toLocaleLowerCase();
     const canManage = (skill: AgentSkillDefinition): boolean =>
-        identity?.isSuper === true || skill.ownerUserId === identity?.userId;
+        identity?.isAdmin === true || skill.ownerUserId === identity?.userId;
     const ownerLabel = (skill: AgentSkillDefinition): string =>
         skill.ownerUserId === identity?.userId
             ? (identity?.username ?? "我")

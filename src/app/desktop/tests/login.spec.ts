@@ -148,7 +148,8 @@ test("shows authentication errors and enters the workspace after login", async (
                 JSON.stringify({
                     userId: "0198a96d-19e4-7000-8000-000000000001",
                     username: "admin",
-                    isSuper: true,
+                    isAdmin: true,
+                    mustChangePassword: false,
                     sessionToken: "test-session-token",
                     expiresAt: "2026-07-15T00:00:00Z",
                 }),
@@ -239,16 +240,18 @@ test("shows authentication errors and enters the workspace after login", async (
                     {
                         userId: "0198a96d-19e4-7000-8000-000000000001",
                         username: "admin",
-                        isSuper: true,
+                        isAdmin: true,
                         isLocked: false,
+                        isDisabled: false,
                         lastLoginTime: "2026-07-18T14:56:00Z",
                         createdTime: "2026-05-01T09:00:00Z",
                     },
                     {
                         userId: "0198a96d-19e4-7000-8000-000000000002",
                         username: "bob",
-                        isSuper: false,
+                        isAdmin: false,
                         isLocked: accountLocked,
+                        isDisabled: false,
                         lastLoginTime: "2026-07-17T18:20:00Z",
                         createdTime: "2026-05-03T10:15:00Z",
                     },
@@ -354,7 +357,10 @@ test("shows authentication errors and enters the workspace after login", async (
             .getByRole("button", { name: "打开用户菜单" })
             .dispatchEvent("click");
         await expect(page.getByText("个人设置", { exact: true })).toBeVisible();
-        await expect(page.getByText("管理", { exact: true })).toBeVisible();
+        await expect(page.getByText("修改密码", { exact: true })).toBeVisible();
+        await expect(
+            page.getByRole("menu").getByText("管理", { exact: true }),
+        ).toBeVisible();
         await page
             .getByText("个人设置", { exact: true })
             .dispatchEvent("click");
@@ -474,20 +480,32 @@ test("shows authentication errors and enters the workspace after login", async (
         ).toBeVisible();
         await expect(page.getByText("bob", { exact: true })).toBeVisible();
         await expect(page.getByText("已锁定", { exact: true })).toBeVisible();
-        await page
-            .getByRole("button", { name: "解封 bob" })
+        await page.getByRole("button", { name: "管理 bob" }).dispatchEvent("click");
+        const manageDialog = page.getByRole("dialog", {
+            name: "管理用户 · bob",
+        });
+        await expect(manageDialog).toBeVisible();
+        await expect(manageDialog).toContainText(
+            "该账号因登录失败次数过多被系统自动锁定。",
+        );
+        await manageDialog
+            .getByText("解锁", { exact: true })
             .dispatchEvent("click");
         const unlockDialog = page.getByRole("dialog", {
-            name: "解封账号 bob",
+            name: "解锁账号 bob",
         });
         await expect(unlockDialog).toBeVisible();
         await page
-            .getByRole("button", { name: "确认解封" })
+            .getByRole("button", { name: "确认解锁" })
             .dispatchEvent("click");
         await expect(unlockDialog).toBeHidden();
-        await expect(page.getByText("bob 已解封")).toBeVisible();
+        await expect(page.getByText("bob 已解锁")).toBeVisible();
         expect(accountUnlockAttempts).toBe(1);
-        await expect(page.getByText("正常", { exact: true })).toHaveCount(2);
+        await expect(
+            page.getByRole("table").getByText("正常", { exact: true }),
+        ).toHaveCount(2);
+        await page.keyboard.press("Escape");
+        await expect(manageDialog).toBeHidden();
 
         await page
             .locator(".app-sidebar .nav-item", { hasText: "工具" })
@@ -676,7 +694,7 @@ test("hides system administration navigation from regular users", async ({
                 JSON.stringify({
                     userId: "0198a96d-19e4-7000-8000-000000000002",
                     username: "member",
-                    isSuper: false,
+                    isAdmin: false,
                     sessionToken: "member-session-token",
                     expiresAt: "2026-07-15T00:00:00Z",
                 }),

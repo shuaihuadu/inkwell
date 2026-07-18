@@ -74,7 +74,7 @@ public interface IAgentService
     /// <returns>表示异步操作的任务。</returns>
     Task UnshareAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default);
 
-    /// <summary>管理员强制撤销共享；<paramref name="actorUserId"/> 是否 IsSuper 由 Inkwell.WebApi 授权中间件前置校验，本方法不重复校验。</summary>
+    /// <summary>管理员强制撤销共享；<paramref name="actorUserId"/> 是否 IsAdmin 由 Inkwell.WebApi 授权中间件前置校验，本方法不重复校验。</summary>
     /// <param name="agentId">Agent 标识。</param>
     /// <param name="actorUserId">执行操作的管理员用户标识。</param>
     /// <param name="ct">取消令牌。</param>

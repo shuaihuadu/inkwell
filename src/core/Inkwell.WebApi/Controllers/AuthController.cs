@@ -9,7 +9,7 @@ namespace Inkwell.WebApi.Controllers;
 /// 提供用户登录会话 API。
 /// </summary>
 [Route("api/auth")]
-[Authorize(Policy = AuthorizationPolicies.RequireAuthenticatedUser)]
+[Authorize]
 public sealed class AuthController(IAuthService authService) : InkwellControllerBase
 {
     /// <summary>
@@ -128,23 +128,65 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     }
 
     /// <summary>
+    /// 修改当前用户密码。
+    /// </summary>
+    [HttpPost("password")]
+    [EnableRateLimiting(AuthorizationPolicies.AuthRateLimiterPolicy)]
+    [ProducesResponseType<AuthSession>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AuthSession>> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            AuthSession session = await authService.ChangePasswordAsync(
+                this.GetRequiredUserId(),
+                request.CurrentPassword,
+                request.NewPassword,
+                this.GetRequiredBearerToken(),
+                cancellationToken).ConfigureAwait(false);
+
+            return this.Ok(session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return this.Unauthorized();
+        }
+    }
+
+    /// <summary>
     /// 获取部署内的账号列表。
     /// </summary>
-    /// <param name="isLocked">锁定状态筛选条件；未指定时返回全部账号。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>账号摘要列表。</returns>
     [HttpGet("accounts")]
-    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
     [ProducesResponseType<IReadOnlyList<UserListItem>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<UserListItem>>> ListAccountsAsync(
-        bool? isLocked,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<UserListItem>>> ListAccountsAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<UserListItem> accounts = await authService
-            .ListAccountsAsync(isLocked, cancellationToken)
+            .ListAccountsAsync(this.GetRequiredUserId(), cancellationToken)
             .ConfigureAwait(false);
 
         return this.Ok(accounts);
+    }
+
+    /// <summary>创建账号并返回仅显示一次的临时凭据。</summary>
+    [HttpPost("accounts")]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
+    [ProducesResponseType<IssuedCredential>(StatusCodes.Status201Created)]
+    public async Task<ActionResult<IssuedCredential>> CreateAccountAsync(
+        CreateAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        IssuedCredential credential = await authService.CreateAccountAsync(
+            request.Username,
+            request.IsAdmin,
+            this.GetRequiredUserId(),
+            cancellationToken).ConfigureAwait(false);
+
+        return this.StatusCode(StatusCodes.Status201Created, credential);
     }
 
     /// <summary>
@@ -154,7 +196,7 @@ public sealed class AuthController(IAuthService authService) : InkwellController
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>无响应正文。</returns>
     [HttpPost("accounts/{userId:guid}/unlock")]
-    [Authorize(Policy = AuthorizationPolicies.RequireSuperUser)]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UnlockAccountAsync(Guid userId, CancellationToken cancellationToken)
@@ -164,5 +206,35 @@ public sealed class AuthController(IAuthService authService) : InkwellController
             .ConfigureAwait(false);
 
         return this.NoContent();
+    }
+
+    /// <summary>禁用指定账号。</summary>
+    [HttpPost("accounts/{userId:guid}/disable")]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
+    public async Task<IActionResult> DisableAccountAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await authService.DisableAccountAsync(userId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+        return this.NoContent();
+    }
+
+    /// <summary>启用指定账号。</summary>
+    [HttpPost("accounts/{userId:guid}/enable")]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
+    public async Task<IActionResult> EnableAccountAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await authService.EnableAccountAsync(userId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+        return this.NoContent();
+    }
+
+    /// <summary>重置指定账号密码并返回仅显示一次的临时凭据。</summary>
+    [HttpPost("accounts/{userId:guid}/reset-password")]
+    [Authorize(Policy = AuthorizationPolicies.RequireAdmin)]
+    [ProducesResponseType<IssuedCredential>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IssuedCredential>> ResetPasswordAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IssuedCredential credential = await authService
+            .ResetPasswordAsync(userId, this.GetRequiredUserId(), cancellationToken)
+            .ConfigureAwait(false);
+        return this.Ok(credential);
     }
 }

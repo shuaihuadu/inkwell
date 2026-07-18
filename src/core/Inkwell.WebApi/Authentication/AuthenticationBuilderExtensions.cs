@@ -7,7 +7,7 @@ public static class AuthenticationBuilderExtensions
 {
     /// <summary>
     /// 注册 <see cref="AuthenticationDefaults.SchemeName"/> 鉴权方案（默认方案）
-    /// 以及 <see cref="AuthorizationPolicies.RequireSuperUser"/> 授权策略。
+    /// 以及 <see cref="AuthorizationPolicies.RequireAdmin"/> 授权策略。
     /// </summary>
     /// <param name="services">服务集合。</param>
     /// <returns>服务集合，便于链式调用。</returns>
@@ -21,8 +21,13 @@ public static class AuthenticationBuilderExtensions
 
         services
             .AddAuthorizationBuilder()
-            .AddPolicy(AuthorizationPolicies.RequireAuthenticatedUser, policy => policy.RequireAuthenticatedUser())
-            .AddPolicy(AuthorizationPolicies.RequireSuperUser, policy => policy.RequireClaim(SessionClaimTypes.IsSuper, "true"));
+            .AddPolicy(AuthorizationPolicies.RequireAuthenticatedUser, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireClaim(SessionClaimTypes.MustChangePassword, "false"))
+            .AddPolicy(AuthorizationPolicies.RequireAdmin, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireClaim(SessionClaimTypes.MustChangePassword, "false")
+                .RequireClaim(SessionClaimTypes.IsAdmin, "true"));
 
         return services;
     }

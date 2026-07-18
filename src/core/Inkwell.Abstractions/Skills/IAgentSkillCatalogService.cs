@@ -27,16 +27,16 @@ public interface IAgentSkillCatalogService
     /// <param name="skillId">Skill 标识。</param>
     /// <param name="request">更新请求。</param>
     /// <param name="actorUserId">操作者用户标识。</param>
-    /// <param name="actorIsSuper">操作者是否为管理员。</param>
+    /// <param name="actorIsAdmin">操作者是否为管理员。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>更新后的 Skill 定义。</returns>
-    Task<AgentSkillDefinition> UpdateSkillAsync(Guid skillId, AgentSkillUpdateRequest request, Guid actorUserId, bool actorIsSuper, CancellationToken ct = default);
+    Task<AgentSkillDefinition> UpdateSkillAsync(Guid skillId, AgentSkillUpdateRequest request, Guid actorUserId, bool actorIsAdmin, CancellationToken ct = default);
 
     /// <summary>删除指定 Skill。</summary>
     /// <param name="skillId">Skill 标识。</param>
     /// <param name="actorUserId">操作者用户标识。</param>
-    /// <param name="actorIsSuper">操作者是否为管理员。</param>
+    /// <param name="actorIsAdmin">操作者是否为管理员。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>删除成功返回 <see langword="true"/>；Skill 不存在返回 <see langword="false"/>。</returns>
-    Task<bool> DeleteSkillAsync(Guid skillId, Guid actorUserId, bool actorIsSuper, CancellationToken ct = default);
+    Task<bool> DeleteSkillAsync(Guid skillId, Guid actorUserId, bool actorIsAdmin, CancellationToken ct = default);
 }

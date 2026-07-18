@@ -58,7 +58,7 @@ H1 ↔ H3 衔接的关键事实：
 
 - **REQ-NNN / NFR-NNN / EX-NNN** 编号取自 [requirements.md §5.1 / §6 / §7](./requirements.md)。
 - **UI-NNN** 编号取自 [ui-spec.md](./ui-spec.md)；**UF-NNN** 取自 [user-flow.md](./user-flow.md)；**AC-NNN** 取自 [acceptance-criteria.md](./acceptance-criteria.md)。
-- 路径前缀 `apps/desktop/` 表示 Electron 客户端；`src/server/Inkwell.*` 表示 ASP.NET Core 后端模块。两者均为**建议名称**，最终由 H2 ADR 锁定。
+- 本文最初产于绿地阶段；未标记“已实现”的 `apps/desktop/`、`src/server/Inkwell.*` 仍是历史建议路径，不作为当前拓扑事实。当前目录以 [AGENTS.md §3](../../AGENTS.md) 与对应 H3 文档为准；已实现条目应使用仓库真实路径。
 - **置信度判定**：
   - `high` = 代码中找到直接证据（绿地状态下不可能命中，全文无 `high`）。
   - `medium` = 上游已有明确决策（OQ closed / REQ 验收口径明确）→ 建议路径具备语义支撑。
@@ -70,14 +70,11 @@ H1 ↔ H3 衔接的关键事实：
 
 ### 2.1 REQ-001 用户登录
 
-- **建议受影响模块**：后端鉴权与会话；客户端登录页与会话持久化
-- **受影响文件（已存在）**：—
-- **预计新增文件（建议）**：
-  - 后端：`src/server/Inkwell.Auth/`
-  - 客户端：`apps/desktop/src/features/auth/`（Electron 主进程持登录态 24 h，依 [UF-001](./user-flow.md)）
-- **建议测试**：后端单元测试（口令校验）+ 客户端 E2E（UI-001）
-- **风险**：[OQ-005 closed §A](./open-questions.md) v1 用户名 / 密码 + 后端运维 SQL 创建账号；v2 SSO 时需重做用户表与登录链路
-- **置信度**：medium
+- **受影响模块**：`Inkwell.Abstractions.Auth`、`Inkwell.Core.Auth`、EF Core User 持久化、WebApi Session Authentication、Electron 登录与会话 IPC
+- **已实现文件**：`src/core/Inkwell.Abstractions/Auth/`、`src/core/Inkwell.Core/Auth/`、`src/core/Inkwell.WebApi/{Authentication,Controllers/AuthController.cs}`、`src/app/desktop/src/features/auth/`、`src/app/desktop/electron/{main.ts,preload.ts}`
+- **测试**：`tests/Inkwell.Core.Tests/Auth/AuthServiceTests.cs`、`tests/Inkwell.WebApi.Tests/Controllers/AuthControllerTests.cs`、`src/app/desktop/tests/login.spec.ts`
+- **风险**：仍不提供自助注册 / SSO / 公网 OAuth；初始 Admin 依赖安全配置 Seed 密码，后续账号由 Admin 创建
+- **置信度**：high（已实现并验证）
 
 ### 2.2 REQ-002 Agent 列表与基础管理
 
@@ -244,16 +241,15 @@ H1 ↔ H3 衔接的关键事实：
 - **风险**：EX-004 模型不支持视觉时上传组件前置拒收的判定需要后端"模型能力清单"；麦克风 / 通知权限两端差异
 - **置信度**：medium
 
-### 2.17 REQ-017 Admin 最小管理员页
+### 2.17 REQ-017 Admin 用户管理
 
-- **建议受影响模块**：后端 Admin 能力（解封 / 撤销共享 / 审计查询）；客户端 UI-009 管理页
-- **受影响文件（已存在）**：—
-- **预计新增文件（建议）**：
-  - 后端：扩展 `Inkwell.Auth` + `Inkwell.Agents` + `Inkwell.AuditLog`
-  - 客户端：`apps/desktop/src/features/admin/`（仅 `is_super=true` 可见）
-- **建议测试**：后端集成测试（is_super 路由网关 + 解封 + 撤销共享）+ 客户端 E2E
-- **风险**：[OQ-007 closed §C](./open-questions.md)：v1 即出最小管理员页；与 NFR-004 审计日志强耦合
-- **置信度**：medium
+- **受影响模块**：`Inkwell.Abstractions.Auth` 契约与 User Model、`Inkwell.Core.Auth` 业务规则、EF Core User 持久化、WebApi Auth 路由与策略、Electron IPC 与 UI-009；撤销共享仍由 `Inkwell.Core.Agents` 负责
+- **已实现文件**：
+  - 后端：`src/core/Inkwell.Abstractions/Auth/`、`src/core/Inkwell.Core/Auth/AuthService.cs`、`src/core/Inkwell.WebApi/{Authentication,Controllers/AuthController.cs}`、`src/core/providers/Persistence/Inkwell.Persistence.EFCore*/Migrations/`
+  - 客户端：`src/app/desktop/src/features/users/`、`src/app/desktop/src/features/auth/change-password-modal.tsx`、`src/app/desktop/{electron/main.ts,electron/preload.ts}`
+- **测试**：`tests/Inkwell.Core.Tests/Auth/AuthServiceTests.cs` 覆盖自动锁定、会话版本、临时密码与状态正交；`tests/Inkwell.WebApi.Tests/Controllers/AuthControllerTests.cs` 覆盖 Admin actor 传递及不存在主动锁定接口；Electron E2E 覆盖普通用户不可见系统管理入口
+- **风险**：初始单 Admin 被锁定时仍需 SQL / 管理脚本运维兜底；临时密码只能显示一次且不得进入日志
+- **置信度**：high（已实现并通过 build / test / E2E 验证）
 
 ### 2.18 NFR-001 联网要求
 
@@ -481,7 +477,7 @@ deploy/                            Docker Compose（dev）+ AKS manifests / Helm
 - [OQ-004 closed §A](./open-questions.md) 单 Token 模型
 - [OQ-005 closed §A](./open-questions.md) 用户名 / 密码 + 后端运维 SQL 创建
 - [OQ-006 closed §A](./open-questions.md) 范围全做风险已签字接受
-- [OQ-007 closed §C](./open-questions.md) v1 即出最小管理员页（is_super=true）
+- [OQ-007 closed §C](./open-questions.md) v1 即出最小管理员页（当前字段 `is_admin=true`）
 - [OQ-008 closed §C](./open-questions.md) 长期记忆与对话表关系推迟到 H3
 - [OQ-009 closed §B](./open-questions.md) Win11 + macOS 12+ Apple Silicon
 - [OQ-010 closed §C](./open-questions.md) 三档 tab
