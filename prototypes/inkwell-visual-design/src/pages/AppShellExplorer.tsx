@@ -53,6 +53,10 @@ import { useDesign, type AppearanceMode } from "../context/DesignContext";
 import { THEMES, THEME_NAMES } from "../tokens/themes";
 import AgentDesignPage from "./AgentDesignPage";
 import AgentChatPage from "./AgentChatPage";
+import ToolListPage from "./ToolListPage";
+import SkillListPage from "./SkillListPage";
+import ModelListPage from "./ModelListPage";
+import UserManagementPage from "./UserManagementPage";
 
 // ─── Types（对齐 ui-spec.md §0.2 / §11） ──────────────────────────────────────
 
@@ -98,8 +102,8 @@ const ERROR_BANNER_META: Record<
 
 // 左侧 nav 三个分组，每个分组都可独立展开/折叠（requirements.md §13 第 29/31 条 / ui-spec.md OQ-011 2026-07-15 两轮修订）：
 // - 工作区（原“工作空间”）：Agent 空间（原“Agent 库”，实际入口）
-// - 资源中心（原“能力管理”）：工具管理 / Skills 管理 / 模型管理（v1 均为占位入口，未来统一管理预留信息架，不扩展 v1 功能范围）
-// - 系统管理：Admin（实际入口，仅 is_super 可见）
+// - 资源中心（原“能力管理”）：工具 / Skills / 模型
+// - 系统管理：用户管理（仅 is_super 可见）
 const NAV_GROUPS: {
     key: string;
     label: string;
@@ -108,7 +112,6 @@ const NAV_GROUPS: {
         label: string;
         icon: React.ReactNode;
         requiresSuper?: boolean;
-        placeholder?: boolean;
     }[];
 }[] = [
     {
@@ -124,21 +127,18 @@ const NAV_GROUPS: {
         items: [
             {
                 key: "tools",
-                label: "工具管理",
+                label: "工具",
                 icon: <ToolOutlined />,
-                placeholder: true,
             },
             {
                 key: "skills",
-                label: "Skills 管理",
+                label: "Skills",
                 icon: <ReadOutlined />,
-                placeholder: true,
             },
             {
                 key: "models",
-                label: "模型管理",
+                label: "模型",
                 icon: <ApiOutlined />,
-                placeholder: true,
             },
         ],
     },
@@ -148,7 +148,7 @@ const NAV_GROUPS: {
         items: [
             {
                 key: "admin",
-                label: "Admin",
+                label: "用户管理",
                 icon: <SafetyCertificateOutlined />,
                 requiresSuper: true,
             },
@@ -249,17 +249,20 @@ function AgentLibraryMock({
     onSelectAgent,
     onCreateAgent,
     onEditAgent,
+    isSuper,
 }: {
     activeTab: string;
     onTabChange: (key: string) => void;
     onSelectAgent: (agent: { name: string; published: boolean }) => void;
     onCreateAgent: () => void;
     onEditAgent: (name: string) => void;
+    isSuper: boolean;
 }) {
     const { token } = antdTheme.useToken();
     const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>("all");
     const [searchText, setSearchText] = useState("");
     const [page, setPage] = useState(1);
+    const [modalApi, modalContextHolder] = Modal.useModal();
     const palette = [
         token.colorPrimary,
         token.colorInfo,
@@ -304,6 +307,7 @@ function AgentLibraryMock({
 
     return (
         <div>
+            {modalContextHolder}
             <div
                 style={{
                     display: "flex",
@@ -443,6 +447,33 @@ function AgentLibraryMock({
                                         />
                                     </Tooltip>
                                 )}
+                                {activeTab === "shared" && isSuper && (
+                                    <Tooltip title="撤销共享">
+                                        <Button
+                                            className="inkwell-agent-card-edit-btn"
+                                            danger
+                                            type="text"
+                                            size="small"
+                                            icon={<SafetyCertificateOutlined />}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                modalApi.confirm({
+                                                    title: `撤销「${agent.name}」的共享`,
+                                                    content: "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
+                                                    okText: "确认撤销",
+                                                    okButtonProps: { danger: true },
+                                                    cancelText: "取消",
+                                                });
+                                            }}
+                                            style={{
+                                                position: "absolute",
+                                                top: 6,
+                                                right: 6,
+                                                zIndex: 1,
+                                            }}
+                                        />
+                                    </Tooltip>
+                                )}
                                 <div
                                     style={{
                                         width: "100%",
@@ -569,41 +600,6 @@ function AgentLibraryMock({
     );
 }
 
-// ─── UI-009 Admin 管理页（占位内容） ──────────────────────────────────────────
-
-function AdminMock() {
-    return (
-        <div>
-            <Typography.Title level={4} style={{ marginTop: 0 }}>
-                Admin 管理页
-            </Typography.Title>
-            <Typography.Paragraph type="secondary">
-                UI-009 · 仅 <code>is_super=true</code>{" "}
-                可见，用于撤销他人共享、管理 Agent 全局可见性。
-            </Typography.Paragraph>
-            <Empty description="占位内容，详见 UI-009" />
-        </div>
-    );
-}
-
-// ─── UI-010 / UI-011 / UI-012 工具管理・Skills 管理・模型管理（v1 占位，详见 requirements.md §13 第 29/31 条） ──
-
-function ComingSoonMock({ title, uiId }: { title: string; uiId: string }) {
-    return (
-        <div>
-            <Typography.Title level={4} style={{ marginTop: 0 }}>
-                {title}
-            </Typography.Title>
-            <Typography.Paragraph type="secondary">
-                {uiId} · v1 仅预留导航位置，用于未来统一管理
-                {title.replace("管理", "")}
-                ；详细页面设计、管理维度与权限边界推迟到 v2 重新走需求澄清。
-            </Typography.Paragraph>
-            <Empty description="即将上线" />
-        </div>
-    );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AppShellExplorer() {
@@ -647,15 +643,6 @@ export default function AppShellExplorer() {
 
     const userMenuItems = [
         { key: "settings", icon: <SettingOutlined />, label: "个人设置" },
-        ...(isSuper
-            ? [
-                  {
-                      key: "admin",
-                      icon: <SafetyCertificateOutlined />,
-                      label: "管理",
-                  },
-              ]
-            : []),
         { type: "divider" as const },
         // UI-002 锁定页（ui-spec.md §2）的模拟入口——真实产品里这个页面主要由 5
         // 分钟无操作/主窗口失焦自动触发（NFR-003），但很多真实产品也会在用户菜单里附带一个
@@ -729,7 +716,7 @@ export default function AppShellExplorer() {
                         }}
                     />
                     <Typography.Text style={{ fontSize: 12 }}>
-                        is_super（显示 Admin 入口）
+                        is_super（显示管理能力）
                     </Typography.Text>
                 </Space>
                 <Tag
@@ -1005,15 +992,7 @@ export default function AppShellExplorer() {
                                                 const active =
                                                     activeNav === item.key;
                                                 return (
-                                                    <Tooltip
-                                                        key={item.key}
-                                                        title={
-                                                            item.placeholder
-                                                                ? "占位入口 · 即将上线"
-                                                                : ""
-                                                        }
-                                                        placement="right"
-                                                    >
+                                                    <Tooltip key={item.key} title="" placement="right">
                                                         <div
                                                             onClick={() => {
                                                                 setActiveNav(
@@ -1077,26 +1056,6 @@ export default function AppShellExplorer() {
                                                                     {item.label}
                                                                 </span>
                                                             )}
-                                                            {!collapsed &&
-                                                                item.placeholder && (
-                                                                    <Tag
-                                                                        style={{
-                                                                            margin: 0,
-                                                                            fontSize: 10,
-                                                                            lineHeight:
-                                                                                "16px",
-                                                                            padding:
-                                                                                "0 4px",
-                                                                            color: token.colorTextTertiary,
-                                                                            background:
-                                                                                token.colorFillQuaternary,
-                                                                            borderColor:
-                                                                                "transparent",
-                                                                        }}
-                                                                    >
-                                                                        待上线
-                                                                    </Tag>
-                                                                )}
                                                         </div>
                                                     </Tooltip>
                                                 );
@@ -1152,16 +1111,17 @@ export default function AppShellExplorer() {
                                     onEditAgent={(name) =>
                                         setSelectedAgent(name)
                                     }
+                                    isSuper={isSuper}
                                 />
                             )
                         ) : activeNav === "tools" ? (
-                            <ComingSoonMock title="工具管理" uiId="UI-010" />
+                            <ToolListPage />
                         ) : activeNav === "skills" ? (
-                            <ComingSoonMock title="Skills 管理" uiId="UI-011" />
+                            <SkillListPage isSuper={isSuper} />
                         ) : activeNav === "models" ? (
-                            <ComingSoonMock title="模型管理" uiId="UI-012" />
+                            <ModelListPage />
                         ) : (
-                            <AdminMock />
+                            <UserManagementPage />
                         )}
                     </div>
                 </div>

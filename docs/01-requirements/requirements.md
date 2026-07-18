@@ -48,7 +48,7 @@ v1 仅一类主角色：**Member（已登录用户）**。
 
 - 所有登录用户能力对等：均可创建 / 编辑 / 删除自己创建的 Agent，可使用其他成员共享出来的 Agent，可向团队共享自己创建的 Agent。
 - v1 **不引入**编辑者 / 只读使用者等细粒度角色拆分；账号由后端运维人员通过 SQL / 管理脚本创建（依 [OQ-005 已关闭](./open-questions.md#oq-005-v1-账号开通方式管理员后台创建的具体形态)）；个人以及 OPC 自部署场景下，部署者本人即运维角色，初始账号由部署流程的 Seed 步骤创建。
-- **Admin（Member 子集，`is_super=true`）**：依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义) v1 保留“最小管理员”能力。Admin 是在用户表上加一个标记位的 Member，平时能力与 Member 一致；额外可访问仅面向 Admin 的管理页（REQ-017），能力限于：解封账号、撤销其他成员的共享 Agent。本属性不开放给用户自助升级，仅由后端运维在 SQL 中设置。
+- **Admin（Member 子集，`is_super=true`）**：依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义) v1 保留“最小管理员”能力。Admin 是在用户表上加一个标记位的 Member，平时能力与 Member 一致；额外可解封账号、撤销其他成员的共享 Agent，并可管理全部 Skill。本属性不开放给用户自助升级，仅由后端运维在 SQL 中设置。
 - 未来角色演进（细粒度角色 / 开放注册 / SSO）记录在 [§10 不做范围](#10-不做范围) 与 OQ-005 / OQ-007 决策纪录。
 
 ## 4. 核心场景
@@ -79,7 +79,7 @@ v1 仅一类主角色：**Member（已登录用户）**。
 ### 4.4 场景 S4：给 Agent 配置工具与 Skills
 
 1. 成员在配置页打开"工具"面板，选择已注册的工具（Function Calling）勾选给 Agent；成员可填工具特定参数。
-2. 成员在配置页打开"Skills"面板，从 Skill 库中选择若干 Skill 挂到 Agent；Skill 采用 [agentskills.io](https://agentskills.io/home) 的 `SKILL.md` 文件夹格式（仅 `SKILL.md` + `references/` + `assets/`，**v1 禁用** `scripts/`，详见 §10）。
+2. 成员在配置页打开"Skills"面板，从 Skill 库中选择若干 Skill 挂到 Agent；Skill 采用 [agentskills.io](https://agentskills.io/home) 的 `SKILL.md` 文件夹格式，支持 `SKILL.md` + `references/` + `assets/` + `scripts/`；v1 保存但不执行脚本（详见 §10）。
 3. 保存后，对话场景下后端按渐进加载（Discovery → Activation → Execution）让 Agent 在合适时机吸收 Skill 上下文。
 
 ### 4.5 场景 S5：调试与回放对话
@@ -131,17 +131,17 @@ inkwell 后端作为服务端，将四种协议格式的请求交给对应的 MA
 | REQ-002 | Agent 列表与基础管理                | 列表 / 新建 / 编辑 / 删除 / 共享。                                                                                                                                     |
 | REQ-003 | Agent 基础属性                      | 名称（必填，1–50 字）、头像（图片，可选）、描述（≤ 500 字）。                                                                                                          |
 | REQ-004 | Instructions / System Prompt        | 多行文本，无字数硬上限（提交时仅做超大警告，不阻断）。                                                                                                                 |
-| REQ-005 | 模型选择                            | 从后端配置的模型列表中选择；v1 必须支持 Azure OpenAI，并预留多家云服务（OpenAI / Claude / Qwen / 智谱 / 等）的接入位。                                                 |
+| REQ-005 | 模型选择与目录                      | 从 Provider 实时发现的模型列表中选择；提供只读模型目录、能力信息、连通性测试及 LiteLLM Dashboard 管理外链。                                                         |
 | REQ-006 | 模型参数配置                        | temperature / top_p / max_tokens 等模型相关参数；UI 允许"使用默认"。                                                                                                   |
-| REQ-007 | Function Calling / 工具调用         | 后端注册工具，Agent 配置时勾选并传入参数；运行期由后端代理调用。                                                                                                       |
-| REQ-008 | Agent Skills（agentskills.io 格式） | 仅支持 `SKILL.md` + `references/` + `assets/`；按 Discovery → Activation → Execution 渐进加载。                                                                        |
+| REQ-007 | Function Calling / 工具调用         | 后端注册工具，Agent 配置时勾选并传入参数；提供工具只读目录；Snapshot 固化 Tool ID 与静态参数，不引入目录级启停状态。                                                   |
+| REQ-008 | Agent Skills（agentskills.io 格式） | 支持上传、浏览、编辑与删除；上传时从 `SKILL.md` frontmatter 解析名称/描述，接受 `references/`、`assets/`、`scripts/`；v1 保存但不执行脚本；Owner 管理自己的 Skill，Admin 可管理全部；保存时内容进入 Snapshot。 |
 | REQ-009 | 知识库 / RAG                        | 上传文档（PDF / Word / Markdown / 纯文本）→ 解析 → 入库 → 对话时召回。                                                                                                 |
 | REQ-010 | 多轮对话与长期记忆                  | 多轮上下文；长期记忆策略对用户呈现（开 / 关 / 摘要式）。                                                                                                               |
 | REQ-013 | API Key 管理                        | 独立的 API Key 管理功能（创建 / 命名 / 撤销、绑定一个或多个 Agent）；调用走鉴权；取代原单 Token 机制。                                                                 |
 | REQ-014 | 调试 / 评测                         | trace 全链路可视化；调试样本可保存为评测集；提供"重放"。                                                                                                               |
 | REQ-015 | 版本管理                            | 配置支持"存为草稿"（不影响已发布版本与正在进行的对话）与"发布"（生成新版本并立即生效）两级操作；用户能查看版本 diff 并回滚。                                           |
 | REQ-016 | 多模态输入                          | 同时支持图片 / 语音 / 文档输入。                                                                                                                                       |
-| REQ-017 | Admin 最小管理员页                  | v1 提供仅面向 `is_super=true` Member 的管理页，能力限定为：解封账号、撤销其他成员的共享（依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义)）。 |
+| REQ-017 | 用户管理                            | v1 提供仅面向 `is_super=true` Member 的用户列表与解封能力；撤销他人共享迁移到 Agent 空间“团队共享”的 Admin 上下文操作。                                               |
 | REQ-018 | 多协议兼容调用                      | 支持 OpenAI ChatCompletion API、OpenAI Responses API、OpenAI Conversations API、AG-UI 协议四种格式的服务端兼容调用；具体支持范围由 H3 决定。                           |
 
 > **REQ-016 实现说明**（H1 边界，仅写期望）：
@@ -187,7 +187,8 @@ inkwell 后端作为服务端，将四种协议格式的请求交给对应的 MA
 - **登录态**：所有用户操作（除登录本身）必须基于有效登录态。
 - **角色**：v1 仅 Member 主角色 + Admin 子集（见 §3）。
 - **资源所有权**：每个 Agent 属于一个 Owner（创建者）；Owner 可编辑 / 删除 / 共享 Agent。共享后的 Agent 对其他成员**只读使用**（不能编辑或删除）；其他成员可“复制为我的 Agent”获得一份新 Owner 副本。
-- **Admin 越权能力**（仅 `is_super=true` 的 Member）：可解封账号、可撤销他人的共享 Agent（仅取消共享可见性，不删除 Owner 原件）；不能编辑他人的 Agent 配置。依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义)。
+- **Skill 所有权**：上传者是 Skill Owner；Owner 可编辑名称、描述、Markdown 内容和删除自己的 Skill；Admin 可管理全部 Skill，其他 Member 只读和挂载。
+- **Admin 越权能力**（仅 `is_super=true` 的 Member）：可解封账号、撤销他人的共享 Agent（仅取消共享可见性，不删除 Owner 原件）、管理全部 Skill；不能编辑他人的 Agent 配置。依 [OQ-007 已关闭](./open-questions.md#oq-007-团队角色暂不区分的下游含义)。
 - **对外调用**：API Key 与一个或多个 Agent 绑定（具体绑定粒度由 H3 决定）；Key 只能调用其绑定的 Agent，不能越权调用未绑定的 Agent；Key 可随时撤销，撤销后立即失效。Key 的数量上限 / 轮换策略等具体细节由 H3 决定。
 - **客户端会话**：5 分钟无操作锁定（见 NFR-003）。
 
@@ -239,7 +240,7 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 
 ## 10. 不做范围（v1 明确不做）
 
-- **不做**：Skill 携带 `scripts/` 的执行（仅支持 `SKILL.md` + `references/` + `assets/`）。
+- **不做**：Skill 携带 `scripts/` 的执行。v1 可以上传、保存和随 Snapshot 固化脚本文件，但不调用、不解释执行结果，也不预留 `ISkillExecutor`。
 - **不做**：本地大模型接入（v1 不接 Ollama / vLLM / llama.cpp）。
 - **不做**：Skill 市场 / 社区分享生态（Skill 由后端管理员或用户上传到自家库，不公开发布）。
 - **不做**：跨团队 / 多组织（v1 一个部署一个团队）。
@@ -262,10 +263,10 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 | REQ-002 | 用户能在客户端列出可见 Agent；能新建 / 编辑 / 删除自己创建的 Agent；不能编辑 / 删除他人 Agent；能把自己的 Agent 共享给团队，他人可见。               |
 | REQ-003 | 新建 Agent 时，名称、头像、描述均可保存与回显；名称为空 / 超长时被前后端拒收。                                                                       |
 | REQ-004 | 用户能写入并保存 Instructions；对话时该 Instructions 实际生效（在调试 trace 中可见）。                                                               |
-| REQ-005 | 用户能在 UI 中选到至少 Azure OpenAI；UI 中显示的模型列表完全由后端配置文件决定，不在客户端硬编码。                                                   |
+| REQ-005 | 用户能浏览 Provider 实时发现的模型及其分类、上下文上限和三态能力；所有登录用户均可测试任意模型的连通性，并可通过后端提供的 URL 打开 LiteLLM Dashboard。      |
 | REQ-006 | 用户能调整 temperature / top_p / max_tokens 等参数；这些参数最终在调试 trace 中可见出现在对应的模型调用入参中。                                      |
-| REQ-007 | 用户能给 Agent 勾选已注册工具；对话中 Agent 决定调用工具时，调用与返回在调试 trace 中可见；工具失败按 EX-003 处理。                                  |
-| REQ-008 | 用户能给 Agent 挂载 Skill；Skill 的 `SKILL.md` 元数据 + 指令在 Activation 后能在调试 trace 中看到被加载；任何携带 `scripts/` 的 Skill 在挂载时被拒。 |
+| REQ-007 | 用户能浏览工具目录并给 Agent 勾选工具；Snapshot 固化 Tool ID 与静态参数，目录不提供启停；工具调用与失败在 trace 中可见。                                   |
+| REQ-008 | 用户能上传和挂载 Skill；Owner 可编辑、删除自己的 Skill，Admin 可管理全部；保存草稿时解析完整 Skill 内容，发布后目录编辑或删除不影响已发布版本。         |
 | REQ-009 | 用户能上传 PDF / Word / Markdown / 纯文本；对话中相关问题能从知识库召回片段，并在 trace 中显示召回内容。                                             |
 | REQ-010 | 多轮对话上下文连续；长期记忆开 / 关 / 摘要三档可在 UI 中切换；切换的实际效果在 trace 中可见。                                                        |
 
@@ -273,7 +274,7 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 | REQ-014 | 用户能查看每次对话 / 每次工具调用 / 每次模型调用的全链路 trace；能保存样本到评测集；能对样本"回放"。                                                                          |
 | REQ-015 | 用户能将配置改动"存为草稿"（不生成新版本，不影响已发布版本或正在进行的对话）；点击"发布"后才生成新版本并立即生效；用户能查看版本 diff 并回滚。                                |
 | REQ-016 | 用户在对话中能输入图片 / 语音 / 文档；图片在支持视觉的模型上能被处理（不支持时按 EX-004）；语音上传后能被转写为文本注入对话；文档可被注入对话上下文或入知识库。               |
-| REQ-017 | 仅 `is_super=true` 的 Member 可访问管理页；管理页能完成两项动作：解封被锁账号、撤销他人的共享 Agent（只取消共享可见性，不删除 Owner 原件）；非 Admin 用户访问管理页被重定向。 |
+| REQ-017 | 仅 `is_super=true` 的 Member 可访问用户管理页并解封被锁账号；Admin 在 Agent 空间“团队共享”中可撤销他人共享；非 Admin 用户访问用户管理页被重定向。       |
 | REQ-018 | 外部系统能分别以 OpenAI ChatCompletion API、OpenAI Responses API、OpenAI Conversations API、AG-UI 四种协议格式之一发起调用，均能成功完成一次 Agent 调用并获得合法响应。       |
 | NFR-001 | 关闭网络后客户端不可用，按 EX-001 提示。                                                                                                                                      |
 | NFR-002 | 同一份代码能在 **Windows 11** 与 **macOS 12+（Apple Silicon）** 上构建并启动到登录页；功能表现两端等价。Windows 10 / Intel Mac / macOS 11 及以下不作为测试矩阵。              |
@@ -323,6 +324,8 @@ v1 默认策略（具体保留期由后端配置项控制，初始默认值由 H
 31. **左侧导航分组与 Agent 库更名 + 新增模型管理占位入口**（Owner 决定，2026-07-15）：第 29 条命名的"工作空间 / 能力管理"与 UI-003 页面名"Agent 库"改名——`工作空间` → `工作区`，`Agent 库` → `Agent 空间`，`能力管理` → `资源中心`；`资源中心` 分组下新增第三个占位叶子 **模型管理（UI-012）**，与工具管理（UI-010）、Skills 管理（UI-011）同级同规则：仅提供导航位置与"即将上线"提示，不实现模型目录的列表 / 编辑 / 启停等具体管理功能；REQ-005（模型选择）本身的 v1 范围不变（Agent 配置页"模型与参数"区段仍从后端配置的模型列表中选择，不依赖本占位页），本条不新增 v1 功能范围。本条只改名称与新增占位导航项，不影响第 29 / 30 条已锁定的分组结构、展开折叠交互与点击分流规则；第 29 / 30 条原文中出现的"Agent 库 / 工作空间 / 能力管理"是决策当时的旧名，保留原文不回溯改写，以本条新名为准。
 32. **移除 Agent 空间"我使用过" tab**（Owner 决定，2026-07-15）：[OQ-010 closed](./open-questions.md#oq-010-v1-是否需要团队共享-agent-库独立于我的-agent) 原选项 C 锁定的"三档 tab（我的 / 团队共享 / 我使用过）"改为**两档 tab（我的 / 团队共享）**，不再单独展示"与之有过对话历史"的 Agent 集合；OQ-010 与 §13 第 26 条历史记录原文不回溯改写，仅记录当时的决策过程，以本条为最新准。下游文档同步：[ui-spec.md §3.1](./ui-spec.md)（两档 tab）/ [§3.2](./ui-spec.md)（移除"空（我使用过）"空态行）/ [§3.6](./ui-spec.md)；[user-flow.md UF-003](./user-flow.md)（移除"我使用过"切换步骤与语义说明）；[acceptance-criteria.md AC-007](./acceptance-criteria.md)（改为两档）/ **AC-012 标记移除**（原验收点专门针对"我使用过" tab，随 tab 移除失效，编号保留不回收复用，见该文件行内说明）。v2 若要恢复"使用过"维度，需重新走 H1 需求澄清（判定语义、与对话历史表的关联方式等），不能直接复用本条或 OQ-010 的旧描述作为最终设计。
 33. **Agent 硬删除级联会话历史**（Owner 决定，2026-07-16）：删除 Agent 时同步永久删除其全部版本、全部参与用户的 `AgentConversation`、消息与 MAF Session 检查点，不保留“Agent 已删除但历史仍可查看”的孤立会话。删除确认必须明确提示该跨用户、不可恢复后果。本条是 §8.4“对话归参与用户所有”的显式系统级例外；单独删除或清空某一 Conversation 仍只允许其所属用户操作。
+34. **资源中心正式页面 + 用户管理收敛**（Owner 决定，2026-07-18）：第 29 / 31 条定义的 UI-010 工具、UI-011 Skills、UI-012 模型由“占位入口”升级为 v1 正式列表页。Tool 定义仍由后端注册，目录只读，不提供启停；Agent Snapshot 固化 Tool ID 与静态参数，工具执行实现仍由部署代码提供。Skill 新增 Owner，Owner 可编辑名称/描述/Markdown 内容和删除自己的 Skill，Admin 可管理全部，其他 Member 只读；不提供启停，References / Assets 本轮不提供编辑；保存 Agent 草稿时完整 Skill 定义进入 `AgentBuildOptions.Skills`，发布时随 Snapshot 固化，目录后续编辑或删除不影响已保存版本。模型目录严格映射 Provider 实时发现的 `LLMModel`，所有登录用户可测试任意分类模型，页面通过后端配置的独立管理 URL 打开 LiteLLM Dashboard，禁止从 Proxy Endpoint 猜测 URL。原 UI-009 “Admin 管理页”改为“用户管理”，只保留账号列表与解封；Admin 撤销共享迁移到 UI-003“团队共享”卡片操作。UI-009 ~ UI-012 必须复用同一列表页模板，统一筛选在左、刷新与搜索在右、表格滚动边界、总数左下、分页右下和每页 20 条；各页面仅维护字段列与业务动作。第 29 / 31 条关于“占位”的历史原文不回溯改写，以本条为最新准。
+35. **Skill 上传元数据与 scripts 兼容**（Owner 决定，2026-07-18）：上传 UI 不重复收集名称和描述，后端从 `SKILL.md` YAML frontmatter 的 `name` / `description` 解析并在上传预览中回显；上传后 Owner / Admin 仍可编辑。恢复 ADR-010 的原始边界：`scripts/` 允许上传并原样保存，随 Skill 定义进入 Agent 草稿与发布 Snapshot，但 v1 不执行脚本、不预留 `ISkillExecutor`，详情页必须提示“当前版本不会执行”。第 11 条“v1 不允许带 scripts”的历史原文被本条替代，不回溯改写。
 
 > Owner 决定 v1 不做审计日志功能（第 14 条原话"审计日志是需要的"、第 23 条原话"查全量审计"的部分表述不再生效，其余部分继续有效）。已移除 NFR-004、REQ-013"审计"表述、REQ-017"查看全量审计日志"子能力、§3/§7/§8/§9 中的审计相关字样；ADR-008 / HD-007（`IAuditLogger` 端口）/ HD-018（`Inkwell.Core.AuditLogs`）三个下游文档已删除。
 

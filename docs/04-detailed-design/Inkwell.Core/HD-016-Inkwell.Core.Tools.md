@@ -22,6 +22,8 @@ upstream:
 >
 > **2026-07-16 替代性 errata（工具 Definition 与 MAF 运行时对象分界）**：`IAgentToolBindingResolver`、内部 `AgentToolBindingResolver` 与 `JsonDelegateAIFunction` 均已移除；下方仍描述这些类型及其直接返回 `AIFunction` 的章节保留为历史依据，不再代表当前代码契约。现行链路由 `AgentBuildOptions.ToolBindings` 在 Snapshot 中保存工具 ID 与静态参数，不加载或复制可变的 `AgentToolDefinition`，也不转换为可执行 `AIFunction`；最终运行时接入方式等待 Agent Factory review 定稿。Tools 业务边界不公开 MAF 运行时对象。
 >
+> **2026-07-18 补充决议（目录不提供启停）**：UI-010 升级为正式只读目录，但不改变本 HD 的运行期管理边界。`AgentToolDefinition` 不新增 `IsEnabled`，Repository / Service 不新增状态修改方法；Agent Snapshot 继续只固化 Tool ID 与静态参数，工具执行实现由对应部署版本提供。由于目录状态不属于 Snapshot，引入全局启停会制造“修改目录即可改变历史版本”的错误语义，因此 v1 不提供该能力。
+>
 > **起草顺序说明**：本 HD 之所以在 H3 起草顺序上插队到 `.Models` / `.Skills` / `.KnowledgeBase` 等模块之前，是因为 [HD-015 §8 Q&A-2](HD-015-Inkwell.Core.Agents.md#8-需要-owner-确认的问题) 记录的 Owner 决议——本次由 prompt 直接告知这是已成立的既定结论，本文件不重新发起确认，仅据此安排起草顺序。
 >
 > **范围核实结论（非臆造，逐条附证据）**：

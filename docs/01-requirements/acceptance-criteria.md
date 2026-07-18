@@ -64,9 +64,12 @@ downstream: []
 
 ### REQ-005 · 模型选择
 
-- **AC-020**：在 UI-004 模型与参数区段下拉模型列表，至少包含一项 Azure OpenAI（具体 SKU 由后端配置决定）。
-- **AC-021**：UI-004 模型下拉的所有选项与后端配置文件声明的模型集合一致；客户端代码中**不**硬编码任何模型名（可由 H4 通过"切换后端配置后客户端列表随之变化"用例验证）。
-- **AC-022**：模型不可用时，UI-004 模型下拉项灰显，hover 显示"该模型暂不可用，请联系管理员"。
+- **AC-020**：在 UI-004 模型与参数区段下拉模型列表，至少包含 LiteLLM 实时发现的一项 Chat 模型；具体模型集合由 LiteLLM 配置决定。
+- **AC-021**：UI-004 模型下拉与 UI-012 中 `Category=Chat` 的实时模型集合一致；客户端代码中**不**硬编码任何模型名（可由 H4 通过“切换 LiteLLM 配置后客户端列表随之变化”用例验证）。
+- **AC-022**：已保存的模型在 LiteLLM 中被移除后，UI-004 显示“该模型已不可用，请重新选择”，并阻断发布；其他配置仍可查看和编辑。
+- **AC-097**：UI-012 每行完整展示 `LLMModel` 的 ID、分类、Provider Mode、OwnedBy、输入/输出 Token 上限和视觉/工具/结构化输出/推理四项能力；能力值 `null` 显示“未知”，不显示成“不支持”。
+- **AC-098**：任一已登录 Member 可在 UI-012 对任意分类模型点击“测试”，看到测试中状态及成功/失败、脱敏错误；列表不常驻显示延迟。Provider 不支持或无法识别的分类返回失败结果，按钮不得预先置灰，测试完成后按钮仍保留并允许再次测试。
+- **AC-099**：UI-012 点击“模型管理”，Electron 通过后端返回的独立管理 URL 在系统浏览器打开 LiteLLM Dashboard；客户端不从 Proxy Endpoint 拼接 URL。
 
 ### REQ-006 · 模型参数配置
 
@@ -79,13 +82,18 @@ downstream: []
 - **AC-026**：在 UI-005 触发该工具的对话，UI-007 trace 详情能看到工具调用入参与返回值。
 - **AC-027**：工具失败时，UI-005 的工具气泡内联红色标识 + 失败原因；UI-007 trace 中该步骤标"failed"并保留原因（EX-003）。
 - **AC-028**：UI-004 勾选工具但缺必填参数，点"保存"被拒，字段下红字"工具 <名称> 缺少必填参数：<字段>"。
+- **AC-100**：UI-010 展示全部 Tool 的名称、描述、参数数量和更新时间；所有 Member 只读，页面不出现启停、新建、编辑或删除操作。
+- **AC-101**：保存和发布 Agent 后，版本 Snapshot 中能回显所选 Tool ID 与静态参数；Tool 目录不出现启停状态，运行时工具实现由对应部署版本提供。
 
 ### REQ-008 · Agent Skills（agentskills.io 格式）
 
-- **AC-029**：在 UI-004 Skills 区段上传含 `scripts/` 的 Skill 文件夹 / zip，前端**前置**拒收，弹错"v1 不支持携带 scripts/ 的 Skill"，文件不进入 Skill 库。
-- **AC-030**：上传仅含 `SKILL.md` + `references/` + `assets/` 的 Skill，能成功入库并出现在 Skills 列表。
+- **AC-029**：在 UI-004 / UI-011 上传含 `scripts/` 的 Skill 文件夹 / zip，文件能成功入库；详情显示脚本数量和“当前版本不会执行”提示，Agent 运行时不执行脚本。
+- **AC-030**：上传含有效 `SKILL.md`（可同时含 `references/`、`assets/`、`scripts/`）的 Skill 时，不要求重复填写名称和描述；系统从 YAML frontmatter 解析并回显 `name` / `description`，成功后出现在 Skills 列表。
 - **AC-031**：把 Skill 挂到 Agent 后在 UI-005 进行相关对话，UI-007 trace 中能看到 Discovery / Activation / Execution 三阶段命中状态。
 - **AC-032**：已挂载的 Skill 在对话期被后端判定缺失（EX-008），UI-005 出现淡黄系统提示气泡；对话不阻断，UI-007 trace 标"skill load warning"。
+- **AC-102**：上传者在 UI-011 可编辑自己 Skill 的名称、描述和 Markdown 内容并保存回显；References / Assets 保持只读；其他普通 Member 不显示编辑操作，Admin 可编辑全部。
+- **AC-103**：Owner 或 Admin 编辑 Skill 后，已发布 Agent 仍使用发布时 Snapshot 中的旧内容；重新发布新版本后才使用编辑后的内容。
+- **AC-104**：Owner 或 Admin 删除 Skill 时必须二次确认；确认后列表移除，已保存草稿和已发布版本仍使用各自 Snapshot 中的 Skill 内容；后续新挂载无法再选择该 Skill；非 Owner 普通 Member 不能删除。
 
 ### REQ-009 · 知识库 / RAG
 
@@ -140,10 +148,10 @@ downstream: []
 
 ### REQ-017 · Admin 最小管理员页
 
-- **AC-065**：仅 `is_super=true` 的 Member 在顶栏用户菜单看到"管理"入口；普通 Member 不可见。
+- **AC-065**：仅 `is_super=true` 的 Member 在左侧“系统管理”分组看到“用户管理”入口；普通 Member 不可见。
 - **AC-066**：普通 Member 直接访问 UI-009 路由，被重定向（或显示"无权限"占位 + "返回 Agent 空间"按钮）。
 - **AC-067**：Admin 在 UI-009 `账号` tab 对一个被锁账号点"解封"，二次确认后该账号状态变"正常"。
-- **AC-068**：Admin 在 UI-009 `共享` tab 对他人共享中的 Agent 点"撤销共享"，二次确认后该 Agent 从其他成员的 `团队共享` tab 消失；Owner 原件不被删除；Agent Owner 进入 UI-004 后顶部出现状态条"该共享已被管理员撤销"。
+- **AC-068**：Admin 在 UI-003 `团队共享` 对他人共享 Agent 点“撤销共享”，二次确认后该 Agent 从其他成员的 `团队共享` 消失；Owner 原件不被删除；Agent Owner 进入 UI-004 后顶部出现状态条“该共享已被管理员撤销”。
 - **AC-070**：Admin **不**能在 UI-004 编辑他人 Agent 的任意配置字段（保存按钮不出现）。
 
 ---
@@ -204,10 +212,10 @@ downstream: []
 | REQ-002   | AC-007 ~ AC-013                                     |
 | REQ-003   | AC-014 / AC-015 / AC-016                            |
 | REQ-004   | AC-017 / AC-018 / AC-019                            |
-| REQ-005   | AC-020 / AC-021 / AC-022                            |
+| REQ-005   | AC-020 / AC-021 / AC-022 / AC-097 ~ AC-099          |
 | REQ-006   | AC-023 / AC-024                                     |
-| REQ-007   | AC-025 / AC-026 / AC-027 / AC-028                   |
-| REQ-008   | AC-029 / AC-030 / AC-031 / AC-032                   |
+| REQ-007   | AC-025 / AC-026 / AC-027 / AC-028 / AC-100 / AC-101 |
+| REQ-008   | AC-029 / AC-030 / AC-031 / AC-032 / AC-102 ~ AC-104 |
 | REQ-009   | AC-033 / AC-034 / AC-035                            |
 | REQ-010   | AC-036 / AC-037                                     |
 | REQ-011   | ~~AC-038~AC-040~~（推迟 v2）                        |
