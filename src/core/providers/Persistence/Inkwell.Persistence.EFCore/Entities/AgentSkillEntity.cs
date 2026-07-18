@@ -2,9 +2,11 @@
 
 namespace Inkwell.Persistence.EFCore.Entities;
 
-internal sealed class AgentSkillEntity : IHasTimestamps
+internal sealed class AgentSkillEntity : IHasOwner, IHasTimestamps
 {
     public Guid Id { get; init; }
+
+    public Guid OwnerUserId { get; init; }
 
     public string Name { get; init; } = "";
 
@@ -17,6 +19,11 @@ internal sealed class AgentSkillEntity : IHasTimestamps
 
     /// <summary>序列化的 <c>IReadOnlyList&lt;Uri&gt;</c>；默认空数组。</summary>
     public string AssetFileUris { get; init; } = "[]";
+
+    /// <summary>序列化的 <c>IReadOnlyList&lt;Uri&gt;</c>；默认空数组。</summary>
+    public string ScriptFileUris { get; init; } = "[]";
+
+    public byte[] RowVersion { get; init; } = [];
 
     public DateTimeOffset CreatedTime { get; init; }
 

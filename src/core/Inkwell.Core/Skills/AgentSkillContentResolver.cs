@@ -35,5 +35,12 @@ internal sealed class AgentSkillContentResolver(IPersistenceProvider persistence
     }
 
     private static AgentSkillContent ToSkillContent(AgentSkillDefinition skill) =>
-        new(skill.Id, skill.Name, skill.Description, skill.Content, skill.ReferenceFileUris, skill.AssetFileUris);
+        new(
+            skill.Id,
+            skill.Name,
+            skill.Description,
+            skill.Content,
+            skill.ReferenceFileUris,
+            skill.AssetFileUris,
+            skill.ScriptFileUris);
 }

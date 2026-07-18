@@ -11,6 +11,9 @@ import { join } from "node:path";
 import type {
     AgentDefinition,
     AgentListItem,
+    AgentSkillDefinition,
+    AgentSkillUpdateRequest,
+    AgentSkillUploadFile,
     AgentToolDefinition,
     AppMetadata,
     AuthIdentity,
@@ -128,7 +131,9 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
         ...init,
         headers: {
             Accept: "application/json",
-            ...(init?.body ? { "Content-Type": "application/json" } : {}),
+            ...(init?.body && !(init.body instanceof FormData)
+                ? { "Content-Type": "application/json" }
+                : {}),
             ...(sessionToken
                 ? { Authorization: `Bearer ${sessionToken}` }
                 : {}),
@@ -314,6 +319,42 @@ const registerApiHandlers = (): void => {
     ipcMain.handle("inkwell:list-tools", () => {
         requireAuthenticated();
         return request<AgentToolDefinition[]>("/api/tools");
+    });
+    ipcMain.handle("inkwell:list-skills", () => {
+        requireAuthenticated();
+        return request<AgentSkillDefinition[]>("/api/skills");
+    });
+    ipcMain.handle(
+        "inkwell:upload-skill",
+        (_event, file: AgentSkillUploadFile) => {
+            requireAuthenticated();
+            const body = new FormData();
+            body.append(
+                "file",
+                new Blob([file.bytes], { type: "application/octet-stream" }),
+                file.name,
+            );
+            return request<AgentSkillDefinition>("/api/skills", {
+                method: "POST",
+                body,
+            });
+        },
+    );
+    ipcMain.handle(
+        "inkwell:update-skill",
+        (_event, skillId: string, input: AgentSkillUpdateRequest) => {
+            requireAuthenticated();
+            return request<AgentSkillDefinition>(
+                `/api/skills/${encodeURIComponent(skillId)}`,
+                { method: "PUT", body: JSON.stringify(input) },
+            );
+        },
+    );
+    ipcMain.handle("inkwell:delete-skill", (_event, skillId: string) => {
+        requireAuthenticated();
+        return request<void>(`/api/skills/${encodeURIComponent(skillId)}`, {
+            method: "DELETE",
+        });
     });
     ipcMain.handle("inkwell:list-models", () => {
         requireAuthenticated();

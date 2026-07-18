@@ -23,6 +23,34 @@ const toolsResponse = JSON.stringify([
         updatedTime: "2026-07-18T08:42:00Z",
     },
 ]);
+const skillsResponse = JSON.stringify([
+    {
+        id: "0198a96d-19e4-7000-8000-000000000201",
+        ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
+        name: "合同审查规范",
+        description: "按团队法务标准识别合同风险并输出分级建议。",
+        content: "# 合同审查规范\n\n先识别合同类型，再输出风险。",
+        referenceFileUris: ["inkwell://skills/references/rule.md"],
+        assetFileUris: ["inkwell://skills/assets/template.docx"],
+        scriptFileUris: ["inkwell://skills/scripts/check.ps1"],
+        rowVersion: "AAAAAAAAAAAAAAAAAAAAAA==",
+        createdTime: "2026-07-17T08:00:00Z",
+        updatedTime: "2026-07-18T09:20:00Z",
+    },
+    {
+        id: "0198a96d-19e4-7000-8000-000000000202",
+        ownerUserId: "0198a96d-19e4-7000-8000-000000000002",
+        name: "研发周报",
+        description: "将工作记录整理为统一的研发周报格式。",
+        content: "# 研发周报",
+        referenceFileUris: [],
+        assetFileUris: [],
+        scriptFileUris: [],
+        rowVersion: "AAAAAAAAAAAAAAAAAAAAAA==",
+        createdTime: "2026-07-16T08:00:00Z",
+        updatedTime: "2026-07-17T02:08:00Z",
+    },
+]);
 
 test("renders the prototype-aligned login experience", async ({
     browserName,
@@ -100,6 +128,7 @@ test("renders the prototype-aligned login experience", async ({
 test("shows authentication errors and enters the workspace after login", async ({
     browserName,
 }, testInfo) => {
+    test.setTimeout(60_000);
     let loginAttempts = 0;
     let modelTestAttempts = 0;
     let accountLocked = true;
@@ -138,6 +167,12 @@ test("shows authentication errors and enters the workspace after login", async (
         if (request.url === "/api/tools") {
             response.setHeader("Content-Type", "application/json");
             response.end(toolsResponse);
+            return;
+        }
+
+        if (request.url === "/api/skills") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(skillsResponse);
             return;
         }
 
@@ -385,9 +420,15 @@ test("shows authentication errors and enters the workspace after login", async (
                 modelTable.getByRole("columnheader", { name: column }),
             ).toBeVisible();
         }
-        await expect(modelTable.getByText("对话", { exact: true })).toBeVisible();
-        await expect(modelTable.getByText("嵌入", { exact: true })).toBeVisible();
-        const listCapabilityTag = modelTable.locator(".ant-tag-success").first();
+        await expect(
+            modelTable.getByText("对话", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            modelTable.getByText("嵌入", { exact: true }),
+        ).toBeVisible();
+        const listCapabilityTag = modelTable
+            .locator(".ant-tag-success")
+            .first();
         await expect(listCapabilityTag).toHaveCSS(
             "background-color",
             "rgb(32, 43, 36)",
@@ -408,9 +449,7 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             modelDetails.locator(".ant-tag-success").first(),
         ).toHaveCSS("background-color", "rgb(32, 43, 36)");
-        await modelDetails
-            .locator(".ant-drawer-close")
-            .dispatchEvent("click");
+        await modelDetails.locator(".ant-drawer-close").dispatchEvent("click");
         await expect(modelDetails).toBeHidden();
         await page
             .getByRole("button", { name: "测试 gpt-5.4" })
@@ -467,7 +506,9 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             toolTable.getByText("current_date_time", { exact: true }),
         ).toBeVisible();
-        await expect(toolTable.getByText("2 项", { exact: true })).toBeVisible();
+        await expect(
+            toolTable.getByText("2 项", { exact: true }),
+        ).toBeVisible();
         await page.setViewportSize({ width: 1080, height: 720 });
         await page.screenshot({
             path: testInfo.outputPath("tool-management-dark-1080x720.png"),
@@ -487,13 +528,90 @@ test("shows authentication errors and enters the workspace after login", async (
         await toolDetails
             .getByText("原始 JSON Schema", { exact: true })
             .dispatchEvent("click");
-        await expect(
-            toolDetails.getByText(/"timeZone"/),
-        ).toBeVisible();
-        await toolDetails
-            .locator(".ant-drawer-close")
-            .dispatchEvent("click");
+        await expect(toolDetails.getByText(/"timeZone"/)).toBeVisible();
+        await toolDetails.locator(".ant-drawer-close").dispatchEvent("click");
         await expect(toolDetails).toBeHidden();
+
+        await page
+            .locator(".app-sidebar .nav-item", { hasText: "Skills" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("heading", { name: "Skills", exact: true }),
+        ).toBeVisible();
+        const skillTable = page.getByRole("table");
+        for (const column of [
+            "名称",
+            "描述",
+            "所有者",
+            "资料",
+            "更新时间",
+            "操作",
+        ]) {
+            await expect(
+                skillTable.getByRole("columnheader", { name: column }),
+            ).toBeVisible();
+        }
+        await expect(
+            skillTable.getByText("合同审查规范", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            skillTable.getByText("研发周报", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            skillTable.getByText("1 引用 · 1 素材 · 1 脚本", { exact: true }),
+        ).toBeVisible();
+        await page.getByRole("combobox").dispatchEvent("mousedown");
+        await page
+            .locator(".ant-select-dropdown")
+            .getByText("其他成员", { exact: true })
+            .dispatchEvent("click");
+        await expect(
+            skillTable.getByText("合同审查规范", { exact: true }),
+        ).toBeHidden();
+        await expect(
+            skillTable.getByText("研发周报", { exact: true }),
+        ).toBeVisible();
+        await page.getByRole("combobox").dispatchEvent("mousedown");
+        await page
+            .locator(".ant-select-dropdown")
+            .getByText("全部归属", { exact: true })
+            .dispatchEvent("click");
+        await page
+            .getByRole("button", { name: "查看 合同审查规范" })
+            .dispatchEvent("click");
+        const skillDetails = page.getByRole("dialog", { name: "Skill 详情" });
+        await expect(skillDetails).toBeVisible();
+        await expect(
+            skillDetails.getByText("脚本已保存，当前版本不会执行"),
+        ).toBeVisible();
+        await skillDetails.locator(".ant-drawer-close").dispatchEvent("click");
+        await page
+            .getByRole("button", { name: "上传 Skill" })
+            .dispatchEvent("click");
+        const uploadDialog = page.getByRole("dialog", { name: "上传 Skill" });
+        await uploadDialog.locator('input[type="file"]').setInputFiles({
+            name: "SKILL.md",
+            mimeType: "text/markdown",
+            buffer: Buffer.from(
+                "---\nname: 合同审查规范\ndescription: 按团队法务标准识别合同风险并输出分级建议。\n---\n# 合同审查规范",
+            ),
+        });
+        await expect(uploadDialog.getByText("SKILL.md 解析预览")).toBeVisible();
+        await expect(
+            uploadDialog.getByText(
+                "0 个 references · 0 个 asset · 0 个 scripts",
+            ),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(uploadDialog).toBeHidden();
+        await page.setViewportSize({ width: 1080, height: 720 });
+        expect(
+            await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(1080);
+        await page.screenshot({
+            path: testInfo.outputPath("skill-management-dark-1080x720.png"),
+            fullPage: true,
+        });
 
         await page.getByRole("button", { name: "Agent 空间" }).click();
         await expect(

@@ -11,11 +11,14 @@ internal static class AgentSkillMappingExtensions
         return new AgentSkillDefinition
         {
             Id = entity.Id,
+            OwnerUserId = entity.OwnerUserId,
             Name = entity.Name,
             Description = entity.Description,
             Content = entity.ContentMarkdown,
             ReferenceFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ReferenceFileUris) ?? [],
             AssetFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.AssetFileUris) ?? [],
+            ScriptFileUris = JsonSerializer.Deserialize<IReadOnlyList<Uri>>(entity.ScriptFileUris) ?? [],
+            RowVersion = entity.RowVersion,
             CreatedTime = entity.CreatedTime,
             UpdatedTime = entity.UpdatedTime,
         };
@@ -28,11 +31,14 @@ internal static class AgentSkillMappingExtensions
         return new AgentSkillEntity
         {
             Id = model.Id,
+            OwnerUserId = model.OwnerUserId,
             Name = model.Name,
             Description = model.Description,
             ContentMarkdown = model.Content,
             ReferenceFileUris = JsonSerializer.Serialize(model.ReferenceFileUris),
             AssetFileUris = JsonSerializer.Serialize(model.AssetFileUris),
+            ScriptFileUris = JsonSerializer.Serialize(model.ScriptFileUris),
+            RowVersion = model.RowVersion,
             CreatedTime = model.CreatedTime,
             UpdatedTime = model.UpdatedTime,
         };

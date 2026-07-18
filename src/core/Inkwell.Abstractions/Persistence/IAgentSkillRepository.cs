@@ -2,7 +2,7 @@
 
 namespace Inkwell;
 
-/// <summary><see cref="AgentSkillDefinition"/> 具名 Repository（只读目录 + 上传写入，无 Update/Delete）。</summary>
+/// <summary><see cref="AgentSkillDefinition"/> 具名 Repository。</summary>
 public interface IAgentSkillRepository
 {
     /// <summary>新增 Skill。</summary>
@@ -10,6 +10,18 @@ public interface IAgentSkillRepository
     /// <param name="ct">取消令牌。</param>
     /// <returns>已新增的 Skill。</returns>
     Task<AgentSkillDefinition> AddSkill(AgentSkillDefinition skill, CancellationToken ct = default);
+
+    /// <summary>更新 Skill。</summary>
+    /// <param name="skill">待更新的 Skill。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>更新后的 Skill。</returns>
+    Task<AgentSkillDefinition> UpdateSkill(AgentSkillDefinition skill, CancellationToken ct = default);
+
+    /// <summary>删除 Skill。</summary>
+    /// <param name="id">Skill 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>删除成功返回 <see langword="true"/>；Skill 不存在返回 <see langword="false"/>。</returns>
+    Task<bool> DeleteSkill(Guid id, CancellationToken ct = default);
 
     /// <summary>获取指定 Skill。</summary>
     /// <param name="id">Skill 标识。</param>

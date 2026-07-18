@@ -34,6 +34,7 @@ import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
 import { ModelManagement } from "../models/model-management";
+import { SkillManagement } from "../skills/skill-management";
 import { ToolManagement } from "../tools/tool-management";
 import { UserManagement } from "../users/user-management";
 import {
@@ -78,9 +79,8 @@ const navigationGroups: NavigationGroup[] = [
             },
             {
                 key: "skills",
-                label: "Skills 管理",
+                label: "Skills",
                 icon: <ReadOutlined />,
-                placeholder: true,
             },
             {
                 key: "models",
@@ -295,6 +295,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 <div className="workspace-content">
                     <div
                         className="workspace-route"
+                        hidden={activeNavigation !== "skills"}
+                    >
+                        <SkillManagement />
+                    </div>
+                    <div
+                        className="workspace-route"
                         hidden={activeNavigation !== "agents"}
                     >
                         {children}
@@ -319,6 +325,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     </div>
                     {activeNavigation !== "agents" &&
                         activeNavigation !== "tools" &&
+                        activeNavigation !== "skills" &&
                         activeNavigation !== "models" &&
                         activeNavigation !== "admin" && (
                             <main className="placeholder-page">

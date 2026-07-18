@@ -44,6 +44,7 @@ public sealed class AgentBuildOptionsResolverTests
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
         Id = Guid.CreateVersion7(),
+        OwnerUserId = Guid.CreateVersion7(),
         Name = "source-review",
         Description = "Reviews sources.",
         Content = "Review every source before citing it.",
@@ -54,6 +55,12 @@ public sealed class AgentBuildOptionsResolverTests
     private sealed class StubAgentSkillRepository(AgentSkillDefinition skill) : IAgentSkillRepository
     {
         public Task<AgentSkillDefinition> AddSkill(AgentSkillDefinition skillToAdd, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentSkillDefinition> UpdateSkill(AgentSkillDefinition skillToUpdate, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> DeleteSkill(Guid id, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public Task<AgentSkillDefinition> GetSkill(Guid id, CancellationToken ct = default) =>

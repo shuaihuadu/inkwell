@@ -14,6 +14,7 @@ internal sealed class PostgresModelCustomizer(ModelCustomizerDependencies depend
         modelBuilder.Entity<AgentSessionStateEntity>().Property(state => state.SerializedState).HasColumnType("jsonb");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ReferenceFileUris).HasColumnType("jsonb");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.AssetFileUris).HasColumnType("jsonb");
+        modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ScriptFileUris).HasColumnType("jsonb");
         modelBuilder.Entity<AgentToolEntity>().Property(tool => tool.ParametersJsonSchema).HasColumnType("jsonb");
         modelBuilder.Entity<AgentEntity>().Property(agent => agent.BuildOptions).HasColumnType("jsonb");
         modelBuilder.Entity<AgentVersionEntity>().Property(version => version.Snapshot).HasColumnType("jsonb");

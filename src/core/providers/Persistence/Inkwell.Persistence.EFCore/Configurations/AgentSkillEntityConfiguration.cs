@@ -12,5 +12,10 @@ internal sealed class AgentSkillEntityConfiguration : IEntityTypeConfiguration<A
         b.Property(x => x.Name).IsRequired().HasMaxLength(200);
         b.Property(x => x.Description).IsRequired();
         b.Property(x => x.ContentMarkdown).IsRequired();
+        b.Property(x => x.RowVersion).IsRequired().HasMaxLength(16).IsConcurrencyToken();
+        b.HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(x => x.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

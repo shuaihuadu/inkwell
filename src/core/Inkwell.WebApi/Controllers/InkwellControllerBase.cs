@@ -27,6 +27,19 @@ public abstract class InkwellControllerBase : ControllerBase
     }
 
     /// <summary>
+    /// 获取当前已认证用户是否为超级管理员。
+    /// </summary>
+    /// <returns>当前用户是超级管理员时返回 <see langword="true"/>。</returns>
+    protected bool GetRequiredIsSuper()
+    {
+        string? value = this.User.FindFirstValue(SessionClaimTypes.IsSuper);
+
+        return bool.TryParse(value, out bool isSuper)
+            ? isSuper
+            : throw new UnauthorizedAccessException("Authenticated user role is missing or invalid.");
+    }
+
+    /// <summary>
     /// 获取当前请求携带的 Bearer 会话令牌。
     /// </summary>
     /// <returns>Bearer 会话令牌。</returns>

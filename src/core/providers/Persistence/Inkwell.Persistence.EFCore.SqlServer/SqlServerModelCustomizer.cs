@@ -14,6 +14,7 @@ internal sealed class SqlServerModelCustomizer(ModelCustomizerDependencies depen
         modelBuilder.Entity<AgentSessionStateEntity>().Property(state => state.SerializedState).HasColumnType("json");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ReferenceFileUris).HasColumnType("json");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.AssetFileUris).HasColumnType("json");
+        modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ScriptFileUris).HasColumnType("json");
         modelBuilder.Entity<AgentToolEntity>().Property(tool => tool.ParametersJsonSchema).HasColumnType("json");
         modelBuilder.Entity<AgentEntity>().Property(agent => agent.BuildOptions).HasColumnType("json");
         modelBuilder.Entity<AgentVersionEntity>().Property(version => version.Snapshot).HasColumnType("json");

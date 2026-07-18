@@ -9,4 +9,5 @@ public sealed record class AgentSkillContent(
     string Description,
     string ContentMarkdown,
     IReadOnlyList<Uri> ReferenceFileUris,
-    IReadOnlyList<Uri> AssetFileUris);
+    IReadOnlyList<Uri> AssetFileUris,
+    IReadOnlyList<Uri> ScriptFileUris);

@@ -106,6 +106,32 @@ export interface AgentToolDefinition {
     updatedTime: string;
 }
 
+export interface AgentSkillDefinition {
+    id: string;
+    ownerUserId: string;
+    name: string;
+    description: string;
+    content: string;
+    referenceFileUris: string[];
+    assetFileUris: string[];
+    scriptFileUris: string[];
+    rowVersion: string;
+    createdTime: string;
+    updatedTime: string;
+}
+
+export interface AgentSkillUpdateRequest {
+    name: string;
+    description: string;
+    content: string;
+    rowVersion: string;
+}
+
+export interface AgentSkillUploadFile {
+    name: string;
+    bytes: Uint8Array;
+}
+
 export interface UserListItem {
     userId: string;
     username: string;
@@ -146,6 +172,13 @@ export interface InkwellDesktopApi {
     ) => () => void;
     listAgents: () => Promise<AgentListItem[]>;
     listTools: () => Promise<AgentToolDefinition[]>;
+    listSkills: () => Promise<AgentSkillDefinition[]>;
+    uploadSkill: (file: AgentSkillUploadFile) => Promise<AgentSkillDefinition>;
+    updateSkill: (
+        skillId: string,
+        request: AgentSkillUpdateRequest,
+    ) => Promise<AgentSkillDefinition>;
+    deleteSkill: (skillId: string) => Promise<void>;
     listModels: () => Promise<LLMModel[]>;
     getModelManagementInfo: () => Promise<LLMProviderManagementInfo>;
     testModel: (modelId: string) => Promise<LLMModelTestResult>;

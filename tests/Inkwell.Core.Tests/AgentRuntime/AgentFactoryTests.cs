@@ -89,6 +89,7 @@ public sealed class AgentFactoryTests
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
         Id = Guid.CreateVersion7(),
+        OwnerUserId = Guid.CreateVersion7(),
         Name = "source-review",
         Description = "Reviews sources.",
         Content = "Review every source before citing it.",

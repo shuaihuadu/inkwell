@@ -3,12 +3,17 @@
 namespace Inkwell;
 
 /// <summary>Skill 目录业务 Model；用 Definition 后缀撞名降级——注意 Microsoft.Agents.AI 命名空间下已存在 <c>AgentSkill</c> 抽象基类，本类型故意不叫 AgentSkill 以避免同名冲突。</summary>
-public sealed record class AgentSkillDefinition : IHasTimestamps
+public sealed record class AgentSkillDefinition : IHasOwner, IHasTimestamps
 {
     /// <summary>
     /// 获取 Skill 标识。
     /// </summary>
     public required Guid Id { get; init; }
+
+    /// <summary>
+    /// 获取 Skill 所有者用户标识。
+    /// </summary>
+    public required Guid OwnerUserId { get; init; }
 
     /// <summary>
     /// 获取 Skill 名称。
@@ -34,6 +39,16 @@ public sealed record class AgentSkillDefinition : IHasTimestamps
     /// 获取 Skill 资源文件的存储 URI 集合。
     /// </summary>
     public IReadOnlyList<Uri> AssetFileUris { get; init; } = [];
+
+    /// <summary>
+    /// 获取 Skill 脚本文件的存储 URI 集合。
+    /// </summary>
+    public IReadOnlyList<Uri> ScriptFileUris { get; init; } = [];
+
+    /// <summary>
+    /// 获取乐观并发版本。
+    /// </summary>
+    public byte[] RowVersion { get; init; } = [];
 
     /// <summary>
     /// 获取 Skill 创建时间。

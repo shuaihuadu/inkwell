@@ -4,6 +4,7 @@ using Inkwell.Persistence.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
 {
     [DbContext(typeof(InkwellDbContext))]
-    partial class InkwellDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260718144944_AddSkillManagement")]
+    partial class AddSkillManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

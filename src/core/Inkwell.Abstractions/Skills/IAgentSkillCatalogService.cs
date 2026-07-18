@@ -2,7 +2,7 @@
 
 namespace Inkwell;
 
-/// <summary>Skill 目录只读查询 + 上传注册业务对外接口。</summary>
+/// <summary>Skill 列表查询、上传与维护业务对外接口。</summary>
 public interface IAgentSkillCatalogService
 {
     /// <summary>获取可用 Skill 列表。</summary>
@@ -18,7 +18,25 @@ public interface IAgentSkillCatalogService
 
     /// <summary>上传并注册 Skill。</summary>
     /// <param name="request">Skill 上传请求。</param>
+    /// <param name="ownerUserId">上传者用户标识。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>已注册的 Skill 定义。</returns>
-    Task<AgentSkillDefinition> UploadSkillAsync(AgentSkillUploadRequest request, CancellationToken ct = default);
+    Task<AgentSkillDefinition> UploadSkillAsync(AgentSkillUploadRequest request, Guid ownerUserId, CancellationToken ct = default);
+
+    /// <summary>更新指定 Skill 的可编辑内容。</summary>
+    /// <param name="skillId">Skill 标识。</param>
+    /// <param name="request">更新请求。</param>
+    /// <param name="actorUserId">操作者用户标识。</param>
+    /// <param name="actorIsSuper">操作者是否为管理员。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>更新后的 Skill 定义。</returns>
+    Task<AgentSkillDefinition> UpdateSkillAsync(Guid skillId, AgentSkillUpdateRequest request, Guid actorUserId, bool actorIsSuper, CancellationToken ct = default);
+
+    /// <summary>删除指定 Skill。</summary>
+    /// <param name="skillId">Skill 标识。</param>
+    /// <param name="actorUserId">操作者用户标识。</param>
+    /// <param name="actorIsSuper">操作者是否为管理员。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>删除成功返回 <see langword="true"/>；Skill 不存在返回 <see langword="false"/>。</returns>
+    Task<bool> DeleteSkillAsync(Guid skillId, Guid actorUserId, bool actorIsSuper, CancellationToken ct = default);
 }

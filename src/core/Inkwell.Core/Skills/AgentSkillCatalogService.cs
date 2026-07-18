@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Inkwell;
 
-/// <summary><see cref="IAgentSkillCatalogService"/> 唯一实现；只读查询 + 上传解析与持久化。</summary>
+/// <summary><see cref="IAgentSkillCatalogService"/> 唯一实现；查询、上传与维护 Skill。</summary>
 internal sealed partial class AgentSkillCatalogService(IPersistenceProvider persistence) : IAgentSkillCatalogService
 {
     private readonly IAgentSkillRepository _skills = persistence.GetRepository<IAgentSkillRepository>();
@@ -21,26 +21,40 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
     public async Task<AgentSkillDefinition> GetSkillAsync(Guid skillId, CancellationToken ct = default) =>
         await this._skills.GetSkill(skillId, ct).ConfigureAwait(false);
 
-    public async Task<AgentSkillDefinition> UploadSkillAsync(AgentSkillUploadRequest request, CancellationToken ct = default)
+    public async Task<AgentSkillDefinition> UploadSkillAsync(
+        AgentSkillUploadRequest request,
+        Guid ownerUserId,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        if (ownerUserId == Guid.Empty)
+        {
+            throw new ArgumentException("OwnerUserId must not be empty.", nameof(ownerUserId));
+        }
 
         if (!TryParseFrontmatter(request.SkillMdContent, out string? name, out string? description, out string? contentMarkdown))
         {
             throw new ArgumentException("SKILL.md frontmatter is missing or invalid.", nameof(request));
         }
 
-        ValidatePackageStructure(request.PackageEntries, out IReadOnlyList<Uri>? referenceUris, out IReadOnlyList<Uri>? assetUris);
+        ValidatePackageStructure(
+            request.PackageEntries,
+            out IReadOnlyList<Uri>? referenceUris,
+            out IReadOnlyList<Uri>? assetUris,
+            out IReadOnlyList<Uri>? scriptUris);
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        AgentSkillDefinition skill = new AgentSkillDefinition
+        AgentSkillDefinition skill = new()
         {
             Id = Guid.CreateVersion7(),
+            OwnerUserId = ownerUserId,
             Name = name,
             Description = description,
             Content = contentMarkdown,
             ReferenceFileUris = referenceUris,
             AssetFileUris = assetUris,
+            ScriptFileUris = scriptUris,
             CreatedTime = now,
             UpdatedTime = now,
         };
@@ -49,6 +63,44 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
             innerCt => this._skills.AddSkill(skill, innerCt),
             ct).ConfigureAwait(false);
     }
+
+    public async Task<AgentSkillDefinition> UpdateSkillAsync(
+        Guid skillId,
+        AgentSkillUpdateRequest request,
+        Guid actorUserId,
+        bool actorIsSuper,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ValidateEditableFields(request.Name, request.Description, request.Content);
+
+        AgentSkillDefinition skill = await this._skills.GetSkill(skillId, ct).ConfigureAwait(false);
+        ValidateManagementPermission(skill, actorUserId, actorIsSuper);
+        AgentSkillDefinition updated = skill with
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Content = request.Content,
+            RowVersion = request.RowVersion,
+            UpdatedTime = DateTimeOffset.UtcNow,
+        };
+
+        return await persistence.ExecuteInTransactionAsync(
+            innerCt => this._skills.UpdateSkill(updated, innerCt),
+            ct).ConfigureAwait(false);
+    }
+
+    public async Task<bool> DeleteSkillAsync(
+        Guid skillId,
+        Guid actorUserId,
+        bool actorIsSuper,
+        CancellationToken ct = default) =>
+        await persistence.ExecuteInTransactionAsync(async innerCt =>
+        {
+            AgentSkillDefinition skill = await this._skills.GetSkill(skillId, innerCt).ConfigureAwait(false);
+            ValidateManagementPermission(skill, actorUserId, actorIsSuper);
+            return await this._skills.DeleteSkill(skillId, innerCt).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
 
     private static bool TryParseFrontmatter(string skillMdContent, out string name, out string description, out string contentMarkdown)
     {
@@ -101,10 +153,15 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
         return true;
     }
 
-    private static void ValidatePackageStructure(IReadOnlyList<AgentSkillPackageEntry> entries, out IReadOnlyList<Uri> referenceUris, out IReadOnlyList<Uri> assetUris)
+    private static void ValidatePackageStructure(
+        IReadOnlyList<AgentSkillPackageEntry> entries,
+        out IReadOnlyList<Uri> referenceUris,
+        out IReadOnlyList<Uri> assetUris,
+        out IReadOnlyList<Uri> scriptUris)
     {
         List<Uri> references = [];
         List<Uri> assets = [];
+        List<Uri> scripts = [];
 
         foreach (AgentSkillPackageEntry entry in entries)
         {
@@ -112,10 +169,9 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
 
             if (normalized.StartsWith("scripts/", StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException($"Skill package contains disallowed 'scripts/' entry: '{entry.RelativePath}'.");
+                scripts.Add(entry.StorageUri);
             }
-
-            if (normalized.StartsWith("references/", StringComparison.OrdinalIgnoreCase))
+            else if (normalized.StartsWith("references/", StringComparison.OrdinalIgnoreCase))
             {
                 references.Add(entry.StorageUri);
             }
@@ -131,6 +187,39 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
 
         referenceUris = references;
         assetUris = assets;
+        scriptUris = scripts;
+    }
+
+    private static void ValidateManagementPermission(
+        AgentSkillDefinition skill,
+        Guid actorUserId,
+        bool actorIsSuper)
+    {
+        if (!actorIsSuper && skill.OwnerUserId != actorUserId)
+        {
+            throw new UnauthorizedAccessException(
+                $"User '{actorUserId}' cannot manage skill '{skill.Id}'.");
+        }
+    }
+
+    private static void ValidateEditableFields(string name, string description, string content)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+        {
+            throw new ArgumentException("Name must be between 1 and 80 characters.", nameof(name));
+        }
+
+        if (string.IsNullOrWhiteSpace(description) || description.Length > 240)
+        {
+            throw new ArgumentException(
+                "Description must be between 1 and 240 characters.",
+                nameof(description));
+        }
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            throw new ArgumentException("Content must not be empty.", nameof(content));
+        }
     }
 
     [GeneratedRegex(@"\A---\s*\n(?<frontmatter>.*?)\n---\s*\n", RegexOptions.Singleline)]
