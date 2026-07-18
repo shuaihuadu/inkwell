@@ -34,6 +34,7 @@ import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
 import { ModelManagement } from "../models/model-management";
+import { ToolManagement } from "../tools/tool-management";
 import { UserManagement } from "../users/user-management";
 import {
     type AppearanceMode,
@@ -72,9 +73,8 @@ const navigationGroups: NavigationGroup[] = [
         items: [
             {
                 key: "tools",
-                label: "工具管理",
+                label: "工具",
                 icon: <ToolOutlined />,
-                placeholder: true,
             },
             {
                 key: "skills",
@@ -301,6 +301,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     </div>
                     <div
                         className="workspace-route"
+                        hidden={activeNavigation !== "tools"}
+                    >
+                        <ToolManagement />
+                    </div>
+                    <div
+                        className="workspace-route"
                         hidden={activeNavigation !== "models"}
                     >
                         <ModelManagement />
@@ -312,6 +318,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                         {identity?.isSuper && <UserManagement />}
                     </div>
                     {activeNavigation !== "agents" &&
+                        activeNavigation !== "tools" &&
                         activeNavigation !== "models" &&
                         activeNavigation !== "admin" && (
                             <main className="placeholder-page">

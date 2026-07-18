@@ -97,6 +97,15 @@ export interface LLMProviderManagementInfo {
     dashboardUrl: string | null;
 }
 
+export interface AgentToolDefinition {
+    id: string;
+    name: string;
+    description: string;
+    parametersJsonSchema: string;
+    createdTime: string;
+    updatedTime: string;
+}
+
 export interface UserListItem {
     userId: string;
     username: string;
@@ -136,6 +145,7 @@ export interface InkwellDesktopApi {
         listener: (snapshot: AuthSnapshot) => void,
     ) => () => void;
     listAgents: () => Promise<AgentListItem[]>;
+    listTools: () => Promise<AgentToolDefinition[]>;
     listModels: () => Promise<LLMModel[]>;
     getModelManagementInfo: () => Promise<LLMProviderManagementInfo>;
     testModel: (modelId: string) => Promise<LLMModelTestResult>;

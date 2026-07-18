@@ -17,6 +17,7 @@ const api: InkwellDesktopApi = {
     return () => ipcRenderer.removeListener('inkwell:auth-state-changed', handler)
   },
   listAgents: () => ipcRenderer.invoke('inkwell:list-agents'),
+  listTools: () => ipcRenderer.invoke('inkwell:list-tools'),
   listModels: () => ipcRenderer.invoke('inkwell:list-models'),
   getModelManagementInfo: () => ipcRenderer.invoke('inkwell:model-management-info'),
   testModel: (modelId) => ipcRenderer.invoke('inkwell:test-model', modelId),

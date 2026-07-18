@@ -3,6 +3,26 @@ import electronPath from "electron";
 import { createServer } from "node:http";
 
 const applicationEntry = "out/main/index.js";
+const toolsResponse = JSON.stringify([
+    {
+        id: "0198a96d-19e4-7000-8000-000000000101",
+        name: "current_date_time",
+        description: "返回指定时区的当前日期和时间。",
+        parametersJsonSchema: JSON.stringify({
+            type: "object",
+            required: ["timeZone"],
+            properties: {
+                timeZone: {
+                    type: "string",
+                    enum: ["UTC", "Asia/Shanghai"],
+                },
+                format: { type: "string" },
+            },
+        }),
+        createdTime: "2026-07-17T08:00:00Z",
+        updatedTime: "2026-07-18T08:42:00Z",
+    },
+]);
 
 test("renders the prototype-aligned login experience", async ({
     browserName,
@@ -112,6 +132,12 @@ test("shows authentication errors and enters the workspace after login", async (
         if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
             response.end("[]");
+            return;
+        }
+
+        if (request.url === "/api/tools") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(toolsResponse);
             return;
         }
 
@@ -414,21 +440,60 @@ test("shows authentication errors and enters the workspace after login", async (
         await page
             .getByRole("button", { name: "解封 bob" })
             .dispatchEvent("click");
-        await expect(
-            page.getByRole("dialog", { name: "解封账号 bob" }),
-        ).toBeVisible();
+        const unlockDialog = page.getByRole("dialog", {
+            name: "解封账号 bob",
+        });
+        await expect(unlockDialog).toBeVisible();
         await page
             .getByRole("button", { name: "确认解封" })
             .dispatchEvent("click");
+        await expect(unlockDialog).toBeHidden();
         await expect(page.getByText("bob 已解封")).toBeVisible();
         expect(accountUnlockAttempts).toBe(1);
         await expect(page.getByText("正常", { exact: true })).toHaveCount(2);
 
-        await page.getByRole("button", { name: /工具管理/ }).click();
+        await page
+            .locator(".app-sidebar .nav-item", { hasText: "工具" })
+            .dispatchEvent("click");
         await expect(
-            page.getByRole("heading", { name: "工具管理" }),
+            page.getByRole("heading", { name: "工具", exact: true }),
         ).toBeVisible();
-        await expect(page.getByText("即将上线", { exact: true })).toBeVisible();
+        const toolTable = page.getByRole("table");
+        for (const column of ["名称", "描述", "参数", "更新时间", "操作"]) {
+            await expect(
+                toolTable.getByRole("columnheader", { name: column }),
+            ).toBeVisible();
+        }
+        await expect(
+            toolTable.getByText("current_date_time", { exact: true }),
+        ).toBeVisible();
+        await expect(toolTable.getByText("2 项", { exact: true })).toBeVisible();
+        await page.setViewportSize({ width: 1080, height: 720 });
+        await page.screenshot({
+            path: testInfo.outputPath("tool-management-dark-1080x720.png"),
+            fullPage: true,
+        });
+        await page
+            .getByRole("button", { name: "查看 current_date_time" })
+            .dispatchEvent("click");
+        const toolDetails = page.getByRole("dialog", { name: "Tool 详情" });
+        await expect(toolDetails).toBeVisible();
+        await expect(
+            toolDetails.getByRole("cell", { name: "timeZone" }),
+        ).toBeVisible();
+        await expect(
+            toolDetails.getByText("UTC, Asia/Shanghai", { exact: true }),
+        ).toBeVisible();
+        await toolDetails
+            .getByText("原始 JSON Schema", { exact: true })
+            .dispatchEvent("click");
+        await expect(
+            toolDetails.getByText(/"timeZone"/),
+        ).toBeVisible();
+        await toolDetails
+            .locator(".ant-drawer-close")
+            .dispatchEvent("click");
+        await expect(toolDetails).toBeHidden();
 
         await page.getByRole("button", { name: "Agent 空间" }).click();
         await expect(
@@ -506,6 +571,12 @@ test("hides system administration navigation from regular users", async ({
         if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
             response.end("[]");
+            return;
+        }
+
+        if (request.url === "/api/tools") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(toolsResponse);
             return;
         }
 

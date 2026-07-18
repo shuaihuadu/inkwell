@@ -511,6 +511,16 @@ textarea {
     gap: 12px;
     margin-top: 10px;
 }
+.tool-schema {
+    max-height: 320px;
+    margin: 0;
+    padding: 14px;
+    overflow: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 @media (max-width: 760px) {
     .inkwell-data-list-header {
         align-items: flex-start;

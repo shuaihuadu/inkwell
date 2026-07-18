@@ -11,6 +11,7 @@ import { join } from "node:path";
 import type {
     AgentDefinition,
     AgentListItem,
+    AgentToolDefinition,
     AppMetadata,
     AuthIdentity,
     AuthSnapshot,
@@ -309,6 +310,10 @@ const registerApiHandlers = (): void => {
     ipcMain.handle("inkwell:list-agents", () => {
         requireAuthenticated();
         return request<AgentListItem[]>("/api/agents/mine");
+    });
+    ipcMain.handle("inkwell:list-tools", () => {
+        requireAuthenticated();
+        return request<AgentToolDefinition[]>("/api/tools");
     });
     ipcMain.handle("inkwell:list-models", () => {
         requireAuthenticated();
