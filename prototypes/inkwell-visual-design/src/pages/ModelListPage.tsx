@@ -148,7 +148,6 @@ function CapabilityTag({ value }: { value: Capability }) {
 export default function ModelListPage() {
     const [searchText, setSearchText] = useState("");
     const [category, setCategory] = useState("all");
-    const [capability, setCapability] = useState("all");
     const [selectedModel, setSelectedModel] = useState<ModelItem | null>(null);
     const [testStates, setTestStates] = useState<Record<string, TestState>>({});
     const [messageApi, contextHolder] = message.useMessage();
@@ -159,13 +158,7 @@ export default function ModelListPage() {
             .includes(searchText.trim().toLowerCase());
         const matchesCategory =
             category === "all" || model.category === category;
-        const matchesCapability =
-            capability === "all" ||
-            (capability === "vision" && model.vision === true) ||
-            (capability === "tools" && model.tools === true) ||
-            (capability === "structured" && model.structuredOutput === true) ||
-            (capability === "reasoning" && model.reasoning === true);
-        return matchesText && matchesCategory && matchesCapability;
+        return matchesText && matchesCategory;
     });
 
     const testModel = (model: ModelItem) => {
@@ -220,51 +213,37 @@ export default function ModelListPage() {
                 </Button>
             }
             filters={
-                <>
-                    <Select
-                        value={category}
-                        onChange={setCategory}
-                        style={{ width: 170 }}
-                        options={[
-                            { value: "all", label: "全部类型" },
-                            { value: "Chat", label: CATEGORY_LABELS.Chat },
-                            {
-                                value: "Embedding",
-                                label: CATEGORY_LABELS.Embedding,
-                            },
-                            {
-                                value: "ImageGeneration",
-                                label: CATEGORY_LABELS.ImageGeneration,
-                            },
-                            {
-                                value: "VideoGeneration",
-                                label: CATEGORY_LABELS.VideoGeneration,
-                            },
-                            {
-                                value: "Unknown",
-                                label: CATEGORY_LABELS.Unknown,
-                            },
-                        ]}
-                    />
-                    <Select
-                        value={capability}
-                        onChange={setCapability}
-                        style={{ width: 150 }}
-                        options={[
-                            { value: "all", label: "全部能力" },
-                            { value: "vision", label: "视觉" },
-                            { value: "tools", label: "工具调用" },
-                            { value: "structured", label: "结构化输出" },
-                            { value: "reasoning", label: "推理" },
-                        ]}
-                    />
-                </>
+                <Select
+                    value={category}
+                    onChange={setCategory}
+                    style={{ width: 170 }}
+                    options={[
+                        { value: "all", label: "全部类型" },
+                        { value: "Chat", label: CATEGORY_LABELS.Chat },
+                        {
+                            value: "Embedding",
+                            label: CATEGORY_LABELS.Embedding,
+                        },
+                        {
+                            value: "ImageGeneration",
+                            label: CATEGORY_LABELS.ImageGeneration,
+                        },
+                        {
+                            value: "VideoGeneration",
+                            label: CATEGORY_LABELS.VideoGeneration,
+                        },
+                        {
+                            value: "Unknown",
+                            label: CATEGORY_LABELS.Unknown,
+                        },
+                    ]}
+                />
             }
             refreshLabel="刷新模型"
             searchValue={searchText}
             searchPlaceholder="搜索模型标识或提供方"
             onSearchChange={setSearchText}
-            paginationResetKey={`${searchText}:${category}:${capability}`}
+            paginationResetKey={`${searchText}:${category}`}
             dataSource={filteredModels}
             rowKey="key"
             tableScrollX={1120}
