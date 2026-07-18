@@ -97,7 +97,7 @@ export function ToolManagement() {
     return (
         <DataListPage<AgentToolDefinition>
             title="工具"
-            description="浏览系统注册的 Function Calling 工具。目录只读，Snapshot 固化 Tool ID 与静态参数。"
+            description="查看系统内置的 Agent 可用工具及其参数定义。工具信息仅供查看，不可编辑。"
             refreshLabel="刷新工具"
             onRefresh={() => void toolsQuery.refetch()}
             refreshing={toolsQuery.isFetching && !toolsQuery.isLoading}
