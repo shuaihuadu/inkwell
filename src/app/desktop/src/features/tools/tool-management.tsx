@@ -97,7 +97,7 @@ export function ToolManagement() {
     return (
         <DataListPage<AgentToolDefinition>
             title="工具"
-            description="查看系统内置的 Agent 可用工具及其参数定义。工具信息仅供查看，不可编辑。"
+            description="查看 Agent 可使用的工具。工具帮助 Agent 查询信息、调用服务或完成具体操作。"
             refreshLabel="刷新工具"
             onRefresh={() => void toolsQuery.refetch()}
             refreshing={toolsQuery.isFetching && !toolsQuery.isLoading}

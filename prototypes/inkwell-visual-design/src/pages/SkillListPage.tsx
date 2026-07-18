@@ -164,7 +164,7 @@ export default function SkillListPage({ isSuper }: { isSuper: boolean }) {
     return (
         <ResourceListPage<SkillItem>
             title="Skills"
-            description="管理团队共享的静态知识与指令。保存 Agent 时，完整内容进入 Snapshot。"
+            description="查看和管理 Agent 的 Skill。Skill 通过任务说明和参考资料，教 Agent 如何完成特定工作。"
             primaryAction={
                 <Button
                     type="primary"

@@ -472,6 +472,10 @@ textarea {
     flex-wrap: wrap;
     margin-bottom: 16px;
 }
+.inkwell-data-list-toolbar > .ant-space:first-child .ant-select {
+    min-width: 132px;
+    flex: 0 0 auto;
+}
 .inkwell-data-list-actions {
     margin-left: auto;
 }
