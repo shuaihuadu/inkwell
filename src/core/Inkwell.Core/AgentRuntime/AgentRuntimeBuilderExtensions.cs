@@ -17,7 +17,7 @@ public static class AgentRuntimeBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.TryAddScoped<IAgentBuildOptionsResolver, AgentBuildOptionsResolver>();
-        builder.Services.TryAddScoped<IAgentFactory, ModelRoutingAgentFactory>();
+        builder.Services.TryAddScoped<IAgentFactory, AgentFactory>();
         builder.Services.TryAddScoped<IAgentBuildService, AgentBuildService>();
 
         return builder;

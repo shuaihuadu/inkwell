@@ -8,7 +8,7 @@ namespace Inkwell.Core.Tests.AgentRuntime;
 /// 验证 LLM Provider 到 MAF Agent 的构建行为。
 /// </summary>
 [TestClass]
-public sealed class ModelRoutingAgentFactoryTests
+public sealed class AgentFactoryTests
 {
     /// <summary>
     /// 验证 Chat 模型使用同一模型标识创建聊天客户端。
@@ -19,7 +19,7 @@ public sealed class ModelRoutingAgentFactoryTests
         // Arrange
         LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
         StubChatLLMProvider chatProvider = new();
-        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
+        AgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
         AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
@@ -39,7 +39,7 @@ public sealed class ModelRoutingAgentFactoryTests
         // Arrange
         LLMModel model = CreateModel("text-embedding-3-large", LLMModelCategory.Embedding);
         StubChatLLMProvider chatProvider = new();
-        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
+        AgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -59,7 +59,7 @@ public sealed class ModelRoutingAgentFactoryTests
         // Arrange
         LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
         StubChatLLMProvider chatProvider = new();
-        ModelRoutingAgentFactory factory = CreateFactory(model, chatProvider);
+        AgentFactory factory = CreateFactory(model, chatProvider);
         AgentBuildOptions buildOptions = new()
         {
             ModelOptions = new AgentModelOptions { ModelId = model.Id },
@@ -83,7 +83,7 @@ public sealed class ModelRoutingAgentFactoryTests
         ProviderMode = category == LLMModelCategory.Chat ? "chat" : "embedding",
     };
 
-    private static ModelRoutingAgentFactory CreateFactory(LLMModel model, StubChatLLMProvider chatProvider) =>
+    private static AgentFactory CreateFactory(LLMModel model, StubChatLLMProvider chatProvider) =>
         new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider());
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()

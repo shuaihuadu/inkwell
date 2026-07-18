@@ -9,7 +9,7 @@ namespace Inkwell;
 /// <summary>
 /// 通过当前 LLM Provider 构建 MAF Agent。
 /// </summary>
-internal sealed class ModelRoutingAgentFactory(
+internal sealed class AgentFactory(
     ILLMProvider llmProvider,
     IChatLLMProvider chatLLMProvider,
     IPersistenceProvider persistence) : IAgentFactory
