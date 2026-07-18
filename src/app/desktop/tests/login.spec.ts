@@ -264,7 +264,19 @@ test("shows authentication errors and enters the workspace after login", async (
             page.getByRole("button", { name: "用户管理" }),
         ).toBeVisible();
 
-        await page.getByRole("button", { name: "关于 Inkwell" }).click();
+        const aboutTrigger = page.getByRole("button", {
+            name: "关于 Inkwell",
+        });
+        await expect(aboutTrigger).toHaveCSS(
+            "animation-name",
+            "inkwell-breathe",
+        );
+        await expect(aboutTrigger).toHaveCSS("animation-duration", "1.8s");
+        await expect(aboutTrigger).toHaveCSS(
+            "will-change",
+            "filter, opacity, transform",
+        );
+        await aboutTrigger.click();
         await expect(
             page.getByRole("heading", { name: "Inkwell", exact: true }),
         ).toBeVisible();

@@ -281,15 +281,34 @@ textarea {
     color: var(--primary);
     background: currentcolor;
     cursor: pointer;
-    animation: breathe 2.4s ease-in-out infinite;
+    animation: inkwell-breathe 1.8s ease-in-out infinite;
+    will-change: filter, opacity, transform;
 }
-@keyframes breathe {
+@keyframes inkwell-breathe {
     0%,
     100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 18%, transparent);
+        filter: drop-shadow(0 0 0 currentcolor);
+        opacity: 0.72;
+        transform: translateY(0);
     }
-    50% {
-        box-shadow: 0 0 0 6px transparent;
+    45% {
+        filter: drop-shadow(0 0 5px currentcolor);
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+    58% {
+        transform: translateY(0);
+    }
+    66% {
+        transform: translateY(-1px);
+    }
+    74% {
+        transform: translateY(0);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .about-trigger {
+        animation: none;
     }
 }
 .app-header-actions {

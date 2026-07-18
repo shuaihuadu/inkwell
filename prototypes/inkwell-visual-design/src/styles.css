@@ -63,15 +63,33 @@ body,
     100% {
         filter: drop-shadow(0 0 0 currentColor);
         opacity: 0.72;
+        transform: translateY(0);
     }
-    50% {
+    45% {
         filter: drop-shadow(0 0 5px currentColor);
         opacity: 1;
+        transform: translateY(-3px);
+    }
+    58% {
+        transform: translateY(0);
+    }
+    66% {
+        transform: translateY(-1px);
+    }
+    74% {
+        transform: translateY(0);
     }
 }
 
 .inkwell-breathe-icon {
-    animation: inkwell-breathe 1.5s ease-in-out infinite;
+    animation: inkwell-breathe 1.8s ease-in-out infinite;
+    will-change: filter, opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .inkwell-breathe-icon {
+        animation: none;
+    }
 }
 
 /* Agent 空间卡片右上角“编辑”快捷按钮：仅已发布 Agent 显示，默认隐藏、hover 卡片时才浮现，
