@@ -6,11 +6,13 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 
 ## 核心能力
 
-- **Agent 基础体验**：创建基础 Agent 并进行对话
+- **Agent 创作**：配置基础信息、Instructions、模型参数、Tools 与 Skills，支持草稿保存和试运行
+- **发布与协作**：发布 Agent 版本、查看版本历史、共享给团队或复制为独立 Agent
+- **Agent 对话**：使用已发布版本持续对话，也可在编辑器中试运行草稿
 - **模型接入**：统一管理并选用不同模型
 - **Skills 与工具**：管理 Agent Skills，查看可用工具目录
 - **账号管理**：管理员维护用户账号，用户可修改自己的密码
-- **本地运行**：使用 Aspire 一键启动完整开发环境
+- **本地运行**：使用 Aspire 启动完整开发环境，并通过内置指南快速上手
 
 ## 技术栈
 
@@ -33,7 +35,7 @@ dotnet run --project src/core/Inkwell.AppHost
 
 启动后访问 LiteLLM Portal（<http://localhost:6804/ui>），使用用户名 `admin` 和上面配置的管理员密钥登录，然后在 Portal 中添加模型和供应商凭据。Portal 模型保存在独立的 LiteLLM PostgreSQL 数据库中，Inkwell 会自动发现并允许其用于基础对话；未配置能力覆盖的模型默认不声明视觉、工具调用或结构化输出能力。
 
-启动后可通过 Aspire Dashboard 查看和管理各项本地服务。默认管理员账号和密码均为 `admin`。
+启动后可通过 Aspire Dashboard 查看和管理各项本地服务。Inkwell 默认管理员账号和密码均为 `admin`，首次登录后必须修改密码。
 
 常用本地地址：
 
@@ -44,12 +46,13 @@ dotnet run --project src/core/Inkwell.AppHost
 
 ## Roadmap
 
-- ✅ Agent 基础创建与对话
+- ✅ Agent 创建、完整配置、草稿保存与试运行
+- ✅ Agent 发布、版本历史、团队共享与复制
 - ✅ LiteLLM 模型发现、模型管理与基础对话
 - ✅ Agent Skills 管理与只读工具目录
 - ✅ 用户账号管理与密码修改
 - ✅ Aspire 本地编排与 PostgreSQL / SQL Server 双数据库迁移
-- 🚧 Agent 完整配置、共享、克隆与版本管理
+- 🚧 Agent 版本回滚的桌面操作与更完整的协作治理
 - 🚧 知识库、长期记忆、多模态、调试与评测
 - 🚧 对外协议兼容与生产部署
 
