@@ -6,10 +6,10 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 
 ## 核心能力
 
-- **Agent 管理**：创建、配置和管理 Agent
+- **Agent 基础体验**：创建基础 Agent 并进行对话
 - **模型接入**：统一管理并选用不同模型
-- **Agent 对话**：通过桌面客户端与 Agent 交互并查看会话记录
-- **版本管理**：发布、查看和回滚 Agent 版本
+- **Skills 与工具**：管理 Agent Skills，查看可用工具目录
+- **账号管理**：管理员维护用户账号，用户可修改自己的密码
 - **本地运行**：使用 Aspire 一键启动完整开发环境
 
 ## 技术栈
@@ -22,19 +22,12 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 
 ## 本地启动
 
-本机需安装 .NET 10 SDK 和 Docker Desktop。运行 Aspire AppHost 即可启动本地开发环境：
-
-首次启动前，使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥。密钥必须以 `sk-` 开头：
-
-```bash
-dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
-```
-
-然后启动完整本地开发环境：
+本机需安装 .NET 10 SDK 和 Docker Desktop。克隆仓库后，使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥（必须以 `sk-` 开头），然后启动 Aspire AppHost：
 
 ```bash
 git clone https://github.com/shuaihuadu/inkwell.git
 cd inkwell
+dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
 dotnet run --project src/core/Inkwell.AppHost
 ```
 
@@ -51,14 +44,20 @@ dotnet run --project src/core/Inkwell.AppHost
 
 ## Roadmap
 
-- ✅ H1 需求（reviewed）/ H2 架构（approved）
-- ✅ H3 端口层详细设计（`Inkwell.Abstractions` 全部 7 份 HD 已 reviewed）
-- ✅ H5 后端核心实现：`Inkwell.Abstractions` / `Inkwell.Core` / 12 个 Provider 适配器 / `Inkwell.WebApi` / `Inkwell.Worker` / `Inkwell.Migrator`，Postgres / Redis / MinIO / AzureBlob / Qdrant 均有真实容器集成测试
-- 🚧 H3 剩余业务模块详细设计：`Models` / `Skills` 已起草待评审；`KnowledgeBase` / `Memory` / `PublicApi` / `Traces` / `Versioning` / `Multimodal` / `Health` 尚未起草
-- 🚧 H4 测试用例设计（尚未开始）
-- 🚧 `Inkwell.WebApi` ↔ `Inkwell.Worker` 跨服务集成用例（enqueue → consume → ack，覆盖知识库入库、DurableTask 场景）
-- 🚧 Electron + React 客户端（已具备登录、Agent 工作区与聊天开发基线，其他功能持续实现）
-- 🚧 Aspire AppHost（dev）已完成首批编排；Helm Chart（prod）尚未搭建
+- ✅ Agent 基础创建与对话
+- ✅ LiteLLM 模型发现、模型管理与基础对话
+- ✅ Agent Skills 管理与只读工具目录
+- ✅ 用户账号管理与密码修改
+- ✅ Aspire 本地编排与 PostgreSQL / SQL Server 双数据库迁移
+- 🚧 Agent 完整配置、共享、克隆与版本管理
+- 🚧 知识库、长期记忆、多模态、调试与评测
+- 🚧 对外协议兼容与生产部署
+
+## 关注公众号
+
+如果你也关注 AI Agent 的工程化落地、Microsoft Agent Framework 与 .NET AI 开发，欢迎扫码关注「全栈哥」。项目进展、架构思考和实践记录会持续分享。
+
+![全栈哥公众号二维码](src/app/desktop/public/quanzhange.jpg)
 
 ## 许可证
 

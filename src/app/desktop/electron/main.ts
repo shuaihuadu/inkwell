@@ -3,6 +3,7 @@ import {
     BrowserWindow,
     ipcMain,
     powerMonitor,
+    protocol,
     safeStorage,
     shell,
 } from "electron";
@@ -10,7 +11,11 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
     AgentDefinition,
+    AgentAvatarUploadFile,
+    AgentAvatarUploadResponse,
     AgentListItem,
+    AgentUpsertRequest,
+    AgentVersion,
     AgentSkillDefinition,
     AgentSkillUpdateRequest,
     AgentSkillUploadFile,
@@ -22,7 +27,6 @@ import type {
     ChatRequest,
     ChangePasswordRequest,
     CreateAccountRequest,
-    CreateAgentRequest,
     IssuedCredential,
     LoginRequest,
     LoginResult,
@@ -33,11 +37,18 @@ import type {
     UserListItem,
 } from "../src/shared/network/contracts.js";
 
+protocol.registerSchemesAsPrivileged([
+    {
+        scheme: "inkwell",
+        privileges: { secure: true, standard: true, supportFetchAPI: true },
+    },
+]);
+
 const apiBaseUrl = (
     process.env.INKWELL_WEBAPI_URL ?? "http://localhost:6801"
 ).replace(/\/$/, "");
 const authSessionFileName = "auth-session.bin";
-const idleLockMilliseconds = 5 * 60 * 1000;
+const idleLockMilliseconds = 60 * 60 * 1000;
 const applicationIconPath = join(__dirname, "../renderer/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
@@ -486,17 +497,88 @@ const registerApiHandlers = (): void => {
         },
     );
     ipcMain.handle(
-        "inkwell:create-agent",
-        async (_event, input: CreateAgentRequest): Promise<AgentDefinition> => {
+        "inkwell:get-agent",
+        (_event, agentId: string): Promise<AgentDefinition> => {
             requireAuthenticated();
-            const agent = await request<AgentDefinition>("/api/agents", {
+            return request<AgentDefinition>(
+                `/api/agents/${encodeURIComponent(agentId)}`,
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:create-agent",
+        (_event, input: AgentUpsertRequest): Promise<AgentDefinition> => {
+            requireAuthenticated();
+            return request<AgentDefinition>("/api/agents", {
                 method: "POST",
                 body: JSON.stringify(input),
             });
-            await request(`/api/agents/${agent.id}/publish`, {
+        },
+    );
+    ipcMain.handle(
+        "inkwell:update-agent",
+        (
+            _event,
+            agentId: string,
+            input: AgentUpsertRequest,
+        ): Promise<AgentDefinition> => {
+            requireAuthenticated();
+            return request<AgentDefinition>(
+                `/api/agents/${encodeURIComponent(agentId)}`,
+                { method: "PUT", body: JSON.stringify(input) },
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:clone-agent",
+        (_event, agentId: string): Promise<AgentDefinition> => {
+            requireAuthenticated();
+            return request<AgentDefinition>(
+                `/api/agents/${encodeURIComponent(agentId)}/clone`,
+                { method: "POST" },
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:upload-agent-avatar",
+        (_event, file: AgentAvatarUploadFile): Promise<AgentAvatarUploadResponse> => {
+            requireAuthenticated();
+            const body = new FormData();
+            body.append(
+                "file",
+                new Blob([file.bytes], { type: file.contentType }),
+                file.name,
+            );
+            return request<AgentAvatarUploadResponse>("/api/agents/avatar", {
                 method: "POST",
+                body,
             });
-            return agent;
+        },
+    );
+    ipcMain.handle(
+        "inkwell:publish-agent",
+        (
+            _event,
+            agentId: string,
+            changeSummary: string | null,
+        ): Promise<AgentVersion> => {
+            requireAuthenticated();
+            return request<AgentVersion>(
+                `/api/agents/${encodeURIComponent(agentId)}/publish`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ changeSummary }),
+                },
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:list-agent-versions",
+        (_event, agentId: string): Promise<AgentVersion[]> => {
+            requireAuthenticated();
+            return request<AgentVersion[]>(
+                `/api/agents/${encodeURIComponent(agentId)}/versions`,
+            );
         },
     );
 
@@ -504,14 +586,17 @@ const registerApiHandlers = (): void => {
         "inkwell:chat",
         async (event, input: ChatRequest): Promise<void> => {
             requireAuthenticated();
+            const versionQuery =
+                input.runMode === "draft" ? "?version=draft" : "";
             const response = await fetch(
-                `${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions`,
+                `${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions${versionQuery}`,
                 {
                     method: "POST",
                     headers: {
                         Accept: "text/event-stream",
                         Authorization: `Bearer ${sessionToken ?? ""}`,
                         "Content-Type": "application/json",
+                        "X-Inkwell-Agent-Run-Mode": input.runMode,
                     },
                     body: JSON.stringify({
                         model: "inkwell",
@@ -599,6 +684,21 @@ const createWindow = (): void => {
 
 app.whenReady().then(() => {
     app.dock?.setIcon(applicationIconPath);
+    protocol.handle("inkwell", (protocolRequest) => {
+        const resource = new URL(protocolRequest.url);
+        if (resource.hostname !== "agent-avatars" || !sessionToken) {
+            return new Response(null, { status: 404 });
+        }
+
+        const key = resource.pathname
+            .split("/")
+            .filter(Boolean)
+            .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+            .join("/");
+        return fetch(`${apiBaseUrl}/api/agents/avatar/${key}`, {
+            headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+    });
     registerApiHandlers();
     powerMonitor.on("lock-screen", lockAuthentication);
     app.on("browser-window-blur", scheduleIdleLock);

@@ -38,6 +38,8 @@ public sealed class ControllerRoutingTests
         Assert.Contains("api/auth/logout", routePatterns);
         Assert.Contains("api/auth/session", routePatterns);
         Assert.Contains("api/agents", routePatterns);
+        Assert.Contains("api/agents/avatar", routePatterns);
+        Assert.Contains("api/agents/avatar/{*key}", routePatterns);
         Assert.Contains("api/agents/mine", routePatterns);
         Assert.Contains("api/agents/shared", routePatterns);
         Assert.Contains("api/agents/{agentId:guid}", routePatterns);

@@ -65,13 +65,14 @@ public sealed class AgentVersionServiceTests
         AgentVersionService service = new(new ImmediatePersistenceProvider(agents, versions));
 
         // Act
-        AgentVersion published = await service.PublishAsync(agent.Id, ownerUserId);
+        AgentVersion published = await service.PublishAsync(agent.Id, ownerUserId, "Update model settings");
 
         // Assert
         AgentDefinition updatedAgent = await agents.GetAgent(agent.Id);
         Assert.AreEqual(agent.Id, published.AgentId);
         Assert.AreEqual(agent.Name, published.Snapshot.Name);
         Assert.AreSame(agent.BuildOptions, published.Snapshot.BuildOptions);
+        Assert.AreEqual("Update model settings", published.ChangeSummary);
         Assert.AreEqual(published.Id, updatedAgent.CurrentPublishedVersionId);
         Assert.AreEqual(1, updatedAgent.LatestPublishedVersionNumber);
         Assert.IsNotNull(published.PublishedTime);

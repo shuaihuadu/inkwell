@@ -92,8 +92,8 @@ body,
     }
 }
 
-/* Agent 空间卡片右上角“编辑”快捷按钮：仅已发布 Agent 显示，默认隐藏、hover 卡片时才浮现，
- * 避免已发布 Agent 卡片被"点击即进对话"占用后失去快速回到配置页的入口
+/* Agent 空间卡片右下角快捷操作：默认隐藏、hover 卡片时才浮现；标题区只承载名称与状态，
+ * 避免状态 Tag 与操作按钮争抢空间，同时保留已发布 Agent 快速进入配置或共享的入口
  * （requirements.md §13 第 30 条 / ui-spec.md §3.4 2026-07-15 修订）。 */
 .inkwell-agent-card-edit-btn {
     opacity: 0;

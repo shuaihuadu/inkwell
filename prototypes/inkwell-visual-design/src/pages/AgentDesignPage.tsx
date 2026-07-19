@@ -1208,6 +1208,8 @@ export default function AgentDesignPage({
     const [conversationOpen, setConversationOpen] = useState(false);
     const [publishModalOpen, setPublishModalOpen] = useState(false);
     const [changeSummary, setChangeSummary] = useState("");
+    const [shareAfterPublish, setShareAfterPublish] = useState(false);
+    const [messageApi, messageContextHolder] = message.useMessage();
 
     const isReadonly = state === "readonly" || state === "submitting";
     const isOwner = state !== "readonly";
@@ -1219,6 +1221,7 @@ export default function AgentDesignPage({
     // `.copilotWrapper` 结构，面板打开时左侧配置表单仍可继续滚动/编辑。
     return (
         <div style={{ height: "100%", display: "flex", overflow: "hidden" }}>
+            {messageContextHolder}
             <div
                 style={{
                     flex: 1,
@@ -1586,56 +1589,64 @@ export default function AgentDesignPage({
                     <div
                         style={{
                             flex: 1,
-                            overflow: "auto",
-                            padding:
-                                density === "compact"
-                                    ? "18px 24px"
-                                    : "24px 32px",
+                            minHeight: 0,
                             minWidth: 280,
                             background: token.colorBgContainer,
+                            display: "flex",
+                            flexDirection: "column",
+                            overflow: "hidden",
                         }}
                     >
                         <div
                             style={{
                                 width: "100%",
+                                minHeight: 48,
+                                padding:
+                                    density === "compact"
+                                        ? "0 24px"
+                                        : "0 32px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                flexShrink: 0,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
                             }}
                         >
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    marginBottom:
-                                        density === "compact" ? 14 : 20,
-                                    paddingBottom:
-                                        density === "compact" ? 10 : 14,
-                                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                                }}
+                            <Typography.Title
+                                level={density === "compact" ? 5 : 3}
+                                style={{ margin: 0 }}
                             >
-                                <Typography.Title
-                                    level={density === "compact" ? 5 : 3}
-                                    style={{ margin: 0 }}
-                                >
-                                    {
-                                        SECTIONS.find((s) => s.key === section)
-                                            ?.label
-                                    }
-                                </Typography.Title>
-                                {section === "instructions" && (
-                                    <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            aria-label="Instructions 帮助"
-                                            icon={<QuestionCircleOutlined />}
-                                            style={{
-                                                color: token.colorTextSecondary,
-                                            }}
-                                        />
-                                    </Tooltip>
-                                )}
-                            </div>
+                                {
+                                    SECTIONS.find((s) => s.key === section)
+                                        ?.label
+                                }
+                            </Typography.Title>
+                            {section === "instructions" && (
+                                <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        aria-label="Instructions 帮助"
+                                        icon={<QuestionCircleOutlined />}
+                                        style={{
+                                            color: token.colorTextSecondary,
+                                        }}
+                                    />
+                                </Tooltip>
+                            )}
+                        </div>
 
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflow: "auto",
+                                padding:
+                                    density === "compact"
+                                        ? "18px 24px"
+                                        : "24px 32px",
+                            }}
+                        >
                             <SectionContent
                                 section={section}
                                 readonly={isReadonly}
@@ -1649,8 +1660,19 @@ export default function AgentDesignPage({
             {/* 存为草稿与发布是两个独立动作：存为草稿不产生新版本、不影响已发布版本或正在进行的对话；发布才会把当前编辑内容提交为新版本并立即生效（对应 requirements.md REQ-015 二态版本模型） */}
             <Modal
                 open={publishModalOpen}
-                onCancel={() => setPublishModalOpen(false)}
-                onOk={() => setPublishModalOpen(false)}
+                onCancel={() => {
+                    setPublishModalOpen(false);
+                    setShareAfterPublish(false);
+                }}
+                onOk={() => {
+                    setPublishModalOpen(false);
+                    messageApi.success(
+                        shareAfterPublish
+                            ? "已发布新版本并共享给团队"
+                            : "已发布新版本",
+                    );
+                    setShareAfterPublish(false);
+                }}
                 okText="发布"
                 cancelText="取消"
                 title="发布新版本"
@@ -1666,6 +1688,22 @@ export default function AgentDesignPage({
                             placeholder="说明本次修改的内容，会记录到版本历史里"
                             maxLength={100}
                         />
+                    </Form.Item>
+                    <Form.Item style={{ marginTop: 16, marginBottom: 0 }}>
+                        <Checkbox
+                            checked={shareAfterPublish}
+                            onChange={(event) =>
+                                setShareAfterPublish(event.target.checked)
+                            }
+                        >
+                            发布后共享给团队
+                        </Checkbox>
+                        <Typography.Text
+                            type="secondary"
+                            style={{ display: "block", marginTop: 4, marginLeft: 24 }}
+                        >
+                            团队成员将可以查看并使用本次发布的新版本。
+                        </Typography.Text>
                     </Form.Item>
                 </Form>
             </Modal>

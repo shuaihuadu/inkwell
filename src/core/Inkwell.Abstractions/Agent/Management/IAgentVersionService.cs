@@ -50,9 +50,10 @@ public interface IAgentVersionService
     /// </summary>
     /// <param name="agentId">Agent 标识。</param>
     /// <param name="actorUserId">操作用户标识。</param>
+    /// <param name="changeSummary">变更摘要。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>发布后的不可变版本。</returns>
-    Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default);
+    Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 从历史版本快照创建并发布一个新的当前版本。

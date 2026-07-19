@@ -29,8 +29,9 @@ public sealed class AgentBuildServiceTests
             PublishedTime = DateTimeOffset.UtcNow,
         };
         RecordingVersionService versionService = new(version);
+        RecordingAgentService agentService = new();
         RecordingAgentFactory factory = new();
-        AgentBuildService service = new(versionService, factory);
+        AgentBuildService service = new(versionService, agentService, factory);
 
         // Act
         AIAgent result = await service.BuildPublishedAsync(agentId, requestingUserId);
@@ -42,7 +43,133 @@ public sealed class AgentBuildServiceTests
         Assert.AreSame(version, factory.Version);
     }
 
-    private sealed class RecordingVersionService(AgentVersion version) : IAgentVersionService
+    /// <summary>
+    /// 验证已发布 Agent 试运行禁用需要产品会话的持久化聊天历史。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildPublishedTrialAsync_WithChatHistory_DisablesChatHistoryAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid requestingUserId = Guid.CreateVersion7();
+        AgentVersion version = new()
+        {
+            Id = Guid.CreateVersion7(),
+            AgentId = agentId,
+            VersionNumber = 1,
+            Snapshot = CreateSnapshot() with
+            {
+                BuildOptions = CreateBuildOptionsWithChatHistory(),
+            },
+            CreatedByUserId = Guid.CreateVersion7(),
+            CreatedTime = DateTimeOffset.UtcNow,
+            UpdatedTime = DateTimeOffset.UtcNow,
+            PublishedTime = DateTimeOffset.UtcNow,
+        };
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(new RecordingVersionService(version), new RecordingAgentService(), factory);
+
+        // Act
+        _ = await service.BuildPublishedTrialAsync(agentId, requestingUserId);
+
+        // Assert
+        Assert.IsNotNull(version.Snapshot.BuildOptions.ChatHistoryOptions);
+        Assert.IsNotNull(factory.Version);
+        Assert.IsNull(factory.Version.Snapshot.BuildOptions.ChatHistoryOptions);
+    }
+
+    /// <summary>
+    /// 验证草稿构建只加载所有者当前保存的 Agent 定义。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildDraftAsync_OwnerRequest_DelegatesAgentDefinitionAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        AgentDefinition agent = CreateAgent(ownerUserId);
+        RecordingVersionService versionService = new(null);
+        RecordingAgentService agentService = new(agent);
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(versionService, agentService, factory);
+
+        // Act
+        AIAgent result = await service.BuildDraftAsync(agent.Id, ownerUserId);
+
+        // Assert
+        Assert.AreSame(factory.Agent, result);
+        Assert.AreEqual(agent.Id, agentService.AgentId);
+        Assert.AreEqual(ownerUserId, agentService.RequestingUserId);
+        Assert.AreSame(agent, factory.Definition);
+    }
+
+    /// <summary>
+    /// 验证草稿试运行禁用需要产品会话的持久化聊天历史。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildDraftTrialAsync_WithChatHistory_DisablesChatHistoryAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        AgentDefinition agent = CreateAgent(ownerUserId) with
+        {
+            BuildOptions = CreateBuildOptionsWithChatHistory(),
+        };
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(new RecordingVersionService(null), new RecordingAgentService(agent), factory);
+
+        // Act
+        _ = await service.BuildDraftTrialAsync(agent.Id, ownerUserId);
+
+        // Assert
+        Assert.IsNotNull(agent.BuildOptions.ChatHistoryOptions);
+        Assert.IsNotNull(factory.Definition);
+        Assert.IsNull(factory.Definition.BuildOptions.ChatHistoryOptions);
+    }
+
+    /// <summary>
+    /// 验证普通草稿构建仍保留持久化聊天历史配置。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildDraftAsync_WithChatHistory_PreservesChatHistoryAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        AgentDefinition agent = CreateAgent(ownerUserId) with
+        {
+            BuildOptions = CreateBuildOptionsWithChatHistory(),
+        };
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(new RecordingVersionService(null), new RecordingAgentService(agent), factory);
+
+        // Act
+        _ = await service.BuildDraftAsync(agent.Id, ownerUserId);
+
+        // Assert
+        Assert.IsNotNull(factory.Definition?.BuildOptions.ChatHistoryOptions);
+    }
+
+    /// <summary>
+    /// 验证共享 Agent 的非所有者不能构建草稿。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildDraftAsync_NonOwnerRequest_ThrowsUnauthorizedAccessExceptionAsync()
+    {
+        // Arrange
+        AgentDefinition agent = CreateAgent(Guid.CreateVersion7()) with { IsShared = true };
+        RecordingVersionService versionService = new(null);
+        RecordingAgentService agentService = new(agent);
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(versionService, agentService, factory);
+
+        // Act
+        ValueTask<AIAgent> action = service.BuildDraftAsync(agent.Id, Guid.CreateVersion7());
+
+        // Assert
+        await Assert.ThrowsExactlyAsync<UnauthorizedAccessException>(action.AsTask);
+        Assert.IsNull(factory.Definition);
+    }
+
+    private sealed class RecordingVersionService(AgentVersion? version) : IAgentVersionService
     {
         public Guid AgentId { get; private set; }
 
@@ -55,7 +182,7 @@ public sealed class AgentBuildServiceTests
         {
             this.AgentId = agentId;
             this.RequestingUserId = requestingUserId;
-            return Task.FromResult(version);
+            return Task.FromResult(version ?? throw new InvalidOperationException("No published version was configured."));
         }
 
         public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
@@ -67,10 +194,51 @@ public sealed class AgentBuildServiceTests
         public Task<IReadOnlyList<AgentVersion>> ListVersionsAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
+        public Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<AgentVersion> RollbackAsync(Guid agentId, Guid sourceVersionId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingAgentService(AgentDefinition? agent = null) : IAgentService
+    {
+        public Guid AgentId { get; private set; }
+
+        public Guid RequestingUserId { get; private set; }
+
+        public Task<AgentDefinition> GetAgentAsync(Guid agentId, Guid requestingUserId, CancellationToken ct = default)
+        {
+            this.AgentId = agentId;
+            this.RequestingUserId = requestingUserId;
+            return Task.FromResult(agent ?? throw new InvalidOperationException("No Agent definition was configured."));
+        }
+
+        public Task<AgentDefinition> CreateAgentAsync(AgentUpsertRequest request, Guid ownerUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentDefinition> UpdateAgentAsync(Guid agentId, AgentUpsertRequest request, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> DeleteAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentListItem>> ListMyAgentsAsync(Guid ownerUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentListItem>> ListSharedAgentsAsync(Guid excludingOwnerUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task ShareAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task UnshareAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task RevokeShareAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentDefinition> CloneAgentAsync(Guid agentId, Guid newOwnerUserId, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 
@@ -80,8 +248,13 @@ public sealed class AgentBuildServiceTests
 
         public AgentVersion? Version { get; private set; }
 
-        public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public AgentDefinition? Definition { get; private set; }
+
+        public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default)
+        {
+            this.Definition = agent;
+            return ValueTask.FromResult(this.Agent);
+        }
 
         public ValueTask<AIAgent> BuildAsync(AgentVersion version, CancellationToken cancellationToken = default)
         {
@@ -97,6 +270,25 @@ public sealed class AgentBuildServiceTests
         {
             ModelOptions = new AgentModelOptions { ModelId = "test-model" },
         },
+    };
+
+    private static AgentBuildOptions CreateBuildOptionsWithChatHistory() => new()
+    {
+        ModelOptions = new AgentModelOptions { ModelId = "test-model" },
+        ChatHistoryOptions = new AgentChatHistoryOptions { MaxMessages = 40 },
+    };
+
+    private static AgentDefinition CreateAgent(Guid ownerUserId) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        OwnerUserId = ownerUserId,
+        Name = "assistant",
+        BuildOptions = new AgentBuildOptions
+        {
+            ModelOptions = new AgentModelOptions { ModelId = "test-model" },
+        },
+        CreatedTime = DateTimeOffset.UtcNow,
+        UpdatedTime = DateTimeOffset.UtcNow,
     };
 
     private sealed class StubAgent : AIAgent

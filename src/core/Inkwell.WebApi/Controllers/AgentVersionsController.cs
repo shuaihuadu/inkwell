@@ -40,13 +40,21 @@ public sealed class AgentVersionsController(IAgentVersionService versionService)
 
     /// <summary>发布 Agent 当前定义。</summary>
     /// <param name="agentId">Agent 标识。</param>
+    /// <param name="request">发布请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>发布后的 Agent 版本。</returns>
     [HttpPost("publish")]
     [ProducesResponseType<AgentVersion>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<AgentVersion>> PublishAsync(Guid agentId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AgentVersion>> PublishAsync(
+        Guid agentId,
+        PublishAgentVersionRequest request,
+        CancellationToken cancellationToken)
     {
-        AgentVersion version = await versionService.PublishAsync(agentId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
+        AgentVersion version = await versionService.PublishAsync(
+            agentId,
+            this.GetRequiredUserId(),
+            request.ChangeSummary,
+            cancellationToken).ConfigureAwait(false);
 
         return this.Ok(version);
     }

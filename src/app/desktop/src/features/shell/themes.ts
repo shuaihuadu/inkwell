@@ -11,7 +11,7 @@ export interface DesktopTheme {
 
 const commonTokens: ThemeConfig["token"] = {
     borderRadius: 8,
-    fontFamily: "Avenir Next, PingFang SC, Microsoft YaHei, sans-serif",
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 export const desktopThemes: Record<ThemeName, DesktopTheme> = {

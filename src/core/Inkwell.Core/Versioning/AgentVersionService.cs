@@ -50,7 +50,7 @@ internal sealed class AgentVersionService(
         return await this._versions.ListVersionsByAgentAsync(agentId, cancellationToken).ConfigureAwait(false);
     }
 
-    public Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, CancellationToken cancellationToken = default) =>
+    public Task<AgentVersion> PublishAsync(Guid agentId, Guid actorUserId, string? changeSummary = null, CancellationToken cancellationToken = default) =>
         persistence.ExecuteInTransactionAsync(async innerCancellationToken =>
         {
             AgentDefinition agent = await this._agents.GetAgent(agentId, innerCancellationToken).ConfigureAwait(false);
@@ -67,6 +67,7 @@ internal sealed class AgentVersionService(
                 VersionNumber = nextVersionNumber,
                 Snapshot = snapshot,
                 CreatedByUserId = actorUserId,
+                ChangeSummary = changeSummary,
                 CreatedTime = now,
                 UpdatedTime = now,
                 PublishedTime = now,

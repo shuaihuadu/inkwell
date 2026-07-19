@@ -19,23 +19,7 @@ export function DesktopThemeProvider({ children }: DesktopThemeProviderProps) {
     useEffect(() => {
         document.documentElement.dataset.appearance = isDark ? "dark" : "light";
         document.documentElement.dataset.theme = themeName;
-        document.documentElement.style.setProperty(
-            "--primary",
-            String(activeTokens?.colorPrimary),
-        );
-        document.documentElement.style.setProperty(
-            "--shell-bg",
-            String(activeTokens?.colorBgLayout),
-        );
-        document.documentElement.style.setProperty(
-            "--shell-panel",
-            String(activeTokens?.colorBgContainer),
-        );
-        document.documentElement.style.setProperty(
-            "--shell-border",
-            String(activeTokens?.colorBorderSecondary),
-        );
-    }, [activeTokens, isDark, themeName]);
+    }, [isDark, themeName]);
 
     return (
         <ConfigProvider
@@ -47,7 +31,34 @@ export function DesktopThemeProvider({ children }: DesktopThemeProviderProps) {
                 token: activeTokens,
             }}
         >
-            {children}
+            <ThemeCssVariables>{children}</ThemeCssVariables>
         </ConfigProvider>
     );
+}
+
+function ThemeCssVariables({ children }: DesktopThemeProviderProps) {
+    const { token } = theme.useToken();
+
+    useEffect(() => {
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty("--primary", token.colorPrimary);
+        rootStyle.setProperty("--primary-soft", token.colorPrimaryBg);
+        rootStyle.setProperty("--shell-bg", token.colorBgLayout);
+        rootStyle.setProperty("--shell-panel", token.colorBgContainer);
+        rootStyle.setProperty("--shell-border", token.colorBorderSecondary);
+        rootStyle.setProperty(
+            "--shell-text-description",
+            token.colorTextDescription,
+        );
+        rootStyle.setProperty(
+            "--shell-text-tertiary",
+            token.colorTextTertiary,
+        );
+        rootStyle.setProperty(
+            "--shell-fill-quaternary",
+            token.colorFillQuaternary,
+        );
+    }, [token]);
+
+    return children;
 }

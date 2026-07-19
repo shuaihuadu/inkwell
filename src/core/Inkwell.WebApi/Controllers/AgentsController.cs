@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Inkwell.WebApi.Agents;
+
 namespace Inkwell.WebApi.Controllers;
 
 /// <summary>
@@ -7,8 +9,13 @@ namespace Inkwell.WebApi.Controllers;
 /// </summary>
 [Route("api/agents")]
 [Authorize(Policy = AuthorizationPolicies.RequireAuthenticatedUser)]
-public sealed class AgentsController(IAgentService agentService) : InkwellControllerBase
+public sealed class AgentsController(
+    IAgentService agentService,
+    IFileStorageProvider fileStorageProvider) : InkwellControllerBase
 {
+    private const long MaxAvatarSizeBytes = 5 * 1024 * 1024;
+    private const string AvatarContainer = "agent-avatars";
+
     /// <summary>创建 Agent。</summary>
     /// <param name="request">Agent 创建请求。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -19,7 +26,69 @@ public sealed class AgentsController(IAgentService agentService) : InkwellContro
     {
         AgentDefinition agent = await agentService.CreateAgentAsync(request, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
 
-        return this.CreatedAtAction(nameof(GetAsync), new { agentId = agent.Id }, agent);
+        return this.StatusCode(StatusCodes.Status201Created, agent);
+    }
+
+    /// <summary>上传 Agent 头像。</summary>
+    /// <param name="file">头像图片文件。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>可保存到 Agent 定义的头像 URI。</returns>
+    [HttpPost("avatar")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxAvatarSizeBytes)]
+    [ProducesResponseType<AgentAvatarUploadResponse>(StatusCodes.Status201Created)]
+    public async Task<ActionResult<AgentAvatarUploadResponse>> UploadAvatarAsync(
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        if (file.Length is <= 0 or > MaxAvatarSizeBytes)
+        {
+            throw new ArgumentException("Agent avatar must not be empty or exceed 5 MB.", nameof(file));
+        }
+
+        string extension = file.ContentType.ToLowerInvariant() switch
+        {
+            "image/jpeg" => ".jpg",
+            "image/png" => ".png",
+            "image/webp" => ".webp",
+            _ => throw new ArgumentException("Agent avatar must be a PNG, JPEG, or WebP image.", nameof(file)),
+        };
+        string key = $"{this.GetRequiredUserId():N}/{Guid.CreateVersion7():N}{extension}";
+        await using Stream stream = file.OpenReadStream();
+        _ = await fileStorageProvider.UploadAsync(
+            AvatarContainer,
+            key,
+            stream,
+            new FileMetadata(file.ContentType),
+            cancellationToken).ConfigureAwait(false);
+
+        AgentAvatarUploadResponse response = new(new Uri($"inkwell://{AvatarContainer}/{key}"));
+        return this.StatusCode(StatusCodes.Status201Created, response);
+    }
+
+    /// <summary>读取已上传的 Agent 头像。</summary>
+    /// <param name="key">头像对象键。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>头像文件内容。</returns>
+    [HttpGet("avatar/{*key}")]
+    [ProducesResponseType<FileStreamResult>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> DownloadAvatarAsync(
+        string key,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(key) || key.Split('/').Any(segment => segment is "" or "." or ".."))
+        {
+            throw new ArgumentException("Agent avatar key is invalid.", nameof(key));
+        }
+
+        FileDownloadResponse response = await fileStorageProvider.DownloadAsync(
+            AvatarContainer,
+            key,
+            cancellationToken).ConfigureAwait(false);
+        this.Response.Headers.ETag = response.ETag;
+        return this.File(response.Content, response.Metadata.ContentType);
     }
 
     /// <summary>获取当前用户拥有的 Agent。</summary>
@@ -136,6 +205,6 @@ public sealed class AgentsController(IAgentService agentService) : InkwellContro
     {
         AgentDefinition clone = await agentService.CloneAgentAsync(agentId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
 
-        return this.CreatedAtAction(nameof(GetAsync), new { agentId = clone.Id }, clone);
+        return this.StatusCode(StatusCodes.Status201Created, clone);
     }
 }

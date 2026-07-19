@@ -1,22 +1,17 @@
 import {
-    ArrowLeftOutlined,
-    DeleteOutlined,
     EditOutlined,
-    EllipsisOutlined,
+    EyeOutlined,
     PlusOutlined,
     ReloadOutlined,
-    SafetyCertificateOutlined,
     SearchOutlined,
     ShareAltOutlined,
-    StopOutlined,
+    UndoOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    Avatar,
     Button,
     Card,
     Col,
-    Dropdown,
     Empty,
     Input,
     Modal,
@@ -30,6 +25,7 @@ import {
     Tooltip,
     Typography,
     message,
+    theme as antdTheme,
 } from "antd";
 import type { ModalFuncProps } from "antd";
 import { useDeferredValue, useState } from "react";
@@ -41,10 +37,9 @@ import { ChatPanel } from "../chat/chat-panel";
 
 type AgentTab = "mine" | "shared";
 type AgentStatusFilter = "all" | "published" | "draft";
-type AgentAction = "delete" | "share" | "unshare" | "revoke";
+type AgentAction = "share" | "unshare" | "revoke";
 
 const AgentsPerPage = 20;
-const AvatarColors = ["#5760cb", "#1677ff", "#00875a", "#d46b08"];
 
 interface AgentWorkspaceProps {
     onCreateAgent?: () => void;
@@ -56,6 +51,7 @@ export function AgentWorkspace({
     onEditAgent,
 }: AgentWorkspaceProps) {
     const identity = useAuthStore((state) => state.identity);
+    const { token } = antdTheme.useToken();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<AgentTab>("mine");
     const [statusFilter, setStatusFilter] =
@@ -84,7 +80,6 @@ export function AgentWorkspace({
             action: AgentAction;
             agentId: string;
         }) => {
-            if (action === "delete") await desktopApi.deleteAgent(agentId);
             if (action === "share") await desktopApi.shareAgent(agentId);
             if (action === "unshare") await desktopApi.unshareAgent(agentId);
             if (action === "revoke")
@@ -93,7 +88,6 @@ export function AgentWorkspace({
         onSuccess: async (_result, variables) => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
             const successMessages: Record<AgentAction, string> = {
-                delete: "Agent 已删除",
                 share: "Agent 已共享给团队",
                 unshare: "已撤销团队共享",
                 revoke: "已由管理员撤销共享",
@@ -121,9 +115,10 @@ export function AgentWorkspace({
         .filter((agent) =>
             agent.name.toLocaleLowerCase().includes(deferredSearch),
         )
-        .sort(
-            (left, right) =>
-                Date.parse(right.updatedTime) - Date.parse(left.updatedTime),
+        .sort((left, right) =>
+            activeTab === "mine"
+                ? Number(isPublished(left)) - Number(isPublished(right))
+                : 0,
         );
     const lastPage = Math.max(
         1,
@@ -138,15 +133,11 @@ export function AgentWorkspace({
     if (chatAgent) {
         return (
             <main className="agent-chat-workspace">
-                <Button
-                    className="agent-chat-back"
-                    type="text"
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => setChatAgent(null)}
-                >
-                    返回 Agent 空间
-                </Button>
-                <ChatPanel key={chatAgent.id} agent={chatAgent} />
+                <ChatPanel
+                    key={chatAgent.id}
+                    agent={chatAgent}
+                    onClose={() => setChatAgent(null)}
+                />
             </main>
         );
     }
@@ -249,7 +240,7 @@ export function AgentWorkspace({
                 />
             )}
 
-            <section className="agent-space-canvas">
+            <section className={`agent-space-canvas ${activeTab}`}>
                 {currentQuery.isLoading ? (
                     <AgentGridSkeleton />
                 ) : currentQuery.isError ? (
@@ -267,7 +258,7 @@ export function AgentWorkspace({
                     />
                 ) : (
                     <Row gutter={[12, 12]} align="stretch">
-                        {pageAgents.map((agent) => (
+                        {pageAgents.map((agent, index) => (
                             <Col
                                 className="agent-space-column"
                                 key={agent.id}
@@ -275,12 +266,19 @@ export function AgentWorkspace({
                             >
                                 <AgentCard
                                     agent={agent}
+                                    avatarColor={[
+                                        token.colorPrimary,
+                                        token.colorInfo,
+                                        token.colorSuccess,
+                                        token.colorWarning,
+                                    ][index % 4]}
                                     activeTab={activeTab}
                                     currentUserId={identity?.userId}
                                     isAdmin={identity?.isAdmin === true}
                                     isPending={actionMutation.isPending}
                                     onOpen={() => openAgent(agent)}
                                     onEdit={() => openEditor(agent.id)}
+                                    onView={() => openEditor(agent.id)}
                                     onAction={(action) =>
                                         requestAction(action, agent)
                                     }
@@ -312,104 +310,153 @@ export function AgentWorkspace({
 
 function AgentCard({
     agent,
+    avatarColor,
     activeTab,
     currentUserId,
     isAdmin,
     isPending,
     onOpen,
     onEdit,
+    onView,
     onAction,
 }: {
     agent: AgentListItem;
+    avatarColor: string;
     activeTab: AgentTab;
     currentUserId?: string;
     isAdmin: boolean;
     isPending: boolean;
     onOpen: () => void;
     onEdit: () => void;
+    onView: () => void;
     onAction: (action: AgentAction) => void;
 }) {
     const isOwner = agent.ownerUserId === currentUserId;
-    const actionItems =
-        activeTab === "mine" && isOwner
-            ? [
-                  { key: "edit", label: "编辑", icon: <EditOutlined /> },
-                  agent.isShared
-                      ? {
-                            key: "unshare",
-                            label: "撤销共享",
-                            icon: <StopOutlined />,
-                        }
-                      : {
-                            key: "share",
-                            label: "共享给团队",
-                            icon: <ShareAltOutlined />,
-                        },
-                  {
-                      key: "delete",
-                      label: "删除",
-                      icon: <DeleteOutlined />,
-                      danger: true,
-                  },
-              ]
-            : activeTab === "shared" && isAdmin
-              ? [
-                    {
-                        key: "revoke",
-                        label: "管理员撤销共享",
-                        icon: <SafetyCertificateOutlined />,
-                        danger: true,
-                    },
-                ]
-              : [];
+    const showOwnerActions = activeTab === "mine" && isOwner;
+    const actionCount = showOwnerActions
+        ? isPublished(agent)
+            ? 2
+            : 1
+        : activeTab === "shared"
+          ? isAdmin
+              ? 2
+              : 1
+          : 0;
 
     return (
         <Card
             hoverable
             className="agent-space-card"
             onClick={onOpen}
-            styles={{ body: { padding: 14 } }}
+            styles={{ body: { padding: 12 } }}
         >
-            {actionItems.length > 0 && (
-                <Dropdown
-                    trigger={["click"]}
-                    menu={{
-                        items: actionItems,
-                        onClick: ({ key, domEvent }) => {
-                            domEvent.stopPropagation();
-                            if (key === "edit") onEdit();
-                            else onAction(key as AgentAction);
-                        },
-                    }}
-                >
-                    <Button
-                        className="agent-card-actions"
-                        type="text"
-                        size="small"
-                        aria-label={`管理 ${agent.name}`}
-                        icon={<EllipsisOutlined />}
-                        loading={isPending}
-                        onClick={(event) => event.stopPropagation()}
-                    />
-                </Dropdown>
+            {(showOwnerActions || activeTab === "shared") && (
+                <Space size={0} className="agent-card-actions">
+                    {showOwnerActions && (
+                        <Tooltip title="编辑配置">
+                            <Button
+                                type="text"
+                                size="small"
+                                aria-label={`编辑 ${agent.name}`}
+                                icon={<EditOutlined />}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onEdit();
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                    {showOwnerActions &&
+                        isPublished(agent) &&
+                        !agent.isShared && (
+                        <Tooltip title="共享已发布版本">
+                            <Button
+                                type="text"
+                                size="small"
+                                aria-label={`共享 ${agent.name}`}
+                                icon={<ShareAltOutlined />}
+                                loading={isPending}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onAction("share");
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                    {showOwnerActions && agent.isShared && (
+                        <Tooltip title="撤销共享">
+                            <Button
+                                danger
+                                type="text"
+                                size="small"
+                                aria-label={`撤销 ${agent.name} 共享`}
+                                icon={<UndoOutlined />}
+                                loading={isPending}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onAction("unshare");
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                    {activeTab === "shared" && (
+                        <Tooltip title="查看详情">
+                            <Button
+                                type="text"
+                                size="small"
+                                aria-label={`查看 ${agent.name} 详情`}
+                                icon={<EyeOutlined />}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onView();
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                    {activeTab === "shared" && isAdmin && (
+                        <Tooltip title="撤销共享">
+                            <Button
+                                danger
+                                type="text"
+                                size="small"
+                                aria-label={`撤销 ${agent.name} 共享`}
+                                icon={<UndoOutlined />}
+                                loading={isPending}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onAction("revoke");
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                </Space>
             )}
             <div className="agent-card-heading">
-                <Avatar
-                    src={agent.avatarUri ?? undefined}
-                    style={{ background: getAvatarColor(agent.name) }}
+                <div
+                    className="agent-card-avatar"
+                    style={{ background: avatarColor }}
                 >
-                    {agent.name.slice(0, 1).toUpperCase()}
-                </Avatar>
-                <div>
+                    {agent.avatarUri ? (
+                        <img src={agent.avatarUri} alt="" />
+                    ) : (
+                        <Typography.Text>
+                            {agent.name.slice(0, 1)}
+                        </Typography.Text>
+                    )}
+                </div>
+                <div className="agent-card-copy">
                     <Space size={6}>
                         <Typography.Text strong ellipsis>
                             {agent.name}
                         </Typography.Text>
                         {!isPublished(agent) && <Tag color="warning">草稿</Tag>}
+                        {activeTab === "mine" && agent.isShared && (
+                            <Tag color="processing">已共享</Tag>
+                        )}
                     </Space>
                     <Typography.Text type="secondary" ellipsis>
                         {activeTab === "shared"
-                            ? `Owner ${shortId(agent.ownerUserId)} · `
+                            ? `${shortId(agent.ownerUserId)} · `
                             : ""}
                         {isPublished(agent)
                             ? `v${agent.latestPublishedVersionNumber}`
@@ -418,10 +465,13 @@ function AgentCard({
                     </Typography.Text>
                 </div>
             </div>
-            <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }}>
+            <Typography.Paragraph
+                className={`agent-card-description actions-${actionCount}`}
+                type="secondary"
+                ellipsis={{ rows: 2 }}
+            >
                 {agent.descriptionExcerpt || "暂无描述"}
             </Typography.Paragraph>
-            {agent.isShared && <Tag color="processing">团队共享</Tag>}
         </Card>
     );
 }
@@ -490,23 +540,6 @@ function getActionDialog(
     action: AgentAction,
     agentName: string,
 ): ModalFuncProps {
-    if (action === "delete") {
-        return {
-            title: `删除「${agentName}」`,
-            content: "删除后不可恢复，确认删除？",
-            okText: "确认删除",
-            okButtonProps: { danger: true },
-            cancelText: "取消",
-        };
-    }
-    if (action === "unshare") {
-        return {
-            title: `撤销「${agentName}」的共享`,
-            content: "撤销共享后，已使用过的成员将无法继续访问该 Agent。确认？",
-            okText: "确认撤销",
-            cancelText: "取消",
-        };
-    }
     if (action === "revoke") {
         return {
             title: `撤销「${agentName}」的共享`,
@@ -522,14 +555,6 @@ function getActionDialog(
         okText: "确认共享",
         cancelText: "取消",
     };
-}
-
-function getAvatarColor(name: string): string {
-    const hash = Array.from(name).reduce(
-        (result, character) => result + (character.codePointAt(0) ?? 0),
-        0,
-    );
-    return AvatarColors[hash % AvatarColors.length];
 }
 
 function shortId(value: string): string {

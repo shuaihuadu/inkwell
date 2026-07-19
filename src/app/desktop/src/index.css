@@ -5,11 +5,13 @@
     --shell-hover: #f3f1f7;
     --shell-text: #18201f;
     --shell-muted: #52706a;
+    --shell-text-description: rgb(0 0 0 / 45%);
+    --shell-text-tertiary: rgb(0 0 0 / 45%);
     --primary: #68469c;
     --primary-soft: #f1edf7;
     --message-bg: #f0f3f2;
     --shell-shadow: rgb(27 56 49 / 8%);
-    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
     color: var(--shell-text);
     background: var(--shell-bg);
     font-synthesis: none;
@@ -22,6 +24,8 @@
     --shell-hover: #302a38;
     --shell-text: #f0edf3;
     --shell-muted: #b4abbc;
+    --shell-text-description: rgb(255 255 255 / 45%);
+    --shell-text-tertiary: rgb(255 255 255 / 45%);
     --primary-soft: color-mix(in srgb, var(--primary) 18%, var(--shell-panel));
     --message-bg: color-mix(in srgb, var(--shell-panel) 78%, #fff 8%);
     --shell-shadow: rgb(0 0 0 / 28%);
@@ -251,8 +255,9 @@ textarea {
 }
 .workspace-shell {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
     flex-direction: column;
+    overflow: hidden;
     background: var(--shell-bg);
 }
 .app-header {
@@ -381,12 +386,15 @@ textarea {
 }
 .nav-group-trigger {
     justify-content: space-between;
-    padding: 5px 12px;
-    color: var(--shell-muted);
+    padding: 4px 12px;
+    color: var(--shell-text-description);
+    font-family: inherit;
     font-size: 11px;
     font-weight: 600;
+    line-height: 1.5714285714;
 }
 .nav-group-trigger .anticon {
+    color: var(--shell-text-tertiary);
     font-size: 9px;
     transition: transform 0.15s ease;
 }
@@ -395,11 +403,11 @@ textarea {
 }
 .nav-item {
     gap: 10px;
-    min-height: 34px;
     margin-bottom: 3px;
     padding: 7px 12px;
     border-radius: 6px;
     color: var(--shell-text);
+    font-family: inherit;
     font-size: 13px;
 }
 .nav-item:hover {
@@ -437,6 +445,123 @@ textarea {
 }
 .workspace-route[hidden] {
     display: none;
+}
+.user-guide-page {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: 200px minmax(0, 1fr);
+    overflow: hidden;
+    background: var(--shell-panel);
+}
+.user-guide-sidebar {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--shell-border);
+    background: var(--shell-bg);
+}
+.user-guide-sidebar-header {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--shell-border);
+}
+.user-guide-sidebar-header .ant-typography {
+    font-size: 13px;
+}
+.user-guide-search {
+    padding: 10px 8px 0;
+}
+.user-guide-nav {
+    flex: 1;
+    padding: 10px 8px;
+    overflow: auto;
+}
+.user-guide-nav > button {
+    width: 100%;
+    margin-bottom: 3px;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--shell-text);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    transition:
+        color 0.15s,
+        background-color 0.15s;
+}
+.user-guide-nav > button:hover {
+    background: var(--shell-hover);
+}
+.user-guide-nav > button.active {
+    color: var(--primary);
+    background: var(--primary-soft);
+    font-weight: 600;
+}
+.user-guide-content {
+    width: 100%;
+    max-width: 920px;
+    padding: 26px 36px 40px;
+    overflow: auto;
+}
+.user-guide-heading {
+    margin-bottom: 28px;
+}
+.user-guide-heading .ant-typography.ant-typography-h2 {
+    margin: 5px 0 8px;
+}
+.user-guide-heading .ant-typography-paragraph {
+    font-size: 15px;
+}
+.user-guide-actions {
+    margin-top: 18px;
+}
+.user-guide-list {
+    margin-bottom: 24px;
+}
+.user-guide-list-item {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--shell-border);
+}
+.user-guide-list-item > span {
+    padding-top: 2px;
+    font-size: 17px;
+}
+.user-guide-list-item .ant-typography-paragraph {
+    margin: 3px 0 0;
+}
+.quick-start-progress {
+    margin-bottom: 18px;
+}
+.quick-start-list {
+    width: 100%;
+}
+.quick-start-item {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--shell-border);
+    cursor: pointer;
+}
+.quick-start-item > span:last-child > .ant-typography {
+    display: block;
+}
+.quick-start-item > span:last-child > .ant-typography-secondary {
+    font-size: 12px;
+}
+.quick-start-agent-button {
+    margin-top: 22px;
 }
 .placeholder-page {
     display: grid;
@@ -652,7 +777,7 @@ textarea {
     width: 100%;
     min-width: 0;
     height: 100%;
-    padding: 24px 28px;
+    padding: 20px;
     overflow: auto;
     background: var(--shell-bg);
 }
@@ -665,10 +790,10 @@ textarea {
     gap: 16px;
 }
 .agent-space-header {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 .agent-space-header h4.ant-typography {
-    margin: 0 0 3px;
+    margin: 0;
 }
 .agent-space-toolbar {
     flex-wrap: wrap;
@@ -678,39 +803,45 @@ textarea {
     margin: 0;
 }
 .agent-space-toolbar .ant-input-affix-wrapper {
-    width: 220px;
+    width: 200px;
 }
 .agent-status-filter {
     width: 320px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 .agent-space-canvas {
     position: relative;
     min-height: 548px;
+}
+.agent-space-canvas.shared {
+    min-height: 594px;
 }
 .agent-space-column {
     max-width: 20%;
 }
 .agent-space-card.ant-card {
     position: relative;
-    height: 138px;
+    height: 128px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: 10px;
 }
 .agent-space-card .ant-card-body {
     display: flex;
     height: 100%;
     flex-direction: column;
 }
-.agent-card-actions.ant-btn {
+.agent-card-actions.ant-space {
     position: absolute;
     z-index: 1;
-    top: 7px;
-    right: 7px;
-    opacity: 0;
+    right: 6px;
+    bottom: 6px;
 }
-.agent-space-card:hover .agent-card-actions,
-.agent-card-actions:focus-visible {
+.agent-card-actions .ant-btn {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.agent-space-card:hover .agent-card-actions .ant-btn,
+.agent-card-actions .ant-btn:focus-visible {
     opacity: 1;
 }
 .agent-card-heading {
@@ -718,9 +849,29 @@ textarea {
     min-width: 0;
     align-items: flex-start;
     gap: 10px;
-    padding-right: 24px;
+    padding-right: 0;
 }
-.agent-card-heading > div {
+.agent-card-avatar {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 10px;
+}
+.agent-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.agent-card-avatar .ant-typography {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+}
+.agent-card-copy {
     min-width: 0;
     flex: 1;
 }
@@ -738,21 +889,21 @@ textarea {
     font-size: 10px;
     line-height: 16px;
 }
-.agent-card-heading > div > .ant-typography {
+.agent-card-copy > .ant-typography {
     display: block;
     margin-top: 2px;
     font-size: 11px;
 }
-.agent-space-card .ant-typography.ant-typography-secondary.ant-typography-ellipsis {
-    margin: 7px 0 0;
+.agent-space-card
+    .ant-typography.ant-typography-secondary.ant-typography-ellipsis {
+    margin: 6px 0 0;
     font-size: 12px;
 }
-.agent-space-card > .ant-card-body > .ant-tag {
-    width: fit-content;
-    margin-top: auto;
-    margin-right: 0;
-    font-size: 10px;
-    line-height: 18px;
+.agent-card-description.actions-1 {
+    padding-right: 26px;
+}
+.agent-card-description.actions-2 {
+    padding-right: 52px;
 }
 .agent-space-empty {
     position: absolute;
@@ -769,16 +920,605 @@ textarea {
     width: 100%;
     height: 100%;
 }
-.agent-chat-back.ant-btn {
+.chat-panel-full {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    background: var(--shell-panel);
+}
+.chat-page-header {
+    display: flex;
+    min-height: 52px;
+    align-items: center;
+    flex: 0 0 52px;
+    gap: 10px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--shell-border);
+}
+.chat-page-header .agent-avatar.ant-avatar {
+    flex: 0 0 28px;
+    color: #fff;
+    background: var(--primary);
+}
+.chat-page-header > .ant-typography {
+    overflow: hidden;
+    max-width: min(320px, 40vw);
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chat-page-header .ant-tag {
+    margin: 0;
+}
+.chat-page-body {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+}
+.chat-history {
+    display: flex;
+    width: 240px;
+    flex: 0 0 240px;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--shell-border);
+    background: var(--shell-bg);
+    transition:
+        width 150ms ease,
+        flex-basis 150ms ease;
+}
+.chat-history.collapsed {
+    width: 44px;
+    flex-basis: 44px;
+}
+.chat-history-header {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 44px;
+    padding: 8px 12px 8px 16px;
+    border-bottom: 1px solid var(--shell-border);
+}
+.chat-history.collapsed .chat-history-header {
+    justify-content: center;
+    padding: 8px;
+}
+.chat-history-header > .ant-typography {
+    font-size: 11px;
+    font-weight: 600;
+}
+.chat-history-list {
+    min-height: 0;
+    flex: 1;
+    padding: 8px 6px;
+    overflow: auto;
+}
+.chat-history.collapsed .chat-history-list {
+    padding: 6px;
+}
+.chat-main {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    background: var(--shell-panel);
+}
+.chat-full-messages {
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+.chat-full-messages .chat-bubble-list {
+    height: 100%;
+}
+.chat-full-messages .ant-bubble-list-scroll-box {
+    padding: 20px 24px 0;
+}
+.chat-full-empty {
+    display: flex;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    flex-direction: column;
+    padding: 24px;
+}
+.chat-full-empty h3.ant-typography {
+    margin: 0 0 24px;
+}
+.chat-full-empty .ant-prompts {
+    max-width: 640px;
+    justify-content: center;
+}
+.chat-full-composer {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 16px 8px 20px;
+}
+.chat-full-composer .chat-sender {
+    width: min(100%, 760px);
+}
+.agent-editor-page {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--shell-bg);
+}
+.agent-editor-loading {
+    padding: 32px;
+}
+.agent-editor-header {
+    position: sticky;
+    z-index: 3;
+    top: 0;
+    display: flex;
+    min-height: 60px;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 24px;
+    border-bottom: 1px solid var(--shell-border);
+    background: var(--shell-panel);
+}
+.agent-editor-identity {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+.agent-editor-identity > .ant-typography {
+    display: block;
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.agent-editor-identity > .ant-space {
+    margin-top: 4px;
+}
+.agent-editor-identity > .ant-space .ant-typography {
+    font-size: 11px;
+}
+.agent-editor-avatar.ant-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: #fff;
+    background: linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--primary) 72%, transparent),
+        var(--primary)
+    );
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 24%, transparent);
+    font-size: 17px;
+    font-weight: 700;
+}
+.agent-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.agent-editor-actions .ant-btn {
+    flex-shrink: 0;
+}
+.agent-editor-workspace {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+    background: var(--shell-panel);
+}
+.agent-editor-body {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+.agent-editor-sections {
+    display: flex;
+    width: 176px;
+    flex: 0 0 176px;
+    flex-direction: column;
+    border-right: 1px solid var(--shell-border);
+    background: var(--shell-fill-quaternary);
+    overflow: hidden;
+    transition:
+        width 0.2s ease,
+        flex-basis 0.2s ease;
+}
+.agent-editor-sections.collapsed {
+    width: 52px;
+    flex-basis: 52px;
+}
+.agent-editor-sections-toggle {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px;
+    border-bottom: 1px solid var(--shell-border);
+}
+.agent-editor-section-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 8px;
+    overflow: auto;
+}
+.agent-editor-section-list button {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 100%;
+    min-height: 34px;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--shell-text);
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    text-align: left;
+}
+.agent-editor-section-list button > .anticon {
+    flex-shrink: 0;
+    font-size: 14px;
+}
+.agent-editor-sections.collapsed .agent-editor-section-list button {
+    justify-content: center;
+    padding: 8px 0;
+}
+.agent-editor-section-list button:hover {
+    background: var(--shell-hover);
+}
+.agent-editor-section-list button.active {
+    color: var(--primary);
+    background: var(--primary-soft);
+    font-weight: 600;
+}
+.agent-editor-content {
+    display: flex;
+    min-width: 280px;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--shell-panel);
+}
+.agent-editor-section-heading {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 6px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--shell-border);
+}
+.agent-editor-section-heading h5.ant-typography {
+    margin: 0;
+}
+.agent-editor-content-scroll {
+    min-height: 0;
+    flex: 1;
+    padding: 18px 24px 48px;
+    overflow: auto;
+}
+.agent-basic-grid {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 24px;
+}
+.agent-basic-avatar-wrap {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 6px;
+}
+.agent-basic-avatar {
+    width: 72px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--primary) 72%, white),
+        var(--primary)
+    );
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 24%, transparent);
+    font-size: 24px;
+    font-weight: 700;
+}
+.agent-basic-avatar-editor {
+    cursor: pointer;
+}
+.agent-basic-avatar-editor > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.agent-basic-avatar-overlay {
     position: absolute;
-    z-index: 2;
-    top: 20px;
-    right: 22px;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    background: rgb(0 0 0 / 48%);
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+.agent-basic-avatar-editor:hover .agent-basic-avatar-overlay,
+.agent-basic-avatar-editor:focus-visible .agent-basic-avatar-overlay {
+    opacity: 1;
+}
+.agent-basic-avatar-editor:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -3px;
+}
+.agent-basic-avatar-wrap > .ant-typography {
+    font-size: 11px;
+    white-space: nowrap;
+}
+.agent-publish-share-hint.ant-typography {
+    display: block;
+    margin-top: 4px;
+    margin-left: 24px;
+}
+.agent-model-picker {
+    margin-bottom: 18px;
+    border-radius: 8px;
+    background: var(--shell-fill-quaternary);
+}
+.agent-model-picker .ant-card-body {
+    padding: 14px;
+}
+.agent-model-picker .ant-form-item {
+    margin-bottom: 0;
+}
+.agent-model-section-title.ant-typography {
+    display: block;
+    margin-bottom: 4px;
+}
+.agent-model-section-title.context.ant-typography {
+    margin-top: 20px;
+}
+.agent-model-section-description.ant-typography {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 12px;
+}
+.agent-model-section-description.context.ant-typography {
+    margin-bottom: 10px;
+}
+.agent-parameter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 0;
+}
+.agent-parameter-grid .ant-card {
+    height: 100%;
+    border-radius: 8px;
+}
+.agent-parameter-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.agent-parameter-heading > div {
+    display: flex;
+    flex-direction: column;
+}
+.agent-parameter-heading .ant-typography-secondary {
+    display: block;
+    font-size: 11px;
+}
+.agent-parameter-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+.agent-parameter-input .ant-slider {
+    flex: 1 1 0%;
+    min-width: 0;
+}
+.agent-model-context-input.ant-form-item {
+    margin-bottom: 0;
+}
+.agent-binding-list.ant-space,
+.agent-binding-list .ant-card {
+    width: 100%;
+}
+.agent-binding-selector.ant-checkbox-group {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+}
+.agent-binding-selector .ant-card {
+    width: 100%;
+    border-radius: 8px;
+}
+.agent-binding-selector .ant-card-body {
+    padding: 8px 12px;
+}
+.agent-binding-selector .ant-checkbox-wrapper {
+    display: grid;
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: 12px;
+}
+.agent-binding-selector .ant-checkbox-wrapper > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+.agent-binding-selector .ant-checkbox-wrapper .ant-typography-secondary {
+    font-size: 12px;
+}
+.agent-binding-selector
+    .ant-checkbox-wrapper
+    > span:last-child
+    > .ant-typography:first-child {
+    font-size: 13px;
+}
+.agent-skills-description.ant-typography {
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+.agent-instructions-warning.ant-alert {
+    margin-bottom: 8px;
+}
+.agent-instructions-warning .ant-alert-message {
+    font-size: 12px;
+}
+.agent-tool-parameters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 8px;
+}
+.agent-tool-parameters .ant-form-item {
+    margin-bottom: 0;
+}
+.agent-tool-parameters .ant-input {
+    width: 120px;
+}
+.agent-editor-trial {
+    position: relative;
+    width: 400px;
+    min-width: 0;
+    min-height: 0;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+    border-left: 1px solid var(--shell-border);
+    background: var(--shell-panel);
+    animation: agent-trial-expand 200ms ease-out both;
+}
+.agent-editor-trial .chat-panel {
+    width: 400px;
+    height: 100%;
+}
+.chat-panel-trial .chat-header {
+    gap: 10px;
+    min-height: 48px;
+    height: 48px;
+    padding: 0 10px 0 16px;
+}
+.chat-panel-trial .chat-header .agent-avatar {
+    border-radius: 9px;
+    background: var(--primary);
+}
+.chat-panel-trial .chat-header h4.ant-typography {
+    font-size: 14px;
+}
+.chat-panel-trial .chat-agent-identity > .ant-typography {
+    font-size: 11px;
+}
+.chat-trial-actions {
+    display: flex;
+    margin-left: auto;
+}
+.chat-panel-trial .conversation-starter {
+    display: block;
+    width: 100%;
+    justify-items: stretch;
+    padding: 20px 16px 0;
+    color: inherit;
+    text-align: left;
+}
+.chat-panel-trial .conversation-starter .ant-welcome {
+    margin-bottom: 16px;
+}
+.chat-panel-trial .message-list {
+    min-height: 0;
+    padding: 0;
+}
+.chat-trial-welcome-icon {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: var(--primary);
+    background: var(--primary-soft);
+    font-weight: 700;
+}
+.chat-panel-trial .composer {
+    display: block;
+    margin: 0;
+    padding: 10px 16px 16px;
+    border-width: 1px 0 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+.chat-trial-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.chat-panel-trial .ant-sender-footer .ant-typography {
+    font-size: 11px;
+}
+.chat-bubble-list {
+    height: 100%;
+}
+.chat-panel-trial .chat-bubble-list .ant-bubble-list-scroll-box {
+    padding: 20px 16px 0;
+}
+@keyframes agent-trial-expand {
+    from {
+        width: 0;
+    }
+    to {
+        width: 400px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .agent-editor-trial {
+        animation-duration: 1ms;
+    }
 }
 .chat-panel {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     min-width: 0;
+    min-height: 0;
     background: var(--shell-panel);
 }
 .chat-empty {
@@ -858,6 +1598,10 @@ textarea {
     box-shadow: none !important;
     resize: none;
 }
+.chat-sender .ant-sender-input:focus,
+.chat-sender .ant-sender-input:focus-visible {
+    outline: none !important;
+}
 @keyframes pulse {
     50% {
         opacity: 0.35;
@@ -867,13 +1611,6 @@ textarea {
     .workspace-main {
         grid-template-columns: minmax(300px, 44%) 1fr;
     }
-    .agent-space-page {
-        padding: 20px;
-    }
-    .agent-space-column {
-        max-width: 25%;
-        flex-basis: 25% !important;
-    }
 }
 @media (max-width: 900px) {
     .agent-space-column {
@@ -882,6 +1619,41 @@ textarea {
     }
 }
 @media (max-width: 760px) {
+    .agent-editor-header {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 12px 16px;
+    }
+    .agent-editor-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .agent-editor-workspace {
+        flex-direction: column;
+    }
+    .agent-editor-sections {
+        overflow-x: auto;
+        flex-direction: row;
+        padding: 8px 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--shell-border);
+    }
+    .agent-editor-section-list button {
+        flex: 0 0 auto;
+    }
+    .agent-editor-content {
+        width: 100%;
+    }
+    .agent-editor-section-heading {
+        padding: 0 16px;
+    }
+    .agent-editor-content-scroll {
+        padding: 20px 16px 48px;
+    }
+    .agent-basic-grid,
+    .agent-parameter-grid {
+        grid-template-columns: 1fr;
+    }
     .agent-space-header,
     .agent-space-toolbar,
     .agent-space-pagination {

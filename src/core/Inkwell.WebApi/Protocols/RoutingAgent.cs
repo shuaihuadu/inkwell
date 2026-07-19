@@ -11,9 +11,11 @@ internal sealed class RoutingAgent(
     IHttpContextAccessor httpContextAccessor,
     IServiceScopeFactory scopeFactory) : AIAgent
 {
+    private const string RunModeHeaderName = "X-Inkwell-Agent-Run-Mode";
+
     public override string? Name => "inkwell-routed-agent";
 
-    public override string? Description => "Resolves the published Inkwell agent version selected by the current route.";
+    public override string? Description => "Resolves the published or owner draft Inkwell agent selected by the current route.";
 
     protected override ValueTask<AgentSession> CreateSessionCoreAsync(CancellationToken cancellationToken = default) =>
         ValueTask.FromResult<AgentSession>(new StatelessAgentSession());
@@ -39,8 +41,8 @@ internal sealed class RoutingAgent(
         // RoutingAgent 由 Hosting 以 Singleton 持有；每次 Run 单独创建 Scope，避免跨请求复用构建服务及其持久化依赖。
         using IServiceScope scope = scopeFactory.CreateScope();
         IAgentBuildService buildService = scope.ServiceProvider.GetRequiredService<IAgentBuildService>();
-        AIAgent agent = await buildService
-            .BuildPublishedAsync(this.GetRouteAgentId(), this.GetRequiredUserId(), cancellationToken)
+        AIAgent agent = await this
+            .BuildAgentAsync(buildService, cancellationToken)
             .ConfigureAwait(false);
 
         return await agent.RunAsync(messages, null, options, cancellationToken).ConfigureAwait(false);
@@ -55,8 +57,8 @@ internal sealed class RoutingAgent(
         // Scope 必须覆盖整个流式枚举，确保构建服务及其持久化依赖在响应结束前保持有效。
         using IServiceScope scope = scopeFactory.CreateScope();
         IAgentBuildService buildService = scope.ServiceProvider.GetRequiredService<IAgentBuildService>();
-        AIAgent agent = await buildService
-            .BuildPublishedAsync(this.GetRouteAgentId(), this.GetRequiredUserId(), cancellationToken)
+        AIAgent agent = await this
+            .BuildAgentAsync(buildService, cancellationToken)
             .ConfigureAwait(false);
 
         await foreach (Microsoft.Agents.AI.AgentResponseUpdate update in agent
@@ -65,6 +67,24 @@ internal sealed class RoutingAgent(
         {
             yield return update;
         }
+    }
+
+    private ValueTask<AIAgent> BuildAgentAsync(
+        IAgentBuildService buildService,
+        CancellationToken cancellationToken)
+    {
+        Guid agentId = this.GetRouteAgentId();
+        Guid requestingUserId = this.GetRequiredUserId();
+        HttpRequest? request = httpContextAccessor.HttpContext?.Request;
+        string requestedVersion = request?.Headers[RunModeHeaderName].ToString() ?? string.Empty;
+        if (string.IsNullOrEmpty(requestedVersion))
+        {
+            requestedVersion = request?.Query["version"].ToString() ?? string.Empty;
+        }
+
+        return string.Equals(requestedVersion, "draft", StringComparison.OrdinalIgnoreCase)
+            ? buildService.BuildDraftTrialAsync(agentId, requestingUserId, cancellationToken)
+            : buildService.BuildPublishedTrialAsync(agentId, requestingUserId, cancellationToken);
     }
 
     private Guid GetRouteAgentId()

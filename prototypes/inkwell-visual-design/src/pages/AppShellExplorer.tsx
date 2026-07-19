@@ -4,14 +4,17 @@ import {
     Avatar,
     Button,
     Card,
+    Checkbox,
     Col,
     Divider,
     Dropdown,
+    Drawer,
     Empty,
     Form,
     Input,
     Modal,
     Pagination,
+    Progress,
     Row,
     Segmented,
     Select,
@@ -27,25 +30,32 @@ import {
 import {
     AppstoreOutlined,
     ApiOutlined,
+    BookOutlined,
     BulbFilled,
     BulbOutlined,
     DesktopOutlined,
     DownOutlined,
     EditOutlined,
+    EyeOutlined,
     GithubOutlined,
+    InfoCircleOutlined,
     KeyOutlined,
     LockOutlined,
     LogoutOutlined,
     MoonFilled,
     PlusOutlined,
+    QuestionCircleOutlined,
     ReadOutlined,
     ReloadOutlined,
     RightOutlined,
+    RocketOutlined,
     SafetyCertificateOutlined,
     SearchOutlined,
     SettingOutlined,
+    ShareAltOutlined,
     SunFilled,
     ToolOutlined,
+    UndoOutlined,
     UserOutlined,
 } from "@ant-design/icons";
 import logo from "../../assets/logos/logo.svg?no-inline";
@@ -59,6 +69,7 @@ import ToolListPage from "./ToolListPage";
 import SkillListPage from "./SkillListPage";
 import ModelListPage from "./ModelListPage";
 import UserManagementPage from "./UserManagementPage";
+import UserGuidePage, { type GuideSection } from "./UserGuidePage";
 
 interface ChangePasswordFormValues {
     currentPassword: string;
@@ -72,7 +83,7 @@ type NetworkStatus = "online" | "reconnecting" | "offline";
 
 type ErrorScenario = "none" | "ex-001" | "401" | "429" | "5xx";
 
-type NavKey = "library" | "tools" | "skills" | "models" | "admin";
+type NavKey = "library" | "tools" | "skills" | "models" | "admin" | "guide";
 
 type AgentStatusFilter = "all" | "published" | "draft";
 
@@ -174,6 +185,7 @@ const MOCK_AGENTS = [
         updated: "3 小时前",
         desc: "处理售前售后常见问题，支持多轮澄清与工单转接。",
         published: true,
+        shared: true,
     },
     {
         name: "合同审查",
@@ -182,6 +194,7 @@ const MOCK_AGENTS = [
         updated: "昨天",
         desc: "审查合同条款风险点，输出结构化风险清单。",
         published: true,
+        shared: true,
     },
     {
         name: "周报生成",
@@ -190,6 +203,7 @@ const MOCK_AGENTS = [
         updated: "2 天前",
         desc: "汇总本周工作记录，生成结构化周报草稿。",
         published: false,
+        shared: false,
     },
     {
         name: "代码评审与质量风险分析助手",
@@ -198,6 +212,7 @@ const MOCK_AGENTS = [
         updated: "5 天前",
         desc: "针对大型 Pull Request 的代码差异、依赖变化和上下游影响进行综合分析，识别潜在缺陷、安全风险与可维护性问题，并输出结构化评审建议。",
         published: true,
+        shared: false,
     },
     ...Array.from({ length: 48 }, (_, index) => ({
         name:
@@ -219,6 +234,7 @@ const MOCK_AGENTS = [
             "围绕业务目标生成分析结果和后续行动项。",
         ][index % 3],
         published: index % 5 !== 0,
+        shared: index % 5 !== 0 && (index % 3 === 2 || index % 4 === 0),
     })),
 ];
 
@@ -257,6 +273,7 @@ function AgentLibraryMock({
     onSelectAgent,
     onCreateAgent,
     onEditAgent,
+    onViewAgent,
     isAdmin,
 }: {
     activeTab: string;
@@ -264,13 +281,23 @@ function AgentLibraryMock({
     onSelectAgent: (agent: { name: string; published: boolean }) => void;
     onCreateAgent: () => void;
     onEditAgent: (name: string) => void;
+    onViewAgent: (name: string) => void;
     isAdmin: boolean;
 }) {
     const { token } = antdTheme.useToken();
     const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>("all");
     const [searchText, setSearchText] = useState("");
     const [page, setPage] = useState(1);
+    const [sharedAgentNames, setSharedAgentNames] = useState(
+        () =>
+            new Set(
+                MOCK_AGENTS.filter((agent) => agent.shared).map(
+                    (agent) => agent.name,
+                ),
+            ),
+    );
     const [modalApi, modalContextHolder] = Modal.useModal();
+    const [messageApi, messageContextHolder] = message.useMessage();
     const palette = [
         token.colorPrimary,
         token.colorInfo,
@@ -279,7 +306,9 @@ function AgentLibraryMock({
     ];
     const scopedAgents = MOCK_AGENTS.filter((agent) =>
         activeTab === "shared"
-            ? agent.published && agent.owner !== "owner-alice"
+            ? agent.published &&
+              sharedAgentNames.has(agent.name) &&
+              agent.owner !== "owner-alice"
             : agent.owner === "owner-alice",
     );
     const publishedCount = scopedAgents.filter(
@@ -313,9 +342,45 @@ function AgentLibraryMock({
         setPage(1);
     };
 
+    const shareAgent = (name: string, version: string) => {
+        modalApi.confirm({
+            title: `共享「${name}」给团队`,
+            content: `团队成员将可以查看并使用当前已发布版本 ${version}。未发布的修改不会被共享。`,
+            okText: "确认共享",
+            cancelText: "取消",
+            onOk: () => {
+                setSharedAgentNames((current) => {
+                    const next = new Set(current);
+                    next.add(name);
+                    return next;
+                });
+                messageApi.success("已共享给团队");
+            },
+        });
+    };
+
+    const unshareAgent = (name: string) => {
+        modalApi.confirm({
+            title: `撤销「${name}」的共享`,
+            content: "撤销后，团队成员将无法继续访问该 Agent；你的 Agent 和已有配置不会被删除。",
+            okText: "确认撤销",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: () => {
+                setSharedAgentNames((current) => {
+                    const next = new Set(current);
+                    next.delete(name);
+                    return next;
+                });
+                messageApi.success("已撤销团队共享");
+            },
+        });
+    };
+
     return (
         <div>
             {modalContextHolder}
+            {messageContextHolder}
             <div
                 style={{
                     display: "flex",
@@ -435,52 +500,119 @@ function AgentLibraryMock({
                                     },
                                 }}
                             >
-                                {agent.published && activeTab === "mine" && (
-                                    <Tooltip title="编辑配置（跳 UI-004）">
-                                        <Button
-                                            className="inkwell-agent-card-edit-btn"
-                                            type="text"
-                                            size="small"
-                                            icon={<EditOutlined />}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onEditAgent(agent.name);
-                                            }}
-                                            style={{
-                                                position: "absolute",
-                                                top: 6,
-                                                right: 6,
-                                                zIndex: 1,
-                                            }}
-                                        />
-                                    </Tooltip>
+                                {activeTab === "mine" && (
+                                    <Space
+                                        size={0}
+                                        style={{
+                                            position: "absolute",
+                                            bottom: 6,
+                                            right: 6,
+                                            zIndex: 1,
+                                        }}
+                                    >
+                                        <Tooltip title="编辑配置（跳 UI-004）">
+                                            <Button
+                                                className="inkwell-agent-card-edit-btn"
+                                                type="text"
+                                                size="small"
+                                                aria-label={`编辑 ${agent.name}`}
+                                                icon={<EditOutlined />}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onEditAgent(agent.name);
+                                                }}
+                                            />
+                                        </Tooltip>
+                                        {agent.published &&
+                                            !sharedAgentNames.has(
+                                                agent.name,
+                                            ) && (
+                                                <Tooltip title="共享已发布版本">
+                                                    <Button
+                                                        className="inkwell-agent-card-edit-btn"
+                                                        type="text"
+                                                        size="small"
+                                                        aria-label={`共享 ${agent.name}`}
+                                                        icon={
+                                                            <ShareAltOutlined />
+                                                        }
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            shareAgent(
+                                                                agent.name,
+                                                                agent.version,
+                                                            );
+                                                        }}
+                                                    />
+                                                </Tooltip>
+                                            )}
+                                        {sharedAgentNames.has(agent.name) && (
+                                            <Tooltip title="撤销共享">
+                                                <Button
+                                                    className="inkwell-agent-card-edit-btn"
+                                                    danger
+                                                    type="text"
+                                                    size="small"
+                                                    aria-label={`撤销 ${agent.name} 共享`}
+                                                    icon={<UndoOutlined />}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        unshareAgent(agent.name);
+                                                    }}
+                                                />
+                                            </Tooltip>
+                                        )}
+                                    </Space>
                                 )}
-                                {activeTab === "shared" && isAdmin && (
-                                    <Tooltip title="撤销共享">
-                                        <Button
-                                            className="inkwell-agent-card-edit-btn"
-                                            danger
-                                            type="text"
-                                            size="small"
-                                            icon={<SafetyCertificateOutlined />}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                modalApi.confirm({
-                                                    title: `撤销「${agent.name}」的共享`,
-                                                    content: "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
-                                                    okText: "确认撤销",
-                                                    okButtonProps: { danger: true },
-                                                    cancelText: "取消",
-                                                });
-                                            }}
-                                            style={{
-                                                position: "absolute",
-                                                top: 6,
-                                                right: 6,
-                                                zIndex: 1,
-                                            }}
-                                        />
-                                    </Tooltip>
+                                {activeTab === "shared" && (
+                                    <Space
+                                        size={0}
+                                        style={{
+                                            position: "absolute",
+                                            bottom: 6,
+                                            right: 6,
+                                            zIndex: 1,
+                                        }}
+                                    >
+                                        <Tooltip title="查看详情">
+                                            <Button
+                                                className="inkwell-agent-card-edit-btn"
+                                                type="text"
+                                                size="small"
+                                                aria-label={`查看 ${agent.name} 详情`}
+                                                icon={<EyeOutlined />}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onViewAgent(agent.name);
+                                                }}
+                                            />
+                                        </Tooltip>
+                                        {isAdmin && (
+                                            <Tooltip title="撤销共享">
+                                                <Button
+                                                    className="inkwell-agent-card-edit-btn"
+                                                    danger
+                                                    type="text"
+                                                    size="small"
+                                                    aria-label={`撤销 ${agent.name} 共享`}
+                                                    icon={<UndoOutlined />}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        modalApi.confirm({
+                                                            title: `撤销「${agent.name}」的共享`,
+                                                            content:
+                                                                "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
+                                                            okText: "确认撤销",
+                                                            okButtonProps: {
+                                                                danger: true,
+                                                            },
+                                                            cancelText: "取消",
+                                                        });
+                                                    }}
+                                                />
+                                            </Tooltip>
+                                        )}
+                                    </Space>
                                 )}
                                 <div
                                     style={{
@@ -503,11 +635,6 @@ function AgentLibraryMock({
                                                 display: "flex",
                                                 alignItems: "center",
                                                 gap: 6,
-                                                paddingRight:
-                                                    agent.published &&
-                                                    activeTab === "mine"
-                                                        ? 22
-                                                        : 0,
                                             }}
                                         >
                                             <Typography.Text
@@ -535,6 +662,23 @@ function AgentLibraryMock({
                                                     草稿
                                                 </Tag>
                                             )}
+                                            {activeTab === "mine" &&
+                                                sharedAgentNames.has(
+                                                    agent.name,
+                                                ) && (
+                                                    <Tag
+                                                        color="processing"
+                                                        style={{
+                                                            margin: 0,
+                                                            fontSize: 10,
+                                                            lineHeight: "16px",
+                                                            padding: "0 4px",
+                                                            flexShrink: 0,
+                                                        }}
+                                                    >
+                                                        已共享
+                                                    </Tag>
+                                                )}
                                         </div>
                                         <Typography.Text
                                             type="secondary"
@@ -556,6 +700,16 @@ function AgentLibraryMock({
                                         fontSize: 12,
                                         marginTop: 6,
                                         marginBottom: 0,
+                                        paddingRight:
+                                            activeTab === "mine"
+                                                ? agent.published
+                                                    ? 52
+                                                    : 26
+                                                : activeTab === "shared"
+                                                  ? isAdmin
+                                                      ? 52
+                                                      : 26
+                                                  : 0,
                                     }}
                                     ellipsis={{ rows: 2 }}
                                 >
@@ -626,8 +780,15 @@ export default function AppShellExplorer() {
     const [activeNav, setActiveNav] = useState<NavKey>("library");
     const [activeTab, setActiveTab] = useState("mine");
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+    const [agentDetailReadonly, setAgentDetailReadonly] = useState(false);
     const [creatingAgent, setCreatingAgent] = useState(false);
     const [chattingAgent, setChattingAgent] = useState<string | null>(null);
+    const [guideSection, setGuideSection] =
+        useState<GuideSection>("quick-start");
+    const [quickStartOpen, setQuickStartOpen] = useState(false);
+    const [completedGuideSteps, setCompletedGuideSteps] = useState<Set<number>>(
+        () => new Set(),
+    );
     const [aboutOpen, setAboutOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -661,6 +822,21 @@ export default function AppShellExplorer() {
         { key: "lock", icon: <LockOutlined />, label: "锁定" },
         { key: "logout", icon: <LogoutOutlined />, label: "登出" },
     ];
+    const helpMenuItems = [
+        { key: "guide", icon: <BookOutlined />, label: "使用指南" },
+        { key: "quick-start", icon: <RocketOutlined />, label: "快速开始" },
+        { key: "faq", icon: <QuestionCircleOutlined />, label: "常见问题" },
+        { type: "divider" as const },
+        { key: "about", icon: <InfoCircleOutlined />, label: "关于 Inkwell" },
+    ];
+
+    const openGuide = (section: GuideSection) => {
+        setGuideSection(section);
+        setActiveNav("guide");
+        setSelectedAgent(null);
+        setCreatingAgent(false);
+        setChattingAgent(null);
+    };
 
     const changePassword = async () => {
         await changePasswordForm.validateFields();
@@ -875,6 +1051,29 @@ export default function AppShellExplorer() {
                                 {NETWORK_META[network].label}
                             </Typography.Text>
                         </Space>
+                        <Dropdown
+                            menu={{
+                                items: helpMenuItems,
+                                onClick: ({ key }) => {
+                                    if (key === "guide")
+                                        openGuide("quick-start");
+                                    if (key === "quick-start")
+                                        setQuickStartOpen(true);
+                                    if (key === "faq") openGuide("faq");
+                                    if (key === "about") setAboutOpen(true);
+                                },
+                            }}
+                            trigger={["click"]}
+                            placement="bottomRight"
+                        >
+                            <Tooltip title="帮助">
+                                <Button
+                                    type="text"
+                                    aria-label="帮助"
+                                    icon={<QuestionCircleOutlined />}
+                                />
+                            </Tooltip>
+                        </Dropdown>
                         <div
                             style={{
                                 width: 1,
@@ -956,11 +1155,22 @@ export default function AppShellExplorer() {
                                                 onClick={() =>
                                                     setExpandedGroups(
                                                         (previous) => {
-                                                            const next = new Set(previous);
-                                                            if (next.has(group.key)) {
-                                                                next.delete(group.key);
+                                                            const next =
+                                                                new Set(
+                                                                    previous,
+                                                                );
+                                                            if (
+                                                                next.has(
+                                                                    group.key,
+                                                                )
+                                                            ) {
+                                                                next.delete(
+                                                                    group.key,
+                                                                );
                                                             } else {
-                                                                next.add(group.key);
+                                                                next.add(
+                                                                    group.key,
+                                                                );
                                                             }
                                                             return next;
                                                         },
@@ -969,7 +1179,8 @@ export default function AppShellExplorer() {
                                                 style={{
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    justifyContent: "space-between",
+                                                    justifyContent:
+                                                        "space-between",
                                                     padding: "4px 12px",
                                                     cursor: "pointer",
                                                     userSelect: "none",
@@ -977,7 +1188,10 @@ export default function AppShellExplorer() {
                                             >
                                                 <Typography.Text
                                                     type="secondary"
-                                                    style={{ fontSize: 11, fontWeight: 600 }}
+                                                    style={{
+                                                        fontSize: 11,
+                                                        fontWeight: 600,
+                                                    }}
                                                 >
                                                     {group.label}
                                                 </Typography.Text>
@@ -985,7 +1199,8 @@ export default function AppShellExplorer() {
                                                     style={{
                                                         fontSize: 9,
                                                         color: token.colorTextTertiary,
-                                                        transition: "transform 0.15s",
+                                                        transition:
+                                                            "transform 0.15s",
                                                         transform: isExpanded
                                                             ? "rotate(90deg)"
                                                             : "rotate(0deg)",
@@ -995,13 +1210,22 @@ export default function AppShellExplorer() {
                                         )}
                                         {isExpanded &&
                                             group.items.map((item) => {
-                                                const active = activeNav === item.key;
+                                                const active =
+                                                    activeNav === item.key;
                                                 return (
-                                                    <Tooltip key={item.key} title="" placement="right">
+                                                    <Tooltip
+                                                        key={item.key}
+                                                        title=""
+                                                        placement="right"
+                                                    >
                                                         <div
                                                             onClick={() => {
-                                                                setActiveNav(item.key);
-                                                                setSelectedAgent(null);
+                                                                setActiveNav(
+                                                                    item.key,
+                                                                );
+                                                                setSelectedAgent(
+                                                                    null,
+                                                                );
                                                                 setCreatingAgent(
                                                                     false,
                                                                 );
@@ -1073,10 +1297,13 @@ export default function AppShellExplorer() {
                             flex: 1,
                             minHeight: 0,
                             overflow:
-                                showAgentDetail || showAgentChat
+                                showAgentDetail || showAgentChat || activeNav === "guide"
                                     ? "hidden"
                                     : "auto",
-                            padding: showAgentDetail || showAgentChat ? 0 : 20,
+                            padding:
+                                showAgentDetail || showAgentChat || activeNav === "guide"
+                                    ? 0
+                                    : 20,
                         }}
                     >
                         {activeNav === "library" ? (
@@ -1090,10 +1317,15 @@ export default function AppShellExplorer() {
                             ) : showAgentDetail ? (
                                 <AgentDesignPage
                                     initialState={
-                                        creatingAgent ? "new-draft" : "editing"
+                                        creatingAgent
+                                            ? "new-draft"
+                                            : agentDetailReadonly
+                                              ? "readonly"
+                                              : "editing"
                                     }
                                     onBack={() => {
                                         setSelectedAgent(null);
+                                        setAgentDetailReadonly(false);
                                         setCreatingAgent(false);
                                     }}
                                 />
@@ -1108,10 +1340,18 @@ export default function AppShellExplorer() {
                                             setSelectedAgent(agent.name);
                                         }
                                     }}
-                                    onCreateAgent={() => setCreatingAgent(true)}
-                                    onEditAgent={(name) =>
-                                        setSelectedAgent(name)
-                                    }
+                                    onCreateAgent={() => {
+                                        setAgentDetailReadonly(false);
+                                        setCreatingAgent(true);
+                                    }}
+                                    onEditAgent={(name) => {
+                                        setAgentDetailReadonly(false);
+                                        setSelectedAgent(name);
+                                    }}
+                                    onViewAgent={(name) => {
+                                        setAgentDetailReadonly(true);
+                                        setSelectedAgent(name);
+                                    }}
                                     isAdmin={isAdmin}
                                 />
                             )
@@ -1121,12 +1361,98 @@ export default function AppShellExplorer() {
                             <SkillListPage isAdmin={isAdmin} />
                         ) : activeNav === "models" ? (
                             <ModelListPage />
-                        ) : (
+                        ) : activeNav === "admin" ? (
                             <UserManagementPage />
+                        ) : (
+                            <UserGuidePage
+                                key={guideSection}
+                                initialSection={guideSection}
+                                onStartQuickGuide={() =>
+                                    setQuickStartOpen(true)
+                                }
+                                onGoToAgentSpace={() =>
+                                    setActiveNav("library")
+                                }
+                            />
                         )}
                     </div>
                 </div>
             </div>
+
+            <Drawer
+                open={quickStartOpen}
+                onClose={() => setQuickStartOpen(false)}
+                title="快速开始"
+                size={400}
+                extra={
+                    <Typography.Text type="secondary">
+                        {completedGuideSteps.size} / 5
+                    </Typography.Text>
+                }
+            >
+                <Typography.Paragraph type="secondary">
+                    完成这些关键步骤，建立从配置到团队使用的完整工作流。
+                </Typography.Paragraph>
+                <Progress
+                    percent={completedGuideSteps.size * 20}
+                    showInfo={false}
+                    style={{ marginBottom: 18 }}
+                />
+                <Space orientation="vertical" size={4} style={{ width: "100%" }}>
+                    {[
+                        ["创建一个 Agent", "填写名称和用途"],
+                        ["完成核心配置", "补充 Instructions 并选择模型"],
+                        ["进行一次试运行", "用真实问题检查回答"],
+                        ["发布第一个版本", "生成可用于对话的正式版本"],
+                        ["按需共享给团队", "允许成员只读查看和使用"],
+                    ].map(([title, description], index) => (
+                        <label
+                            key={title}
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "24px minmax(0, 1fr)",
+                                gap: 10,
+                                padding: "12px 4px",
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                                cursor: "pointer",
+                            }}
+                        >
+                            <Checkbox
+                                checked={completedGuideSteps.has(index)}
+                                onChange={(event) => {
+                                    setCompletedGuideSteps((current) => {
+                                        const next = new Set(current);
+                                        if (event.target.checked) next.add(index);
+                                        else next.delete(index);
+                                        return next;
+                                    });
+                                }}
+                            />
+                            <span>
+                                <Typography.Text strong>{title}</Typography.Text>
+                                <Typography.Text
+                                    type="secondary"
+                                    style={{ display: "block", fontSize: 12 }}
+                                >
+                                    {description}
+                                </Typography.Text>
+                            </span>
+                        </label>
+                    ))}
+                </Space>
+                <Button
+                    type="primary"
+                    block
+                    icon={<RocketOutlined />}
+                    style={{ marginTop: 22 }}
+                    onClick={() => {
+                        setQuickStartOpen(false);
+                        setActiveNav("library");
+                    }}
+                >
+                    前往 Agent 空间
+                </Button>
+            </Drawer>
 
             {/* 关于弹层：版本信息从 Header 移入此处，附作者 / GitHub / 公众号占位 */}
             <Modal
@@ -1148,7 +1474,7 @@ export default function AppShellExplorer() {
                 </div>
                 <Divider style={{ margin: "16px 0" }} />
                 <Space
-                    direction="vertical"
+                    orientation="vertical"
                     size={6}
                     style={{ width: "100%", fontSize: 12 }}
                 >
@@ -1235,11 +1561,37 @@ export default function AppShellExplorer() {
                     <Segmented
                         block
                         value={appearanceMode}
-                        onChange={(value) => setAppearanceMode(value as AppearanceMode)}
+                        onChange={(value) =>
+                            setAppearanceMode(value as AppearanceMode)
+                        }
                         options={[
-                            { value: "light", label: <Space size={4}><BulbOutlined />亮色</Space> },
-                            { value: "dark", label: <Space size={4}><BulbFilled />暗色</Space> },
-                            { value: "system", label: <Space size={4}><DesktopOutlined />跟随系统</Space> },
+                            {
+                                value: "light",
+                                label: (
+                                    <Space size={4}>
+                                        <BulbOutlined />
+                                        亮色
+                                    </Space>
+                                ),
+                            },
+                            {
+                                value: "dark",
+                                label: (
+                                    <Space size={4}>
+                                        <BulbFilled />
+                                        暗色
+                                    </Space>
+                                ),
+                            },
+                            {
+                                value: "system",
+                                label: (
+                                    <Space size={4}>
+                                        <DesktopOutlined />
+                                        跟随系统
+                                    </Space>
+                                ),
+                            },
                         ]}
                     />
                 </div>
@@ -1250,7 +1602,9 @@ export default function AppShellExplorer() {
                     <Segmented
                         block
                         value={themeName}
-                        onChange={(value) => setThemeName(value as typeof themeName)}
+                        onChange={(value) =>
+                            setThemeName(value as typeof themeName)
+                        }
                         options={THEME_NAMES.map((name) => ({
                             value: name,
                             label: (
@@ -1261,7 +1615,8 @@ export default function AppShellExplorer() {
                                             width: 8,
                                             height: 8,
                                             borderRadius: "50%",
-                                            background: THEMES[name].primaryColor,
+                                            background:
+                                                THEMES[name].primaryColor,
                                             flexShrink: 0,
                                         }}
                                     />
@@ -1295,7 +1650,10 @@ export default function AppShellExplorer() {
                         label="当前密码"
                         rules={[{ required: true, message: "请输入当前密码" }]}
                     >
-                        <Input.Password autoComplete="current-password" placeholder="输入当前密码" />
+                        <Input.Password
+                            autoComplete="current-password"
+                            placeholder="输入当前密码"
+                        />
                     </Form.Item>
                     <Form.Item
                         name="newPassword"
@@ -1304,16 +1662,28 @@ export default function AppShellExplorer() {
                         dependencies={["currentPassword"]}
                         rules={[
                             { required: true, message: "请输入新密码" },
-                            { min: 8, max: 128, message: "密码长度应为 8–128 个字符" },
+                            {
+                                min: 8,
+                                max: 128,
+                                message: "密码长度应为 8–128 个字符",
+                            },
                             ({ getFieldValue }) => ({
                                 validator: (_, value: string | undefined) =>
-                                    value && value === getFieldValue("currentPassword")
-                                        ? Promise.reject(new Error("新密码不能与当前密码相同"))
+                                    value &&
+                                    value === getFieldValue("currentPassword")
+                                        ? Promise.reject(
+                                              new Error(
+                                                  "新密码不能与当前密码相同",
+                                              ),
+                                          )
                                         : Promise.resolve(),
                             }),
                         ]}
                     >
-                        <Input.Password autoComplete="new-password" placeholder="输入新密码" />
+                        <Input.Password
+                            autoComplete="new-password"
+                            placeholder="输入新密码"
+                        />
                     </Form.Item>
                     <Form.Item
                         name="confirmPassword"
@@ -1323,15 +1693,25 @@ export default function AppShellExplorer() {
                             { required: true, message: "请再次输入新密码" },
                             ({ getFieldValue }) => ({
                                 validator: (_, value: string | undefined) =>
-                                    value && value !== getFieldValue("newPassword")
-                                        ? Promise.reject(new Error("两次输入的新密码不一致"))
+                                    value &&
+                                    value !== getFieldValue("newPassword")
+                                        ? Promise.reject(
+                                              new Error(
+                                                  "两次输入的新密码不一致",
+                                              ),
+                                          )
                                         : Promise.resolve(),
                             }),
                         ]}
                     >
-                        <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+                        <Input.Password
+                            autoComplete="new-password"
+                            placeholder="再次输入新密码"
+                        />
                     </Form.Item>
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <div
+                        style={{ display: "flex", justifyContent: "flex-end" }}
+                    >
                         <Button type="primary" htmlType="submit">
                             修改密码
                         </Button>

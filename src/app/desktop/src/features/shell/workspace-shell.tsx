@@ -1,16 +1,20 @@
 import {
     ApiOutlined,
     AppstoreOutlined,
+    BookOutlined,
     BulbFilled,
     BulbOutlined,
     DesktopOutlined,
     DownOutlined,
     GithubOutlined,
+    InfoCircleOutlined,
     KeyOutlined,
     LogoutOutlined,
     MoonFilled,
+    QuestionCircleOutlined,
     ReadOutlined,
     RightOutlined,
+    RocketOutlined,
     SafetyCertificateOutlined,
     SettingOutlined,
     SunFilled,
@@ -19,10 +23,14 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Avatar,
+    Button,
+    Checkbox,
     Divider,
     Dropdown,
+    Drawer,
     Empty,
     Modal,
+    Progress,
     Segmented,
     Space,
     Switch,
@@ -35,6 +43,7 @@ import { useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
 import { ChangePasswordModal } from "../auth/change-password-modal";
+import { UserGuide, type GuideSection } from "../help/user-guide";
 import { ModelManagement } from "../models/model-management";
 import { SkillManagement } from "../skills/skill-management";
 import { ToolManagement } from "../tools/tool-management";
@@ -46,7 +55,13 @@ import {
 } from "./appearance-store";
 import { desktopThemes, themeNames, type ThemeName } from "./themes";
 
-type NavigationKey = "agents" | "tools" | "skills" | "models" | "admin";
+type NavigationKey =
+    | "agents"
+    | "tools"
+    | "skills"
+    | "models"
+    | "admin"
+    | "guide";
 
 interface NavigationItem {
     key: NavigationKey;
@@ -107,9 +122,10 @@ const navigationGroups: NavigationGroup[] = [
 
 interface WorkspaceShellProps {
     children: ReactNode;
+    onNavigate: (navigate: () => void) => void;
 }
 
-export function WorkspaceShell({ children }: WorkspaceShellProps) {
+export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
     const identity = useAuthStore((state) => state.identity);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
     const appearanceMode = useAppearanceStore((state) => state.mode);
@@ -123,6 +139,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     const [aboutOpen, setAboutOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+    const [quickStartOpen, setQuickStartOpen] = useState(false);
+    const [guideSection, setGuideSection] =
+        useState<GuideSection>("quick-start");
+    const [completedGuideSteps, setCompletedGuideSteps] = useState<Set<number>>(
+        () => new Set(),
+    );
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
         () => new Set(navigationGroups.map((group) => group.key)),
     );
@@ -150,6 +172,15 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             else next.add(groupKey);
             return next;
         });
+    };
+
+    const navigateTo = (navigation: NavigationKey): void => {
+        onNavigate(() => setActiveNavigation(navigation));
+    };
+
+    const openGuide = (section: GuideSection): void => {
+        setGuideSection(section);
+        navigateTo("guide");
     };
 
     const logout = async (): Promise<void> => {
@@ -190,6 +221,50 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     <div className="connection-state" aria-label="后台服务正常">
                         <span /> 后台服务正常
                     </div>
+                    <Dropdown
+                        trigger={["click"]}
+                        placement="bottomRight"
+                        menu={{
+                            items: [
+                                {
+                                    key: "guide",
+                                    icon: <BookOutlined />,
+                                    label: "使用指南",
+                                },
+                                {
+                                    key: "quick-start",
+                                    icon: <RocketOutlined />,
+                                    label: "快速开始",
+                                },
+                                {
+                                    key: "faq",
+                                    icon: <QuestionCircleOutlined />,
+                                    label: "常见问题",
+                                },
+                                { type: "divider" },
+                                {
+                                    key: "about",
+                                    icon: <InfoCircleOutlined />,
+                                    label: "关于 Inkwell",
+                                },
+                            ],
+                            onClick: ({ key }) => {
+                                if (key === "guide") openGuide("quick-start");
+                                if (key === "quick-start")
+                                    setQuickStartOpen(true);
+                                if (key === "faq") openGuide("faq");
+                                if (key === "about") setAboutOpen(true);
+                            },
+                        }}
+                    >
+                        <Tooltip title="帮助">
+                            <Button
+                                type="text"
+                                aria-label="帮助"
+                                icon={<QuestionCircleOutlined />}
+                            />
+                        </Tooltip>
+                    </Dropdown>
                     <div className="header-divider" />
                     <Dropdown
                         trigger={["click"]}
@@ -227,9 +302,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                                 if (key === "settings") setSettingsOpen(true);
                                 if (key === "change-password")
                                     setChangePasswordOpen(true);
-                                if (key === "admin")
-                                    setActiveNavigation("admin");
-                                if (key === "logout") void logout();
+                                if (key === "admin") navigateTo("admin");
+                                if (key === "logout")
+                                    onNavigate(() => void logout());
                             },
                         }}
                     >
@@ -282,9 +357,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                                                 type="button"
                                                 className={`nav-item${activeNavigation === item.key ? " active" : ""}`}
                                                 onClick={() =>
-                                                    setActiveNavigation(
-                                                        item.key,
-                                                    )
+                                                    navigateTo(item.key)
                                                 }
                                             >
                                                 {item.icon}
@@ -333,11 +406,23 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                     >
                         {identity?.isAdmin && <UserManagement />}
                     </div>
+                    <div
+                        className="workspace-route"
+                        hidden={activeNavigation !== "guide"}
+                    >
+                        <UserGuide
+                            key={guideSection}
+                            initialSection={guideSection}
+                            onStartQuickGuide={() => setQuickStartOpen(true)}
+                            onGoToAgentSpace={() => navigateTo("agents")}
+                        />
+                    </div>
                     {activeNavigation !== "agents" &&
                         activeNavigation !== "tools" &&
                         activeNavigation !== "skills" &&
                         activeNavigation !== "models" &&
-                        activeNavigation !== "admin" && (
+                        activeNavigation !== "admin" &&
+                        activeNavigation !== "guide" && (
                             <main className="placeholder-page">
                                 <Empty
                                     image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -356,6 +441,76 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                         )}
                 </div>
             </div>
+
+            <Drawer
+                open={quickStartOpen}
+                onClose={() => setQuickStartOpen(false)}
+                destroyOnHidden
+                title="快速开始"
+                width={400}
+                extra={
+                    <Typography.Text type="secondary">
+                        {completedGuideSteps.size} / 5
+                    </Typography.Text>
+                }
+            >
+                <Typography.Paragraph type="secondary">
+                    完成这些关键步骤，建立从配置到团队使用的完整工作流。
+                </Typography.Paragraph>
+                <Progress
+                    percent={completedGuideSteps.size * 20}
+                    showInfo={false}
+                    className="quick-start-progress"
+                />
+                <Space
+                    orientation="vertical"
+                    size={4}
+                    className="quick-start-list"
+                >
+                    {[
+                        ["创建一个 Agent", "填写名称和用途"],
+                        ["完成核心配置", "补充 Instructions 并选择模型"],
+                        ["进行一次试运行", "用真实问题检查回答"],
+                        ["发布第一个版本", "生成可用于对话的正式版本"],
+                        ["按需共享给团队", "允许成员只读查看和使用"],
+                    ].map(([title, description], index) => (
+                        <label className="quick-start-item" key={title}>
+                            <Checkbox
+                                checked={completedGuideSteps.has(index)}
+                                onChange={(event) => {
+                                    setCompletedGuideSteps((current) => {
+                                        const next = new Set(current);
+                                        if (event.target.checked)
+                                            next.add(index);
+                                        else next.delete(index);
+                                        return next;
+                                    });
+                                }}
+                            />
+                            <span>
+                                <Typography.Text strong>
+                                    {title}
+                                </Typography.Text>
+                                <Typography.Text type="secondary">
+                                    {description}
+                                </Typography.Text>
+                            </span>
+                        </label>
+                    ))}
+                </Space>
+                <Button
+                    type="primary"
+                    block
+                    icon={<RocketOutlined />}
+                    className="quick-start-agent-button"
+                    onClick={() => {
+                        setQuickStartOpen(false);
+                        navigateTo("agents");
+                    }}
+                >
+                    前往 Agent 空间
+                </Button>
+            </Drawer>
 
             <Modal
                 open={aboutOpen}

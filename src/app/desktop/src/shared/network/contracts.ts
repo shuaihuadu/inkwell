@@ -69,7 +69,68 @@ export interface AgentListItem {
 export interface AgentDefinition {
     id: string;
     ownerUserId: string;
+    name: string;
+    avatarUri: string | null;
+    description: string | null;
+    instructions: string | null;
+    buildOptions: AgentBuildOptions;
+    currentPublishedVersionId: string | null;
     latestPublishedVersionNumber: number;
+    isShared: boolean;
+    sharedRevokedByAdminTime: string | null;
+    createdTime: string;
+    updatedTime: string;
+}
+
+export interface AgentModelOptions {
+    modelId: string | null;
+    temperature: number | null;
+    topP: number | null;
+    maxTokens: number | null;
+}
+
+export interface AgentChatHistoryOptions {
+    maxMessages: number | null;
+    reducerType: string | null;
+    maxMessagesToRetrieve: number | null;
+}
+
+export interface AgentToolBinding {
+    toolId: string;
+    parametersJson: string | null;
+}
+
+export interface AgentSkillBinding {
+    skillId: string;
+}
+
+export interface AgentBuildOptions {
+    modelOptions: AgentModelOptions;
+    chatHistoryOptions: AgentChatHistoryOptions | null;
+    toolBindings?: AgentToolBinding[];
+    skills?: AgentSkillDefinition[];
+}
+
+export interface AgentUpsertRequest {
+    name: string;
+    avatarUri: string | null;
+    description: string | null;
+    instructions: string | null;
+    modelOptions: AgentModelOptions;
+    chatHistoryOptions: AgentChatHistoryOptions | null;
+    toolBindings: AgentToolBinding[];
+    skillBindings: AgentSkillBinding[];
+}
+
+export interface AgentVersion {
+    id: string;
+    agentId: string;
+    versionNumber: number;
+    createdByUserId: string;
+    changeSummary: string | null;
+    createdTime: string;
+    updatedTime: string;
+    publishedTime: string | null;
 }
 
 export type LLMModelCategory =
@@ -136,6 +197,16 @@ export interface AgentSkillUploadFile {
     bytes: Uint8Array;
 }
 
+export interface AgentAvatarUploadFile {
+    name: string;
+    contentType: string;
+    bytes: Uint8Array;
+}
+
+export interface AgentAvatarUploadResponse {
+    avatarUri: string;
+}
+
 export interface UserListItem {
     userId: string;
     username: string;
@@ -157,13 +228,6 @@ export interface IssuedCredential {
     temporaryPassword: string;
 }
 
-export interface CreateAgentRequest {
-    name: string;
-    description: string;
-    instructions: string;
-    modelId: string;
-}
-
 export interface ChatMessage {
     role: "user" | "assistant";
     content: string;
@@ -172,6 +236,7 @@ export interface ChatMessage {
 export interface ChatRequest {
     requestId: string;
     agentId: string;
+    runMode: "published" | "draft";
     messages: ChatMessage[];
 }
 
@@ -211,7 +276,21 @@ export interface InkwellDesktopApi {
     disableAccount: (userId: string) => Promise<void>;
     enableAccount: (userId: string) => Promise<void>;
     resetAccountPassword: (userId: string) => Promise<IssuedCredential>;
-    createAgent: (request: CreateAgentRequest) => Promise<AgentDefinition>;
+    getAgent: (agentId: string) => Promise<AgentDefinition>;
+    createAgent: (request: AgentUpsertRequest) => Promise<AgentDefinition>;
+    updateAgent: (
+        agentId: string,
+        request: AgentUpsertRequest,
+    ) => Promise<AgentDefinition>;
+    cloneAgent: (agentId: string) => Promise<AgentDefinition>;
+    uploadAgentAvatar: (
+        file: AgentAvatarUploadFile,
+    ) => Promise<AgentAvatarUploadResponse>;
+    publishAgent: (
+        agentId: string,
+        changeSummary: string | null,
+    ) => Promise<AgentVersion>;
+    listAgentVersions: (agentId: string) => Promise<AgentVersion[]>;
     chat: (request: ChatRequest) => Promise<void>;
     onChatDelta: (
         listener: (requestId: string, content: string) => void,
