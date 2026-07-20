@@ -59,6 +59,34 @@ public sealed class ControllerRoutingTests
     }
 
     /// <summary>
+    /// 验证创建会话响应引用的命名路由能够生成消息资源地址。
+    /// </summary>
+    [TestMethod]
+    public async Task ConversationMessagesRoute_GeneratesExpectedLocationAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        builder.Services.AddControllers().AddApplicationPart(typeof(AgentConversationsController).Assembly);
+        using WebApplication application = builder.Build();
+        application.Urls.Add("http://127.0.0.1:0");
+        application.MapControllers();
+        await application.StartAsync();
+        LinkGenerator links = application.Services.GetRequiredService<LinkGenerator>();
+
+        // Act
+        string? path = links.GetPathByName(
+            "AgentConversations.GetMessages",
+            new { agentId, conversationId });
+
+        // Assert
+        Assert.AreEqual($"/api/agents/{agentId:D}/conversations/{conversationId:D}/messages", path);
+
+        await application.StopAsync();
+    }
+
+    /// <summary>
     /// 验证登录匿名开放，而 Auth Controller 的其余操作要求基础登录态，并提供改密入口。
     /// </summary>
     [TestMethod]

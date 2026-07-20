@@ -19,7 +19,7 @@ public sealed class AgentConversationServiceTests
         DateTimeOffset now = new(2026, 7, 16, 0, 0, 0, TimeSpan.Zero);
         FakeAgentRepository agents = new(CreateAgent(agentId, agentOwnerId, publishedVersionId, isShared: true));
         FakeConversationRepository conversations = new();
-        FakePersistenceProvider persistence = new(agents, conversations, new FakeMessageRepository(), new FakeSessionStateRepository());
+        FakePersistenceProvider persistence = new(agents, conversations, new FakeMessageRepository());
         AgentConversationService service = CreateService(persistence, now);
 
         // Act
@@ -61,8 +61,7 @@ public sealed class AgentConversationServiceTests
             new FakePersistenceProvider(
                 new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
                 conversations,
-                new FakeMessageRepository(),
-                new FakeSessionStateRepository()),
+                new FakeMessageRepository()),
             now);
 
         // Act
@@ -88,8 +87,7 @@ public sealed class AgentConversationServiceTests
         FakePersistenceProvider persistence = new(
             new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
             conversations,
-            messages,
-            new FakeSessionStateRepository());
+            messages);
         AgentConversationService service = CreateService(persistence, now);
 
         // Act
@@ -109,43 +107,11 @@ public sealed class AgentConversationServiceTests
         Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
     }
 
-    /// <summary>验证 Session State Revision 不连续时由 Service 拒绝且不调用 Repository 写入。</summary>
-    /// <returns>表示异步测试操作的任务。</returns>
-    [TestMethod]
-    public async Task SaveSessionStateAsync_WithSkippedRevision_ReturnsConflictWithoutWritingAsync()
-    {
-        // Arrange
-        Guid ownerUserId = Guid.CreateVersion7();
-        Guid agentId = Guid.CreateVersion7();
-        Guid conversationId = Guid.CreateVersion7();
-        DateTimeOffset now = new(2026, 7, 16, 4, 0, 0, TimeSpan.Zero);
-        AgentConversation conversation = CreateConversation(conversationId, agentId, ownerUserId, now);
-        FakeSessionStateRepository states = new() { ExistingState = CreateState(conversationId, 1, now) };
-        FakePersistenceProvider persistence = new(
-            new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
-            new FakeConversationRepository { ExistingConversation = conversation },
-            new FakeMessageRepository(),
-            states);
-        AgentConversationService service = CreateService(persistence, now);
-
-        // Act
-        AgentSessionStateSaveResult result = await service.SaveSessionStateAsync(
-            ownerUserId,
-            agentId,
-            CreateState(conversationId, 3, now),
-            "run-a");
-
-        // Assert
-        Assert.AreEqual(AgentSessionStateSaveResult.ConcurrencyConflict, result);
-        Assert.IsNull(states.AddedState);
-        Assert.IsNull(states.UpdatedState);
-        Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
-    }
-
     private static AgentConversationService CreateService(FakePersistenceProvider persistence, DateTimeOffset now) =>
         new(
             persistence,
-            new FixedTimeProvider(now));
+            new FixedTimeProvider(now),
+            new UnsupportedBuildService());
 
     private static AgentDefinition CreateAgent(Guid id, Guid ownerUserId, Guid publishedVersionId, bool isShared) => new()
     {
@@ -174,18 +140,22 @@ public sealed class AgentConversationServiceTests
         UpdatedTime = now,
     };
 
-    private static AgentSessionState CreateState(Guid conversationId, long revision, DateTimeOffset now) => new()
-    {
-        ConversationId = conversationId,
-        SerializedState = JsonSerializer.SerializeToElement(new { revision }),
-        Revision = revision,
-        LastRunId = "run-a",
-        UpdatedTime = now,
-    };
-
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class UnsupportedBuildService : IAgentBuildService
+    {
+        public ValueTask<AIAgent> BuildDraftAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public ValueTask<AIAgent> BuildDraftTrialAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public ValueTask<AIAgent> BuildPublishedAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public ValueTask<AIAgent> BuildPublishedConversationAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public ValueTask<AIAgent> BuildPublishedTrialAsync(Guid agentId, Guid requestingUserId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakePersistenceProvider(params object[] repositories) : IPersistenceProvider
@@ -291,28 +261,4 @@ public sealed class AgentConversationServiceTests
         public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
-    private sealed class FakeSessionStateRepository : IAgentSessionStateRepository
-    {
-        public AgentSessionState? ExistingState { get; init; }
-
-        public AgentSessionState? AddedState { get; private set; }
-
-        public AgentSessionState? UpdatedState { get; private set; }
-
-        public Task<AgentSessionState?> GetSessionStateOrDefault(Guid conversationId, CancellationToken ct = default) => Task.FromResult(this.ExistingState);
-
-        public Task AddSessionState(AgentSessionState state, CancellationToken ct = default)
-        {
-            this.AddedState = state;
-            return Task.CompletedTask;
-        }
-
-        public Task UpdateSessionState(AgentSessionState state, CancellationToken ct = default)
-        {
-            this.UpdatedState = state;
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> DeleteSessionStateByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
-    }
 }

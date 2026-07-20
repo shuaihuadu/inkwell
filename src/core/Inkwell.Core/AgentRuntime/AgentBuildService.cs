@@ -52,6 +52,22 @@ internal sealed class AgentBuildService(
     }
 
     /// <inheritdoc />
+    public async ValueTask<AIAgent> BuildPublishedConversationAsync(
+        Guid agentId,
+        Guid versionId,
+        Guid requestingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        AgentVersion version = await versionService
+            .GetPublishedVersionAsync(agentId, versionId, requestingUserId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return await agentFactory
+            .BuildConversationAsync(version, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async ValueTask<AIAgent> BuildPublishedTrialAsync(
         Guid agentId,
         Guid requestingUserId,

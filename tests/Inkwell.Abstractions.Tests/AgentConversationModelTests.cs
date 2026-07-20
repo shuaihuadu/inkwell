@@ -74,30 +74,4 @@ public sealed class AgentConversationModelTests
         Assert.AreEqual(expected.Message.Text, actual.Message.Text);
     }
 
-    /// <summary>
-    /// 验证 Session 检查点保留 JSON、修订号和 nullable Run 标识。
-    /// </summary>
-    [TestMethod]
-    public void AgentSessionState_WithNoLastRun_RoundTripsJson()
-    {
-        // Arrange
-        AgentSessionState expected = new()
-        {
-            ConversationId = Guid.CreateVersion7(),
-            SerializedState = JsonSerializer.SerializeToElement(new { value = "state" }),
-            Revision = 1,
-            UpdatedTime = DateTimeOffset.UtcNow,
-        };
-
-        // Act
-        string json = JsonSerializer.Serialize(expected);
-        AgentSessionState? actual = JsonSerializer.Deserialize<AgentSessionState>(json);
-
-        // Assert
-        Assert.IsNotNull(actual);
-        Assert.AreEqual(expected.ConversationId, actual.ConversationId);
-        Assert.AreEqual(expected.Revision, actual.Revision);
-        Assert.AreEqual("state", actual.SerializedState.GetProperty("value").GetString());
-        Assert.IsNull(actual.LastRunId);
-    }
 }

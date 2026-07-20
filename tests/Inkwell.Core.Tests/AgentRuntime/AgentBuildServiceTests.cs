@@ -79,6 +79,44 @@ public sealed class AgentBuildServiceTests
     }
 
     /// <summary>
+    /// 验证产品会话按锁定版本构建，并选择外部持久化聊天历史。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildPublishedConversationAsync_WithChatHistory_UsesBoundVersionAndPersistentHistoryAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid versionId = Guid.CreateVersion7();
+        Guid requestingUserId = Guid.CreateVersion7();
+        AgentVersion version = new()
+        {
+            Id = versionId,
+            AgentId = agentId,
+            VersionNumber = 1,
+            Snapshot = CreateSnapshot() with
+            {
+                BuildOptions = CreateBuildOptionsWithChatHistory(),
+            },
+            CreatedByUserId = Guid.CreateVersion7(),
+            CreatedTime = DateTimeOffset.UtcNow,
+            UpdatedTime = DateTimeOffset.UtcNow,
+            PublishedTime = DateTimeOffset.UtcNow,
+        };
+        RecordingVersionService versionService = new(version);
+        RecordingAgentFactory factory = new();
+        AgentBuildService service = new(versionService, new RecordingAgentService(), factory);
+
+        // Act
+        _ = await service.BuildPublishedConversationAsync(agentId, versionId, requestingUserId);
+
+        // Assert
+        Assert.AreEqual(versionId, versionService.VersionId);
+        Assert.AreEqual(requestingUserId, versionService.RequestingUserId);
+        Assert.IsNotNull(version.Snapshot.BuildOptions.ChatHistoryOptions);
+        Assert.AreSame(version, factory.ConversationVersion);
+    }
+
+    /// <summary>
     /// 验证草稿构建只加载所有者当前保存的 Agent 定义。
     /// </summary>
     [TestMethod]
@@ -175,6 +213,8 @@ public sealed class AgentBuildServiceTests
 
         public Guid RequestingUserId { get; private set; }
 
+        public Guid VersionId { get; private set; }
+
         public Task<AgentVersion> GetPublishedVersionAsync(
             Guid agentId,
             Guid requestingUserId,
@@ -185,8 +225,13 @@ public sealed class AgentBuildServiceTests
             return Task.FromResult(version ?? throw new InvalidOperationException("No published version was configured."));
         }
 
-        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<AgentVersion> GetPublishedVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default)
+        {
+            this.AgentId = agentId;
+            this.VersionId = versionId;
+            this.RequestingUserId = requestingUserId;
+            return Task.FromResult(version ?? throw new InvalidOperationException("No published version was configured."));
+        }
 
         public Task<AgentVersion> GetVersionAsync(Guid agentId, Guid versionId, Guid requestingUserId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -248,6 +293,8 @@ public sealed class AgentBuildServiceTests
 
         public AgentVersion? Version { get; private set; }
 
+        public AgentVersion? ConversationVersion { get; private set; }
+
         public AgentDefinition? Definition { get; private set; }
 
         public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default)
@@ -259,6 +306,12 @@ public sealed class AgentBuildServiceTests
         public ValueTask<AIAgent> BuildAsync(AgentVersion version, CancellationToken cancellationToken = default)
         {
             this.Version = version;
+            return ValueTask.FromResult(this.Agent);
+        }
+
+        public ValueTask<AIAgent> BuildConversationAsync(AgentVersion version, CancellationToken cancellationToken = default)
+        {
+            this.ConversationVersion = version;
             return ValueTask.FromResult(this.Agent);
         }
     }

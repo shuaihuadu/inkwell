@@ -119,6 +119,56 @@ public sealed class RoutingAgentTests
         Assert.IsTrue(request.IsTrial);
     }
 
+    /// <summary>
+    /// 验证绑定产品会话的正式流式运行会提交消息和 Session 检查点。
+    /// </summary>
+    [TestMethod]
+    public async Task RunStreamingAsync_PublishedConversation_CommitsMessagesAndSessionStateAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        Guid versionId = Guid.CreateVersion7();
+        RecordingAgentBuildService buildService = new();
+        RecordingAgentConversationService conversationService = new(new AgentConversation
+        {
+            Id = conversationId,
+            SessionKey = conversationId.ToString("D"),
+            AgentId = agentId,
+            AgentVersionId = versionId,
+            OwnerUserId = ownerUserId,
+            LastActivityTime = DateTimeOffset.UtcNow,
+            CreatedTime = DateTimeOffset.UtcNow,
+            UpdatedTime = DateTimeOffset.UtcNow,
+        });
+        ServiceCollection services = new();
+        services.AddSingleton<IAgentBuildService>(buildService);
+        services.AddSingleton<IAgentConversationService>(conversationService);
+        services.AddSingleton(TimeProvider.System);
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.Request.Headers["X-Inkwell-Conversation-Id"] = conversationId.ToString();
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
+        HttpContextAccessor accessor = new() { HttpContext = httpContext };
+        RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
+
+        // Act
+        await foreach (Microsoft.Agents.AI.AgentResponseUpdate _ in agent.RunStreamingAsync(
+            [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")]))
+        {
+        }
+
+        // Assert
+        Assert.HasCount(1, conversationService.CommittedBatches);
+        Assert.HasCount(2, conversationService.CommittedBatches[0].Messages);
+        Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.User, conversationService.CommittedBatches[0].Messages[0].Role);
+        Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.Assistant, conversationService.CommittedBatches[0].Messages[1].Role);
+    }
+
     private sealed class RecordingAgentBuildService : IAgentBuildService
     {
         public List<(Guid AgentId, Guid RequestingUserId, bool IsDraft, bool IsTrial)> Requests { get; } = [];
@@ -150,6 +200,16 @@ public sealed class RoutingAgentTests
             return ValueTask.FromResult<AIAgent>(new StubAgent());
         }
 
+        public ValueTask<AIAgent> BuildPublishedConversationAsync(
+            Guid agentId,
+            Guid versionId,
+            Guid requestingUserId,
+            CancellationToken cancellationToken = default)
+        {
+            this.Requests.Add((agentId, requestingUserId, false, false));
+            return ValueTask.FromResult<AIAgent>(new StubAgent());
+        }
+
         public ValueTask<AIAgent> BuildPublishedTrialAsync(
             Guid agentId,
             Guid requestingUserId,
@@ -157,6 +217,79 @@ public sealed class RoutingAgentTests
         {
             this.Requests.Add((agentId, requestingUserId, false, true));
             return ValueTask.FromResult<AIAgent>(new StubAgent());
+        }
+    }
+
+    private sealed class RecordingAgentConversationService(AgentConversation conversation) : IAgentConversationService
+    {
+        public List<(string ExecutionId, IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> Messages)> CommittedBatches { get; } = [];
+
+        public Task<AgentConversation> CreateConversationAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default) =>
+            Task.FromResult(conversation);
+
+        public Task<PagedResult<AgentConversationListItem>> ListConversationsAsync(
+            Guid agentId,
+            Guid ownerUserId,
+            Pagination pagination,
+            CancellationToken ct = default) =>
+            Task.FromResult(new PagedResult<AgentConversationListItem>([], 0, pagination));
+
+        public Task<PagedResult<AgentChatMessage>> GetMessagesAsync(
+            Guid ownerUserId,
+            Guid agentId,
+            Guid conversationId,
+            Pagination pagination,
+            CancellationToken ct = default) =>
+            Task.FromResult(new PagedResult<AgentChatMessage>([], 0, pagination));
+
+        public Task DeleteMessageAsync(Guid ownerUserId, Guid agentId, Guid conversationId, Guid messageId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task ClearConversationAsync(Guid ownerUserId, Guid agentId, Guid conversationId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task DeleteConversationAsync(Guid ownerUserId, Guid agentId, Guid conversationId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+
+        public Task<AgentChatMessageCommitResult> CommitRunMessagesAsync(
+            Guid ownerUserId,
+            Guid agentId,
+            Guid conversationId,
+            string executionId,
+            IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> messages,
+            CancellationToken ct = default)
+        {
+            this.CommittedBatches.Add((executionId, messages));
+            return Task.FromResult(AgentChatMessageCommitResult.Committed);
+        }
+
+        public Task<AgentResponse> RunAsync(
+            Guid ownerUserId,
+            Guid agentId,
+            Guid conversationId,
+            IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> messages,
+            AgentRunOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AgentResponse(new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant, "world")));
+
+        public async IAsyncEnumerable<AgentResponseUpdate> RunStreamingAsync(
+            Guid ownerUserId,
+            Guid agentId,
+            Guid conversationId,
+            IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> messages,
+            AgentRunOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            string executionId = Guid.CreateVersion7().ToString("D");
+            Microsoft.Extensions.AI.ChatMessage assistantMessage = new(Microsoft.Extensions.AI.ChatRole.Assistant, "world");
+            _ = await this.CommitRunMessagesAsync(
+                ownerUserId,
+                agentId,
+                conversationId,
+                executionId,
+                [.. messages, assistantMessage],
+                cancellationToken);
+            yield return new AgentResponseUpdate(Microsoft.Extensions.AI.ChatRole.Assistant, "world");
         }
     }
 
@@ -184,12 +317,15 @@ public sealed class RoutingAgentTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new Microsoft.Agents.AI.AgentResponse());
 
-        protected override IAsyncEnumerable<Microsoft.Agents.AI.AgentResponseUpdate> RunCoreStreamingAsync(
+        protected override async IAsyncEnumerable<Microsoft.Agents.AI.AgentResponseUpdate> RunCoreStreamingAsync(
             IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
             Microsoft.Agents.AI.AgentSession? session = null,
             Microsoft.Agents.AI.AgentRunOptions? options = null,
-            CancellationToken cancellationToken = default) =>
-            AsyncEnumerable.Empty<Microsoft.Agents.AI.AgentResponseUpdate>();
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new Microsoft.Agents.AI.AgentResponseUpdate(Microsoft.Extensions.AI.ChatRole.Assistant, "world");
+        }
     }
 
     private sealed class StubAgentSession : AgentSession;

@@ -21,10 +21,20 @@ public sealed class InkwellChatHistoryProviderTests
         Guid sessionId = Guid.CreateVersion7();
         ChatMessage historicalMessage = new(ChatRole.User, "history");
         FakeMessageRepository repository = new([historicalMessage]);
-        InkwellChatHistoryProvider provider = new(new RecordingPersistenceProvider(repository), 10);
+        FakeConversationRepository conversations = new(CreateConversation(sessionId));
+        RecordingPersistenceProvider persistence = new(repository, conversations);
+        InkwellChatHistoryProvider provider = new(
+            persistence,
+            new AgentConversationMessageCommitter(persistence, TimeProvider.System),
+            10);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
-        InkwellChatHistoryProvider.AttachSession(session, sessionId);
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            Guid.CreateVersion7().ToString("D"));
         ChatMessage requestMessage = new(ChatRole.User, "current");
         ChatHistoryProvider.InvokingContext context = new(agent, session, [requestMessage]);
 
@@ -48,12 +58,21 @@ public sealed class InkwellChatHistoryProviderTests
     {
         // Arrange
         Guid sessionId = Guid.CreateVersion7();
+        string executionId = Guid.CreateVersion7().ToString("D");
         FakeMessageRepository repository = new([]);
-        RecordingPersistenceProvider persistence = new(repository);
-        InkwellChatHistoryProvider provider = new(persistence);
+        FakeConversationRepository conversations = new(CreateConversation(sessionId));
+        RecordingPersistenceProvider persistence = new(repository, conversations);
+        InkwellChatHistoryProvider provider = new(
+            persistence,
+            new AgentConversationMessageCommitter(persistence, TimeProvider.System));
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
-        InkwellChatHistoryProvider.AttachSession(session, sessionId);
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            executionId);
         ChatMessage request = new(ChatRole.User, "question");
         ChatMessage response = new(ChatRole.Assistant, "answer");
         ChatHistoryProvider.InvokedContext context = new(agent, session, [request], [response]);
@@ -64,9 +83,14 @@ public sealed class InkwellChatHistoryProviderTests
         // Assert
         Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
         Assert.AreEqual(sessionId, repository.AddedMessages[0].ConversationId);
+        Assert.AreEqual(executionId, repository.AddedMessages[0].RunId);
         Assert.HasCount(2, repository.AppendedMessages);
         Assert.AreSame(request, repository.AppendedMessages[0]);
         Assert.AreSame(response, repository.AppendedMessages[1]);
+        Assert.AreEqual(executionId, conversations.UpdatedConversation?.LastCommittedRunId);
+        JsonElement serializedState = session.StateBag.Serialize();
+        Assert.HasCount(1, serializedState.EnumerateObject().ToList());
+        Assert.AreEqual(sessionId.ToString("D"), serializedState.GetProperty(InkwellChatHistoryProvider.SessionIdStateKey).GetString());
     }
 
     /// <summary>
@@ -78,11 +102,20 @@ public sealed class InkwellChatHistoryProviderTests
     {
         // Arrange
         FakeMessageRepository repository = new([]);
-        RecordingPersistenceProvider persistence = new(repository);
-        InkwellChatHistoryProvider provider = new(persistence);
+        Guid sessionId = Guid.CreateVersion7();
+        FakeConversationRepository conversations = new(CreateConversation(sessionId));
+        RecordingPersistenceProvider persistence = new(repository, conversations);
+        InkwellChatHistoryProvider provider = new(
+            persistence,
+            new AgentConversationMessageCommitter(persistence, TimeProvider.System));
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
-        InkwellChatHistoryProvider.AttachSession(session, Guid.CreateVersion7());
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            Guid.CreateVersion7().ToString("D"));
         ChatHistoryProvider.InvokedContext context = new(agent, session, [new ChatMessage(ChatRole.User, "question")], new InvalidOperationException("failed"));
 
         // Act
@@ -149,12 +182,24 @@ public sealed class InkwellChatHistoryProviderTests
         }
     }
 
-    private sealed class RecordingPersistenceProvider(IAgentChatMessageRepository messages) : IPersistenceProvider
+    private static AgentConversation CreateConversation(Guid conversationId) => new()
+    {
+        Id = conversationId,
+        SessionKey = conversationId.ToString("D"),
+        AgentId = Guid.CreateVersion7(),
+        AgentVersionId = Guid.CreateVersion7(),
+        OwnerUserId = Guid.CreateVersion7(),
+        LastActivityTime = DateTimeOffset.UtcNow,
+        CreatedTime = DateTimeOffset.UtcNow,
+        UpdatedTime = DateTimeOffset.UtcNow,
+    };
+
+    private sealed class RecordingPersistenceProvider(params object[] repositories) : IPersistenceProvider
     {
         public IsolationLevel? LastIsolationLevel { get; private set; }
 
         public TRepository GetRepository<TRepository>() where TRepository : notnull =>
-            messages is TRepository repository ? repository : throw new NotSupportedException();
+            repositories.OfType<TRepository>().Single();
 
         public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
             await action(ct).ConfigureAwait(false);
@@ -189,9 +234,11 @@ public sealed class InkwellChatHistoryProviderTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<AgentChatMessage>> ListAllMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<AgentChatMessage>>(this.AddedMessages);
 
-        public Task<IReadOnlyList<AgentChatMessage>> ListMessagesByRun(Guid conversationId, string runId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<AgentChatMessage>> ListMessagesByRun(Guid conversationId, string runId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AgentChatMessage>>(
+                this.AddedMessages.Where(message => message.ConversationId == conversationId && message.RunId == runId).ToList());
 
         public Task<IReadOnlyList<AgentChatMessage>> AddMessages(IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default)
         {
@@ -210,6 +257,34 @@ public sealed class InkwellChatHistoryProviderTests
         public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class FakeConversationRepository(AgentConversation conversation) : IAgentConversationRepository
+    {
+        public AgentConversation Conversation { get; } = conversation;
+
+        public AgentConversation? UpdatedConversation { get; private set; }
+
+        public Task<AgentConversation> GetConversation(Guid conversationId, CancellationToken ct = default) =>
+            Task.FromResult(this.UpdatedConversation ?? this.Conversation);
+
+        public Task UpdateConversation(AgentConversation conversation, CancellationToken ct = default)
+        {
+            this.UpdatedConversation = conversation;
+            return Task.CompletedTask;
+        }
+
+        public Task<AgentConversation> AddConversation(AgentConversation conversation, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> DeleteConversation(Guid conversationId, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }

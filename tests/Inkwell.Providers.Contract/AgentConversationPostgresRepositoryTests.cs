@@ -71,38 +71,10 @@ public sealed class AgentConversationPostgresRepositoryTests
         CollectionAssert.AreEqual(new int?[] { 0, 1 }, byRun.Select(message => message.RunMessageIndex).ToArray());
     }
 
-    /// <summary>验证 Session State 的新增、更新和删除 CRUD。</summary>
+    /// <summary>验证 Repository CRUD 在事务失败时整体回滚。</summary>
     /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]
-    public async Task SessionStateCrud_AddUpdateDelete_PersistsValuesAsync()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        SeededConversation seeded = await SeedConversationAsync();
-        DateTimeOffset now = seeded.CreatedTime.AddMinutes(1);
-        await using ServiceProvider provider = BuildServiceProvider();
-        IAgentSessionStateRepository states = provider.GetRequiredService<IAgentSessionStateRepository>();
-        AgentSessionState firstState = CreateState(seeded.ConversationId, 1, "run-a", now);
-
-        // Act
-        await states.AddSessionState(firstState);
-        AgentSessionState updatedState = CreateState(seeded.ConversationId, 2, "run-b", now.AddMinutes(1));
-        await states.UpdateSessionState(updatedState);
-        AgentSessionState? persisted = await states.GetSessionStateOrDefault(seeded.ConversationId);
-        bool deleted = await states.DeleteSessionStateByConversation(seeded.ConversationId);
-
-        // Assert
-        Assert.IsNotNull(persisted);
-        Assert.AreEqual(2L, persisted.Revision);
-        Assert.AreEqual("run-b", persisted.LastRunId);
-        Assert.IsTrue(deleted);
-        Assert.IsNull(await states.GetSessionStateOrDefault(seeded.ConversationId));
-    }
-
-    /// <summary>验证跨 Repository CRUD 在事务失败时整体回滚。</summary>
-    /// <returns>表示异步测试操作的任务。</returns>
-    [TestMethod]
-    public async Task ExecuteInTransaction_CrossRepositoryFailure_RollsBackDeletedDataAsync()
+    public async Task ExecuteInTransaction_RepositoryFailure_RollsBackDeletedDataAsync()
     {
         // Arrange
         await ResetDatabaseAsync();
@@ -111,9 +83,7 @@ public sealed class AgentConversationPostgresRepositoryTests
         await using ServiceProvider provider = BuildServiceProvider();
         IPersistenceProvider persistence = provider.GetRequiredService<IPersistenceProvider>();
         IAgentChatMessageRepository messages = provider.GetRequiredService<IAgentChatMessageRepository>();
-        IAgentSessionStateRepository states = provider.GetRequiredService<IAgentSessionStateRepository>();
         _ = await messages.AddMessages([CreateMessage(seeded.ConversationId, "run-a", 0, new ChatMessage(ChatRole.User, "keep"), now)]);
-        await states.AddSessionState(CreateState(seeded.ConversationId, 1, "run-a", now));
 
         // Act
         Task ActAsync() => persistence.ExecuteInTransactionAsync(
@@ -121,7 +91,6 @@ public sealed class AgentConversationPostgresRepositoryTests
             async innerCt =>
             {
                 _ = await messages.DeleteMessagesByConversation(seeded.ConversationId, innerCt);
-                _ = await states.DeleteSessionStateByConversation(seeded.ConversationId, innerCt);
                 throw new InvalidOperationException("Force rollback.");
             });
 
@@ -129,20 +98,6 @@ public sealed class AgentConversationPostgresRepositoryTests
         _ = await Assert.ThrowsExactlyAsync<InvalidOperationException>(ActAsync);
         PagedResult<AgentChatMessage> remainingMessages = await messages.ListMessagesByConversation(seeded.ConversationId, Pagination.Default);
         Assert.HasCount(1, remainingMessages.Items);
-        Assert.IsNotNull(await states.GetSessionStateOrDefault(seeded.ConversationId));
-    }
-
-    private static AgentSessionState CreateState(Guid conversationId, long revision, string runId, DateTimeOffset updatedTime)
-    {
-        using JsonDocument document = JsonDocument.Parse($$"""{"runId":"{{runId}}","revision":{{revision}}}""");
-        return new AgentSessionState
-        {
-            ConversationId = conversationId,
-            SerializedState = document.RootElement.Clone(),
-            Revision = revision,
-            LastRunId = runId,
-            UpdatedTime = updatedTime,
-        };
     }
 
     private static AgentChatMessage CreateMessage(Guid conversationId, string runId, int runMessageIndex, ChatMessage message, DateTimeOffset now) => new()
@@ -162,7 +117,7 @@ public sealed class AgentConversationPostgresRepositoryTests
         await using ServiceProvider provider = BuildServiceProvider();
         InkwellDbContext db = provider.GetRequiredService<InkwellDbContext>();
         _ = await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE agent_chat_messages, agent_session_states, agent_conversations, agent_versions, agents CASCADE;");
+            "TRUNCATE TABLE agent_chat_messages, agent_conversations, agent_versions, agents CASCADE;");
     }
 
     private static async Task<SeededConversation> SeedConversationAsync()

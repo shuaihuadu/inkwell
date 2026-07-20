@@ -12,6 +12,7 @@ internal sealed class RoutingAgent(
     IServiceScopeFactory scopeFactory) : AIAgent
 {
     private const string RunModeHeaderName = "X-Inkwell-Agent-Run-Mode";
+    private const string ConversationIdHeaderName = "X-Inkwell-Conversation-Id";
 
     public override string? Name => "inkwell-routed-agent";
 
@@ -40,12 +41,27 @@ internal sealed class RoutingAgent(
     {
         // RoutingAgent 由 Hosting 以 Singleton 持有；每次 Run 单独创建 Scope，避免跨请求复用构建服务及其持久化依赖。
         using IServiceScope scope = scopeFactory.CreateScope();
+        IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> requestMessages = messages as IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> ?? messages.ToList();
+        if (this.TryGetPublishedConversationId(out Guid conversationId))
+        {
+            IAgentConversationService conversationService = scope.ServiceProvider.GetRequiredService<IAgentConversationService>();
+            return await conversationService
+                .RunAsync(
+                    this.GetRequiredUserId(),
+                    this.GetRouteAgentId(),
+                    conversationId,
+                    requestMessages,
+                    options,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         IAgentBuildService buildService = scope.ServiceProvider.GetRequiredService<IAgentBuildService>();
         AIAgent agent = await this
             .BuildAgentAsync(buildService, cancellationToken)
             .ConfigureAwait(false);
 
-        return await agent.RunAsync(messages, null, options, cancellationToken).ConfigureAwait(false);
+        return await agent.RunAsync(requestMessages, null, options, cancellationToken).ConfigureAwait(false);
     }
 
     protected override async IAsyncEnumerable<Microsoft.Agents.AI.AgentResponseUpdate> RunCoreStreamingAsync(
@@ -56,13 +72,33 @@ internal sealed class RoutingAgent(
     {
         // Scope 必须覆盖整个流式枚举，确保构建服务及其持久化依赖在响应结束前保持有效。
         using IServiceScope scope = scopeFactory.CreateScope();
+        IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> requestMessages = messages as IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> ?? messages.ToList();
+        if (this.TryGetPublishedConversationId(out Guid conversationId))
+        {
+            IAgentConversationService conversationService = scope.ServiceProvider.GetRequiredService<IAgentConversationService>();
+            await foreach (Microsoft.Agents.AI.AgentResponseUpdate update in conversationService
+                .RunStreamingAsync(
+                    this.GetRequiredUserId(),
+                    this.GetRouteAgentId(),
+                    conversationId,
+                    requestMessages,
+                    options,
+                    cancellationToken)
+                .ConfigureAwait(false))
+            {
+                yield return update;
+            }
+
+            yield break;
+        }
+
         IAgentBuildService buildService = scope.ServiceProvider.GetRequiredService<IAgentBuildService>();
         AIAgent agent = await this
             .BuildAgentAsync(buildService, cancellationToken)
             .ConfigureAwait(false);
 
         await foreach (Microsoft.Agents.AI.AgentResponseUpdate update in agent
-            .RunStreamingAsync(messages, null, options, cancellationToken)
+            .RunStreamingAsync(requestMessages, null, options, cancellationToken)
             .ConfigureAwait(false))
         {
             yield return update;
@@ -85,6 +121,20 @@ internal sealed class RoutingAgent(
         return string.Equals(requestedVersion, "draft", StringComparison.OrdinalIgnoreCase)
             ? buildService.BuildDraftTrialAsync(agentId, requestingUserId, cancellationToken)
             : buildService.BuildPublishedTrialAsync(agentId, requestingUserId, cancellationToken);
+    }
+
+    private bool TryGetPublishedConversationId(out Guid conversationId)
+    {
+        HttpRequest? request = httpContextAccessor.HttpContext?.Request;
+        string runMode = request?.Headers[RunModeHeaderName].ToString() ?? string.Empty;
+        string conversationValue = request?.Headers[ConversationIdHeaderName].ToString() ?? string.Empty;
+        conversationId = Guid.Empty;
+        if (string.Equals(runMode, "draft", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return Guid.TryParse(conversationValue, out conversationId);
     }
 
     private Guid GetRouteAgentId()

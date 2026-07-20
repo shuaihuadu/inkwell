@@ -12,7 +12,8 @@ namespace Inkwell;
 internal sealed class AgentFactory(
     ILLMProvider llmProvider,
     IChatLLMProvider chatLLMProvider,
-    IPersistenceProvider persistence) : IAgentFactory
+    IPersistenceProvider persistence,
+    TimeProvider timeProvider) : IAgentFactory
 {
     /// <inheritdoc />
     public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default)
@@ -25,6 +26,7 @@ internal sealed class AgentFactory(
             agent.Description,
             agent.Instructions,
             agent.BuildOptions,
+            false,
             cancellationToken);
     }
 
@@ -41,6 +43,24 @@ internal sealed class AgentFactory(
             snapshot.Description,
             snapshot.Instructions,
             snapshot.BuildOptions,
+            false,
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public ValueTask<AIAgent> BuildConversationAsync(AgentVersion version, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+
+        AgentSnapshot snapshot = version.Snapshot;
+
+        return this.BuildCoreAsync(
+            version.Id.ToString(),
+            snapshot.Name,
+            snapshot.Description,
+            snapshot.Instructions,
+            snapshot.BuildOptions,
+            true,
             cancellationToken);
     }
 
@@ -50,6 +70,7 @@ internal sealed class AgentFactory(
         string? description,
         string? instructions,
         AgentBuildOptions buildOptions,
+        bool usePersistentChatHistory,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -81,7 +102,7 @@ internal sealed class AgentFactory(
                 TopP = (float?)modelOptions.TopP,
                 MaxOutputTokens = modelOptions.MaxTokens,
             },
-            ChatHistoryProvider = this.CreateChatHistoryProvider(buildOptions.ChatHistoryOptions),
+            ChatHistoryProvider = this.CreateChatHistoryProvider(buildOptions.ChatHistoryOptions, usePersistentChatHistory),
             AIContextProviders = CreateContextProviders(buildOptions.Skills),
         };
 
@@ -89,10 +110,16 @@ internal sealed class AgentFactory(
         return chatClient.AsAIAgent(options);
     }
 
-    private InkwellChatHistoryProvider? CreateChatHistoryProvider(AgentChatHistoryOptions? options) =>
-        options is null
-            ? null
-            : new InkwellChatHistoryProvider(persistence, options.MaxMessagesToRetrieve);
+    private ChatHistoryProvider CreateChatHistoryProvider(AgentChatHistoryOptions? options, bool usePersistentChatHistory) =>
+        !usePersistentChatHistory && options is null
+            ? new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
+            {
+                JsonSerializerOptions = AgentSessionJsonOptions.Default,
+            })
+            : new InkwellChatHistoryProvider(
+                persistence,
+                new AgentConversationMessageCommitter(persistence, timeProvider),
+                options?.MaxMessagesToRetrieve);
 
     private static List<AIContextProvider> CreateContextProviders(
         ImmutableArray<AgentSkillDefinition> skillDefinitions)

@@ -1,6 +1,5 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
-using System.Data;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -14,12 +13,16 @@ namespace Inkwell;
 /// </remarks>
 internal sealed class InkwellChatHistoryProvider(
     IPersistenceProvider persistence,
-    int? maxMessagesToRetrieve = null,
-    TimeProvider? timeProvider = null) : ChatHistoryProvider
+    AgentConversationMessageCommitter messageCommitter,
+    int? maxMessagesToRetrieve = null) : ChatHistoryProvider
 {
     internal const string SessionIdStateKey = "Inkwell.SessionId";
+    private const string OwnerUserIdStateKey = "Inkwell.OwnerUserId";
+    private const string AgentIdStateKey = "Inkwell.AgentId";
+    private const string ExecutionIdStateKey = "Inkwell.ExecutionId";
 
-    private static readonly IReadOnlyList<string> stateKeys = [SessionIdStateKey];
+    private static readonly IReadOnlyList<string> stateKeys =
+        [SessionIdStateKey, OwnerUserIdStateKey, AgentIdStateKey, ExecutionIdStateKey];
 
     private readonly IAgentChatMessageRepository _messages = persistence.GetRepository<IAgentChatMessageRepository>();
 
@@ -30,18 +33,30 @@ internal sealed class InkwellChatHistoryProvider(
     /// 将 Inkwell 业务 Session 标识附加到 MAF Session。
     /// </summary>
     /// <param name="session">MAF Session。</param>
-    /// <param name="sessionId">Inkwell 业务 Session 标识。</param>
-    internal static void AttachSession(AgentSession session, Guid sessionId)
+    /// <param name="conversationId">产品会话标识。</param>
+    /// <param name="ownerUserId">会话所属参与用户标识。</param>
+    /// <param name="agentId">Agent 标识。</param>
+    /// <param name="executionId">服务端执行标识。</param>
+    internal static void AttachSession(
+        AgentSession session,
+        Guid conversationId,
+        Guid ownerUserId,
+        Guid agentId,
+        string executionId)
     {
         ArgumentNullException.ThrowIfNull(session);
-        session.StateBag.SetValue(SessionIdStateKey, sessionId.ToString());
+        ArgumentException.ThrowIfNullOrWhiteSpace(executionId);
+        session.StateBag.SetValue(SessionIdStateKey, conversationId.ToString("D"));
+        session.StateBag.SetValue(OwnerUserIdStateKey, ownerUserId.ToString("D"));
+        session.StateBag.SetValue(AgentIdStateKey, agentId.ToString("D"));
+        session.StateBag.SetValue(ExecutionIdStateKey, executionId);
     }
 
     /// <inheritdoc />
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
-        Guid sessionId = GetSessionId(context.Session);
-        IReadOnlyList<ChatMessage> history = await this._messages.ListHistoryMessagesAsync(sessionId, maxMessagesToRetrieve, cancellationToken).ConfigureAwait(false);
+        Guid conversationId = GetStateGuid(context.Session, SessionIdStateKey);
+        IReadOnlyList<ChatMessage> history = await this._messages.ListHistoryMessagesAsync(conversationId, maxMessagesToRetrieve, cancellationToken).ConfigureAwait(false);
 
         return history;
     }
@@ -49,7 +64,12 @@ internal sealed class InkwellChatHistoryProvider(
     /// <inheritdoc />
     protected override async ValueTask StoreChatHistoryAsync(InvokedContext context, CancellationToken cancellationToken = default)
     {
-        Guid sessionId = GetSessionId(context.Session);
+        AgentSession session = context.Session
+            ?? throw new InvalidOperationException("The MAF AgentSession is required for Inkwell chat history.");
+        Guid conversationId = GetStateGuid(session, SessionIdStateKey);
+        Guid ownerUserId = GetStateGuid(session, OwnerUserIdStateKey);
+        Guid agentId = GetStateGuid(session, AgentIdStateKey);
+        string executionId = GetStateString(session, ExecutionIdStateKey);
         List<ChatMessage> newMessages = [.. context.RequestMessages.Concat(context.ResponseMessages ?? [])];
 
         if (newMessages.Count == 0)
@@ -57,38 +77,37 @@ internal sealed class InkwellChatHistoryProvider(
             return;
         }
 
-        DateTimeOffset now = (timeProvider ?? TimeProvider.System).GetUtcNow();
-        List<AgentChatMessage> messagesToAdd = new(newMessages.Count);
-        foreach (ChatMessage message in newMessages)
+        AgentChatMessageCommitResult result = await messageCommitter
+            .CommitAsync(ownerUserId, agentId, conversationId, executionId, newMessages, cancellationToken)
+            .ConfigureAwait(false);
+        if (result == AgentChatMessageCommitResult.Conflict)
         {
-            messagesToAdd.Add(new AgentChatMessage
-            {
-                Id = Guid.CreateVersion7(),
-                ConversationId = sessionId,
-                Message = message,
-                SequenceNumber = 0,
-                CreatedTime = now,
-                UpdatedTime = now,
-            });
+            throw new InvalidOperationException($"Conversation run message conflict: executionId={executionId}");
         }
 
-        await persistence.ExecuteInTransactionAsync(
-            IsolationLevel.Serializable,
-            async innerCancellationToken =>
-            {
-                _ = await this._messages.AddMessages(messagesToAdd, innerCancellationToken).ConfigureAwait(false);
-            },
-            cancellationToken).ConfigureAwait(false);
+        _ = session.StateBag.TryRemoveValue(OwnerUserIdStateKey);
+        _ = session.StateBag.TryRemoveValue(AgentIdStateKey);
+        _ = session.StateBag.TryRemoveValue(ExecutionIdStateKey);
     }
 
-    private static Guid GetSessionId(AgentSession? session)
+    private static Guid GetStateGuid(AgentSession? session, string key)
     {
-        if (session?.StateBag.GetValue<string>(SessionIdStateKey) is not string sessionIdValue
-            || !Guid.TryParse(sessionIdValue, out Guid sessionId))
+        string value = GetStateString(session, key);
+        if (!Guid.TryParse(value, out Guid result))
         {
-            throw new InvalidOperationException("The MAF AgentSession is not attached to an Inkwell session.");
+            throw new InvalidOperationException($"The MAF AgentSession contains an invalid '{key}' value.");
         }
 
-        return sessionId;
+        return result;
+    }
+
+    private static string GetStateString(AgentSession? session, string key)
+    {
+        if (session?.StateBag.GetValue<string>(key) is not string value || string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"The MAF AgentSession does not contain '{key}'.");
+        }
+
+        return value;
     }
 }

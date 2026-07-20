@@ -18,7 +18,7 @@ public sealed class AgentFactoryTests
     {
         // Arrange
         LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
-        StubChatLLMProvider chatProvider = new();
+        using StubChatLLMProvider chatProvider = new();
         AgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
@@ -38,7 +38,7 @@ public sealed class AgentFactoryTests
     {
         // Arrange
         LLMModel model = CreateModel("text-embedding-3-large", LLMModelCategory.Embedding);
-        StubChatLLMProvider chatProvider = new();
+        using StubChatLLMProvider chatProvider = new();
         AgentFactory factory = CreateFactory(model, chatProvider);
 
         // Act
@@ -58,7 +58,7 @@ public sealed class AgentFactoryTests
     {
         // Arrange
         LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
-        StubChatLLMProvider chatProvider = new();
+        using StubChatLLMProvider chatProvider = new();
         AgentFactory factory = CreateFactory(model, chatProvider);
         AgentBuildOptions buildOptions = new()
         {
@@ -76,6 +76,55 @@ public sealed class AgentFactoryTests
         Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
     }
 
+    /// <summary>
+    /// 验证默认内存历史能够恢复被 jsonb 重排过多态元数据的 Session 状态。
+    /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task BuildAsync_WithoutPersistentHistory_RestoresJsonbReorderedSessionAsync()
+    {
+        // Arrange
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        using StubChatLLMProvider chatProvider = new();
+        AgentFactory factory = CreateFactory(model, chatProvider);
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
+        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        InMemoryChatHistoryProvider provider = Assert.IsInstanceOfType<InMemoryChatHistoryProvider>(chatClientAgent.ChatHistoryProvider);
+        AgentSession session = await agent.CreateSessionAsync();
+        provider.SetMessages(session, [new ChatMessage(ChatRole.User, "hello")]);
+        JsonElement serializedState = await agent.SerializeSessionAsync(session, AgentSessionJsonOptions.Default);
+        JsonElement reorderedState = MoveMetadataPropertiesToEnd(serializedState);
+
+        // Act
+        AgentSession restoredSession = await agent.DeserializeSessionAsync(reorderedState, AgentSessionJsonOptions.Default);
+        List<ChatMessage> restoredMessages = provider.GetMessages(restoredSession);
+
+        // Assert
+        Assert.HasCount(1, restoredMessages);
+        Assert.AreEqual(ChatRole.User, restoredMessages[0].Role);
+        Assert.AreEqual("hello", restoredMessages[0].Text);
+    }
+
+    /// <summary>
+    /// 验证产品会话构建始终使用 Inkwell 外部持久化聊天历史。
+    /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task BuildConversationAsync_WithoutConfiguredHistory_UsesInkwellProviderAsync()
+    {
+        // Arrange
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        using StubChatLLMProvider chatProvider = new();
+        AgentFactory factory = CreateFactory(model, chatProvider);
+
+        // Act
+        AIAgent agent = await factory.BuildConversationAsync(CreateVersion(model.Id));
+
+        // Assert
+        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        Assert.IsInstanceOfType<InkwellChatHistoryProvider>(chatClientAgent.ChatHistoryProvider);
+    }
+
     private static LLMModel CreateModel(string id, LLMModelCategory category) => new()
     {
         Id = id,
@@ -84,7 +133,7 @@ public sealed class AgentFactoryTests
     };
 
     private static AgentFactory CreateFactory(LLMModel model, StubChatLLMProvider chatProvider) =>
-        new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider());
+        new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider(), TimeProvider.System);
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
@@ -96,6 +145,50 @@ public sealed class AgentFactoryTests
         CreatedTime = DateTimeOffset.UtcNow,
         UpdatedTime = DateTimeOffset.UtcNow,
     };
+
+    private static JsonElement MoveMetadataPropertiesToEnd(JsonElement value)
+    {
+        using MemoryStream stream = new();
+        using (Utf8JsonWriter writer = new(stream))
+        {
+            WriteWithMetadataLast(writer, value);
+        }
+
+        using JsonDocument document = JsonDocument.Parse(stream.ToArray());
+        return document.RootElement.Clone();
+    }
+
+    private static void WriteWithMetadataLast(Utf8JsonWriter writer, JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            writer.WriteStartObject();
+            IEnumerable<JsonProperty> properties = value.EnumerateObject();
+            foreach (JsonProperty property in properties.Where(property => !property.Name.StartsWith('$'))
+                .Concat(properties.Where(property => property.Name.StartsWith('$'))))
+            {
+                writer.WritePropertyName(property.Name);
+                WriteWithMetadataLast(writer, property.Value);
+            }
+
+            writer.WriteEndObject();
+            return;
+        }
+
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            writer.WriteStartArray();
+            foreach (JsonElement item in value.EnumerateArray())
+            {
+                WriteWithMetadataLast(writer, item);
+            }
+
+            writer.WriteEndArray();
+            return;
+        }
+
+        value.WriteTo(writer);
+    }
 
     private static AgentVersion CreateVersion(string modelId, AgentBuildOptions? buildOptions = null)
     {
@@ -139,12 +232,14 @@ public sealed class AgentFactoryTests
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
-    private sealed class StubChatLLMProvider : IChatLLMProvider
+    private sealed class StubChatLLMProvider : IChatLLMProvider, IDisposable
     {
         private static readonly HttpClient client = new()
         {
             BaseAddress = new Uri("https://litellm.example/"),
         };
+
+        private LiteLLMProvider? _provider;
 
         public int CallCount { get; private set; }
 
@@ -154,21 +249,38 @@ public sealed class AgentFactoryTests
         {
             this.CallCount++;
             this.ModelId = modelId;
-            LiteLLMProvider provider = new(
+            this._provider = new LiteLLMProvider(
                 client,
                 Options.Create(new LiteLLMOptions
                 {
                     Endpoint = new Uri("https://litellm.example/"),
                     ApiKey = "test-key",
                 }));
-            return provider.CreateChatClient(modelId);
+            return this._provider.CreateChatClient(modelId);
         }
+
+        public void Dispose() => this._provider?.Dispose();
     }
 
     private sealed class StubPersistenceProvider : IPersistenceProvider
     {
-        public TRepository GetRepository<TRepository>() where TRepository : notnull =>
+        private readonly StubMessageRepository _messages = new();
+        private readonly StubConversationRepository _conversations = new();
+
+        public TRepository GetRepository<TRepository>() where TRepository : notnull
+        {
+            if (this._messages is TRepository messages)
+            {
+                return messages;
+            }
+
+            if (this._conversations is TRepository conversations)
+            {
+                return conversations;
+            }
+
             throw new NotSupportedException();
+        }
 
         public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default) =>
             throw new NotSupportedException();
@@ -181,5 +293,37 @@ public sealed class AgentFactoryTests
 
         public Task<TResult> ExecuteInTransactionAsync<TResult>(IsolationLevel isolationLevel, Func<CancellationToken, Task<TResult>> action, CancellationToken ct = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class StubMessageRepository : IAgentChatMessageRepository
+    {
+        public Task<PagedResult<AgentChatMessage>> ListMessagesByConversation(Guid conversationId, Pagination pagination, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChatMessage>> ListHistoryMessagesAsync(Guid conversationId, int? maxMessages = null, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentChatMessage>> ListAllMessagesByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentChatMessage>> ListMessagesByRun(Guid conversationId, string runId, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentChatMessage>> AddMessages(IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    private sealed class StubConversationRepository : IAgentConversationRepository
+    {
+        public Task<AgentConversation> AddConversation(AgentConversation conversation, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<AgentConversation> GetConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task UpdateConversation(AgentConversation conversation, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task<bool> DeleteConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 }

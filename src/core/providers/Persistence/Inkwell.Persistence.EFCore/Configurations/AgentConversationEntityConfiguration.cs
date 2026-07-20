@@ -24,9 +24,5 @@ internal sealed class AgentConversationEntityConfiguration : IEntityTypeConfigur
             .WithOne(message => message.Conversation)
             .HasForeignKey(message => message.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne(conversation => conversation.SessionState)
-            .WithOne(state => state.Conversation)
-            .HasForeignKey<AgentSessionStateEntity>(state => state.ConversationId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

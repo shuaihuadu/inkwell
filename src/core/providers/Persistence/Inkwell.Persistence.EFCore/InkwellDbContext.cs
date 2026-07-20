@@ -25,8 +25,6 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
 
     internal DbSet<AgentChatMessageEntity> AgentChatMessages => this.Set<AgentChatMessageEntity>();
 
-    internal DbSet<AgentSessionStateEntity> AgentSessionStates => this.Set<AgentSessionStateEntity>();
-
     internal DbSet<AgentSkillEntity> AgentSkills => this.Set<AgentSkillEntity>();
 
     /// <inheritdoc />

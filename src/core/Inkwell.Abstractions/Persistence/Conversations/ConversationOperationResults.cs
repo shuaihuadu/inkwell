@@ -14,13 +14,3 @@ public enum AgentChatMessageCommitResult
     /// <summary>相同幂等键已保存不同内容。</summary>
     Conflict,
 }
-
-/// <summary>表示 Session State 保存结果。</summary>
-public enum AgentSessionStateSaveResult
-{
-    /// <summary>检查点已保存。</summary>
-    Saved,
-
-    /// <summary>修订号不连续。</summary>
-    ConcurrencyConflict,
-}

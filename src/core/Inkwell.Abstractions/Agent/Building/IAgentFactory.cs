@@ -24,4 +24,12 @@ public interface IAgentFactory
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>构建完成的 MAF Agent。</returns>
     ValueTask<AIAgent> BuildAsync(AgentVersion version, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 根据不可变发布版本构建使用外部持久化聊天历史的产品会话 Agent。
+    /// </summary>
+    /// <param name="version">不可变 Agent 发布版本。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>构建完成的 MAF Agent。</returns>
+    ValueTask<AIAgent> BuildConversationAsync(AgentVersion version, CancellationToken cancellationToken = default);
 }

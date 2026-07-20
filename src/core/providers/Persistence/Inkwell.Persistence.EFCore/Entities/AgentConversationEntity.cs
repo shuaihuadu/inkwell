@@ -15,5 +15,4 @@ internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner
     public DateTimeOffset CreatedTime { get; init; }
     public DateTimeOffset UpdatedTime { get; init; }
     public List<AgentChatMessageEntity> Messages { get; set; } = [];
-    public AgentSessionStateEntity? SessionState { get; set; }
 }

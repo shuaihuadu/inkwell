@@ -10,6 +10,8 @@ namespace Inkwell.WebApi.Controllers;
 [Authorize(Policy = AuthorizationPolicies.RequireAuthenticatedUser)]
 public sealed class AgentConversationsController(IAgentConversationService conversationService) : InkwellControllerBase
 {
+    private const string GetMessagesRouteName = "AgentConversations.GetMessages";
+
     /// <summary>创建并锁定当前发布版本的产品会话。</summary>
     /// <param name="agentId">Agent 标识。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -21,7 +23,7 @@ public sealed class AgentConversationsController(IAgentConversationService conve
         AgentConversation conversation = await conversationService.CreateConversationAsync(agentId, this.GetRequiredUserId(), cancellationToken).ConfigureAwait(false);
         AgentConversationResponse response = ToResponse(conversation);
 
-        return this.CreatedAtAction(nameof(GetMessagesAsync), new { agentId, conversationId = response.Id }, response);
+        return this.CreatedAtRoute(GetMessagesRouteName, new { agentId, conversationId = response.Id }, response);
     }
 
     /// <summary>分页列出当前参与用户在指定 Agent 下的会话。</summary>
@@ -54,7 +56,7 @@ public sealed class AgentConversationsController(IAgentConversationService conve
     /// <param name="pageSize">每页条数。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>消息分页结果。</returns>
-    [HttpGet("{conversationId:guid}/messages")]
+    [HttpGet("{conversationId:guid}/messages", Name = GetMessagesRouteName)]
     [ProducesResponseType<PagedResponse<AgentChatMessageResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AgentChatMessageResponse>>> GetMessagesAsync(
         Guid agentId,

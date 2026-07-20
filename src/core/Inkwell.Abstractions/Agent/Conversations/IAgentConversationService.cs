@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Microsoft.Agents.AI;
+
 namespace Inkwell;
 
 /// <summary>定义产品会话 CRUD 和 Owner 授权业务操作。</summary>
@@ -64,12 +66,35 @@ public interface IAgentConversationService
     /// <returns>消息批次提交结果。</returns>
     Task<AgentChatMessageCommitResult> CommitRunMessagesAsync(Guid ownerUserId, Guid agentId, Guid conversationId, string executionId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default);
 
-    /// <summary>按 Revision 保存 Session 检查点。</summary>
+    /// <summary>执行产品会话并提交本轮消息。</summary>
     /// <param name="ownerUserId">会话所属参与用户标识。</param>
     /// <param name="agentId">Agent 标识。</param>
-    /// <param name="state">待保存的 Session 检查点。</param>
-    /// <param name="executionId">服务端执行标识。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>Session 检查点保存结果。</returns>
-    Task<AgentSessionStateSaveResult> SaveSessionStateAsync(Guid ownerUserId, Guid agentId, AgentSessionState state, string executionId, CancellationToken ct = default);
+    /// <param name="conversationId">产品会话标识。</param>
+    /// <param name="messages">本次协议请求携带的消息。</param>
+    /// <param name="options">Agent 运行选项。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Agent 响应。</returns>
+    Task<AgentResponse> RunAsync(
+        Guid ownerUserId,
+        Guid agentId,
+        Guid conversationId,
+        IReadOnlyList<ChatMessage> messages,
+        AgentRunOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>流式执行产品会话，并在完整成功后提交本轮消息。</summary>
+    /// <param name="ownerUserId">会话所属参与用户标识。</param>
+    /// <param name="agentId">Agent 标识。</param>
+    /// <param name="conversationId">产品会话标识。</param>
+    /// <param name="messages">本次协议请求携带的消息。</param>
+    /// <param name="options">Agent 运行选项。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>Agent 响应更新流。</returns>
+    IAsyncEnumerable<AgentResponseUpdate> RunStreamingAsync(
+        Guid ownerUserId,
+        Guid agentId,
+        Guid conversationId,
+        IReadOnlyList<ChatMessage> messages,
+        AgentRunOptions? options = null,
+        CancellationToken cancellationToken = default);
 }

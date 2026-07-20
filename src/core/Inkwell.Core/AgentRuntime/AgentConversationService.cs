@@ -1,6 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Data;
+using System.Runtime.CompilerServices;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Inkwell;
@@ -8,12 +10,13 @@ namespace Inkwell;
 /// <summary><see cref="IAgentConversationService"/> 的默认实现。</summary>
 internal sealed class AgentConversationService(
     IPersistenceProvider persistence,
-    TimeProvider timeProvider) : IAgentConversationService
+    TimeProvider timeProvider,
+    IAgentBuildService buildService) : IAgentConversationService
 {
     private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
     private readonly IAgentConversationRepository _conversations = persistence.GetRepository<IAgentConversationRepository>();
     private readonly IAgentChatMessageRepository _messages = persistence.GetRepository<IAgentChatMessageRepository>();
-    private readonly IAgentSessionStateRepository _sessionStates = persistence.GetRepository<IAgentSessionStateRepository>();
+    private readonly AgentConversationMessageCommitter _messageCommitter = new(persistence, timeProvider);
 
     public Task<AgentConversation> CreateConversationAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default) =>
         persistence.ExecuteInTransactionAsync(
@@ -77,7 +80,6 @@ internal sealed class AgentConversationService(
                     throw new KeyNotFoundException($"Agent chat message not found: id={messageId}");
                 }
 
-                _ = await this._sessionStates.DeleteSessionStateByConversation(conversationId, innerCt).ConfigureAwait(false);
                 IReadOnlyList<AgentChatMessage> remainingMessages = await this._messages.ListAllMessagesByConversation(conversationId, innerCt).ConfigureAwait(false);
                 AgentConversation updated = conversation with
                 {
@@ -100,7 +102,6 @@ internal sealed class AgentConversationService(
                 DateTimeOffset now = timeProvider.GetUtcNow();
                 AgentConversation conversation = await this.GetAuthorizedConversationAsync(ownerUserId, agentId, conversationId, innerCt).ConfigureAwait(false);
                 _ = await this._messages.DeleteMessagesByConversation(conversationId, innerCt).ConfigureAwait(false);
-                _ = await this._sessionStates.DeleteSessionStateByConversation(conversationId, innerCt).ConfigureAwait(false);
                 AgentConversation cleared = conversation with
                 {
                     Title = null,
@@ -135,86 +136,68 @@ internal sealed class AgentConversationService(
         IReadOnlyList<ChatMessage> messages,
         CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(executionId);
-        ArgumentNullException.ThrowIfNull(messages);
-        return persistence.ExecuteInTransactionAsync(
-            IsolationLevel.Serializable,
-            async innerCt =>
-            {
-                DateTimeOffset now = timeProvider.GetUtcNow();
-                AgentConversation conversation = await this.GetAuthorizedConversationAsync(ownerUserId, agentId, conversationId, innerCt).ConfigureAwait(false);
-                IReadOnlyList<AgentChatMessage> existing = await this._messages.ListMessagesByRun(conversationId, executionId, innerCt).ConfigureAwait(false);
-                if (existing.Count > 0)
-                {
-                    return MessageBatchesEqual(existing, messages)
-                        ? AgentChatMessageCommitResult.AlreadyCommitted
-                        : AgentChatMessageCommitResult.Conflict;
-                }
-
-                List<AgentChatMessage> batch = new(messages.Count);
-                for (int index = 0; index < messages.Count; index++)
-                {
-                    batch.Add(new AgentChatMessage
-                    {
-                        Id = Guid.CreateVersion7(),
-                        ConversationId = conversationId,
-                        RunId = executionId,
-                        RunMessageIndex = index,
-                        Message = messages[index],
-                        SequenceNumber = 0,
-                        CreatedTime = now,
-                        UpdatedTime = now,
-                    });
-                }
-
-                _ = await this._messages.AddMessages(batch, innerCt).ConfigureAwait(false);
-                IReadOnlyList<AgentChatMessage> allMessages = await this._messages.ListAllMessagesByConversation(conversationId, innerCt).ConfigureAwait(false);
-                AgentConversation updated = conversation with
-                {
-                    Title = FindTitle(allMessages),
-                    LastCommittedRunId = executionId,
-                    LastActivityTime = now,
-                    UpdatedTime = now,
-                };
-                await this._conversations.UpdateConversation(updated, innerCt).ConfigureAwait(false);
-                return AgentChatMessageCommitResult.Committed;
-            },
-            ct);
+        return this._messageCommitter.CommitAsync(ownerUserId, agentId, conversationId, executionId, messages, ct);
     }
 
-    public Task<AgentSessionStateSaveResult> SaveSessionStateAsync(
+    /// <inheritdoc />
+    public async Task<AgentResponse> RunAsync(
         Guid ownerUserId,
         Guid agentId,
-        AgentSessionState state,
-        string executionId,
-        CancellationToken ct = default)
+        Guid conversationId,
+        IReadOnlyList<ChatMessage> messages,
+        AgentRunOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(state);
-        ArgumentException.ThrowIfNullOrWhiteSpace(executionId);
-        return persistence.ExecuteInTransactionAsync(
-            IsolationLevel.Serializable,
-            async innerCt =>
-            {
-                _ = await this.GetAuthorizedConversationAsync(ownerUserId, agentId, state.ConversationId, innerCt).ConfigureAwait(false);
+        RunContext context = await this.PrepareRunAsync(ownerUserId, agentId, conversationId, messages, cancellationToken).ConfigureAwait(false);
+        AgentResponse response = await context.Agent
+            .RunAsync(context.RunMessages, context.Session, options, cancellationToken)
+            .ConfigureAwait(false);
+        return response;
+    }
 
-                AgentSessionState? existing = await this._sessionStates.GetSessionStateOrDefault(state.ConversationId, innerCt).ConfigureAwait(false);
-                if (state.Revision != (existing?.Revision ?? 0) + 1)
-                {
-                    return AgentSessionStateSaveResult.ConcurrencyConflict;
-                }
+    /// <inheritdoc />
+    public async IAsyncEnumerable<AgentResponseUpdate> RunStreamingAsync(
+        Guid ownerUserId,
+        Guid agentId,
+        Guid conversationId,
+        IReadOnlyList<ChatMessage> messages,
+        AgentRunOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        RunContext context = await this.PrepareRunAsync(ownerUserId, agentId, conversationId, messages, cancellationToken).ConfigureAwait(false);
 
-                if (existing is null)
-                {
-                    await this._sessionStates.AddSessionState(state, innerCt).ConfigureAwait(false);
-                }
-                else
-                {
-                    await this._sessionStates.UpdateSessionState(state, innerCt).ConfigureAwait(false);
-                }
+        await foreach (AgentResponseUpdate update in context.Agent
+            .RunStreamingAsync(context.RunMessages, context.Session, options, cancellationToken)
+            .ConfigureAwait(false))
+        {
+            yield return update;
+        }
 
-                return AgentSessionStateSaveResult.Saved;
-            },
-            ct);
+    }
+
+    private async Task<RunContext> PrepareRunAsync(
+        Guid ownerUserId,
+        Guid agentId,
+        Guid conversationId,
+        IReadOnlyList<ChatMessage> requestMessages,
+        CancellationToken cancellationToken)
+    {
+        AgentConversation conversation = await this.GetAuthorizedConversationAsync(ownerUserId, agentId, conversationId, cancellationToken).ConfigureAwait(false);
+        AIAgent agent = await buildService
+            .BuildPublishedConversationAsync(agentId, conversation.AgentVersionId, ownerUserId, cancellationToken)
+            .ConfigureAwait(false);
+        string executionId = Guid.CreateVersion7().ToString("D");
+        AgentSession session = await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+        InkwellChatHistoryProvider.AttachSession(session, conversationId, ownerUserId, agentId, executionId);
+
+        return new RunContext(
+            ownerUserId,
+            agentId,
+            conversationId,
+            executionId,
+            agent,
+            session,
+            requestMessages);
     }
 
     private static string? FindTitle(IReadOnlyList<AgentChatMessage> messages)
@@ -223,12 +206,6 @@ internal sealed class AgentConversationService(
             .FirstOrDefault(message => message.Role == ChatRole.User && !string.IsNullOrEmpty(message.Text));
         return firstUserMessage?.Text is { } text ? text[..Math.Min(30, text.Length)] : null;
     }
-
-    private static bool MessageBatchesEqual(IReadOnlyList<AgentChatMessage> existing, IReadOnlyList<ChatMessage> expected) =>
-        existing.Count == expected.Count
-        && existing.Select((message, index) => JsonElement.DeepEquals(
-            JsonSerializer.SerializeToElement(message.Message),
-            JsonSerializer.SerializeToElement(expected[index]))).All(equal => equal);
 
     private async Task<AgentConversation> GetAuthorizedConversationAsync(Guid ownerUserId, Guid agentId, Guid conversationId, CancellationToken ct)
     {
@@ -241,5 +218,14 @@ internal sealed class AgentConversationService(
 
         return conversation;
     }
+
+    private sealed record class RunContext(
+        Guid OwnerUserId,
+        Guid AgentId,
+        Guid ConversationId,
+        string ExecutionId,
+        AIAgent Agent,
+        AgentSession Session,
+        IReadOnlyList<ChatMessage> RunMessages);
 
 }
