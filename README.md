@@ -20,15 +20,18 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 - **后端**：.NET · ASP.NET Core · Microsoft Agent Framework
 - **数据与基础设施**：EF Core · PostgreSQL / SQL Server · Qdrant · Redis · MinIO / Azure Blob
 - **开发与部署**：Aspire · Docker · Kubernetes · Helm
+- **可观测性**：OpenTelemetry · Grafana · Prometheus · Tempo · Loki
 - **测试**：MSTest · Vitest · Playwright · Testcontainers
 
 ## 本地启动
 
-本机需安装 .NET 10 SDK 和 Docker Desktop。克隆仓库后，使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥（必须以 `sk-` 开头），然后启动 Aspire AppHost：
+本机需安装 [.NET 10 SDK](global.json)、Node.js（含 npm）和 Docker Desktop。克隆仓库后，先按 lockfile 安装 Desktop 与视觉原型依赖，再使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥（必须以 `sk-` 开头），最后启动 Aspire AppHost：
 
 ```bash
 git clone https://github.com/shuaihuadu/inkwell.git
 cd inkwell
+npm --prefix src/app/desktop ci
+npm --prefix prototypes/inkwell-visual-design ci
 dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
 dotnet run --project src/core/Inkwell.AppHost
 ```
@@ -41,6 +44,12 @@ dotnet run --project src/core/Inkwell.AppHost
 
 - Aspire Dashboard：<https://localhost:15888>
 - 视觉原型设计：<http://localhost:6800>
+- WebApi：<http://localhost:6801>
+- LiteLLM Portal：<http://localhost:6804/ui>
+- Grafana：<http://localhost:6805>
+- Prometheus：<http://localhost:6806>
+- Tempo：<http://localhost:6807>
+- Loki：<http://localhost:6808>
 
 端口配置位于 `src/core/Inkwell.AppHost/appsettings.json`。
 

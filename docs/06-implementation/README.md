@@ -5,11 +5,11 @@ stage: H5
 document_type: index
 status: draft
 authors:
-	- name: GitHub Copilot
-		role: agent
+  - name: GitHub Copilot
+    role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-17
+updated: 2026-07-21
 upstream: []
 downstream: []
 ---
@@ -53,6 +53,13 @@ downstream: []
 | H5-013 | LLM Provider 与 LiteLLM 接入 | Provider 端口、实时模型发现、分类、Agent Chat Client | 模型列表、详情、管理外链与 Member 测试入口已实现；非 Chat 诊断待补 | [任务简报](H5-013-llm-provider/ai-task-brief.md) |
 
 总体依赖、实施顺序和各单元完成定义见 [Desktop 实施路线图](desktop-implementation-roadmap.md)。
+
+## 横切实施指南
+
+| 主题 | 适用范围 | 文档 |
+| --- | --- | --- |
+| Grafana 指标查看 | OpenTelemetry Agent 指标、PromQL、Tempo 联查、Dashboard 与故障排查 | [Grafana 指标查看指南](observability/metrics-guide.md) |
+| 日志治理缺口 | 当前日志覆盖矩阵、生产 Alloy/Collector、脱敏、成本与告警 backlog | [日志现状与生产治理缺口](observability/logging-gap-analysis.md) |
 
 ## 执行规则
 
