@@ -1,5 +1,8 @@
 # Inkwell
 
+> [!WARNING]
+> Inkwell 当前处于活跃开发阶段，尚未发布稳定版本。功能、配置、数据库结构和公开接口都可能发生 Breaking Change，请勿将 `main` 分支视为稳定兼容基线。
+
 Inkwell 是一个基于 [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) 打造的智能体工作空间：团队可以把它部署给内部成员协作使用，个人及 OPC（One Person Company，单人公司）也可以独立部署给自己使用。
 
 Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://github.com/microsoft/agent-framework): teams can deploy it for internal collaborative use, and individuals or OPCs (One Person Companies) can self-host it for personal use.
