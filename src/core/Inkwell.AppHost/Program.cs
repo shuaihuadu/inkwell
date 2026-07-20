@@ -1,6 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
+string aspireDashboardOtlpEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]
+    ?? throw new InvalidOperationException("Missing ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL.");
 int prototypePort = GetPort(builder.Configuration["Ports:Prototype"], "Ports:Prototype", 6800);
 int desktopPort = GetPort(builder.Configuration["Ports:Desktop"], "Ports:Desktop", 6888);
 int webApiPort = GetPort(builder.Configuration["Ports:WebApi"], "Ports:WebApi", 6801);
@@ -96,6 +98,7 @@ IResourceBuilder<ProjectResource> webApi = builder
     .WithEnvironment("Inkwell__LiteLLM__DashboardUrl", liteLLMDashboardUrl)
     .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", observability.GetEndpoint("otlp-grpc"))
     .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("Inkwell__OpenTelemetry__AspireOtlpEndpoint", aspireDashboardOtlpEndpoint)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithHttpEndpoint(port: webApiPort, name: "http")
     .WaitFor(liteLLM)
@@ -116,6 +119,7 @@ builder.AddProject<Projects.Inkwell_Worker>("worker")
     .WithEnvironment("Inkwell__LiteLLM__ApiKey", liteLLMMasterKey)
     .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", observability.GetEndpoint("otlp-grpc"))
     .WithEnvironment("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+    .WithEnvironment("Inkwell__OpenTelemetry__AspireOtlpEndpoint", aspireDashboardOtlpEndpoint)
     .WaitFor(liteLLM)
     .WaitFor(observability)
     .WaitForCompletion(postgresMigrator)

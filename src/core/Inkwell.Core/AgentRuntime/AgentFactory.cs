@@ -15,6 +15,8 @@ internal sealed class AgentFactory(
     IPersistenceProvider persistence,
     TimeProvider timeProvider) : IAgentFactory
 {
+    internal const string TelemetrySourceName = "Inkwell.Agent";
+
     /// <inheritdoc />
     public ValueTask<AIAgent> BuildAsync(AgentDefinition agent, CancellationToken cancellationToken = default)
     {
@@ -107,7 +109,10 @@ internal sealed class AgentFactory(
         };
 
         IChatClient chatClient = chatLLMProvider.CreateChatClient(model.Id);
-        return chatClient.AsAIAgent(options);
+        return new OpenTelemetryAgent(chatClient.AsAIAgent(options), TelemetrySourceName)
+        {
+            EnableSensitiveData = false,
+        };
     }
 
     private ChatHistoryProvider CreateChatHistoryProvider(AgentChatHistoryOptions? options, bool usePersistentChatHistory) =>

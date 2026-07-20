@@ -19,21 +19,45 @@ using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+Uri? aspireOtlpEndpoint = builder.Configuration.GetValue<Uri>("Inkwell:OpenTelemetry:AspireOtlpEndpoint");
 
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService("inkwell-webapi"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter())
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddOtlpExporter());
-builder.Logging.AddOpenTelemetry(logging => logging
-    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("inkwell-webapi"))
-    .AddOtlpExporter());
+    .WithTracing(tracing =>
+    {
+        _ = tracing
+            .AddSource("Inkwell.Agent")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter();
+        if (aspireOtlpEndpoint is not null)
+        {
+            _ = tracing.AddOtlpExporter("aspire", options => options.Endpoint = aspireOtlpEndpoint);
+        }
+    })
+    .WithMetrics(metrics =>
+    {
+        _ = metrics
+            .AddMeter("Inkwell.Agent")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddOtlpExporter();
+        if (aspireOtlpEndpoint is not null)
+        {
+            _ = metrics.AddOtlpExporter("aspire", options => options.Endpoint = aspireOtlpEndpoint);
+        }
+    });
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    _ = logging
+        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("inkwell-webapi"))
+        .AddOtlpExporter();
+    if (aspireOtlpEndpoint is not null)
+    {
+        _ = logging.AddOtlpExporter("aspire", options => options.Endpoint = aspireOtlpEndpoint);
+    }
+});
 
 // ADR-019：Inkwell.WebApi 仅注册 IQueueProvider enqueue 侧，不跑 consumer（consumer 归 Inkwell.Worker）。
 // dev 默认 Provider 组合：Postgres（ADR-005 docker-compose 默认）+ 进程内 Cache/Queue/FileStorage/VectorStore。

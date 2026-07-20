@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Options;
 
 namespace Inkwell.Core.Tests.AgentRuntime;
@@ -26,6 +28,7 @@ public sealed class AgentFactoryTests
 
         // Assert
         Assert.IsNotNull(agent);
+        Assert.IsInstanceOfType<OpenTelemetryAgent>(agent);
         Assert.AreEqual(model.Id, chatProvider.ModelId);
         Assert.AreEqual(1, chatProvider.CallCount);
     }
@@ -70,7 +73,8 @@ public sealed class AgentFactoryTests
         AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id, buildOptions));
 
         // Assert
-        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        ChatClientAgent? chatClientAgent = agent.GetService<ChatClientAgent>();
+        Assert.IsNotNull(chatClientAgent);
         List<AIContextProvider> contextProviders = chatClientAgent.AIContextProviders?.ToList() ?? [];
         Assert.HasCount(1, contextProviders);
         Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
@@ -88,7 +92,8 @@ public sealed class AgentFactoryTests
         using StubChatLLMProvider chatProvider = new();
         AgentFactory factory = CreateFactory(model, chatProvider);
         AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
-        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        ChatClientAgent? chatClientAgent = agent.GetService<ChatClientAgent>();
+        Assert.IsNotNull(chatClientAgent);
         InMemoryChatHistoryProvider provider = Assert.IsInstanceOfType<InMemoryChatHistoryProvider>(chatClientAgent.ChatHistoryProvider);
         AgentSession session = await agent.CreateSessionAsync();
         provider.SetMessages(session, [new ChatMessage(ChatRole.User, "hello")]);
@@ -121,8 +126,55 @@ public sealed class AgentFactoryTests
         AIAgent agent = await factory.BuildConversationAsync(CreateVersion(model.Id));
 
         // Assert
-        ChatClientAgent chatClientAgent = (ChatClientAgent)agent;
+        ChatClientAgent? chatClientAgent = agent.GetService<ChatClientAgent>();
+        Assert.IsNotNull(chatClientAgent);
         Assert.IsInstanceOfType<InkwellChatHistoryProvider>(chatClientAgent.ChatHistoryProvider);
+    }
+
+    /// <summary>
+    /// 验证运行 Agent 时发出 GenAI trace 与标准指标，且不采集消息正文。
+    /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task BuildAsync_WhenRun_EmitsGenAITelemetryWithoutSensitiveDataAsync()
+    {
+        // Arrange
+        List<Activity> activities = [];
+        List<string> instruments = [];
+        using ActivityListener activityListener = new()
+        {
+            ShouldListenTo = source => source.Name == AgentFactory.TelemetrySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activities.Add,
+        };
+        ActivitySource.AddActivityListener(activityListener);
+
+        using MeterListener meterListener = new();
+        meterListener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == AgentFactory.TelemetrySourceName)
+            {
+                instruments.Add(instrument.Name);
+                listener.EnableMeasurementEvents(instrument);
+            }
+        };
+        meterListener.SetMeasurementEventCallback<long>((_, _, _, _) => { });
+        meterListener.SetMeasurementEventCallback<double>((_, _, _, _) => { });
+        meterListener.Start();
+
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        AgentFactory factory = CreateFactory(model, new RespondingChatLLMProvider());
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
+
+        // Act
+        await agent.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        // Assert
+        OpenTelemetryAgent telemetryAgent = Assert.IsInstanceOfType<OpenTelemetryAgent>(agent);
+        Assert.IsFalse(telemetryAgent.EnableSensitiveData);
+        Assert.IsTrue(activities.Any(activity => Equals(activity.GetTagItem("gen_ai.operation.name"), "invoke_agent")));
+        CollectionAssert.Contains(instruments, "gen_ai.client.operation.duration");
+        CollectionAssert.Contains(instruments, "gen_ai.client.token.usage");
     }
 
     private static LLMModel CreateModel(string id, LLMModelCategory category) => new()
@@ -132,7 +184,7 @@ public sealed class AgentFactoryTests
         ProviderMode = category == LLMModelCategory.Chat ? "chat" : "embedding",
     };
 
-    private static AgentFactory CreateFactory(LLMModel model, StubChatLLMProvider chatProvider) =>
+    private static AgentFactory CreateFactory(LLMModel model, IChatLLMProvider chatProvider) =>
         new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider(), TimeProvider.System);
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()
@@ -260,6 +312,45 @@ public sealed class AgentFactoryTests
         }
 
         public void Dispose() => this._provider?.Dispose();
+    }
+
+    private sealed class RespondingChatLLMProvider : IChatLLMProvider
+    {
+        public IChatClient CreateChatClient(string modelId) => new RespondingChatClient(modelId);
+    }
+
+    private sealed class RespondingChatClient(string modelId) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done"))
+            {
+                ModelId = modelId,
+                Usage = new UsageDetails
+                {
+                    InputTokenCount = 1,
+                    OutputTokenCount = 1,
+                    TotalTokenCount = 2,
+                },
+            });
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "done");
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class StubPersistenceProvider : IPersistenceProvider
