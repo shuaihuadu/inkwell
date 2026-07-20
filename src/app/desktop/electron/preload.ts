@@ -66,6 +66,22 @@ const api: InkwellDesktopApi = {
         ipcRenderer.invoke("inkwell:publish-agent", agentId, changeSummary),
     listAgentVersions: (agentId) =>
         ipcRenderer.invoke("inkwell:list-agent-versions", agentId),
+    createAgentConversation: (agentId) =>
+        ipcRenderer.invoke("inkwell:create-agent-conversation", agentId),
+    listAgentConversations: (agentId) =>
+        ipcRenderer.invoke("inkwell:list-agent-conversations", agentId),
+    getAgentConversationMessages: (agentId, conversationId) =>
+        ipcRenderer.invoke(
+            "inkwell:get-agent-conversation-messages",
+            agentId,
+            conversationId,
+        ),
+    deleteAgentConversation: (agentId, conversationId) =>
+        ipcRenderer.invoke(
+            "inkwell:delete-agent-conversation",
+            agentId,
+            conversationId,
+        ),
     chat: (request) => ipcRenderer.invoke("inkwell:chat", request),
     onChatDelta: (listener) => {
         const handler = (

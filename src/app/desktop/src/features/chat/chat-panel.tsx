@@ -32,9 +32,10 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
+    AgentConversationListItem,
     AgentListItem,
     ChatMessage,
 } from "../../shared/network/contracts";
@@ -58,7 +59,15 @@ const ChatPrompts = [
     { key: "rewrite", description: "帮我优化一段产品介绍文案" },
 ];
 
-type LocalConversation = ConversationItemType;
+type LocalConversation = ConversationItemType & { key: string };
+
+const toConversationItem = (
+    conversation: AgentConversationListItem,
+): LocalConversation => ({
+    key: conversation.id,
+    label: conversation.title ?? "新会话",
+    group: "历史会话",
+});
 
 export function ChatPanel({
     agent,
@@ -74,7 +83,6 @@ export function ChatPanel({
     const [activeConversationKey, setActiveConversationKey] = useState<
         string | null
     >(null);
-    const conversationMessages = useRef(new Map<string, ChatMessage[]>());
     const [messageApi, contextHolder] = message.useMessage();
     const agentDetailsQuery = useQuery({
         queryKey: ["agents", agent?.id, "chat-details"],
@@ -82,89 +90,135 @@ export function ChatPanel({
         enabled: variant === "full" && Boolean(agent),
     });
 
+    useEffect(() => {
+        if (variant !== "full" || !agent) return;
+
+        let disposed = false;
+        void desktopApi
+            .listAgentConversations(agent.id)
+            .then(async (items) => {
+                if (disposed) return;
+                setConversations(items.map(toConversationItem));
+                const first = items[0];
+                if (!first) {
+                    setActiveConversationKey(null);
+                    setMessages([]);
+                    return;
+                }
+
+                const persistedMessages =
+                    await desktopApi.getAgentConversationMessages(
+                        agent.id,
+                        first.id,
+                    );
+                if (disposed) return;
+                setActiveConversationKey(first.id);
+                setMessages(persistedMessages);
+            })
+            .catch((reason: unknown) => {
+                if (!disposed) {
+                    void messageApi.error(
+                        reason instanceof Error
+                            ? reason.message
+                            : "会话历史加载失败。",
+                    );
+                }
+            });
+
+        return () => {
+            disposed = true;
+        };
+    }, [agent, messageApi, variant]);
+
     useEffect(
         () =>
             desktopApi.onChatDelta((requestId, content) => {
                 if (requestId !== activeRequestId) return;
                 setMessages((current) => {
-                    const next = current.map((item, index) =>
+                    return current.map((item, index) =>
                         index === current.length - 1
                             ? { ...item, content: item.content + content }
                             : item,
                     );
-                    if (activeConversationKey)
-                        conversationMessages.current.set(
-                            activeConversationKey,
-                            next,
-                        );
-                    return next;
                 });
             }),
-        [activeConversationKey, activeRequestId],
+        [activeRequestId],
     );
 
     const send = async (value = draft): Promise<void> => {
         const content = value.trim();
         if (!agent || !content || activeRequestId) return;
         const requestId = crypto.randomUUID();
-        const history: ChatMessage[] = [...messages, { role: "user", content }];
+        const userMessage: ChatMessage = { role: "user", content };
+        const history: ChatMessage[] = [...messages, userMessage];
         const pendingMessages: ChatMessage[] = [
             ...history,
             { role: "assistant", content: "" },
         ];
-        if (variant === "full" && !activeConversationKey) {
-            const conversationKey = crypto.randomUUID();
-            setConversations((current) => [
-                {
-                    key: conversationKey,
-                    label:
-                        content.length > 24
-                            ? `${content.slice(0, 24)}…`
-                            : content,
-                    group: "今天",
-                },
-                ...current,
-            ]);
-            conversationMessages.current.set(conversationKey, pendingMessages);
-            setActiveConversationKey(conversationKey);
-        } else if (activeConversationKey) {
-            conversationMessages.current.set(
-                activeConversationKey,
-                pendingMessages,
-            );
-        }
+        let conversationKey = activeConversationKey;
         setMessages(pendingMessages);
         setDraft("");
         setActiveRequestId(requestId);
+        let completed = false;
         try {
+            if (variant === "full" && !conversationKey) {
+                const conversation =
+                    await desktopApi.createAgentConversation(agent.id);
+                conversationKey = conversation.id;
+                setActiveConversationKey(conversation.id);
+                setConversations((current) => [
+                    toConversationItem(conversation),
+                    ...current,
+                ]);
+            }
+
             await desktopApi.chat({
                 requestId,
                 agentId: agent.id,
                 runMode,
-                messages: history,
+                conversationId:
+                    variant === "full" ? conversationKey : null,
+                messages: variant === "full" ? [userMessage] : history,
             });
+            completed = true;
         } catch (reason) {
             messageApi.error(
                 reason instanceof Error ? reason.message : "Agent 调用失败。",
             );
-            setMessages((current) => {
-                const next = current.map((item, index) =>
+            setMessages((current) =>
+                current.map((item, index) =>
                     index === current.length - 1 && !item.content
                         ? {
                               ...item,
                               content: "暂时无法生成回复，请检查模型服务配置。",
                           }
                         : item,
-                );
-                if (activeConversationKey)
-                    conversationMessages.current.set(
-                        activeConversationKey,
-                        next,
-                    );
-                return next;
-            });
+                ),
+            );
         } finally {
             setActiveRequestId(null);
+            if (completed && variant === "full" && conversationKey) {
+                try {
+                    const [persistedMessages, persistedConversations] =
+                        await Promise.all([
+                            desktopApi.getAgentConversationMessages(
+                                agent.id,
+                                conversationKey,
+                            ),
+                            desktopApi.listAgentConversations(agent.id),
+                        ]);
+                    setMessages(persistedMessages);
+                    setConversations(
+                        persistedConversations.map(toConversationItem),
+                    );
+                } catch (reason) {
+                    void messageApi.error(
+                        reason instanceof Error
+                            ? reason.message
+                            : "会话历史刷新失败。",
+                    );
+                }
+            }
         }
     };
 
@@ -175,29 +229,42 @@ export function ChatPanel({
         setDraft("");
     };
 
-    const switchConversation = (key: string): void => {
+    const switchConversation = async (key: string): Promise<void> => {
         if (activeRequestId) return;
         const conversation = conversations.find((item) => item.key === key);
-        if (!conversation) return;
+        if (!conversation || !agent) return;
         setActiveConversationKey(key);
-        setMessages(conversationMessages.current.get(key) ?? []);
         setDraft("");
+        try {
+            setMessages(
+                await desktopApi.getAgentConversationMessages(agent.id, key),
+            );
+        } catch (reason) {
+            void messageApi.error(
+                reason instanceof Error ? reason.message : "会话消息加载失败。",
+            );
+        }
     };
 
-    const deleteConversation = (key: string): void => {
-        if (activeRequestId) return;
+    const deleteConversation = async (key: string): Promise<void> => {
+        if (activeRequestId || !agent) return;
+        try {
+            await desktopApi.deleteAgentConversation(agent.id, key);
+        } catch (reason) {
+            void messageApi.error(
+                reason instanceof Error ? reason.message : "删除会话失败。",
+            );
+            return;
+        }
+
         const remaining = conversations.filter((item) => item.key !== key);
-        conversationMessages.current.delete(key);
         setConversations(remaining);
         if (activeConversationKey !== key) return;
 
         const next = remaining[0];
         setActiveConversationKey(next ? String(next.key) : null);
-        setMessages(
-            next
-                ? (conversationMessages.current.get(String(next.key)) ?? [])
-                : [],
-        );
+        setMessages([]);
+        if (next) await switchConversation(String(next.key));
     };
 
     const renderMessages = () => (
@@ -260,10 +327,10 @@ export function ChatPanel({
                     </Tooltip>
                     <Avatar
                         className="agent-avatar"
+                        size={28}
                         src={agent.avatarUri ?? undefined}
-                    >
-                        {agent.name.slice(0, 1)}
-                    </Avatar>
+                        icon={agent.avatarUri ? undefined : <RobotOutlined />}
+                    />
                     <Typography.Text strong>{agent.name}</Typography.Text>
                     <Tag>
                         模型：
@@ -332,7 +399,7 @@ export function ChatPanel({
                                         onClick: startNewConversation,
                                     }}
                                     onActiveChange={(key) =>
-                                        switchConversation(String(key))
+                                        void switchConversation(String(key))
                                     }
                                     menu={(conversation) => ({
                                         items: [
@@ -342,7 +409,7 @@ export function ChatPanel({
                                                 danger: true,
                                                 icon: <DeleteOutlined />,
                                                 onClick: () =>
-                                                    deleteConversation(
+                                                    void deleteConversation(
                                                         String(
                                                             conversation.key,
                                                         ),

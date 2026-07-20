@@ -236,6 +236,10 @@ test("shows authentication errors and enters the workspace after login", async (
     let agentShares = 0;
     const chatRequestUrls: string[] = [];
     const chatRunModes: (string | undefined)[] = [];
+    const chatConversationIds: (string | undefined)[] = [];
+    const conversationId = "0198a96d-19e4-7000-8000-000000000401";
+    let conversationCreated = false;
+    let persistedConversationMessages: Array<Record<string, unknown>> = [];
     const capturedPayloads: {
         agentCreate?: Record<string, unknown>;
         agentUpdate?: Record<string, unknown>;
@@ -288,6 +292,87 @@ test("shows authentication errors and enters the workspace after login", async (
         if (request.url === `/api/agents/${publishedAgent.id}`) {
             response.setHeader("Content-Type", "application/json");
             response.end(JSON.stringify(publishedAgent));
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations?page=1&pageSize=100` &&
+            request.method === "GET"
+        ) {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items: conversationCreated
+                        ? [
+                              {
+                                  id: conversationId,
+                                  agentVersionId:
+                                      publishedAgent.currentPublishedVersionId,
+                                  title:
+                                      persistedConversationMessages.length > 0
+                                          ? "验证正式发布版"
+                                          : null,
+                                  lastActivityTime: "2026-07-20T07:00:00Z",
+                                  createdTime: "2026-07-20T07:00:00Z",
+                              },
+                          ]
+                        : [],
+                    totalCount: conversationCreated ? 1 : 0,
+                    pagination: { page: 1, pageSize: 100 },
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations` &&
+            request.method === "POST"
+        ) {
+            conversationCreated = true;
+            response.statusCode = 201;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    id: conversationId,
+                    agentId: publishedAgent.id,
+                    agentVersionId: publishedAgent.currentPublishedVersionId,
+                    title: null,
+                    lastActivityTime: "2026-07-20T07:00:00Z",
+                    createdTime: "2026-07-20T07:00:00Z",
+                    updatedTime: "2026-07-20T07:00:00Z",
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations/${conversationId}/messages?page=1&pageSize=100` &&
+            request.method === "GET"
+        ) {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items: persistedConversationMessages,
+                    totalCount: persistedConversationMessages.length,
+                    page: 1,
+                    pageSize: 100,
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations/${conversationId}` &&
+            request.method === "DELETE"
+        ) {
+            conversationCreated = false;
+            persistedConversationMessages = [];
+            response.statusCode = 204;
+            response.end();
             return;
         }
 
@@ -550,8 +635,11 @@ test("shows authentication errors and enters the workspace after login", async (
                     | string
                     | undefined,
             );
-            request.resume();
-            response.setHeader("Content-Type", "text/event-stream");
+                    chatConversationIds.push(
+                    request.headers["x-inkwell-conversation-id"] as
+                        | string
+                        | undefined,
+                    );
             const content = [
                 "# 运行成功",
                 "",
@@ -570,9 +658,41 @@ test("shows authentication errors and enters the workspace after login", async (
                         `第 ${index + 1} 段用于验证长回复滚动行为的内容。`,
                 ),
             ].join("\n");
-            response.end(
-                `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`,
-            );
+            const chunks: Buffer[] = [];
+            request.on("data", (chunk: Buffer) => chunks.push(chunk));
+            request.on("end", () => {
+                if (
+                    request.headers["x-inkwell-conversation-id"] ===
+                    conversationId
+                ) {
+                    const body = JSON.parse(
+                        Buffer.concat(chunks).toString(),
+                    ) as { messages: Array<{ role: string; content: string }> };
+                    persistedConversationMessages = [
+                        {
+                            id: "0198a96d-19e4-7000-8000-000000000402",
+                            message: {
+                                role: "user",
+                                contents: [{ text: body.messages[0].content }],
+                            },
+                            sequenceNumber: 1,
+                        },
+                        {
+                            id: "0198a96d-19e4-7000-8000-000000000403",
+                            message: {
+                                role: "assistant",
+                                contents: [{ text: content }],
+                            },
+                            sequenceNumber: 2,
+                        },
+                    ];
+                }
+
+                response.setHeader("Content-Type", "text/event-stream");
+                response.end(
+                    `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`,
+                );
+            });
             return;
         }
 
@@ -734,10 +854,27 @@ test("shows authentication errors and enters the workspace after login", async (
             "height",
             "52px",
         );
+        await expect(page.locator(".chat-page-header")).toHaveCSS(
+            "background-color",
+            "rgb(246, 245, 248)",
+        );
+        const publishedAgentAvatar = page.locator(
+            ".chat-page-header .agent-avatar",
+        );
+        await expect(publishedAgentAvatar).toHaveCSS("width", "28px");
+        await expect(publishedAgentAvatar).toHaveCSS("height", "28px");
+        await expect(publishedAgentAvatar).toHaveCSS(
+            "background-color",
+            "rgb(104, 70, 156)",
+        );
         await expect(
             page.getByText("模型：gpt-5.4", { exact: true }),
         ).toBeVisible();
         await expect(page.locator(".chat-history")).toHaveCSS("width", "240px");
+        await expect(page.locator(".chat-history")).toHaveCSS(
+            "background-color",
+            "rgb(246, 245, 248)",
+        );
         await expect(
             page.getByRole("heading", { name: "研发助手" }),
         ).toBeVisible();
@@ -1652,6 +1789,11 @@ test("shows authentication errors and enters the workspace after login", async (
             `/agent/${editableAgent.id}/v1/chat/completions?version=draft`,
         ]);
         expect(chatRunModes).toEqual(["published", "published", "draft"]);
+        expect(chatConversationIds).toEqual([
+            conversationId,
+            undefined,
+            undefined,
+        ]);
         await page
             .getByRole("button", { name: "关闭试运行" })
             .dispatchEvent("click");

@@ -18,9 +18,9 @@
     text-rendering: optimizeLegibility;
 }
 [data-appearance="dark"] {
-    --shell-bg: #151318;
-    --shell-panel: #1f1c23;
-    --shell-border: #37323d;
+    --shell-bg: #121114;
+    --shell-panel: #1c1a20;
+    --shell-border: #312d36;
     --shell-hover: #302a38;
     --shell-text: #f0edf3;
     --shell-muted: #b4abbc;
@@ -937,11 +937,12 @@ textarea {
     gap: 10px;
     padding: 0 16px;
     border-bottom: 1px solid var(--shell-border);
+    background: var(--shell-bg);
 }
 .chat-page-header .agent-avatar.ant-avatar {
     flex: 0 0 28px;
-    color: #fff;
-    background: var(--primary);
+    color: #fff !important;
+    background: var(--primary) !important;
 }
 .chat-page-header > .ant-typography {
     overflow: hidden;

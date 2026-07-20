@@ -11,6 +11,8 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
     AgentDefinition,
+    AgentConversation,
+    AgentConversationListItem,
     AgentAvatarUploadFile,
     AgentAvatarUploadResponse,
     AgentListItem,
@@ -25,6 +27,7 @@ import type {
     AuthSnapshot,
     AuthStatus,
     ChatRequest,
+    ChatMessage,
     ChangePasswordRequest,
     CreateAccountRequest,
     IssuedCredential,
@@ -56,6 +59,18 @@ let idleLockTimer: NodeJS.Timeout | null = null;
 
 interface InternalAuthSession extends AuthIdentity {
     sessionToken: string;
+}
+
+interface PagedApiResponse<T> {
+    items: T[];
+}
+
+interface AgentChatMessageApiResponse {
+    message: {
+        role: string;
+        text?: string | null;
+        contents?: Array<{ text?: string | null }>;
+    };
 }
 
 class ApiRequestError extends Error {
@@ -581,6 +596,66 @@ const registerApiHandlers = (): void => {
             );
         },
     );
+    ipcMain.handle(
+        "inkwell:create-agent-conversation",
+        (_event, agentId: string): Promise<AgentConversation> => {
+            requireAuthenticated();
+            return request<AgentConversation>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations`,
+                { method: "POST" },
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:list-agent-conversations",
+        async (_event, agentId: string): Promise<AgentConversationListItem[]> => {
+            requireAuthenticated();
+            const result = await request<
+                PagedApiResponse<AgentConversationListItem>
+            >(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations?page=1&pageSize=100`,
+            );
+            return result.items;
+        },
+    );
+    ipcMain.handle(
+        "inkwell:get-agent-conversation-messages",
+        async (
+            _event,
+            agentId: string,
+            conversationId: string,
+        ): Promise<ChatMessage[]> => {
+            requireAuthenticated();
+            const result = await request<
+                PagedApiResponse<AgentChatMessageApiResponse>
+            >(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/messages?page=1&pageSize=100`,
+            );
+            return result.items.map(({ message }) => ({
+                role: message.role === "assistant" ? "assistant" : "user",
+                content:
+                    message.text ??
+                    message.contents
+                        ?.map((content) => content.text ?? "")
+                        .join("") ??
+                    "",
+            }));
+        },
+    );
+    ipcMain.handle(
+        "inkwell:delete-agent-conversation",
+        (
+            _event,
+            agentId: string,
+            conversationId: string,
+        ): Promise<void> => {
+            requireAuthenticated();
+            return request<void>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}`,
+                { method: "DELETE" },
+            );
+        },
+    );
 
     ipcMain.handle(
         "inkwell:chat",
@@ -597,6 +672,12 @@ const registerApiHandlers = (): void => {
                         Authorization: `Bearer ${sessionToken ?? ""}`,
                         "Content-Type": "application/json",
                         "X-Inkwell-Agent-Run-Mode": input.runMode,
+                        ...(input.conversationId
+                            ? {
+                                  "X-Inkwell-Conversation-Id":
+                                      input.conversationId,
+                              }
+                            : {}),
                     },
                     body: JSON.stringify({
                         model: "inkwell",

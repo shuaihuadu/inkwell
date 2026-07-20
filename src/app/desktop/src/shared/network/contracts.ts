@@ -237,7 +237,21 @@ export interface ChatRequest {
     requestId: string;
     agentId: string;
     runMode: "published" | "draft";
+    conversationId: string | null;
     messages: ChatMessage[];
+}
+
+export interface AgentConversationListItem {
+    id: string;
+    agentVersionId: string;
+    title: string | null;
+    lastActivityTime: string;
+    createdTime: string;
+}
+
+export interface AgentConversation extends AgentConversationListItem {
+    agentId: string;
+    updatedTime: string;
 }
 
 export interface InkwellDesktopApi {
@@ -291,6 +305,20 @@ export interface InkwellDesktopApi {
         changeSummary: string | null,
     ) => Promise<AgentVersion>;
     listAgentVersions: (agentId: string) => Promise<AgentVersion[]>;
+    createAgentConversation: (
+        agentId: string,
+    ) => Promise<AgentConversation>;
+    listAgentConversations: (
+        agentId: string,
+    ) => Promise<AgentConversationListItem[]>;
+    getAgentConversationMessages: (
+        agentId: string,
+        conversationId: string,
+    ) => Promise<ChatMessage[]>;
+    deleteAgentConversation: (
+        agentId: string,
+        conversationId: string,
+    ) => Promise<void>;
     chat: (request: ChatRequest) => Promise<void>;
     onChatDelta: (
         listener: (requestId: string, content: string) => void,
