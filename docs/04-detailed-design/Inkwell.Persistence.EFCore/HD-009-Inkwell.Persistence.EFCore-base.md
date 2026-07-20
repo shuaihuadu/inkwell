@@ -31,6 +31,8 @@ downstream: []
 > 全文术语锁定 = Entity ↔ Model；具名 Repository 动词白名单 = Add / Update / Get / Delete / List / Find（不带 `Async` 后缀）；mapper 走手写 `XxxMappingExtensions` 三方法（`ToModel` / `ToEntity` / `SelectAsModel`）；全部签名走裸 `Task<T>` + BCL 异常（[ADR-023](../../03-architecture/adr/ADR-023-port-signature-bare-task-with-exceptions.md)）。
 >
 > **2026-07-15 替代性 errata（Conversations 三实体）**：原 §3.13 的 `AgentSessionDefinition` / `AgentSessionEntity` 把产品会话与 MAF Session 状态混为一体。当前 EFCore family 必须按 [HD-017 §0](../Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#0-2026-07-15-当前契约替代下方冲突章节) 实现 `AgentConversation`、`AgentChatMessage`、`AgentSessionState` 三套 Entity / Configuration / Mapping / Repository；本 errata 只替代 Conversations 对应模板行，其余已 reviewed 内容保持不变。
+>
+> **2026-07-20 Session checkpoint 删除 errata**：Conversations 持久化现收敛为 `AgentConversation` 与 `AgentChatMessage` 两套实体。`AgentSessionStateEntity` 及其 Configuration、Mapping、Repository、DI 注册和导航关系已删除；双数据库 `RemoveAgentSessionState` migration 删除旧状态表。下方三实体计数和状态实体配置要求仅保留为历史设计。
 
 ## 1. 模块概述
 

@@ -28,6 +28,8 @@ upstream:
 >
 > **2026-07-16 路由 Session 删除 errata**：`RoutingAgentSession` / `RoutingAgentSessionState` 及其版本固定、内部 Session 序列化逻辑已删除，实际 Agent Session 方案等待后续讨论。当前 `RoutingAgent` 是无状态代理：Create/Serialize/Deserialize 仅满足 MAF 抽象的空占位契约，每次 Run 按 URL 中的 `agentId` 与认证用户重新解析当前发布版本并调用实际 Agent，且不向实际 Agent 传递 Session。本行为是临时路由实现，不覆盖产品 Conversation 已保存的版本不变量，也不构成最终 Session 连续性设计。
 >
+> **2026-07-20 Session checkpoint 删除 errata**：正式 Conversation 不再保存或恢复 `AgentSessionState`。Core 每轮用锁定的 `AgentVersionId` 构建 Agent 并创建新 MAF Session，历史由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复；删除和清空操作只处理消息与 Conversation 派生字段。下方关于 Session 检查点、状态失效和服务端 `SerializedState` 的描述均已过期。
+>
 > **2026-07-16 WebApi/Core 构建边界 errata**：上段“重新解析当前发布版本”由 Core `IAgentBuildService` 完成。`RoutingAgent` 只从 Route 读取 `agentId`、从 Claims 读取 `requestingUserId`，随后调用一次 `BuildPublishedAsync` 并转发 MAF Run；版本授权、Snapshot 绑定解析和 Factory 构建均不在 WebApi 实现。该边界取代下方任何由协议入口直接组合 `IAgentVersionService` / `IAgentBuildOptionsResolver` / `IAgentFactory` 的描述。
 >
 > **2026-07-15 技术方向与待定路由**：AG-UI 直接使用 MAF `MapAGUI`，不增加 Inkwell 自建 Run DTO、协议状态机或 SSE 编码器；会话连续性由 `RunAgentInput.ThreadId` → `AgentSessionStore` 原生链路承接。具体挂载路径尚未由 Owner 拍板：当前代码是 `/agent/{agentId}`，ADR-012 仍描述 `/api/runs`，`/api/agents/{agentId}/agui` 仅为候选，不得写入 H5 brief 作为既定契约。

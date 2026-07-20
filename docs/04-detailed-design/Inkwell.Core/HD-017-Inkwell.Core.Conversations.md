@@ -20,6 +20,8 @@ upstream:
 
 > **2026-07-17 Run 租约移除 errata**：Conversation 不再维护 Run 租约或 fencing。`AgentConversation` 不包含 `ActiveRunId` / `RunLeaseExpiresTime`；Service 与 Repository 不提供 acquire / renew / release 或条件更新接口；消息批次继续使用服务端 `ExecutionId` 作为幂等关联键，SessionState 继续使用 Revision 处理并发。下方所有租约、fencing、`LeaseLost`、租约冲突异常及专用 `409` 描述均被本 errata 取代，不再代表当前代码契约。
 >
+> **2026-07-20 Session checkpoint 删除 errata**：`AgentChatMessage` 现为产品会话跨轮连续性的唯一持久化状态。每轮运行均由绑定版本 Agent 创建新的 MAF `AgentSession`，`InkwellChatHistoryProvider` 使用 `ConversationId` 从消息仓储加载历史，并在成功回调中幂等提交本轮 request + response。`AgentSessionState` Model、Repository、Entity、数据表、Revision/CAS、序列化/反序列化和保存 API 已全部删除；PostgreSQL 与 SQL Server 均由 `RemoveAgentSessionState` migration 删除旧表。`AgentSkillsProvider` 与当前其他 Context Provider 不保存跨轮状态。下方关于 checkpoint、`SerializedState`、SessionStore 和消息/状态双写一致性的描述仅保留为历史设计，不再代表当前契约。
+>
 > **2026-07-15 替代性 errata（`AgentConversation` 与 MAF `AgentSession` 边界）**：Owner 在当前对话中直接确认三项产品不变量：(1) 每个产品会话永久锁定创建时的 `AgentVersion`；(2) REST 先创建 `AgentConversation`，第一次 AG-UI Run 再懒创建 MAF `AgentSession`；(3) 同一 `AgentConversation` 同时只允许一个 Run，后到请求返回 `409 Conflict`，不排队、不并行合并。本 errata 取代 2026-07-12 errata 中把产品会话称为 `AgentSessionDefinition`、把产品元数据与 MAF `SessionState` 混存、以及“对外统一使用 Session”的结论。下方旧章节保留为历史评审依据；凡与本 errata 冲突，以本 errata 为准。
 >
 > **2026-07-16 实际 Agent Session 暂缓 errata**：产品 `AgentConversation` 的版本绑定和消息真值不变量保持不变；实际 MAF `AgentSession` 的创建、包装、持久化和恢复方案暂停，等待后续单独讨论。`RoutingAgentSession` / `RoutingAgentSessionState` 已删除，当前路由代理不承载 `AgentVersionId` 或实际 Agent 状态。下方关于 wrapper Session、`InkwellAgentSessionStore` 和首次 Run 懒建 Session 的实现描述暂不代表当前代码契约。
