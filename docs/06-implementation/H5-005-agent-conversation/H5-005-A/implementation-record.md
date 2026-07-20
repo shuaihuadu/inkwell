@@ -10,7 +10,7 @@ authors:
     role: agent
 reviewers: []
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-20
 upstream:
   - REQ-010
   - REQ-018
@@ -38,9 +38,9 @@ downstream:
 
 ## 1. 实施状态
 
-- **结论**：主体实现已完成，当前会话尚未重跑完整测试矩阵。
-- **代码基线**：`9b7e03d` 及当前工作区；双 Provider Migration 当前为未跟踪文件。
-- **记录日期**：2026-07-17。
+- **结论**：主体实现与完整测试矩阵均已完成。
+- **代码基线**：`559de4d`。
+- **记录日期**：2026-07-20。
 
 ## 2. 上游依据
 
@@ -52,37 +52,36 @@ downstream:
 
 | 路径 / 符号 | 当前职责 | 对应需求 |
 | --- | --- | --- |
-| `Inkwell.Abstractions/Persistence/Conversations` | Conversation、消息、SessionState 三模型和 Repository 端口 | REQ-010、NFR-005 |
-| `Inkwell.Core/Conversations/AgentConversationService` | 创建、列表、历史、删除、清空、消息幂等提交和状态保存 | REQ-010 |
-| `Inkwell.Persistence.EFCore` | 三表 Entity、Mapping、Configuration 和 Repository | NFR-005 |
+| `Inkwell.Abstractions/Persistence/Conversations`、`Agent/Conversations` | Conversation、消息两模型和 Repository / Service 端口 | REQ-010、NFR-005 |
+| `Inkwell.Core/AgentRuntime/AgentConversationService` | 创建、列表、历史、删除、清空、运行编排和消息幂等提交 | REQ-010 |
+| `Inkwell.Core/AgentRuntime/ChatHistory` | 从消息仓储恢复跨轮历史并提交本轮消息 | REQ-010、NFR-005 |
+| `Inkwell.Persistence.EFCore` | Conversation、Message 两表 Entity、Mapping、Configuration 和 Repository | NFR-005 |
 | `Inkwell.WebApi/Controllers/AgentConversationsController` | Conversation 产品 REST | REQ-010、REQ-018 |
-| `Inkwell.Persistence.EFCore.{SqlServer,Postgres}/Migrations` | 双 Provider Initial Migration | NFR-005 |
+| `Inkwell.Persistence.EFCore.{SqlServer,Postgres}/Migrations` | 双 Provider `RemoveAgentSessionState` Migration | NFR-005 |
 
 ## 4. 已验证证据
 
 | 验证项 | 命令或测试 | 结果 | 日期 |
 | --- | --- | --- | --- |
-| Conversation Model | `AgentConversationModelTests` | 测试代码已存在，本记录创建时未重跑 | 2026-07-17 |
-| Conversation Service | `AgentConversationServiceTests` | 测试代码已存在，本记录创建时未重跑 | 2026-07-17 |
-| PostgreSQL Repository | `AgentConversationPostgresRepositoryTests` | 测试代码已存在，本记录创建时未重跑 | 2026-07-17 |
+| Solution build | `dotnet build Inkwell.slnx --no-restore` | 通过 | 2026-07-20 |
+| Full test matrix | `dotnet test Inkwell.slnx --no-build` | 93/93 通过 | 2026-07-20 |
+| Conversation external history | `AgentConversationServiceRunTests` | 两轮运行从消息仓储恢复历史，且不调用 Session 序列化 | 2026-07-20 |
 
 ## 5. 待补验证与实现缺口
 
 | 缺口 | 关联 AC / 风险 | 后续任务 |
 | --- | --- | --- |
-| Abstractions、Core、WebApi、Provider 全矩阵未在本记录创建时重跑 | AC-036、AC-051、AC-060～064、AC-084 | H5-005-A-V |
 | SQL Server Repository 行为覆盖需要与 PostgreSQL 对称核验 | Provider 一致性 | H5-005-A-V |
-| Migration 当前未纳入 git 跟踪，需由 Owner 决定后续提交范围 | 部署可重复性 | 独立提交审计 |
 
 ## 6. 已知偏差
 
 - 原 H5-005-A brief 要求 Run Lease 与 fencing；该设计已被 HD-017 当前契约移除，实际实现不包含这些字段和操作。
-- 实际 Agent Session 的持久化和恢复仍暂缓，归后续 H5-005-B 设计核验。
+- 正式 Conversation 每轮新建 MAF Session；跨轮连续性由 `AgentChatMessage` 唯一事实源恢复，不持久化 Session checkpoint。
 
 ## 7. 后续任务
 
-- H5-005-A-V：运行并补齐 Conversation 相关测试矩阵，更新本记录验证证据。
-- H5-005-B：基于现有 `MapAGUI` 与 `InkwellChatHistoryProvider` 验证真实 AG-UI wire contract。
+- H5-005-A-V：补齐 SQL Server 与 PostgreSQL 对称的 Repository contract 覆盖。
+- H5-005-D：完成取消、错误、重试、断线和锁屏恢复。
 
 ## 8. 维护规则
 

@@ -125,10 +125,7 @@ src/core/Inkwell.Abstractions/
 >   Conversations/
 >     AgentConversation.cs             # 产品会话聚合（HD-017 2026-07-15 errata）
 >     IAgentConversationRepository.cs
->     AgentChatMessage.cs              # 完整 ChatMessage 历史真值
 >     IAgentChatMessageRepository.cs
->     AgentSessionState.cs             # MAF Session 检查点
->     IAgentSessionStateRepository.cs
 >   KnowledgeBase/
 >     KnowledgeBase.cs
 >     IKnowledgeBaseRepository.cs
@@ -192,18 +189,19 @@ src/core/Inkwell.Abstractions/Persistence/
 
 > 由 [HD-017 §2 / §3.1 ~ §3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。
 >
-> **2026-07-15 替代性 errata**：原 `Conversation` / `ConversationMessage` 两 Model 无法区分产品聚合与 MAF 运行时状态，且缺少状态 Repository。当前文件结构以 [HD-017 §0.2](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#02-文件与职责替代) 为准；旧文件名由以下清单取代。
+> **2026-07-20 替代性 errata**：正式 Conversation 每轮新建 MAF Session，跨轮历史仅由 `AgentChatMessage` 持久化；`AgentSessionState` 及其 Repository 已删除。当前文件结构以真实源码为准；下方清单取代此前三模型结构。
 
 ```text
 src/core/Inkwell.Abstractions/Persistence/
   Conversations/                        # 新增子目录（HD-017）
-    AgentConversation.cs                # 产品会话聚合；含不可变 AgentVersionId 与 Run 租约字段
-    AgentChatMessage.cs                 # 完整 ChatMessage 真值；ConversationId + RunId + SequenceNumber
-    AgentSessionState.cs                # MAF AgentSession 持久化检查点；ConversationId 为 PK/FK
-    IAgentConversationRepository.cs     # 会话 CRUD、列表查询与数据库原子 Run 租约
+    AgentConversation.cs                # 产品会话聚合；含不可变 AgentVersionId
+    AgentConversationListItem.cs        # 会话列表裁剪投影
+    ConversationOperationResults.cs     # 消息批次提交结果
+    IAgentConversationRepository.cs     # 会话 CRUD 与列表查询
     IAgentChatMessageRepository.cs      # 消息批量追加、历史查询、清空与 Run 幂等检查
-    IAgentSessionStateRepository.cs     # 状态 Get/Add/Update/Delete，Revision + RowVersion CAS
 ```
+
+完整消息 Model `AgentChatMessage.cs` 位于 `src/core/Inkwell.Abstractions/Agent/Conversations/`，与运行端口 `IAgentConversationService.cs` 共置。
 
 ### Persistence/Skills（HD-020 落地）
 
@@ -541,34 +539,32 @@ src/core/Inkwell.Core/
 >
 > 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
 >
-> **2026-07-15 替代性 errata**：产品 API 重新统一为 Conversation 术语；原 `IConversationService` / `ConversationSummary` / `ConversationService` 由 Agent 前缀类型取代。MAF `AgentSessionStore` 与 `ChatHistoryProvider` 适配器不放在业务 Service 中，而放在唯一允许依赖 MAF 的 `Inkwell.Core.AgentRuntime`。
+> **2026-07-20 替代性 errata**：产品 API 统一使用 Conversation 术语。`IAgentConversationService` 与 `AgentChatMessage` 位于 `Agent/Conversations/`；正式运行编排和 `InkwellChatHistoryProvider` 位于唯一允许依赖 MAF 的 `Inkwell.Core.AgentRuntime`，不实现持久 `AgentSessionStore`。
 
 ```text
-src/core/Inkwell.Abstractions/
-  Conversations/                           # 新增子目录（HD-017）
-    IAgentConversationService.cs           # 产品会话 CRUD、Owner 授权、清空与单 Run 规则
-    AgentConversationSummary.cs            # 会话列表投影 DTO（历史会话侧栏）
-    ConversationOptions.cs                 # MaxMessagesPerConversation / EnableSensitiveDataLogging
-    ConversationOptionsValidator.cs        # IValidateOptions<ConversationOptions>
+src/core/Inkwell.Abstractions/Agent/Conversations/
+  AgentChatMessage.cs                       # 完整 ChatMessage 历史真值
+  IAgentConversationService.cs              # 产品会话 CRUD、Owner 授权与运行入口
 ```
 
-**文件计数 errata**：HD-017 当前在 `Conversations/` 贡献 4 个、在 `Persistence/Conversations/` 贡献 6 个，合计 10 个 `*.cs`；原“8 个”计数仅对应已被替代的旧设计。全项目累计数待 H5 实体文件落地后按实际文件重新核算，不再沿用旧加法。
+**文件计数 errata**：当前以真实源码清单为准，不再沿用旧设计的累计文件计数。
 
 **对接 `Inkwell.Core.Conversations` 的实现**（无独立 Provider csproj，同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）：
 
 ```text
 src/core/Inkwell.Core/
   Conversations/
-    AgentConversationService.cs            # 唯一 IAgentConversationService 实现
     ConversationBuilderExtensions.cs       # UseDefaultConversationService()
   AgentRuntime/
-    InkwellAgentSessionStore.cs             # MAF AgentSessionStore 适配；不读取 HttpContext
-    InkwellChatHistoryProvider.cs           # MAF ChatHistoryProvider；数据库消息为历史真值
+    AgentConversationService.cs             # 唯一 IAgentConversationService 实现；每轮新建 Session
+    ChatHistory/
+      AgentConversationMessageCommitter.cs  # 消息批次事务提交
+      InkwellChatHistoryProvider.cs          # MAF ChatHistoryProvider；数据库消息为历史真值
 ```
 
-`Inkwell.Core.Conversations` 当前贡献 2 个文件；Session Store 与 History Provider 两个适配器计入 `Inkwell.Core.AgentRuntime`。旧累计计数由本 errata 取代，最终以 H5 实际文件清单为准。
+`ConversationBuilderExtensions` 只负责 DI 注册；运行编排与 History Provider 均属于 `Inkwell.Core.AgentRuntime`。旧累计计数由本 errata 取代，最终以实际文件清单为准。
 
-> `Persistence/Conversations/` 的 3 个 Model + 3 个具名 Repository 接口由本 HD 锁定；EFCore Entity / Configuration / Mapping / Repository 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Configurations,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。`Inkwell.Core.AgentRuntime` 适配器通过业务 Service、MAF conversation key 或标准 `RunAgentInput.forwardedProps.inkwell` 的服务端覆盖值访问显式上下文，不读取 `HttpContext`，也不把 `threadId` 或客户端 `runId` 当作授权凭证。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
+> Conversation 持久化由 `AgentConversation`、`AgentChatMessage` 与两个具名 Repository 接口组成；EFCore Entity / Configuration / Mapping / Repository 实现物理位置仍是 `providers/Persistence/Inkwell.Persistence.EFCore/{Entities,Configurations,Mapping,Repositories}/`（[ADR-021](../03-architecture/adr/ADR-021-efcore-persistence-shared-base-and-provider-csproj-layout.md)）。`Inkwell.Core.AgentRuntime` 使用明确的 owner、agent、conversation 和 execution 参数，不把 `threadId` 或客户端 `runId` 当作授权凭证。**本 HD 不实现 `agui_run_events` 表**（归属占位疑问详见 [HD-017 §8 Q&A-D](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#8-需要-owner-确认的问题)）。
 >
 > **2026-07-09 决策更新**：Owner 决定 v1 不做审计日志功能（详见 [requirements.md §13 第 14/23 条 2026-07-09 决策更新](../01-requirements/requirements.md)）。本节原 `## Inkwell.Abstractions.AuditLogs`（HD-018 `IAuditLogger` 唯一实现 + `Persistence/AuditLogs/` + `Audit/` 追加文件）已随 HD-007 / HD-018 一并删除；下游章节的累计文件计数不再包含该段贡献，具体数值以各自 HD 文档最终版为准，不在此处逐一重算。
 
