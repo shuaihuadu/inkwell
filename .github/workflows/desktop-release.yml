@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download installers
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: release-artifacts
           merge-multiple: true
@@ -98,4 +98,5 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: gh release create "$GITHUB_REF_NAME" release-artifacts/* --prerelease --generate-notes --title "$GITHUB_REF_NAME"
