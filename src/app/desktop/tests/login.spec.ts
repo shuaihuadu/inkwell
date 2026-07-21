@@ -1009,6 +1009,10 @@ test("shows authentication errors and enters the workspace after login", async (
         ).toBeVisible();
         await expect(page.getByText("版本", { exact: true })).toBeVisible();
         await expect(page.getByTestId("app-version")).not.toHaveText("-");
+        await expect(page.getByTestId("app-build-number")).not.toHaveText(
+            "未提供",
+        );
+        await expect(page.getByTestId("app-commit")).not.toHaveText("未提供");
         const qrCode = page.getByRole("img", { name: "公众号二维码" });
         await expect(qrCode).toBeVisible();
         expect(

@@ -40,6 +40,9 @@ import type {
     UserListItem,
 } from "../src/shared/network/contracts.js";
 
+declare const __INKWELL_BUILD_NUMBER__: string;
+declare const __INKWELL_COMMIT_SHA__: string;
+
 protocol.registerSchemesAsPrivileged([
     {
         scheme: "inkwell",
@@ -247,8 +250,8 @@ const registerApiHandlers = (): void => {
         "inkwell:app-metadata",
         (): AppMetadata => ({
             version: app.getVersion(),
-            buildNumber: process.env.INKWELL_BUILD_NUMBER ?? null,
-            commit: process.env.INKWELL_COMMIT_SHA ?? null,
+            buildNumber: __INKWELL_BUILD_NUMBER__,
+            commit: __INKWELL_COMMIT_SHA__,
         }),
     );
     ipcMain.handle("inkwell:restore-auth", restoreAuthentication);

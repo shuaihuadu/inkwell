@@ -56,6 +56,18 @@ dotnet run --project src/core/Inkwell.AppHost
 
 端口配置位于 `src/core/Inkwell.AppHost/appsettings.json`。
 
+## Desktop 发布
+
+Desktop 当前版本为 `0.0.1-alpha`。`alpha` 表示功能、配置、数据库结构和公开接口尚未稳定，后续版本可能包含 Breaking Change。
+
+推送与 `src/app/desktop/package.json` 版本一致的 Git Tag（例如 `v0.0.1-alpha`）后，GitHub Actions 会创建 prerelease 并生成以下安装包：
+
+- Windows x64：NSIS `.exe`、MSI `.msi`
+- macOS Universal：`.dmg`、`.zip`
+- Linux x64：`.AppImage`、`.deb`
+
+安装包 About 窗口中的版本来自 `package.json`，构建号来自 GitHub Actions run number 与 run attempt，提交号来自发布工作流对应的 Git commit。安装包内部使用对应的纯数字平台构建版本 `0.0.<run_number>.<run_attempt>`，满足 macOS `CFBundleVersion` 与 Windows `FileVersion` 的格式要求。当前安装包未接入 Windows 代码签名和 macOS notarization，仅用于 alpha 阶段测试；Desktop 仍需连接可用的 Inkwell WebApi。
+
 ## Roadmap
 
 - ✅ Agent 创建、完整配置、草稿保存与试运行

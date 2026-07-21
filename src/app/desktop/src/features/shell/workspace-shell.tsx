@@ -541,13 +541,13 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                         <Typography.Text type="secondary">
                             构建号
                         </Typography.Text>
-                        <Typography.Text>
+                        <Typography.Text data-testid="app-build-number">
                             {metadataQuery.data?.buildNumber ?? "未提供"}
                         </Typography.Text>
                     </div>
                     <div>
                         <Typography.Text type="secondary">提交</Typography.Text>
-                        <Typography.Text>
+                        <Typography.Text data-testid="app-commit">
                             {metadataQuery.data?.commit?.slice(0, 12) ??
                                 "未提供"}
                         </Typography.Text>
