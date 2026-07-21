@@ -3,7 +3,12 @@
   "private": true,
   "version": "0.0.1-alpha",
   "description": "Inkwell desktop application",
-  "author": "ShuaiHua Du",
+  "homepage": "https://github.com/shuaihuadu/inkwell",
+  "author": {
+    "name": "ShuaiHua Du",
+    "email": "shuaihuadu@users.noreply.github.com"
+  },
+  "desktopName": "Inkwell",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
@@ -59,7 +64,8 @@
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -99,6 +105,7 @@
     "linux": {
       "category": "Utility",
       "icon": "public/logo.png",
+      "syncDesktopName": true,
       "target": [
         {
           "target": "AppImage",
