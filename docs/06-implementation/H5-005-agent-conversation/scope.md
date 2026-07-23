@@ -9,7 +9,7 @@ authors:
     role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-20
+updated: 2026-07-21
 upstream:
   - REQ-010
   - REQ-018
@@ -60,7 +60,8 @@ downstream:
 - **已有**：WebApi 通过 MAF `MapAGUI("/agent/{agentId}", agent)` 挂载 AG-UI。
 - **已有**：正式 Conversation 每轮新建 Session，并由 `InkwellChatHistoryProvider` 从服务端消息恢复跨轮历史。
 - **已有**：Conversation REST、Electron IPC、聊天页和跨设备消息恢复链路。
-- **缺失**：工具/Activity、取消、失败重试、断线和锁屏恢复的完整闭环。
+- **已有**：取消、结构化错误与重试、主进程内有界请求快照和锁屏恢复闭环。
+- **缺失**：工具/Activity，以及系统 suspend/resume 后需要独立协议设计的断线重连。
 - **偏差**：真实后端直接使用 MAF `MapAGUI`，与 ADR-012 的 `/api/runs` 描述不一致；直接使用官方 Hosting 是当前技术方向，但具体挂载路径尚未拍板，后续应由有权修改 H2 ADR 的流程补充 ADR-012 errata。
 
 ## 4. 范围
@@ -76,7 +77,7 @@ downstream:
 - **H5-005-A · 已实现**：Conversation 与 Message 两模型、Repository、Service、REST、外部历史 Provider 与双 Provider Mapping；`RemoveAgentSessionState` migration 将持久化收敛为两表。
 - **H5-005-B · 已实现**：使用正式 Conversation 路由验证标准消息、认证授权、真实 SSE 和外部历史恢复。
 - **H5-005-C · 已实现**：接入 Electron IPC、Ant Design X/XMarkdown 和服务端消息历史，验证跨设备恢复和 Electron E2E。
-- **H5-005-D · 前置 H5-005-C**：实现取消、错误、重试、断线和锁屏恢复，验证部分回复持久化、状态重建、AC-079 和 AC-089。
+- **H5-005-D · 已实现**：实现取消、错误、新 ID 重试、主进程存活期间的有界状态快照和锁屏恢复，并通过真实 Electron E2E 验证 AC-079 和 AC-089。
 
 每个子任务执行前必须根据 `implementation-task-brief.template.md` 创建独立 `ai-task-brief.md`。
 

@@ -241,6 +241,20 @@ export interface ChatRequest {
     messages: ChatMessage[];
 }
 
+export type ChatRunStatus = "running" | "completed" | "stopped" | "failed";
+
+export interface ChatRunError {
+    code: string;
+    reason: string;
+}
+
+export interface ChatRunSnapshot {
+    requestId: string;
+    status: ChatRunStatus;
+    content: string;
+    error?: ChatRunError;
+}
+
 export interface AgentConversationListItem {
     id: string;
     agentVersionId: string;
@@ -320,7 +334,9 @@ export interface InkwellDesktopApi {
         conversationId: string,
     ) => Promise<void>;
     chat: (request: ChatRequest) => Promise<void>;
-    onChatDelta: (
-        listener: (requestId: string, content: string) => void,
+    getChatRun: (requestId: string) => Promise<ChatRunSnapshot | null>;
+    stopChat: (requestId: string) => Promise<boolean>;
+    onChatRunChanged: (
+        listener: (snapshot: ChatRunSnapshot) => void,
     ) => () => void;
 }

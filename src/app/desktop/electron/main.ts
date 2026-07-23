@@ -26,6 +26,8 @@ import type {
     AuthIdentity,
     AuthSnapshot,
     AuthStatus,
+    ChatRunError,
+    ChatRunSnapshot,
     ChatRequest,
     ChatMessage,
     ChangePasswordRequest,
@@ -55,10 +57,16 @@ const apiBaseUrl = (
 ).replace(/\/$/, "");
 const authSessionFileName = "auth-session.bin";
 const idleLockMilliseconds = 60 * 60 * 1000;
+const completedChatRunLimit = 20;
 const applicationIconPath = join(__dirname, "../renderer/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
 let idleLockTimer: NodeJS.Timeout | null = null;
+const chatRuns = new Map<
+    string,
+    { controller: AbortController; snapshot: ChatRunSnapshot }
+>();
+const completedChatRunIds: string[] = [];
 
 interface InternalAuthSession extends AuthIdentity {
     sessionToken: string;
@@ -84,6 +92,75 @@ class ApiRequestError extends Error {
         this.status = status;
     }
 }
+
+class ChatRunFailure extends Error {
+    public readonly error: ChatRunError;
+
+    public constructor(error: ChatRunError) {
+        super(`${error.code}: ${error.reason}`);
+        this.error = error;
+    }
+}
+
+const copyChatRunSnapshot = (snapshot: ChatRunSnapshot): ChatRunSnapshot => ({
+    ...snapshot,
+    ...(snapshot.error ? { error: { ...snapshot.error } } : {}),
+});
+
+const broadcastChatRun = (snapshot: ChatRunSnapshot): void => {
+    const value = copyChatRunSnapshot(snapshot);
+    for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("inkwell:chat-run-changed", value);
+    }
+};
+
+const finishChatRun = (
+    requestId: string,
+    status: Exclude<ChatRunSnapshot["status"], "running">,
+    error?: ChatRunError,
+): void => {
+    const run = chatRuns.get(requestId);
+    if (!run || run.snapshot.status !== "running") return;
+
+    run.snapshot = {
+        ...run.snapshot,
+        status,
+        ...(error ? { error } : {}),
+    };
+    broadcastChatRun(run.snapshot);
+    completedChatRunIds.push(requestId);
+    while (completedChatRunIds.length > completedChatRunLimit) {
+        const expiredRequestId = completedChatRunIds.shift();
+        if (
+            expiredRequestId &&
+            chatRuns.get(expiredRequestId)?.snapshot.status !== "running"
+        ) {
+            chatRuns.delete(expiredRequestId);
+        }
+    }
+};
+
+const getSafeErrorReason = async (response: Response): Promise<string> => {
+    const fallback = `Agent request failed with status ${response.status}.`;
+    const text = (await response.text()).trim();
+    if (!text) return fallback;
+
+    try {
+        const problem = JSON.parse(text) as {
+            detail?: unknown;
+            message?: unknown;
+        };
+        const reason =
+            typeof problem.detail === "string"
+                ? problem.detail
+                : typeof problem.message === "string"
+                  ? problem.message
+                  : fallback;
+        return reason.slice(0, 240);
+    } catch {
+        return fallback;
+    }
+};
 
 const broadcastAuthState = (): void => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -662,72 +739,158 @@ const registerApiHandlers = (): void => {
 
     ipcMain.handle(
         "inkwell:chat",
-        async (event, input: ChatRequest): Promise<void> => {
+        async (_event, input: ChatRequest): Promise<void> => {
             requireAuthenticated();
+            const existingRun = chatRuns.get(input.requestId);
+            if (existingRun?.snapshot.status === "running") {
+                throw new Error("A chat run with this request ID is already running.");
+            }
+            for (
+                let index = completedChatRunIds.indexOf(input.requestId);
+                index >= 0;
+                index = completedChatRunIds.indexOf(input.requestId)
+            ) {
+                completedChatRunIds.splice(index, 1);
+            }
+
+            const controller = new AbortController();
+            const run = {
+                controller,
+                snapshot: {
+                    requestId: input.requestId,
+                    status: "running" as const,
+                    content: "",
+                },
+            };
+            chatRuns.set(input.requestId, run);
+            broadcastChatRun(run.snapshot);
             const versionQuery =
                 input.runMode === "draft" ? "?version=draft" : "";
-            const response = await fetch(
-                `${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions${versionQuery}`,
-                {
-                    method: "POST",
-                    headers: {
-                        Accept: "text/event-stream",
-                        Authorization: `Bearer ${sessionToken ?? ""}`,
-                        "Content-Type": "application/json",
-                        "X-Inkwell-Agent-Run-Mode": input.runMode,
-                        ...(input.conversationId
-                            ? {
-                                  "X-Inkwell-Conversation-Id":
-                                      input.conversationId,
-                              }
-                            : {}),
-                    },
-                    body: JSON.stringify({
-                        model: "inkwell",
-                        messages: input.messages,
-                        stream: true,
-                    }),
-                },
-            );
+            try {
+                let response: Response;
+                try {
+                    response = await fetch(
+                        `${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions${versionQuery}`,
+                        {
+                            method: "POST",
+                            headers: {
+                                Accept: "text/event-stream",
+                                Authorization: `Bearer ${sessionToken ?? ""}`,
+                                "Content-Type": "application/json",
+                                "X-Inkwell-Agent-Run-Mode": input.runMode,
+                                ...(input.conversationId
+                                    ? {
+                                          "X-Inkwell-Conversation-Id":
+                                              input.conversationId,
+                                      }
+                                    : {}),
+                            },
+                            body: JSON.stringify({
+                                model: "inkwell",
+                                messages: input.messages,
+                                stream: true,
+                            }),
+                            signal: controller.signal,
+                        },
+                    );
+                } catch (reason) {
+                    if (controller.signal.aborted) throw reason;
+                    throw new ChatRunFailure({
+                        code: "NETWORK_ERROR",
+                        reason: "无法连接模型服务，请检查网络后重试。",
+                    });
+                }
 
-            if (!response.ok || !response.body) {
-                const detail = await response.text();
-                if (response.status === 401) await clearAuthentication();
-                throw new Error(
-                    detail ||
-                        `Agent request failed with status ${response.status}.`,
-                );
-            }
+                if (!response.ok) {
+                    const reason = await getSafeErrorReason(response);
+                    if (response.status === 401) await clearAuthentication();
+                    throw new ChatRunFailure({
+                        code: `HTTP_${response.status}`,
+                        reason,
+                    });
+                }
+                if (!response.body) {
+                    throw new ChatRunFailure({
+                        code: "STREAM_ERROR",
+                        reason: "模型响应流无法读取，请重试。",
+                    });
+                }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop() ?? "";
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() ?? "";
 
-                for (const line of lines) {
-                    const data = line.trim().replace(/^data:\s*/, "");
-                    if (!data || data === "[DONE]") continue;
+                    for (const line of lines) {
+                        const data = line.trim().replace(/^data:\s*/, "");
+                        if (!data || data === "[DONE]") continue;
 
-                    const chunk = JSON.parse(data) as {
-                        choices?: Array<{ delta?: { content?: string } }>;
-                    };
-                    const content = chunk.choices?.[0]?.delta?.content;
-                    if (content) {
-                        event.sender.send(
-                            "inkwell:chat-delta",
-                            input.requestId,
-                            content,
-                        );
+                        let content: string | undefined;
+                        try {
+                            const chunk = JSON.parse(data) as {
+                                choices?: Array<{
+                                    delta?: { content?: string };
+                                }>;
+                            };
+                            content = chunk.choices?.[0]?.delta?.content;
+                        } catch {
+                            throw new ChatRunFailure({
+                                code: "STREAM_ERROR",
+                                reason: "模型响应格式无效，请重试。",
+                            });
+                        }
+                        if (content) {
+                            run.snapshot = {
+                                ...run.snapshot,
+                                content: run.snapshot.content + content,
+                            };
+                            broadcastChatRun(run.snapshot);
+                        }
                     }
                 }
+
+                finishChatRun(input.requestId, "completed");
+            } catch (reason) {
+                if (controller.signal.aborted) {
+                    finishChatRun(input.requestId, "stopped");
+                    return;
+                }
+
+                const error =
+                    reason instanceof ChatRunFailure
+                        ? reason.error
+                        : {
+                              code: "STREAM_ERROR",
+                              reason: "模型响应流意外中断，请重试。",
+                          };
+                finishChatRun(input.requestId, "failed", error);
+                throw new Error(`${error.code}: ${error.reason}`);
             }
+        },
+    );
+    ipcMain.handle(
+        "inkwell:get-chat-run",
+        (_event, requestId: string): ChatRunSnapshot | null => {
+            requireAuthenticated();
+            const snapshot = chatRuns.get(requestId)?.snapshot;
+            return snapshot ? copyChatRunSnapshot(snapshot) : null;
+        },
+    );
+    ipcMain.handle(
+        "inkwell:stop-chat",
+        (_event, requestId: string): boolean => {
+            requireAuthenticated();
+            const run = chatRuns.get(requestId);
+            if (!run || run.snapshot.status !== "running") return false;
+            run.controller.abort();
+            return true;
         },
     );
 };

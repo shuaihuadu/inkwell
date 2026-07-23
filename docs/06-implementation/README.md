@@ -42,14 +42,14 @@ downstream: []
 | H5-002 | 公共外壳与全局体验 | 依赖升级、AppShell、权限导航和主题已完成；继续网络状态与全局错误 | H5-002-A/B 已实现，H5-002-C 待设计 | [范围说明](H5-002-app-shell/scope.md) |
 | H5-003 | Agent 空间与基础管理 | UI-003、我的/团队共享、搜索、删除、共享、点击分流 | H5-003-A 被列表展示契约阻塞 | [范围说明](H5-003-agent-space/scope.md) |
 | H5-004 | Agent 设计与配置 | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布 | 待设计核验 | [范围说明](H5-004-agent-design/scope.md) |
-| H5-005 | Agent 会话 | 会话数据与 REST 已落地；继续验证 MAF AG-UI 并接入 Desktop SDK、Ant Design X 与 Activity | 部分实现，H5-005-A 待补验证记录 | [范围说明](H5-005-agent-conversation/scope.md) |
+| H5-005 | Agent 会话 | 会话数据、REST、MAF AG-UI、Desktop SDK、停止、错误与锁屏恢复已落地 | H5-005-A/B/C/D 已实现 | [范围说明](H5-005-agent-conversation/scope.md) |
 | H5-006 | 版本管理 | UI-008、版本列表、diff、回滚 | 待起草任务简报 | 路线图定义 |
 | H5-007 | 调试与评测 | UI-007、Trace、评测集、回放 | H3 未完成 | 路线图定义 |
 | H5-008 | Admin 管理 | UI-009、账号解封、撤销他人共享 | H5-008-A 用户列表与解封已实现；撤销共享待设计 | [实施记录](H5-008-admin-management/implementation-record.md) |
 | H5-009 | API Key 与外部协议 | API Key 创建/撤销/绑定、四协议调用验证 | H3 未完成 | 路线图定义 |
 | H5-010 | 多模态输入 | 图片、语音转写、文档输入、能力前置校验 | H3 未完成 | 路线图定义 |
 | H5-011 | 桌面横切质量 | 离线与错误规约、可访问性、性能、Windows/macOS 验证 | 持续实施 | 路线图定义 |
-| H5-012 | 桌面打包与更新 | 安装包、签名、公证、自动更新、发布通道 | 尚未规划 | 路线图定义 |
+| H5-012 | 桌面打包与更新 | 安装包、签名、公证、自动更新、发布通道 | 三平台安装包与 prerelease 已实现；签名、公证和自动更新待规划 | 路线图定义 |
 | H5-013 | LLM Provider 与 LiteLLM 接入 | Provider 端口、实时模型发现、分类、Agent Chat Client | 模型列表、详情、管理外链与 Member 测试入口已实现；非 Chat 诊断待补 | [任务简报](H5-013-llm-provider/ai-task-brief.md) |
 
 总体依赖、实施顺序和各单元完成定义见 [Desktop 实施路线图](desktop-implementation-roadmap.md)。

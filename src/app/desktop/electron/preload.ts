@@ -83,16 +83,19 @@ const api: InkwellDesktopApi = {
             conversationId,
         ),
     chat: (request) => ipcRenderer.invoke("inkwell:chat", request),
-    onChatDelta: (listener) => {
+    getChatRun: (requestId) =>
+        ipcRenderer.invoke("inkwell:get-chat-run", requestId),
+    stopChat: (requestId) => ipcRenderer.invoke("inkwell:stop-chat", requestId),
+    onChatRunChanged: (listener) => {
         const handler = (
             _event: Electron.IpcRendererEvent,
-            requestId: string,
-            content: string,
+            snapshot: Parameters<typeof listener>[0],
         ): void => {
-            listener(requestId, content);
+            listener(snapshot);
         };
-        ipcRenderer.on("inkwell:chat-delta", handler);
-        return () => ipcRenderer.removeListener("inkwell:chat-delta", handler);
+        ipcRenderer.on("inkwell:chat-run-changed", handler);
+        return () =>
+            ipcRenderer.removeListener("inkwell:chat-run-changed", handler);
     },
 };
 

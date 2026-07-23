@@ -61,11 +61,11 @@ downstream:
 - Agent Conversation 与 Message 两模型、Repository、Service、REST、EF Core Mapping 与双 Provider Migration。
 - 正式 Conversation 每轮新建 MAF Session，`InkwellChatHistoryProvider` 从数据库消息恢复跨轮历史。
 - Electron Conversation IPC、会话侧栏、消息历史和聊天页端到端链路。
+- Conversation 停止、结构化错误重试与主进程内有界请求快照的锁屏恢复闭环。
 
 已知偏差：
 
 1. 新建 Agent 后立即发布，违反 REQ-015 的草稿/发布分离语义。
-2. Conversation 的取消、错误重试、断线和锁屏恢复尚未完成 H5-005-D 闭环。
 
 ## 3. 实施拆分原则
 
@@ -133,7 +133,7 @@ H5-002-A/B 已在 `726ebd6` 实现依赖升级、公共 AppShell、权限导航�
 - H5-005-A：Conversation 与 Message 两模型、Repository、Service、REST、外部历史 Provider 与双 Provider Migration 已实现；`AgentSessionState` 已删除。
 - H5-005-B：正式 Conversation 路由、认证授权、真实 SSE 和完整消息快照契约已验证；每轮新建 MAF Session，并从持久消息恢复历史。
 - H5-005-C：Electron IPC + Ant Design X / XMarkdown、会话加载与跨设备恢复已实现。
-- H5-005-D：失败、停止、重试、断线兜底、部分回复持久化和锁屏期间结果累积。
+- H5-005-D：失败、停止、新 ID 重试、主进程内有界请求快照和锁屏恢复已实现并通过 Electron E2E 验证 AC-079、AC-089；系统 suspend/resume 断线重连仍需独立协议设计。
 
 ### H5-006 版本管理
 

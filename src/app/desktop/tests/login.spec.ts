@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import electronPath from "electron";
 import { createServer } from "node:http";
+import type { InkwellDesktopApi } from "../src/shared/network/contracts.js";
 
 const applicationEntry = "out/main/index.js";
 const toolsResponse = JSON.stringify([
@@ -326,8 +327,7 @@ test("shows authentication errors and enters the workspace after login", async (
         }
 
         if (
-            request.url ===
-                `/api/agents/${publishedAgent.id}/conversations` &&
+            request.url === `/api/agents/${publishedAgent.id}/conversations` &&
             request.method === "POST"
         ) {
             conversationCreated = true;
@@ -635,11 +635,11 @@ test("shows authentication errors and enters the workspace after login", async (
                     | string
                     | undefined,
             );
-                    chatConversationIds.push(
-                    request.headers["x-inkwell-conversation-id"] as
-                        | string
-                        | undefined,
-                    );
+            chatConversationIds.push(
+                request.headers["x-inkwell-conversation-id"] as
+                    | string
+                    | undefined,
+            );
             const content = [
                 "# 运行成功",
                 "",
@@ -1973,6 +1973,397 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByRole("heading", { name: "Agent 空间" }),
         ).toBeVisible();
+    } finally {
+        await application.close();
+        await new Promise<void>((resolve, reject) => {
+            server.close((error) => (error ? reject(error) : resolve()));
+        });
+    }
+});
+
+test("preserves, stops, and retries chat runs through Electron", async ({
+    browserName,
+}, testInfo) => {
+    test.setTimeout(45_000);
+    let conversationSequence = 0;
+    let rateLimitedAttempts = 0;
+    let stoppedConnectionClosed = false;
+    const conversationIds: string[] = [];
+    const persistedMessages = new Map<string, Array<Record<string, unknown>>>();
+
+    const server = createServer((request, response) => {
+        if (request.url === "/api/auth/login") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    userId: "0198a96d-19e4-7000-8000-000000000001",
+                    username: "admin",
+                    isAdmin: true,
+                    mustChangePassword: false,
+                    sessionToken: "chat-run-session-token",
+                    expiresAt: "2026-07-22T00:00:00Z",
+                }),
+            );
+            return;
+        }
+
+        if (request.url === "/api/auth/unlock") {
+            response.statusCode = 204;
+            response.end();
+            return;
+        }
+
+        if (request.url === "/api/agents/mine") {
+            response.setHeader("Content-Type", "application/json");
+            response.end(myAgentsResponse);
+            return;
+        }
+
+        if (request.url === "/api/agents/shared") {
+            response.setHeader("Content-Type", "application/json");
+            response.end("[]");
+            return;
+        }
+
+        if (request.url === `/api/agents/${publishedAgent.id}`) {
+            response.setHeader("Content-Type", "application/json");
+            response.end(JSON.stringify(publishedAgent));
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations?page=1&pageSize=100` &&
+            request.method === "GET"
+        ) {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items: conversationIds.map((id) => ({
+                        id,
+                        agentVersionId:
+                            publishedAgent.currentPublishedVersionId,
+                        title: "Chat run E2E",
+                        lastActivityTime: "2026-07-21T05:00:00Z",
+                        createdTime: "2026-07-21T05:00:00Z",
+                    })),
+                    totalCount: conversationIds.length,
+                    page: 1,
+                    pageSize: 100,
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url === `/api/agents/${publishedAgent.id}/conversations` &&
+            request.method === "POST"
+        ) {
+            conversationSequence += 1;
+            const id = `0198a96d-19e4-7000-8000-00000000041${conversationSequence}`;
+            conversationIds.unshift(id);
+            persistedMessages.set(id, []);
+            response.statusCode = 201;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    id,
+                    agentId: publishedAgent.id,
+                    agentVersionId: publishedAgent.currentPublishedVersionId,
+                    title: null,
+                    lastActivityTime: "2026-07-21T05:00:00Z",
+                    createdTime: "2026-07-21T05:00:00Z",
+                    updatedTime: "2026-07-21T05:00:00Z",
+                }),
+            );
+            return;
+        }
+
+        const messagesMatch = request.url?.match(
+            /^\/api\/agents\/[^/]+\/conversations\/([^/]+)\/messages\?page=1&pageSize=100$/,
+        );
+        if (messagesMatch && request.method === "GET") {
+            const items = persistedMessages.get(messagesMatch[1]) ?? [];
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items,
+                    totalCount: items.length,
+                    page: 1,
+                    pageSize: 100,
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url?.startsWith(`/agent/${publishedAgent.id}/`) &&
+            request.url.includes("/v1/chat/completions") &&
+            request.method === "POST"
+        ) {
+            const chunks: Buffer[] = [];
+            request.on("data", (chunk: Buffer) => chunks.push(chunk));
+            request.on("end", () => {
+                const body = JSON.parse(Buffer.concat(chunks).toString()) as {
+                    messages: Array<{ role: string; content: string }>;
+                };
+                const userContent = body.messages.at(-1)?.content ?? "";
+                const conversationId = request.headers[
+                    "x-inkwell-conversation-id"
+                ] as string | undefined;
+                const writeDelta = (content: string): void => {
+                    response.write(
+                        `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`,
+                    );
+                };
+                const persist = (assistantContent: string): void => {
+                    if (!conversationId) return;
+                    persistedMessages.set(conversationId, [
+                        {
+                            id: `${conversationId}-user`,
+                            message: {
+                                role: "user",
+                                contents: [{ text: userContent }],
+                            },
+                            sequenceNumber: 1,
+                        },
+                        {
+                            id: `${conversationId}-assistant`,
+                            message: {
+                                role: "assistant",
+                                contents: [{ text: assistantContent }],
+                            },
+                            sequenceNumber: 2,
+                        },
+                    ]);
+                };
+
+                if (userContent === "验证限流错误") {
+                    rateLimitedAttempts += 1;
+                    if (rateLimitedAttempts === 1) {
+                        response.statusCode = 429;
+                        response.setHeader("Content-Type", "application/json");
+                        response.end(
+                            JSON.stringify({
+                                detail: "请求过于频繁，请稍后重试。",
+                            }),
+                        );
+                        return;
+                    }
+
+                    response.setHeader("Content-Type", "text/event-stream");
+                    writeDelta("重试成功");
+                    persist("重试成功");
+                    response.end("data: [DONE]\n\n");
+                    return;
+                }
+
+                response.setHeader("Content-Type", "text/event-stream");
+                if (userContent === "验证锁屏恢复") {
+                    writeDelta("锁屏前");
+                    setTimeout(() => {
+                        writeDelta("，锁屏期间完成");
+                        persist("锁屏前，锁屏期间完成");
+                        response.end("data: [DONE]\n\n");
+                    }, 300);
+                    return;
+                }
+
+                if (userContent === "验证停止") {
+                    writeDelta("停止前已收到的部分文本");
+                    response.on("close", () => {
+                        stoppedConnectionClosed = true;
+                    });
+                    return;
+                }
+
+                response.statusCode = 400;
+                response.end();
+            });
+            return;
+        }
+
+        response.statusCode = 404;
+        response.end();
+    });
+    await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+        throw new Error("Test server did not bind a TCP port.");
+
+    const application = await electron.launch({
+        executablePath: electronPath as unknown as string,
+        args: [
+            applicationEntry,
+            `--user-data-dir=${testInfo.outputPath(`${browserName}-chat-runs`)}`,
+        ],
+        env: {
+            ...process.env,
+            INKWELL_WEBAPI_URL: `http://127.0.0.1:${address.port}`,
+        },
+    });
+
+    try {
+        const page = await application.firstWindow();
+        await page.evaluate(() => {
+            const api = (
+                globalThis as unknown as { inkwell: InkwellDesktopApi }
+            ).inkwell;
+            api.onChatRunChanged((snapshot) => {
+                const snapshots = JSON.parse(
+                    sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+                ) as unknown[];
+                snapshots.push(snapshot);
+                sessionStorage.setItem(
+                    "chat-run-snapshots",
+                    JSON.stringify(snapshots),
+                );
+            });
+        });
+        await page.getByPlaceholder("请输入账号").fill("admin");
+        await page.getByPlaceholder("请输入密码").fill("correct-password");
+        await page.getByRole("button", { name: /登\s*录/ }).click();
+        await page
+            .locator(".agent-space-card")
+            .filter({ hasText: "研发助手" })
+            .dispatchEvent("click");
+
+        const sender = page.getByPlaceholder(
+            "输入消息，Enter 发送，Shift + Enter 换行",
+        );
+        await sender.fill("验证锁屏恢复");
+        await sender.press("Enter");
+        await expect(page.getByText("锁屏前", { exact: true })).toBeVisible();
+        await application.evaluate(({ powerMonitor }) => {
+            powerMonitor.emit("lock-screen");
+        });
+        await expect(
+            page.getByRole("heading", { name: "Inkwell 已锁定" }),
+        ).toBeVisible();
+        const lockedWriteError = await page.evaluate(async () => {
+            try {
+                const api = (
+                    globalThis as unknown as { inkwell: InkwellDesktopApi }
+                ).inkwell;
+                await api.chat({
+                    requestId: "locked-write",
+                    agentId: "0198a96d-19e4-7000-8000-000000000301",
+                    runMode: "published",
+                    conversationId: null,
+                    messages: [{ role: "user", content: "锁定后写入" }],
+                });
+                return null;
+            } catch (reason) {
+                return reason instanceof Error
+                    ? reason.message
+                    : String(reason);
+            }
+        });
+        expect(lockedWriteError).toContain("Client is locked.");
+        const lockedRunErrors = await page.evaluate(async () => {
+            const api = (
+                globalThis as unknown as { inkwell: InkwellDesktopApi }
+            ).inkwell;
+            const snapshots = JSON.parse(
+                sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+            ) as Array<{ requestId: string }>;
+            const requestId = snapshots.at(-1)?.requestId;
+            if (!requestId) return [];
+
+            const invoke = async (
+                operation: () => Promise<unknown>,
+            ): Promise<string | null> => {
+                try {
+                    await operation();
+                    return null;
+                } catch (reason) {
+                    return reason instanceof Error
+                        ? reason.message
+                        : String(reason);
+                }
+            };
+            return Promise.all([
+                invoke(() => api.getChatRun(requestId)),
+                invoke(() => api.stopChat(requestId)),
+            ]);
+        });
+        expect(lockedRunErrors).toHaveLength(2);
+        expect(lockedRunErrors[0]).toContain("Client is locked.");
+        expect(lockedRunErrors[1]).toContain("Client is locked.");
+        await expect
+            .poll(() =>
+                page.evaluate(() => {
+                    const snapshots = JSON.parse(
+                        sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+                    ) as Array<{ status: string }>;
+                    return snapshots.at(-1)?.status;
+                }),
+            )
+            .toBe("completed");
+        await page.getByPlaceholder("密码").fill("correct-password");
+        await page.keyboard.press("Enter");
+        await expect(
+            page.getByText("锁屏前，锁屏期间完成", { exact: true }),
+        ).toBeVisible();
+
+        await page
+            .getByRole("button", { name: "新建会话" })
+            .dispatchEvent("click");
+        await sender.fill("验证停止");
+        await sender.press("Enter");
+        await expect(
+            page.getByText("停止前已收到的部分文本", { exact: true }),
+        ).toBeVisible();
+        await page
+            .locator(".ant-sender-actions-btn-loading-button")
+            .dispatchEvent("click");
+        await expect(
+            page.locator(".ant-sender-actions-btn-loading-button"),
+        ).toHaveCount(0);
+        await expect(
+            page.getByText("停止前已收到的部分文本", { exact: true }),
+        ).toBeVisible();
+        await expect.poll(() => stoppedConnectionClosed).toBe(true);
+
+        await page
+            .getByRole("button", { name: "新建会话" })
+            .dispatchEvent("click");
+        await sender.fill("验证限流错误");
+        await sender.press("Enter");
+        await expect(page.getByText("HTTP_429", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("请求过于频繁，请稍后重试。", { exact: true }),
+        ).toBeVisible();
+        const failedRequestId = await page.evaluate(() => {
+            const snapshots = JSON.parse(
+                sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+            ) as Array<{ requestId: string; status: string }>;
+            return snapshots.findLast(({ status }) => status === "failed")
+                ?.requestId;
+        });
+        await page
+            .getByRole("button", { name: "重试失败消息" })
+            .dispatchEvent("click");
+        await expect(page.getByText("重试成功", { exact: true })).toBeVisible();
+        const completedRequestId = await page.evaluate(() => {
+            const snapshots = JSON.parse(
+                sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+            ) as Array<{
+                requestId: string;
+                status: string;
+                content: string;
+            }>;
+            return snapshots.findLast(
+                ({ status, content }) =>
+                    status === "completed" && content === "重试成功",
+            )?.requestId;
+        });
+        expect(failedRequestId).toBeTruthy();
+        expect(completedRequestId).toBeTruthy();
+        expect(completedRequestId).not.toBe(failedRequestId);
+        expect(rateLimitedAttempts).toBe(2);
     } finally {
         await application.close();
         await new Promise<void>((resolve, reject) => {

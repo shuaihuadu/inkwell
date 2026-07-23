@@ -32,13 +32,16 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
     AgentConversationListItem,
     AgentListItem,
     ChatMessage,
+    ChatRunError,
+    ChatRunSnapshot,
 } from "../../shared/network/contracts";
+import { useAuthStore } from "../auth/auth-store";
 
 interface ChatPanelProps {
     agent: AgentListItem | null;
@@ -78,12 +81,17 @@ export function ChatPanel({
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [draft, setDraft] = useState("");
     const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+    const [latestRequestId, setLatestRequestId] = useState<string | null>(null);
+    const [chatError, setChatError] = useState<
+        (ChatRunError & { input: string }) | null
+    >(null);
     const [historyCollapsed, setHistoryCollapsed] = useState(false);
     const [conversations, setConversations] = useState<LocalConversation[]>([]);
     const [activeConversationKey, setActiveConversationKey] = useState<
         string | null
     >(null);
     const [messageApi, contextHolder] = message.useMessage();
+    const authStatus = useAuthStore((state) => state.status);
     const agentDetailsQuery = useQuery({
         queryKey: ["agents", agent?.id, "chat-details"],
         queryFn: () => desktopApi.getAgent(agent!.id),
@@ -130,20 +138,87 @@ export function ChatPanel({
         };
     }, [agent, messageApi, variant]);
 
+    const applySnapshot = useCallback((
+        snapshot: ChatRunSnapshot,
+        originalInput?: string,
+    ): void => {
+        setMessages((current) =>
+            current.map((item, index) =>
+                index === current.length - 1 && item.role === "assistant"
+                    ? { ...item, content: snapshot.content }
+                    : item,
+            ),
+        );
+        if (snapshot.status === "failed" && snapshot.error) {
+            setChatError((current) => ({
+                ...snapshot.error!,
+                input: originalInput ?? current?.input ?? "",
+            }));
+        } else if (snapshot.status !== "running") {
+            setChatError(null);
+        }
+        if (snapshot.status !== "running") {
+            setActiveRequestId((current) =>
+                current === snapshot.requestId ? null : current,
+            );
+        }
+    }, []);
+
+    const refreshPersistedConversation = useCallback(async (
+        conversationKey: string,
+    ): Promise<void> => {
+        if (!agent || variant !== "full") return;
+        try {
+            const [persistedMessages, persistedConversations] =
+                await Promise.all([
+                    desktopApi.getAgentConversationMessages(
+                        agent.id,
+                        conversationKey,
+                    ),
+                    desktopApi.listAgentConversations(agent.id),
+                ]);
+            if (persistedMessages.at(-1)?.role === "assistant") {
+                setMessages(persistedMessages);
+            }
+            setConversations(persistedConversations.map(toConversationItem));
+        } catch (reason) {
+            void messageApi.error(
+                reason instanceof Error
+                    ? reason.message
+                    : "会话历史刷新失败。",
+            );
+        }
+    }, [agent, messageApi, variant]);
+
     useEffect(
         () =>
-            desktopApi.onChatDelta((requestId, content) => {
-                if (requestId !== activeRequestId) return;
-                setMessages((current) => {
-                    return current.map((item, index) =>
-                        index === current.length - 1
-                            ? { ...item, content: item.content + content }
-                            : item,
-                    );
-                });
+            desktopApi.onChatRunChanged((snapshot) => {
+                if (snapshot.requestId !== latestRequestId) return;
+                applySnapshot(snapshot);
             }),
-        [activeRequestId],
+        [applySnapshot, latestRequestId],
     );
+
+    useEffect(() => {
+        if (authStatus !== "authenticated" || !latestRequestId) return;
+
+        void desktopApi.getChatRun(latestRequestId).then((snapshot) => {
+            if (!snapshot) return;
+            applySnapshot(snapshot);
+            if (
+                snapshot.status !== "running" &&
+                activeConversationKey
+            ) {
+                void refreshPersistedConversation(activeConversationKey);
+            }
+        });
+    }, [
+        activeConversationKey,
+        applySnapshot,
+        authStatus,
+        latestRequestId,
+        refreshPersistedConversation,
+    ]);
 
     const send = async (value = draft): Promise<void> => {
         const content = value.trim();
@@ -158,8 +233,9 @@ export function ChatPanel({
         let conversationKey = activeConversationKey;
         setMessages(pendingMessages);
         setDraft("");
+        setChatError(null);
         setActiveRequestId(requestId);
-        let completed = false;
+        setLatestRequestId(requestId);
         try {
             if (variant === "full" && !conversationKey) {
                 const conversation =
@@ -180,46 +256,41 @@ export function ChatPanel({
                     variant === "full" ? conversationKey : null,
                 messages: variant === "full" ? [userMessage] : history,
             });
-            completed = true;
         } catch (reason) {
-            messageApi.error(
-                reason instanceof Error ? reason.message : "Agent 调用失败。",
-            );
-            setMessages((current) =>
-                current.map((item, index) =>
-                    index === current.length - 1 && !item.content
-                        ? {
-                              ...item,
-                              content: "暂时无法生成回复，请检查模型服务配置。",
-                          }
-                        : item,
-                ),
-            );
-        } finally {
-            setActiveRequestId(null);
-            if (completed && variant === "full" && conversationKey) {
-                try {
-                    const [persistedMessages, persistedConversations] =
-                        await Promise.all([
-                            desktopApi.getAgentConversationMessages(
-                                agent.id,
-                                conversationKey,
-                            ),
-                            desktopApi.listAgentConversations(agent.id),
-                        ]);
-                    setMessages(persistedMessages);
-                    setConversations(
-                        persistedConversations.map(toConversationItem),
-                    );
-                } catch (reason) {
-                    void messageApi.error(
+            const snapshot = await desktopApi
+                .getChatRun(requestId)
+                .catch(() => null);
+            if (snapshot) applySnapshot(snapshot, content);
+            else {
+                setChatError({
+                    code: "NETWORK_ERROR",
+                    reason:
                         reason instanceof Error
                             ? reason.message
-                            : "会话历史刷新失败。",
-                    );
-                }
+                            : "Agent 调用失败。",
+                    input: content,
+                });
             }
+        } finally {
+            const snapshot = await desktopApi
+                .getChatRun(requestId)
+                .catch(() => null);
+            if (snapshot) applySnapshot(snapshot, content);
+            if (variant === "full" && conversationKey) {
+                await refreshPersistedConversation(conversationKey);
+            }
+            setActiveRequestId((current) =>
+                current === requestId ? null : current,
+            );
         }
+    };
+
+    const stop = (): void => {
+        if (activeRequestId) void desktopApi.stopChat(activeRequestId);
+    };
+
+    const retry = (): void => {
+        if (chatError?.input) void send(chatError.input);
     };
 
     const startNewConversation = (): void => {
@@ -227,6 +298,8 @@ export function ChatPanel({
         setActiveConversationKey(null);
         setMessages([]);
         setDraft("");
+        setChatError(null);
+        setLatestRequestId(null);
     };
 
     const switchConversation = async (key: string): Promise<void> => {
@@ -235,6 +308,8 @@ export function ChatPanel({
         if (!conversation || !agent) return;
         setActiveConversationKey(key);
         setDraft("");
+        setChatError(null);
+        setLatestRequestId(null);
         try {
             setMessages(
                 await desktopApi.getAgentConversationMessages(agent.id, key),
@@ -281,14 +356,37 @@ export function ChatPanel({
                 contentRender:
                     item.role === "assistant"
                         ? (content) => (
-                              <XMarkdown
-                                  content={String(content)}
-                                  streaming={{
-                                      hasNextChunk:
-                                          Boolean(activeRequestId) &&
-                                          index === messages.length - 1,
-                                  }}
-                              />
+                              <Space direction="vertical" size={8}>
+                                  {String(content) && (
+                                      <XMarkdown
+                                          content={String(content)}
+                                          streaming={{
+                                              hasNextChunk:
+                                                  Boolean(activeRequestId) &&
+                                                  index === messages.length - 1,
+                                          }}
+                                      />
+                                  )}
+                                  {chatError &&
+                                      index === messages.length - 1 && (
+                                          <Flex vertical gap={4}>
+                                              <Typography.Text type="danger" strong>
+                                                  {chatError.code}
+                                              </Typography.Text>
+                                              <Typography.Text>
+                                                  {chatError.reason}
+                                              </Typography.Text>
+                                              <Button
+                                                  className="chat-retry-button"
+                                                  size="small"
+                                                  aria-label="重试失败消息"
+                                                  onClick={retry}
+                                              >
+                                                  重试
+                                              </Button>
+                                          </Flex>
+                                      )}
+                              </Space>
                           )
                         : undefined,
             }))}
@@ -453,6 +551,7 @@ export function ChatPanel({
                                 value={draft}
                                 onChange={setDraft}
                                 onSubmit={(value) => void send(value)}
+                                onCancel={stop}
                                 loading={Boolean(activeRequestId)}
                                 allowSpeech
                                 footer={(actionNode) => (
@@ -584,6 +683,7 @@ export function ChatPanel({
                     value={draft}
                     onChange={setDraft}
                     onSubmit={(value) => void send(value)}
+                    onCancel={stop}
                     loading={Boolean(activeRequestId)}
                     allowSpeech
                     footer={(actionNode) => (
