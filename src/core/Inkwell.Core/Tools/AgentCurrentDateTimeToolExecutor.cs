@@ -16,7 +16,7 @@ internal sealed class AgentCurrentDateTimeToolExecutor(TimeProvider timeProvider
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
         DateTimeOffset localTime = TimeZoneInfo.ConvertTime(utcNow, timeZone);
 
-        JsonObject result = new JsonObject
+        JsonObject result = new()
         {
             ["utc"] = utcNow.ToString("O"),
             ["timeZoneId"] = timeZoneId,

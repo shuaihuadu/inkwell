@@ -14,7 +14,7 @@ internal static class PasswordHasher
     private const int Iterations = 600_000;
     private const int SaltSizeBytes = 16;
     private const int HashSizeBytes = 32;
-    private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
+    private static readonly HashAlgorithmName algorithm = HashAlgorithmName.SHA256;
 
     public static string Hash(string password)
     {
@@ -24,7 +24,7 @@ internal static class PasswordHasher
         }
 
         byte[] salt = RandomNumberGenerator.GetBytes(SaltSizeBytes);
-        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, Algorithm, HashSizeBytes);
+        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, algorithm, HashSizeBytes);
 
         return $"{Prefix}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
@@ -50,7 +50,7 @@ internal static class PasswordHasher
 
         byte[] salt = Convert.FromBase64String(parts[2]);
         byte[] expectedHash = Convert.FromBase64String(parts[3]);
-        byte[] actualHash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, Algorithm, expectedHash.Length);
+        byte[] actualHash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, algorithm, expectedHash.Length);
 
         return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
     }

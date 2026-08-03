@@ -19,7 +19,7 @@ public static class AgentToolsBuilderExtensions
         builder.Services.AddScoped<IAgentToolCatalogService, AgentToolCatalogService>();
         builder.Services.AddSingleton<IReadOnlyDictionary<Guid, Func<string, CancellationToken, Task<string>>>>(sp =>
         {
-            AgentCurrentDateTimeToolExecutor currentDateTime = new AgentCurrentDateTimeToolExecutor(sp.GetRequiredService<TimeProvider>());
+            AgentCurrentDateTimeToolExecutor currentDateTime = new(sp.GetRequiredService<TimeProvider>());
 
             return new Dictionary<Guid, Func<string, CancellationToken, Task<string>>>
             {

@@ -12,53 +12,53 @@ namespace Inkwell.Providers.Contract;
 [TestClass]
 public sealed class MinIOFileStorageProviderTests
 {
-    private static MinioContainer? s_container;
+    private static MinioContainer? minioContainer;
 
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new MinioBuilder(ContainerImageConfiguration.GetRequired("Tests:MinIO")).Build();
+        minioContainer = new MinioBuilder(ContainerImageConfiguration.GetRequired("Tests:MinIO")).Build();
 
-        await s_container.StartAsync();
+        await minioContainer.StartAsync();
     }
 
     [ClassCleanup]
     public static async Task ClassCleanupAsync()
     {
-        if (s_container is not null)
+        if (minioContainer is not null)
         {
-            await s_container.DisposeAsync();
+            await minioContainer.DisposeAsync();
         }
     }
 
     [TestMethod]
-    public async Task UploadAsync_Then_DownloadAsync_Roundtrips_Content()
+    public async Task UploadAsync_Then_DownloadAsync_Roundtrips_ContentAsync()
     {
         IFileStorageProvider storage = BuildFileStorageProvider();
         string container = $"inkwell-test-{Guid.NewGuid():N}";
         byte[] payload = "hello minio"u8.ToArray();
 
-        await using (MemoryStream uploadStream = new MemoryStream(payload))
+        await using (MemoryStream uploadStream = new(payload))
         {
             await storage.UploadAsync(container, "docs/a.txt", uploadStream, new FileMetadata("text/plain"));
         }
 
         FileDownloadResponse response = await storage.DownloadAsync(container, "docs/a.txt");
 
-        await using MemoryStream downloaded = new MemoryStream();
+        await using MemoryStream downloaded = new();
         await response.Content.CopyToAsync(downloaded);
 
         CollectionAssert.AreEqual(payload, downloaded.ToArray());
     }
 
     [TestMethod]
-    public async Task ExistsAsync_Then_DeleteAsync_Reflects_Object_Lifecycle()
+    public async Task ExistsAsync_Then_DeleteAsync_Reflects_Object_LifecycleAsync()
     {
         IFileStorageProvider storage = BuildFileStorageProvider();
         string container = $"inkwell-test-{Guid.NewGuid():N}";
         byte[] payload = "to be deleted"u8.ToArray();
 
-        await using (MemoryStream uploadStream = new MemoryStream(payload))
+        await using (MemoryStream uploadStream = new(payload))
         {
             await storage.UploadAsync(container, "docs/b.txt", uploadStream, new FileMetadata("text/plain"));
         }
@@ -74,13 +74,13 @@ public sealed class MinIOFileStorageProviderTests
     }
 
     [TestMethod]
-    public async Task ListAsync_Returns_Uploaded_Objects_Under_Prefix()
+    public async Task ListAsync_Returns_Uploaded_Objects_Under_PrefixAsync()
     {
         IFileStorageProvider storage = BuildFileStorageProvider();
         string container = $"inkwell-test-{Guid.NewGuid():N}";
         byte[] payload = "listing"u8.ToArray();
 
-        await using (MemoryStream uploadStream = new MemoryStream(payload))
+        await using (MemoryStream uploadStream = new(payload))
         {
             await storage.UploadAsync(container, "prefix/c.txt", uploadStream, new FileMetadata("text/plain"));
         }
@@ -97,16 +97,16 @@ public sealed class MinIOFileStorageProviderTests
 
     private static IFileStorageProvider BuildFileStorageProvider()
     {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddLogging();
 
         IInkwellBuilder builder = services.AddInkwell(new ConfigurationBuilder().Build());
 
-        string endpoint = s_container!.GetConnectionString()
+        string endpoint = minioContainer!.GetConnectionString()
             .Replace("http://", string.Empty, StringComparison.Ordinal)
             .Replace("https://", string.Empty, StringComparison.Ordinal);
 
-        builder.UseMinIOFileStorage(endpoint, s_container.GetAccessKey(), s_container.GetSecretKey(), useSsl: false);
+        builder.UseMinIOFileStorage(endpoint, minioContainer.GetAccessKey(), minioContainer.GetSecretKey(), useSsl: false);
 
         ServiceProvider provider = builder.Services.BuildServiceProvider();
 

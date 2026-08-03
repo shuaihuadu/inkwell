@@ -12,53 +12,53 @@ namespace Inkwell.Providers.Contract;
 [TestClass]
 public sealed class AzureBlobFileStorageProviderTests
 {
-    private static AzuriteContainer? s_container;
+    private static AzuriteContainer? azuriteContainer;
 
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new AzuriteBuilder(ContainerImageConfiguration.GetRequired("Tests:Azurite")).Build();
+        azuriteContainer = new AzuriteBuilder(ContainerImageConfiguration.GetRequired("Tests:Azurite")).Build();
 
-        await s_container.StartAsync();
+        await azuriteContainer.StartAsync();
     }
 
     [ClassCleanup]
     public static async Task ClassCleanupAsync()
     {
-        if (s_container is not null)
+        if (azuriteContainer is not null)
         {
-            await s_container.DisposeAsync();
+            await azuriteContainer.DisposeAsync();
         }
     }
 
     [TestMethod]
-    public async Task UploadAsync_Then_DownloadAsync_Roundtrips_Content()
+    public async Task UploadAsync_Then_DownloadAsync_Roundtrips_ContentAsync()
     {
         IFileStorageProvider storage = BuildFileStorageProvider();
         string container = $"inkwell-test-{Guid.NewGuid():N}";
         byte[] payload = "hello azurite"u8.ToArray();
 
-        await using (MemoryStream uploadStream = new MemoryStream(payload))
+        await using (MemoryStream uploadStream = new(payload))
         {
             await storage.UploadAsync(container, "docs/a.txt", uploadStream, new FileMetadata("text/plain"));
         }
 
         FileDownloadResponse response = await storage.DownloadAsync(container, "docs/a.txt");
 
-        await using MemoryStream downloaded = new MemoryStream();
+        await using MemoryStream downloaded = new();
         await response.Content.CopyToAsync(downloaded);
 
         CollectionAssert.AreEqual(payload, downloaded.ToArray());
     }
 
     [TestMethod]
-    public async Task ExistsAsync_Then_DeleteAsync_Reflects_Object_Lifecycle()
+    public async Task ExistsAsync_Then_DeleteAsync_Reflects_Object_LifecycleAsync()
     {
         IFileStorageProvider storage = BuildFileStorageProvider();
         string container = $"inkwell-test-{Guid.NewGuid():N}";
         byte[] payload = "to be deleted"u8.ToArray();
 
-        await using (MemoryStream uploadStream = new MemoryStream(payload))
+        await using (MemoryStream uploadStream = new(payload))
         {
             await storage.UploadAsync(container, "docs/b.txt", uploadStream, new FileMetadata("text/plain"));
         }
@@ -75,12 +75,12 @@ public sealed class AzureBlobFileStorageProviderTests
 
     private static IFileStorageProvider BuildFileStorageProvider()
     {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddLogging();
 
         IInkwellBuilder builder = services.AddInkwell(new ConfigurationBuilder().Build());
 
-        builder.UseAzureBlobFileStorage(s_container!.GetConnectionString());
+        builder.UseAzureBlobFileStorage(azuriteContainer!.GetConnectionString());
 
         ServiceProvider provider = builder.Services.BuildServiceProvider();
 

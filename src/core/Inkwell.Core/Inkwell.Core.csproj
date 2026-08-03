@@ -24,6 +24,7 @@
       经 NuGet.org 正式包引入（MAF 已发布稳定版 1.13.0），不再 ProjectReference 同级仓库源码。
     -->
     <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Azure.AI.OpenAI" />

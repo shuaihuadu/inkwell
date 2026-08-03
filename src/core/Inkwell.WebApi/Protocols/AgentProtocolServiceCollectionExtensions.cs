@@ -18,7 +18,7 @@ public static class AgentProtocolServiceCollectionExtensions
 
         services.AddHttpContextAccessor();
         services.AddSingleton<RoutingAgent>();
-        services.AddAGUI();
+        services.AddAGUIServer();
         services.AddOpenAIChatCompletions();
         services.AddOpenAIResponses();
         services.AddOpenAIConversations();

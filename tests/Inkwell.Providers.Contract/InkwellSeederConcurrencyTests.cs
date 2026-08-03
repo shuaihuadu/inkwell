@@ -18,27 +18,27 @@ namespace Inkwell.Providers.Contract;
 public sealed class InkwellSeederConcurrencyTests
 {
     private const string ConfiguredAdminPassword = "configured-admin-password";
-    private static PostgreSqlContainer? s_container;
+    private static PostgreSqlContainer? postgresContainer;
 
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext _)
     {
-        s_container = new PostgreSqlBuilder(ContainerImageConfiguration.GetRequired("Tests:Postgres")).Build();
+        postgresContainer = new PostgreSqlBuilder(ContainerImageConfiguration.GetRequired("Tests:Postgres")).Build();
 
-        await s_container.StartAsync();
+        await postgresContainer.StartAsync();
     }
 
     [ClassCleanup]
     public static async Task ClassCleanupAsync()
     {
-        if (s_container is not null)
+        if (postgresContainer is not null)
         {
-            await s_container.DisposeAsync();
+            await postgresContainer.DisposeAsync();
         }
     }
 
     [TestMethod]
-    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_Admin()
+    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_AdminAsync()
     {
         // Arrange
         ServiceProvider providerA = BuildServiceProvider();
@@ -79,7 +79,7 @@ public sealed class InkwellSeederConcurrencyTests
 
     private static ServiceProvider BuildServiceProvider()
     {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddLogging();
 
         Dictionary<string, string?> configurationValues = new()
@@ -91,7 +91,7 @@ public sealed class InkwellSeederConcurrencyTests
             .Build();
         IInkwellBuilder builder = services.AddInkwell(configuration);
 
-        builder.UsePostgres(s_container!.GetConnectionString());
+        builder.UsePostgres(postgresContainer!.GetConnectionString());
 
         return builder.Services.BuildServiceProvider();
     }

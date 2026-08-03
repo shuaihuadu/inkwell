@@ -25,7 +25,7 @@ internal sealed class AgentToolCatalogService(IPersistenceProvider persistence) 
     {
         AgentToolDefinition tool = await this.GetToolAsync(toolId, ct).ConfigureAwait(false);
         IReadOnlyCollection<string> requiredFields = ExtractRequiredFields(tool.ParametersJsonSchema);
-        IReadOnlySet<string> providedFields = ParseProvidedFieldNames(parametersJson);
+        HashSet<string> providedFields = ParseProvidedFieldNames(parametersJson);
 
         foreach (string field in requiredFields)
         {
@@ -49,18 +49,18 @@ internal sealed class AgentToolCatalogService(IPersistenceProvider persistence) 
         return [.. required.Select(n => n!.GetValue<string>())];
     }
 
-    private static IReadOnlySet<string> ParseProvidedFieldNames(string? parametersJson)
+    private static HashSet<string> ParseProvidedFieldNames(string? parametersJson)
     {
         if (string.IsNullOrEmpty(parametersJson))
         {
-            return new HashSet<string>();
+            return [];
         }
 
         JsonObject? obj = JsonNode.Parse(parametersJson)?.AsObject();
 
         if (obj is null)
         {
-            return new HashSet<string>();
+            return [];
         }
 
         return obj.Where(kvp => kvp.Value is not null).Select(kvp => kvp.Key).ToHashSet();

@@ -18,7 +18,7 @@ public sealed class AddInkwellProgrammaticPathTests
     [TestMethod]
     public void UsePostgres_With_Empty_Configuration_Does_Not_Throw_On_DbContext_Resolution()
     {
-        ServiceCollection services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddLogging();
 
         IInkwellBuilder builder = services.AddInkwell(new ConfigurationBuilder().Build());

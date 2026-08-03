@@ -23,7 +23,7 @@ public static class AgentProtocolEndpointRouteBuilderExtensions
 
         RoutingAgent agent = endpoints.ServiceProvider.GetRequiredService<RoutingAgent>();
 
-        IEndpointConventionBuilder agui = endpoints.MapAGUI("/agent/{agentId}", agent);
+        IEndpointConventionBuilder agui = endpoints.MapAGUIServer("/agent/{agentId}", agent);
         IEndpointConventionBuilder chatCompletions = endpoints.MapOpenAIChatCompletions(
             agent,
             "/agent/{agentId}/v1/chat/completions");

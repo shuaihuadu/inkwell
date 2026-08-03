@@ -56,7 +56,7 @@ public sealed class LiteLLMProviderTests
             """{"object":"list","data":[{"id":"chat-model","owned_by":"openai"},{"id":"embedding-model","owned_by":"openai"},{"id":"image-model","owned_by":"openai"},{"id":"video-model","owned_by":"openai"}]}""",
             """{"data":[{"model_group":"chat-model","mode":"responses","max_input_tokens":1050000,"max_output_tokens":128000,"supports_function_calling":true,"supports_vision":true,"supported_openai_params":["response_format"],"supports_reasoning":true},{"model_group":"embedding-model","mode":"embedding"},{"model_group":"image-model","mode":"image_generation"},{"model_group":"video-model","mode":"video_generation"}]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
 
         // Act
         IReadOnlyList<LLMModel> models = await provider.ListModelsAsync();
@@ -87,7 +87,7 @@ public sealed class LiteLLMProviderTests
             """{"data":[{"id":"rerank-model","owned_by":"custom"}]}""",
             """{"data":[{"model_group":"rerank-model","mode":"rerank"}]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
 
         // Act
         LLMModel model = (await provider.ListModelsAsync()).Single();
@@ -134,7 +134,7 @@ public sealed class LiteLLMProviderTests
             """{"data":[{"id":"GPT-5.4","owned_by":"openai"}]}""",
             """{"data":[{"model_group":"gpt-5.4","mode":"chat"}]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
 
         // Act
         LLMModel model = await provider.GetModelAsync("gpt-5.4");
@@ -155,7 +155,7 @@ public sealed class LiteLLMProviderTests
             """{"data":[{"id":"gpt-5.4","owned_by":"openai"}]}""",
             """{"data":[{"model_group":"gpt-5.4","mode":"chat"}]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
 
         // Act
         LLMModelTestResult result = await provider.TestModelAsync("gpt-5.4");
@@ -177,7 +177,7 @@ public sealed class LiteLLMProviderTests
             """{"data":[{"id":"embedding-model","owned_by":"openai"}]}""",
             """{"data":[{"model_group":"embedding-model","mode":"embedding"}]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
 
         // Act
         LLMModelTestResult result = await provider.TestModelAsync("embedding-model");
@@ -196,7 +196,7 @@ public sealed class LiteLLMProviderTests
         // Arrange
         using StubHttpMessageHandler handler = new("""{"data":[]}""", """{"data":[]}""");
         using HttpClient httpClient = CreateHttpClient(handler);
-        LiteLLMProvider provider = CreateProvider(httpClient);
+        using LiteLLMProvider provider = CreateProvider(httpClient);
         IChatClient chatClient = provider.CreateChatClient("gpt-5.4");
 
         // Act
