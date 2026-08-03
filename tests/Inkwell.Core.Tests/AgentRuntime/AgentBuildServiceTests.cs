@@ -23,7 +23,7 @@ public sealed class AgentBuildServiceTests
             AgentId = agentId,
             VersionNumber = 1,
             Snapshot = CreateSnapshot(),
-            CreatedByUserId = Guid.CreateVersion7(),
+            OwnerUserId = Guid.CreateVersion7(),
             CreatedTime = DateTimeOffset.UtcNow,
             UpdatedTime = DateTimeOffset.UtcNow,
             PublishedTime = DateTimeOffset.UtcNow,
@@ -61,7 +61,7 @@ public sealed class AgentBuildServiceTests
             {
                 BuildOptions = CreateBuildOptionsWithChatHistory(),
             },
-            CreatedByUserId = Guid.CreateVersion7(),
+            OwnerUserId = Guid.CreateVersion7(),
             CreatedTime = DateTimeOffset.UtcNow,
             UpdatedTime = DateTimeOffset.UtcNow,
             PublishedTime = DateTimeOffset.UtcNow,
@@ -97,7 +97,7 @@ public sealed class AgentBuildServiceTests
             {
                 BuildOptions = CreateBuildOptionsWithChatHistory(),
             },
-            CreatedByUserId = Guid.CreateVersion7(),
+            OwnerUserId = Guid.CreateVersion7(),
             CreatedTime = DateTimeOffset.UtcNow,
             UpdatedTime = DateTimeOffset.UtcNow,
             PublishedTime = DateTimeOffset.UtcNow,

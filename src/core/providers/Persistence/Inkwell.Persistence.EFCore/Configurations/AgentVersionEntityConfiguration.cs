@@ -17,5 +17,9 @@ internal sealed class AgentVersionEntityConfiguration : IEntityTypeConfiguration
             .WithMany()
             .HasForeignKey(version => version.AgentId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(version => version.OwnerUser)
+            .WithMany()
+            .HasForeignKey(version => version.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -12,7 +12,7 @@ internal sealed class AgentVersionEntity : IHasTimestamps
 
     public string Snapshot { get; init; } = string.Empty;
 
-    public Guid CreatedByUserId { get; init; }
+    public Guid OwnerUserId { get; init; }
 
     public string? ChangeSummary { get; init; }
 
@@ -21,5 +21,7 @@ internal sealed class AgentVersionEntity : IHasTimestamps
     public DateTimeOffset UpdatedTime { get; init; }
 
     public DateTimeOffset? PublishedTime { get; init; }
+
+    public UserEntity? OwnerUser { get; init; }
 
 }

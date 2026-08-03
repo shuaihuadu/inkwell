@@ -28,9 +28,14 @@ public sealed record class AgentVersion : IHasTimestamps
     public required AgentSnapshot Snapshot { get; init; }
 
     /// <summary>
-    /// 获取创建该版本的用户标识。
+    /// 获取创建该版本的所有者用户标识。
     /// </summary>
-    public required Guid CreatedByUserId { get; init; }
+    public required Guid OwnerUserId { get; init; }
+
+    /// <summary>
+    /// 获取创建该版本的所有者用户名（只读展示字段，不参与持久化）。
+    /// </summary>
+    public string? OwnerUserName { get; init; }
 
     /// <summary>
     /// 获取版本变更摘要。

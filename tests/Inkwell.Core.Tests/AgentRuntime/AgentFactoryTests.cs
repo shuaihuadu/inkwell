@@ -262,7 +262,7 @@ public sealed class AgentFactoryTests
                     ModelOptions = new AgentModelOptions { ModelId = modelId },
                 },
             },
-            CreatedByUserId = Guid.CreateVersion7(),
+            OwnerUserId = Guid.CreateVersion7(),
             CreatedTime = now,
             UpdatedTime = now,
             PublishedTime = now,

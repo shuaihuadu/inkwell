@@ -140,7 +140,7 @@ public sealed class AgentVersionServiceTests
                 Instructions = instructions,
                 BuildOptions = agent.BuildOptions,
             },
-            CreatedByUserId = ownerUserId,
+            OwnerUserId = ownerUserId,
             CreatedTime = now,
             UpdatedTime = now,
             PublishedTime = now,

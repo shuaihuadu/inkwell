@@ -32,6 +32,7 @@ internal sealed class AgentVersionRepository(InkwellDbContext db) : IAgentVersio
     {
         AgentVersionEntity? entity = await db.Set<AgentVersionEntity>()
             .AsNoTracking()
+            .Include(version => version.OwnerUser)
             .FirstOrDefaultAsync(version => version.Id == versionId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -42,6 +43,7 @@ internal sealed class AgentVersionRepository(InkwellDbContext db) : IAgentVersio
     {
         List<AgentVersionEntity> entities = await db.Set<AgentVersionEntity>()
             .AsNoTracking()
+            .Include(version => version.OwnerUser)
             .Where(version => version.AgentId == agentId)
             .OrderByDescending(version => version.VersionNumber)
             .ToListAsync(cancellationToken)
@@ -61,6 +63,7 @@ internal sealed class AgentVersionRepository(InkwellDbContext db) : IAgentVersio
 
         List<AgentVersionEntity> entities = await db.Set<AgentVersionEntity>()
             .AsNoTracking()
+            .Include(version => version.OwnerUser)
             .Where(version => versionIds.Contains(version.Id))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
