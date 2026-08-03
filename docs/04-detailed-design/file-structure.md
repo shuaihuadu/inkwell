@@ -189,7 +189,9 @@ src/core/Inkwell.Abstractions/Persistence/
 
 > 由 [HD-017 §2 / §3.1 ~ §3.4](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md) 锁定。
 >
-> **2026-07-20 替代性 errata**：正式 Conversation 每轮新建 MAF Session，跨轮历史仅由 `AgentChatMessage` 持久化；`AgentSessionState` 及其 Repository 已删除。当前文件结构以真实源码为准；下方清单取代此前三模型结构。
+> **2026-07-20 替代性 errata（已被 2026-07-26 errata 撤销）**：正式 Conversation 每轮新建 MAF Session，跨轮历史仅由 `AgentChatMessage` 持久化；`AgentSessionState` 及其 Repository 已删除。当前文件结构以真实源码为准；下方清单取代此前三模型结构。
+>
+> **2026-07-26 替代性 errata**：`AgentSessionState` Model、`IAgentSessionStateRepository`、`AgentSessionStateEntity` 及其 Configuration / Mapping / Repository 重新引入，另新增 `Inkwell.Core/AgentRuntime/InkwellAgentSessionStateStore.cs`。文件结构仍以真实源码为准。
 
 ```text
 src/core/Inkwell.Abstractions/Persistence/
@@ -539,7 +541,7 @@ src/core/Inkwell.Core/
 >
 > 与 [HD-001 §Inkwell.Abstractions](#inkwellabstractions) 同 csproj；本节仅追加 `Conversations/` 子目录——`Inkwell.Abstractions.csproj` 依赖白名单不变。本端口**无**可切换 Provider（同 [HD-006](Inkwell.Abstractions/HD-006-Inkwell.Abstractions-agent-runtime-port.md) / [HD-014](Inkwell.Core/HD-014-Inkwell.Core.Auth.md) / [HD-015](Inkwell.Core/HD-015-Inkwell.Core.Agents.md) / [HD-016](Inkwell.Core/HD-016-Inkwell.Core.Tools.md) 单实现拓扑）。
 >
-> **2026-07-20 替代性 errata**：产品 API 统一使用 Conversation 术语。`IAgentConversationService` 与 `AgentChatMessage` 位于 `Agent/Conversations/`；正式运行编排和 `InkwellChatHistoryProvider` 位于唯一允许依赖 MAF 的 `Inkwell.Core.AgentRuntime`，不实现持久 `AgentSessionStore`。
+> **2026-07-20 替代性 errata（2026-07-26 部分修正）**：产品 API 统一使用 Conversation 术语。`IAgentConversationService` 与 `AgentChatMessage` 位于 `Agent/Conversations/`；正式运行编排、`InkwellChatHistoryProvider` 与 `InkwellAgentSessionStateStore` 位于唯一允许依赖 MAF 的 `Inkwell.Core.AgentRuntime`。其中 `InkwellAgentSessionStateStore` 于 2026-07-26 重新引入（取代本条原“不实现持久 `AgentSessionStore`”的表述），以非 keyed 方式、Scoped 生命周期注册。
 
 ```text
 src/core/Inkwell.Abstractions/Agent/Conversations/

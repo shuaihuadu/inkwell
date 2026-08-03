@@ -10,9 +10,6 @@ public sealed record class AgentConversation : IHasOwner, IHasTimestamps
     /// <summary>获取会话标识。</summary>
     public required Guid Id { get; init; }
 
-    /// <summary>获取供 Session Store 使用的不透明会话键。</summary>
-    public required string SessionKey { get; init; }
-
     /// <summary>获取会话所属 Agent 标识。</summary>
     public required Guid AgentId { get; init; }
 

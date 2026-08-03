@@ -36,13 +36,15 @@ downstream:
 
 > **当前契约**：H5-005 必须按 [HD-017 §0](../../04-detailed-design/Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#0-2026-07-15-当前契约替代下方冲突章节) 实施：产品 `AgentConversation` 与 MAF `AgentSession` 分离，Conversation 创建时永久锁定 `AgentVersionId`。Run 租约与 fencing 已从当前设计移除，不得从旧任务简报恢复。
 >
-> **2026-07-20 Session 当前契约**：正式 Conversation 按已锁定的 `AgentVersionId` 构建 Agent，每轮创建新的 MAF `AgentSession`。`InkwellChatHistoryProvider` 从 `AgentChatMessage` 唯一事实源恢复跨轮历史并幂等提交本轮消息；不持久化 Session checkpoint，不实现 `AgentSessionStore`。
+> **2026-07-20 Session 当前契约（已被 2026-07-26 契约取代）**：正式 Conversation 按已锁定的 `AgentVersionId` 构建 Agent，每轮创建新的 MAF `AgentSession`。`InkwellChatHistoryProvider` 从 `AgentChatMessage` 唯一事实源恢复跨轮历史并幂等提交本轮消息；不持久化 Session checkpoint，不实现 `AgentSessionStore`。
 >
-> **技术方向**：AG-UI 直接使用 MAF `MapAGUI`；不实现 Inkwell 自建 Run DTO、协议状态机或 SSE 编码器。具体挂载路径仍待 ADR-012 errata 或 Owner 拍板；认证与授权必须在 MAF handler 前完成，`threadId` 只用于定位产品 Conversation，不作为授权凭证。
+> **2026-07-26 Session 当前契约**：Session checkpoint 持久化重新引入，取代上一条契约。`agent_session_states` 表以 `session_key`（`AgentConversation.SessionKey`，`Guid` 的 `"N"` 格式）为唯一键，外键指向 `agent_conversations.session_key` 并级联删除。`InkwellAgentSessionStateStore`（继承 MAF `AgentSessionStore`）独占该表行生命周期：首次保存时建行、清空会话时删行，调用方不预建空行。跨轮历史仍由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复，两者并存互不替代。该 Store 以**非 keyed** 方式注册且必须保持非 keyed：MAF Hosting 通过 `GetKeyedService<AgentSessionStore>(agent.Name)` 解析并强制包裹 `IsolationKeyScopedAgentSessionStore`，后者把 id 改写为 `"{isolationKey}::{sessionStoreId}"`，会同时违反 `session_key` 的 32 字符长度上限与外键约束。
+>
+> **2026-08-03 Session 当前契约**：`SessionKey` 整体移除，取代上一条契约中涉及该列与 Store 基类的部分。`agent_session_states` 以 `conversation_id`（`Guid`）为唯一键，外键直接指向 `agent_conversations.id` 主键并级联删除。`InkwellAgentSessionStateStore` **不再继承** MAF `AgentSessionStore`，按具体类型注册为 Scoped 服务，直接以 `Guid conversationId` 读写；因类型不再是 `AgentSessionStore`，MAF Hosting 已不可能解析并包裹它，上一条契约中「必须保持非 keyed」的防御性约束不再适用。行生命周期独占与「跨轮历史仍由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复」两项保持不变。
+>
+> **技术方向**：AG-UI 直接使用 MAF `MapAGUIServer`；不实现 Inkwell 自建 Run DTO、协议状态机或 SSE 编码器。具体挂载路径仍待 ADR-012 errata 或 Owner 拍板；认证与授权必须在 MAF handler 前完成，`threadId` 只用于定位产品 Conversation，不作为授权凭证。
 >
 > **2026-07-16 协议核验修正**：`@ag-ui/client@0.0.57` 的 `HttpAgent` 对标准 `RunAgentInput` 直接 `JSON.stringify`，发送 `threadId`、`runId`、`state`、完整 `messages` 快照、`tools`、`context`、`forwardedProps` 与可选 `parentRunId` / `resume`。后端直接绑定 MAF/`AGUI.Abstractions` 的标准 Model，不自建接收 DTO；撤销 `AsyncLocal` Run Context accessor 和“客户端只发送本轮新增消息”的设计。
->
-> **MAF API 版本提示**：Inkwell 当前锁定包与生产代码调用 `MapAGUI`，同工作区最新 MAF `main` 已改为 `MapAGUIServer`。H5-005-B 升级依赖后必须以实际恢复版本的编译 API 为准；两者都是官方 Hosting 映射入口，本差异不改变 wire contract，也不得通过自建 endpoint 绕过。
 >
 > **DTO / AgentRun 结论**：AG-UI 入口 DTO 使用实际 MAF 版本提供的 `AGUI.Abstractions.RunAgentInput`，输出为 AG-UI 标准 SSE 事件；Inkwell 不新增产品 `AgentRun` Model / Entity / REST 资源。服务端 `ExecutionId` 只关联消息幂等和 trace，执行结束后不形成独立产品聚合。
 
@@ -57,12 +59,12 @@ downstream:
 ## 3. 当前基线
 
 - **已有**：单 Agent 内存消息列表和 main process Chat Completions SSE 文本增量。
-- **已有**：WebApi 通过 MAF `MapAGUI("/agent/{agentId}", agent)` 挂载 AG-UI。
+- **已有**：WebApi 通过 MAF `MapAGUIServer("/agent/{agentId}", agent)` 挂载 AG-UI。
 - **已有**：正式 Conversation 每轮新建 Session，并由 `InkwellChatHistoryProvider` 从服务端消息恢复跨轮历史。
 - **已有**：Conversation REST、Electron IPC、聊天页和跨设备消息恢复链路。
 - **已有**：取消、结构化错误与重试、主进程内有界请求快照和锁屏恢复闭环。
 - **缺失**：工具/Activity，以及系统 suspend/resume 后需要独立协议设计的断线重连。
-- **偏差**：真实后端直接使用 MAF `MapAGUI`，与 ADR-012 的 `/api/runs` 描述不一致；直接使用官方 Hosting 是当前技术方向，但具体挂载路径尚未拍板，后续应由有权修改 H2 ADR 的流程补充 ADR-012 errata。
+- **偏差**：真实后端直接使用 MAF `MapAGUIServer`，与 ADR-012 的 `/api/runs` 描述不一致；直接使用官方 Hosting 是当前技术方向，但具体挂载路径尚未拍板，后续应由有权修改 H2 ADR 的流程补充 ADR-012 errata。
 
 ## 4. 范围
 
@@ -74,7 +76,7 @@ downstream:
 
 ## 6. 建议工程单元
 
-- **H5-005-A · 已实现**：Conversation 与 Message 两模型、Repository、Service、REST、外部历史 Provider 与双 Provider Mapping；`RemoveAgentSessionState` migration 将持久化收敛为两表。
+- **H5-005-A · 已实现**：Conversation 与 Message 两模型、Repository、Service、REST、外部历史 Provider 与双 Provider Mapping；`RemoveAgentSessionState` migration 曾将持久化收敛为两表，现按 2026-07-26 Session 当前契约重新引入 `agent_session_states` 第三张表。
 - **H5-005-B · 已实现**：使用正式 Conversation 路由验证标准消息、认证授权、真实 SSE 和外部历史恢复。
 - **H5-005-C · 已实现**：接入 Electron IPC、Ant Design X/XMarkdown 和服务端消息历史，验证跨设备恢复和 Electron E2E。
 - **H5-005-D · 已实现**：实现取消、错误、新 ID 重试、主进程存活期间的有界状态快照和锁屏恢复，并通过真实 Electron E2E 验证 AC-079 和 AC-089。
@@ -84,11 +86,11 @@ downstream:
 ## 7. 契约与设计缺口
 
 - 明确 AG-UI 端点输入、认证方式、事件集合和取消语义。
-- 使用直接 `MapAGUI` 技术方向消除协议实现漂移，并通过 ADR errata 流程拍板具体路径、同步 ADR-012；H5 不新增自建 Run DTO 或 SSE 编码器。
+- 使用直接 `MapAGUIServer` 技术方向消除协议实现漂移，并通过 ADR errata 流程拍板具体路径、同步 ADR-012；H5 不新增自建 Run DTO 或 SSE 编码器。
 - 补齐 Conversations REST API；当前 WebApi 只有协议端点，没有产品会话 Controller。
-- Conversation 持久化只包含 `agent_conversations` / `agent_chat_messages` 两表及对应 Model、Repository 与 EFCore Mapping；不得恢复旧 `AgentSessionDefinition` 或 `AgentSessionState` 模型。
+- Conversation 持久化包含 `agent_conversations` / `agent_chat_messages` / `agent_session_states` 三表及对应 Model、Repository 与 EFCore Mapping；不得恢复旧 `AgentSessionDefinition` 模型。
 - 不新增 `agent_run` 表或 Inkwell `AgentRun` Model。完成消息归 `AgentChatMessage`，可观测事件归后续 `Inkwell.Core.Traces`。
-- `InkwellChatHistoryProvider` 负责跨轮历史；当前 Provider 均不需要持久 Session State，不预留无消费者的 `AgentSessionStore`。
+- `InkwellChatHistoryProvider` 负责跨轮历史；`InkwellAgentSessionStateStore` 负责 Session checkpoint。两者职责不重叠：前者以 `AgentChatMessage` 为唯一事实源重建对话历史，后者只存取 MAF 序列化的 Session 状态。
 - H5-005-B 必须先用真实 `@ag-ui/client` `HttpAgent` 发包验证 ASP.NET Core 对标准 `RunAgentInput` 的绑定，固定 camelCase 九字段、可选字段、Bearer Header、完整消息快照及 SSE Accept Header；禁止先按后端假设手写请求 JSON 再声称兼容 SDK。
 - 消息批次用 `(ConversationId, RunId, RunMessageIndex)` 幂等，并在成功批次提交时同步更新 `LastCommittedRunId` 与 `LastActivityTime`；下一轮从持久消息恢复历史。
 - H5-005-A 已删除或替换旧 `AgentSessionDefinition` 链路，并已生成双 Provider Initial Migration；后续不得把旧单表 Session 语义恢复进产品。

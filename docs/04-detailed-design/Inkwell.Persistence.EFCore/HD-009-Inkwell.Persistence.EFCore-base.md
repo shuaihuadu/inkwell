@@ -32,7 +32,11 @@ downstream: []
 >
 > **2026-07-15 替代性 errata（Conversations 三实体）**：原 §3.13 的 `AgentSessionDefinition` / `AgentSessionEntity` 把产品会话与 MAF Session 状态混为一体。当前 EFCore family 必须按 [HD-017 §0](../Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#0-2026-07-15-当前契约替代下方冲突章节) 实现 `AgentConversation`、`AgentChatMessage`、`AgentSessionState` 三套 Entity / Configuration / Mapping / Repository；本 errata 只替代 Conversations 对应模板行，其余已 reviewed 内容保持不变。
 >
-> **2026-07-20 Session checkpoint 删除 errata**：Conversations 持久化现收敛为 `AgentConversation` 与 `AgentChatMessage` 两套实体。`AgentSessionStateEntity` 及其 Configuration、Mapping、Repository、DI 注册和导航关系已删除；双数据库 `RemoveAgentSessionState` migration 删除旧状态表。下方三实体计数和状态实体配置要求仅保留为历史设计。
+> **2026-07-20 Session checkpoint 删除 errata（已被 2026-07-26 errata 撤销）**：Conversations 持久化现收敛为 `AgentConversation` 与 `AgentChatMessage` 两套实体。`AgentSessionStateEntity` 及其 Configuration、Mapping、Repository、DI 注册和导航关系已删除；双数据库 `RemoveAgentSessionState` migration 删除旧状态表。下方三实体计数和状态实体配置要求仅保留为历史设计。
+>
+> **2026-07-26 Session checkpoint 恢复 errata（`SessionKey` 部分已被 2026-08-03 errata 取代）**：`AgentSessionStateEntity` 及其 Configuration、Mapping、Repository 与 DI 注册重新引入，Conversations 回到三套实体，取代上一条 errata。`AgentSessionStateEntityConfiguration` 以 `Id` 为主键（**不是** 旧设计的 `ConversationId` 同时作 PK/FK），对 `SessionKey` 建唯一索引并限长 32，通过 `HasPrincipalKey<AgentConversationEntity>(c => c.SessionKey)` 建立 1:0..1 外键并 `ON DELETE CASCADE`；`SessionState` 列在 PostgreSQL 用 `jsonb`、SQL Server 用 `json`。不恢复 Revision / RowVersion / CAS 配置。
+>
+> **2026-08-03 会话标识统一 errata**：`SessionKey` 整体移除，取代上一条 errata 中关于该列与外键主体键的部分。当前契约为：一、`AgentConversationEntityConfiguration` 不再配置 `SessionKey` 列、其唯一索引与备用键（SQL Server 侧 `AK_AgentConversations_SessionKey` 一并消失）；二、`AgentSessionStateEntityConfiguration` 仍以 `Id` 为主键，改为对 `ConversationId`（`Guid`）建唯一索引，并以常规主键关系建立 1:0..1 外键指向 `agent_conversations.Id` 并 `ON DELETE CASCADE`，**不再使用** `HasPrincipalKey`；三、`SessionState` 的原生 JSON 列类型要求与「不恢复 Revision / RowVersion / CAS」保持不变；四、双 Provider 的 `Migrations/` 已按新 Model 由 `dotnet ef migrations add` 重新生成。
 
 ## 1. 模块概述
 

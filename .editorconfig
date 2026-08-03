@@ -570,3 +570,15 @@ roslynator.prefer_new_line_at_end_of_file = false
 roslynator_use_var = never
 # Format documentation comment summary on single line or multiple lines
 roslynator_doc_comment_summary_style = multi_line
+
+###############################
+# EF Core Migrations          #
+###############################
+
+# Migration / Designer / ModelSnapshot 由 dotnet ef migrations add 生成，禁止手工编辑，
+# 因此对生成结果不施加仓库代码风格约束。
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0005.severity = none # Remove unnecessary using directives
+dotnet_diagnostic.IDE0073.severity = none # Require file header
+dotnet_diagnostic.IDE0161.severity = none # Use file-scoped namespace

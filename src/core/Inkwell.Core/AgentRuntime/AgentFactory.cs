@@ -123,7 +123,7 @@ internal sealed class AgentFactory(
             })
             : new InkwellChatHistoryProvider(
                 persistence,
-                new AgentConversationMessageCommitter(persistence, timeProvider),
+                timeProvider,
                 options?.MaxMessagesToRetrieve);
 
     private static List<AIContextProvider> CreateContextProviders(

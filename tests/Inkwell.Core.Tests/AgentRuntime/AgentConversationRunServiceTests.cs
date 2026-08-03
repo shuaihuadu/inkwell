@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Inkwell.Core.Tests.AgentRuntime;
 
@@ -26,7 +27,6 @@ public sealed class AgentConversationServiceRunTests
         AgentConversation conversation = new()
         {
             Id = conversationId,
-            SessionKey = conversationId.ToString("D"),
             AgentId = agentId,
             AgentVersionId = versionId,
             OwnerUserId = ownerUserId,
@@ -36,18 +36,32 @@ public sealed class AgentConversationServiceRunTests
         };
         StubConversationRepository conversations = new(conversation);
         StubMessageRepository messages = new();
+        StubSessionStateRepository sessionStates = new();
+        await sessionStates.AddSessionState(new AgentSessionState
+        {
+            Id = Guid.CreateVersion7(),
+            ConversationId = conversationId,
+            SessionState = AgentSessionState.Empty,
+            CreatedTime = now,
+            UpdatedTime = now,
+        });
         StubPersistenceProvider persistence = new(
             new StubAgentRepository(),
             conversations,
-            messages);
+            messages,
+            sessionStates);
         InkwellChatHistoryProvider historyProvider = new(
             persistence,
-            new AgentConversationMessageCommitter(persistence, new FixedTimeProvider(now)));
+            new FixedTimeProvider(now));
         RecordingBuildService buildService = new(historyProvider);
         AgentConversationService service = new(
             persistence,
             new FixedTimeProvider(now),
-            buildService);
+            buildService,
+            new InkwellAgentSessionStateStore(
+                persistence,
+                new FixedTimeProvider(now),
+                NullLogger<InkwellAgentSessionStateStore>.Instance));
 
         // Act
         List<AgentResponseUpdate> updates = [];
@@ -111,9 +125,13 @@ public sealed class AgentConversationServiceRunTests
 
     private sealed class StubAgent(InkwellChatHistoryProvider historyProvider) : AIAgent
     {
+        private const string SerializedSession = """{"stub":true}""";
+
         public List<ChatMessage> RequestMessages { get; private set; } = [];
 
         public List<ChatMessage> InvocationMessages { get; private set; } = [];
+
+        public List<string> DeserializedSessions { get; } = [];
 
         protected override ValueTask<AgentSession> CreateSessionCoreAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult<AgentSession>(new StubSession());
@@ -122,13 +140,17 @@ public sealed class AgentConversationServiceRunTests
             AgentSession session,
             JsonSerializerOptions? jsonSerializerOptions = null,
             CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("Conversation runs must not serialize MAF sessions.");
+            ValueTask.FromResult(JsonDocument.Parse(SerializedSession).RootElement.Clone());
 
         protected override ValueTask<AgentSession> DeserializeSessionCoreAsync(
             JsonElement serializedState,
             JsonSerializerOptions? jsonSerializerOptions = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("Conversation runs must not deserialize MAF sessions.");
+            CancellationToken cancellationToken = default)
+        {
+            this.DeserializedSessions.Add(serializedState.GetRawText());
+
+            return ValueTask.FromResult<AgentSession>(new StubSession());
+        }
 
         protected override async Task<AgentResponse> RunCoreAsync(IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
         {
@@ -170,6 +192,38 @@ public sealed class AgentConversationServiceRunTests
     {
     }
 
+    private sealed class StubSessionStateRepository : IAgentSessionStateRepository
+    {
+        private readonly Dictionary<Guid, AgentSessionState> _states = [];
+
+        public IReadOnlyDictionary<Guid, AgentSessionState> States => this._states;
+
+        public Task<AgentSessionState> AddSessionState(AgentSessionState sessionState, CancellationToken ct = default)
+        {
+            this._states[sessionState.ConversationId] = sessionState;
+
+            return Task.FromResult(sessionState);
+        }
+
+        public Task<AgentSessionState?> FindSessionStateByConversation(Guid conversationId, CancellationToken ct = default) =>
+            Task.FromResult(this._states.TryGetValue(conversationId, out AgentSessionState? state) ? state : null);
+
+        public Task<bool> UpdateSessionState(Guid conversationId, string sessionState, DateTimeOffset updatedTime, CancellationToken ct = default)
+        {
+            if (!this._states.TryGetValue(conversationId, out AgentSessionState? existing))
+            {
+                return Task.FromResult(false);
+            }
+
+            this._states[conversationId] = existing with { SessionState = sessionState, UpdatedTime = updatedTime };
+
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> DeleteSessionState(Guid conversationId, CancellationToken ct = default) =>
+            Task.FromResult(this._states.Remove(conversationId));
+    }
+
     private sealed class StubPersistenceProvider(params object[] repositories) : IPersistenceProvider
     {
         public TRepository GetRepository<TRepository>() where TRepository : notnull => repositories.OfType<TRepository>().Single();
@@ -209,8 +263,6 @@ public sealed class AgentConversationServiceRunTests
         public Task<AgentConversation> GetConversation(Guid conversationId, CancellationToken ct = default) => Task.FromResult(this._conversation);
 
         public Task<AgentConversation> AddConversation(AgentConversation value, CancellationToken ct = default) => throw new NotSupportedException();
-
-        public Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default) => throw new NotSupportedException();
 

@@ -22,14 +22,6 @@ internal sealed class AgentConversationRepository(InkwellDbContext db) : IAgentC
         return entity?.ToModel() ?? throw new KeyNotFoundException($"Agent conversation not found: id={conversationId}");
     }
 
-    public async Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sessionKey);
-        AgentConversationEntity? entity = await db.Set<AgentConversationEntity>().AsNoTracking()
-            .FirstOrDefaultAsync(conversation => conversation.SessionKey == sessionKey, ct).ConfigureAwait(false);
-        return entity?.ToModel() ?? throw new KeyNotFoundException($"Agent conversation not found: sessionKey={sessionKey}");
-    }
-
     public async Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default)
     {
         IQueryable<AgentConversationEntity> query = db.Set<AgentConversationEntity>().AsNoTracking()

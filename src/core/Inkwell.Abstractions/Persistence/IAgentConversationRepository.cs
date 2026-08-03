@@ -17,12 +17,6 @@ public interface IAgentConversationRepository
     /// <returns>产品会话。</returns>
     Task<AgentConversation> GetConversation(Guid conversationId, CancellationToken ct = default);
 
-    /// <summary>按不透明 Session Key 获取产品会话。</summary>
-    /// <param name="sessionKey">不透明 Session Key。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>产品会话。</returns>
-    Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default);
-
     /// <summary>分页列出指定参与用户与 Agent 的产品会话。</summary>
     /// <param name="agentId">Agent 标识。</param>
     /// <param name="ownerUserId">会话所属参与用户标识。</param>

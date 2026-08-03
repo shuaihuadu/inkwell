@@ -259,7 +259,11 @@ Agent 名称、头像、描述、Instructions、模型参数、工具与 Skill �
 
 > 由 [HD-017 §0](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#0-2026-07-15-当前契约替代下方冲突章节) 锁定。本节是 H3 第四张业务命名空间贡献的表结构。
 >
-> **2026-07-20 替代性 errata**：Conversation 持久化现仅包含 `agent_conversations` 与 `agent_chat_messages` 两表。聊天消息是跨轮连续性的唯一事实源；MAF Session 每轮新建，不再序列化到数据库。`agent_session_states` 已由双 Provider 的 `RemoveAgentSessionState` migration 删除；下方状态表结构和旧状态迁移规则仅保留为历史设计。
+> **2026-07-20 替代性 errata（已被 2026-07-26 errata 撤销）**：Conversation 持久化现仅包含 `agent_conversations` 与 `agent_chat_messages` 两表。聊天消息是跨轮连续性的唯一事实源；MAF Session 每轮新建，不再序列化到数据库。`agent_session_states` 已由双 Provider 的 `RemoveAgentSessionState` migration 删除；下方状态表结构和旧状态迁移规则仅保留为历史设计。
+>
+> **2026-07-26 替代性 errata（`SessionKey` 部分已被 2026-08-03 errata 取代）**：`agent_session_states` 重新引入，Conversation 持久化回到三表，取代上一条 errata。新表不重建旧设计的 `ConversationId` PK/FK、`Revision` CAS 与 `LastRunId` 字段，具体结构见下方「表 `agent_session_states`」。聊天消息仍是历史唯一事实源，Session 状态只是可丢弃的运行时检查点，不得反向覆盖消息。
+>
+> **2026-08-03 会话标识统一 errata**：`SessionKey` 整体移除，取代上方及下方所有涉及该字段的描述。当前契约为：一、`agent_conversations` 不再包含 `SessionKey` 列、其唯一索引与候选键，也不存在针对该列的更新拒绝规则；二、`agent_session_states` 以 `ConversationId`（`Guid`，非空、唯一索引）为查找键，外键直接指向 `agent_conversations.Id` 主键并 `ON DELETE CASCADE`，不再使用 `HasPrincipalKey` 指向非主键列；三、`InkwellAgentSessionStateStore` 不再继承 MAF `AgentSessionStore`，改为按具体类型注册的 Scoped 服务，直接以 `Guid conversationId` 读写，opaque string key 与 `Guid` 之间的往返转换及其解析失败分支一并删除；四、AG-UI `RunAgentInput.ThreadId` 与 `AgentConversation.Id` 同值，`threadId` 只负责定位，绝不承担授权；五、下方「从旧 `agent_session` 单表迁移」中的 `SessionKey = Id.ToString("D")` 回填规则随之作废（该规则与上方字段定义所写的 `"N"` 格式本身即不自洽）。
 >
 > **2026-07-17 Run 租约移除 errata**：`agent_conversations` 不再包含 `ActiveRunId` / `RunLeaseExpiresTime`，持久化端口不再提供租约或 fencing 操作。消息 `RunId`、`LastCommittedRunId` 与状态 `LastRunId` 仍表示服务端 `ExecutionId`，仅用于执行关联、消息幂等与状态标记。
 >
@@ -268,7 +272,7 @@ Agent 名称、头像、描述、Instructions、模型参数、工具与 Skill �
 ### 表 `agent_conversations`（[REQ-010 + NFR-005](../01-requirements/requirements.md)）
 
 - `Id`：`Guid` v7，主键
-- `SessionKey`：`string`，长度上限 64，唯一索引；创建时写入规范化 `Id.ToString("D")`，供 MAF `AgentSessionStore` 作为 opaque lookup key 使用，Store 不解析其格式
+- `SessionKey`：`string`，长度上限 32，唯一索引；创建时写入规范化 `Id.ToString("N")`，供 MAF `AgentSessionStore` 作为 opaque lookup key 使用，Store 不解析其格式
 - `AgentId`：`Guid`，与 `AgentVersionId` 组成复合外键；不再单独建立指向 `agents.Id` 的 FK
 - `AgentVersionId`：`Guid`，REST 创建 Conversation 时锁定且不可变；复合外键 `(AgentId, AgentVersionId)` → `agent_versions(AgentId, Id)`，`ON DELETE CASCADE`
 - `OwnerUserId`：`Guid`（`IHasOwner`，[HD-017 §1.3 Q1](Inkwell.Core/HD-017-Inkwell.Core.Conversations.md#13-关键决策摘要)，语义 = 会话参与用户，非 `agents.OwnerUserId`），非唯一索引
@@ -292,11 +296,20 @@ Agent 名称、头像、描述、Instructions、模型参数、工具与 Skill �
 
 **约束与索引**：`(ConversationId, SequenceNumber)` 唯一复合索引；对 `RunId IS NOT NULL` 的行建立 `(ConversationId, RunId, RunMessageIndex)` 唯一过滤/部分索引；CHECK 约束保证 `RunId` 与 `RunMessageIndex` 同空或同非空。SqlServer final adapter 使用 SQL Server filtered-index filter，Postgres final adapter 使用 PostgreSQL partial-index predicate，不得把 Provider 专属 SQL 字符串塞入共享 base；双 Provider Migration 必须分别验证索引生成结果。request + response 批量追加在 Serializable 事务内读取最大序号、连续分配消息并更新 `LastCommittedRunId` 与 `LastActivityTime`；同一 Run 重试只有在已有批次逐项相同时才按幂等成功处理。**不**包含 `RowVersion` / `OwnerUserId`。
 
+### 表 `agent_session_states`（[REQ-010 + NFR-005](../01-requirements/requirements.md)）
+
+- `Id`：`Guid` v7，主键
+- `SessionKey`：`string`，长度上限 32，非空，唯一索引；外键 → `agent_conversations.SessionKey`（主体键为 `AgentConversations.SessionKey` 而非主键），`ON DELETE CASCADE`
+- `SessionState`：MAF `AgentSession` 序列化后的 JSON 文档，非空；EF Core Mapping 在 PostgreSQL 使用 `jsonb`、SQL Server 使用 `json`，不得映射为普通文本列，属性和列名不添加 `Json` 后缀
+- `CreatedTime` / `UpdatedTime`：`IHasTimestamps`
+
+**关系基数**：`AgentConversation 1:0..1 AgentSessionState`。行生命周期由 `InkwellAgentSessionStateStore` 独占：首次保存时建行，删除或清空会话时删行，调用方不预建空行。**注意**：`SessionKey` 的 32 字符长度上限与外键约束意味着该 Store 不得以 keyed 方式注册进 MAF Hosting——`IsolationKeyScopedAgentSessionStore` 会把 id 改写为 `"{isolationKey}::{sessionStoreId}"`，同时破坏两者。
+
 ### 删除与清空
 
-- 删除 `agent_conversations` 由数据库级联删除 `agent_chat_messages`。
-- 清空不删除 `agent_conversations`：Service 在同一事务删除该会话全部消息，把 `Title` 置空并刷新 `UpdatedTime`；会话的 `AgentVersionId` 保持不变。
-- Owner 于 2026-07-16 选择 Agent 硬删除级联会话历史：删除 `agents` 依次级联 `agent_versions`、`agent_conversations` 与 `agent_chat_messages`。删除确认必须在 WebApi/UI 明示该跨用户且不可恢复的后果。
+- 删除 `agent_conversations` 由数据库级联删除 `agent_chat_messages` 与 `agent_session_states`。
+- 清空不删除 `agent_conversations`：Service 在同一事务删除该会话全部消息与 Session 状态行，把 `Title` 置空并刷新 `UpdatedTime`；会话的 `AgentVersionId` 保持不变。
+- Owner 于 2026-07-16 选择 Agent 硬删除级联会话历史：删除 `agents` 依次级联 `agent_versions`、`agent_conversations`、`agent_chat_messages` 与 `agent_session_states`。删除确认必须在 WebApi/UI 明示该跨用户且不可恢复的后果。
 
 ### 从旧 `agent_session` 单表迁移
 

@@ -9,10 +9,8 @@ internal sealed class AgentConversationEntityConfiguration : IEntityTypeConfigur
     public void Configure(EntityTypeBuilder<AgentConversationEntity> builder)
     {
         builder.HasKey(conversation => conversation.Id);
-        builder.HasIndex(conversation => conversation.SessionKey).IsUnique();
         builder.HasIndex(conversation => new { conversation.AgentId, conversation.OwnerUserId, conversation.LastActivityTime });
         builder.HasIndex(conversation => conversation.AgentVersionId);
-        builder.Property(conversation => conversation.SessionKey).HasMaxLength(64).IsRequired();
         builder.Property(conversation => conversation.Title).HasMaxLength(30);
         builder.Property(conversation => conversation.LastCommittedRunId).HasMaxLength(64);
         builder.HasOne<AgentVersionEntity>()

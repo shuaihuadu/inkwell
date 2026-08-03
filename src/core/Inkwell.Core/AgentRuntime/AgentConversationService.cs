@@ -11,12 +11,12 @@ namespace Inkwell;
 internal sealed class AgentConversationService(
     IPersistenceProvider persistence,
     TimeProvider timeProvider,
-    IAgentBuildService buildService) : IAgentConversationService
+    IAgentBuildService buildService,
+    InkwellAgentSessionStateStore sessionStateStore) : IAgentConversationService
 {
     private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
     private readonly IAgentConversationRepository _conversations = persistence.GetRepository<IAgentConversationRepository>();
     private readonly IAgentChatMessageRepository _messages = persistence.GetRepository<IAgentChatMessageRepository>();
-    private readonly AgentConversationMessageCommitter _messageCommitter = new(persistence, timeProvider);
 
     public Task<AgentConversation> CreateConversationAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default) =>
         persistence.ExecuteInTransactionAsync(
@@ -37,7 +37,6 @@ internal sealed class AgentConversationService(
                 AgentConversation conversation = new()
                 {
                     Id = conversationId,
-                    SessionKey = conversationId.ToString("D"),
                     AgentId = agentId,
                     AgentVersionId = agentVersionId,
                     OwnerUserId = ownerUserId,
@@ -102,6 +101,7 @@ internal sealed class AgentConversationService(
                 DateTimeOffset now = timeProvider.GetUtcNow();
                 AgentConversation conversation = await this.GetAuthorizedConversationAsync(ownerUserId, agentId, conversationId, innerCt).ConfigureAwait(false);
                 _ = await this._messages.DeleteMessagesByConversation(conversationId, innerCt).ConfigureAwait(false);
+                await sessionStateStore.DeleteSessionStateAsync(conversationId, innerCt).ConfigureAwait(false);
                 AgentConversation cleared = conversation with
                 {
                     Title = null,
@@ -128,17 +128,6 @@ internal sealed class AgentConversationService(
         }
     }
 
-    public Task<AgentChatMessageCommitResult> CommitRunMessagesAsync(
-        Guid ownerUserId,
-        Guid agentId,
-        Guid conversationId,
-        string executionId,
-        IReadOnlyList<ChatMessage> messages,
-        CancellationToken ct = default)
-    {
-        return this._messageCommitter.CommitAsync(ownerUserId, agentId, conversationId, executionId, messages, ct);
-    }
-
     /// <inheritdoc />
     public async Task<AgentResponse> RunAsync(
         Guid ownerUserId,
@@ -152,6 +141,10 @@ internal sealed class AgentConversationService(
         AgentResponse response = await context.Agent
             .RunAsync(context.RunMessages, context.Session, options, cancellationToken)
             .ConfigureAwait(false);
+        await sessionStateStore
+            .SaveSessionAsync(context.Agent, context.ConversationId, context.Session, cancellationToken)
+            .ConfigureAwait(false);
+
         return response;
     }
 
@@ -173,6 +166,9 @@ internal sealed class AgentConversationService(
             yield return update;
         }
 
+        await sessionStateStore
+            .SaveSessionAsync(context.Agent, context.ConversationId, context.Session, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<RunContext> PrepareRunAsync(
@@ -187,7 +183,9 @@ internal sealed class AgentConversationService(
             .BuildPublishedConversationAsync(agentId, conversation.AgentVersionId, ownerUserId, cancellationToken)
             .ConfigureAwait(false);
         string executionId = Guid.CreateVersion7().ToString("D");
-        AgentSession session = await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+        AgentSession session = await sessionStateStore
+            .GetSessionAsync(agent, conversationId, cancellationToken)
+            .ConfigureAwait(false);
         InkwellChatHistoryProvider.AttachSession(session, conversationId, ownerUserId, agentId, executionId);
 
         return new RunContext(

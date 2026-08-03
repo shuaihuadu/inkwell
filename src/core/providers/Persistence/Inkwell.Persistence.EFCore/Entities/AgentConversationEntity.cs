@@ -5,7 +5,6 @@ namespace Inkwell.Persistence.EFCore.Entities;
 internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner
 {
     public Guid Id { get; set; }
-    public string SessionKey { get; set; } = string.Empty;
     public Guid AgentId { get; set; }
     public Guid AgentVersionId { get; set; }
     public Guid OwnerUserId { get; init; }

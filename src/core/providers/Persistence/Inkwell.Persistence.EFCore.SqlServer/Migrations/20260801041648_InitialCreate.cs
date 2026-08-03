@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -73,32 +73,6 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AgentVersions",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AgentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    VersionNumber = table.Column<int>(type: "int", nullable: false),
-                    Snapshot = table.Column<string>(type: "json", nullable: false),
-                    CreatedByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ChangeSummary = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    CreatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    UpdatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    PublishedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AgentVersions", x => x.Id);
-                    table.UniqueConstraint("AK_AgentVersions_AgentId_Id", x => new { x.AgentId, x.Id });
-                    table.ForeignKey(
-                        name: "FK_AgentVersions_Agents_AgentId",
-                        column: x => x.AgentId,
-                        principalTable: "Agents",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "AgentSkills",
                 columns: table => new
                 {
@@ -125,11 +99,42 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "AgentVersions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AgentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    VersionNumber = table.Column<int>(type: "int", nullable: false),
+                    Snapshot = table.Column<string>(type: "json", nullable: false),
+                    OwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ChangeSummary = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CreatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    PublishedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AgentVersions", x => x.Id);
+                    table.UniqueConstraint("AK_AgentVersions_AgentId_Id", x => new { x.AgentId, x.Id });
+                    table.ForeignKey(
+                        name: "FK_AgentVersions_Agents_AgentId",
+                        column: x => x.AgentId,
+                        principalTable: "Agents",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_AgentVersions_Users_OwnerUserId",
+                        column: x => x.OwnerUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "AgentConversations",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SessionKey = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     AgentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     AgentVersionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     OwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -174,6 +179,27 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "AgentSessionStates",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ConversationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    SessionState = table.Column<string>(type: "json", nullable: false),
+                    CreatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AgentSessionStates", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AgentSessionStates_AgentConversations_ConversationId",
+                        column: x => x.ConversationId,
+                        principalTable: "AgentConversations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_AgentChatMessages_ConversationId_SequenceNumber",
                 table: "AgentChatMessages",
@@ -201,9 +227,9 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 column: "OwnerUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AgentConversations_SessionKey",
-                table: "AgentConversations",
-                column: "SessionKey",
+                name: "IX_AgentSessionStates_ConversationId",
+                table: "AgentSessionStates",
+                column: "ConversationId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -222,6 +248,11 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 table: "AgentVersions",
                 columns: new[] { "AgentId", "VersionNumber" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AgentVersions_OwnerUserId",
+                table: "AgentVersions",
+                column: "OwnerUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Agents_CurrentPublishedVersionId",
@@ -262,6 +293,9 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 name: "AgentChatMessages");
 
             migrationBuilder.DropTable(
+                name: "AgentSessionStates");
+
+            migrationBuilder.DropTable(
                 name: "AgentSkills");
 
             migrationBuilder.DropTable(
@@ -271,13 +305,13 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                 name: "AgentConversations");
 
             migrationBuilder.DropTable(
-                name: "Users");
-
-            migrationBuilder.DropTable(
                 name: "AgentVersions");
 
             migrationBuilder.DropTable(
                 name: "Agents");
+
+            migrationBuilder.DropTable(
+                name: "Users");
         }
     }
 }

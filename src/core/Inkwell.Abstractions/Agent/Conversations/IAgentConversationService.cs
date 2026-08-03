@@ -56,16 +56,6 @@ public interface IAgentConversationService
     /// <returns>表示异步操作的任务。</returns>
     Task DeleteConversationAsync(Guid ownerUserId, Guid agentId, Guid conversationId, CancellationToken ct = default);
 
-    /// <summary>幂等提交消息批次。</summary>
-    /// <param name="ownerUserId">会话所属参与用户标识。</param>
-    /// <param name="agentId">Agent 标识。</param>
-    /// <param name="conversationId">产品会话标识。</param>
-    /// <param name="executionId">服务端执行标识。</param>
-    /// <param name="messages">待提交的消息列表。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>消息批次提交结果。</returns>
-    Task<AgentChatMessageCommitResult> CommitRunMessagesAsync(Guid ownerUserId, Guid agentId, Guid conversationId, string executionId, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default);
-
     /// <summary>执行产品会话并提交本轮消息。</summary>
     /// <param name="ownerUserId">会话所属参与用户标识。</param>
     /// <param name="agentId">Agent 标识。</param>

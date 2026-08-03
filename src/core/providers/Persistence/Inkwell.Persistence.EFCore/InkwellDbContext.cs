@@ -25,6 +25,8 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
 
     internal DbSet<AgentChatMessageEntity> AgentChatMessages => this.Set<AgentChatMessageEntity>();
 
+    internal DbSet<AgentSessionStateEntity> AgentSessionStates => this.Set<AgentSessionStateEntity>();
+
     internal DbSet<AgentSkillEntity> AgentSkills => this.Set<AgentSkillEntity>();
 
     /// <inheritdoc />
@@ -38,6 +40,7 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         {
             ApplyTimestamps(modelBuilder);
             ApplyOwnerIndex(modelBuilder);
+            this.ApplyJsonColumns(modelBuilder);
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {
@@ -68,5 +71,13 @@ public class InkwellDbContext(DbContextOptions<InkwellDbContext> options) : DbCo
         {
             mb.Entity(entityType.ClrType).HasIndex(nameof(IHasOwner.OwnerUserId));
         }
+    }
+
+    private void ApplyJsonColumns(ModelBuilder mb)
+    {
+        bool isNpgsql = this.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true;
+        string jsonColumnType = isNpgsql ? "jsonb" : "json";
+
+        mb.Entity<AgentSessionStateEntity>().Property(state => state.SessionState).HasColumnType(jsonColumnType);
     }
 }

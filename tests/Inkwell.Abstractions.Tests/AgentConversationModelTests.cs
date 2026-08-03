@@ -22,7 +22,6 @@ public sealed class AgentConversationModelTests
         AgentConversation expected = new()
         {
             Id = Guid.CreateVersion7(),
-            SessionKey = Guid.CreateVersion7().ToString("D"),
             AgentId = Guid.CreateVersion7(),
             AgentVersionId = Guid.CreateVersion7(),
             OwnerUserId = Guid.CreateVersion7(),

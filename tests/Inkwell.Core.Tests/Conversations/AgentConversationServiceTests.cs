@@ -1,5 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Inkwell.Core.Tests.Conversations;
 
 /// <summary>验证产品会话业务授权和版本锁定。</summary>
@@ -19,7 +21,8 @@ public sealed class AgentConversationServiceTests
         DateTimeOffset now = new(2026, 7, 16, 0, 0, 0, TimeSpan.Zero);
         FakeAgentRepository agents = new(CreateAgent(agentId, agentOwnerId, publishedVersionId, isShared: true));
         FakeConversationRepository conversations = new();
-        FakePersistenceProvider persistence = new(agents, conversations, new FakeMessageRepository());
+        FakeSessionStateRepository sessionStates = new();
+        FakePersistenceProvider persistence = new(agents, conversations, new FakeMessageRepository(), sessionStates);
         AgentConversationService service = CreateService(persistence, now);
 
         // Act
@@ -29,7 +32,7 @@ public sealed class AgentConversationServiceTests
         Assert.AreEqual(agentId, result.AgentId);
         Assert.AreEqual(publishedVersionId, result.AgentVersionId);
         Assert.AreEqual(participantId, result.OwnerUserId);
-        Assert.AreEqual(result.Id.ToString("D"), result.SessionKey);
+        Assert.IsEmpty(sessionStates.States);
         Assert.AreEqual(now, result.LastActivityTime);
         Assert.AreSame(result, conversations.AddedConversation);
         Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
@@ -48,7 +51,6 @@ public sealed class AgentConversationServiceTests
         AgentConversation conversation = new()
         {
             Id = conversationId,
-            SessionKey = conversationId.ToString("D"),
             AgentId = agentId,
             AgentVersionId = Guid.CreateVersion7(),
             OwnerUserId = ownerUserId,
@@ -61,7 +63,8 @@ public sealed class AgentConversationServiceTests
             new FakePersistenceProvider(
                 new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
                 conversations,
-                new FakeMessageRepository()),
+                new FakeMessageRepository(),
+                new FakeSessionStateRepository()),
             now);
 
         // Act
@@ -71,47 +74,15 @@ public sealed class AgentConversationServiceTests
         _ = await Assert.ThrowsExactlyAsync<UnauthorizedAccessException>(ActAsync);
     }
 
-    /// <summary>验证消息提交由 Service 构造幂等批次并提取标题。</summary>
-    /// <returns>表示异步测试操作的任务。</returns>
-    [TestMethod]
-    public async Task CommitRunMessagesAsync_AddsBatchAndUpdatesDerivedConversationAsync()
-    {
-        // Arrange
-        Guid ownerUserId = Guid.CreateVersion7();
-        Guid agentId = Guid.CreateVersion7();
-        Guid conversationId = Guid.CreateVersion7();
-        DateTimeOffset now = new(2026, 7, 16, 3, 0, 0, TimeSpan.Zero);
-        AgentConversation conversation = CreateConversation(conversationId, agentId, ownerUserId, now);
-        FakeConversationRepository conversations = new() { ExistingConversation = conversation };
-        FakeMessageRepository messages = new();
-        FakePersistenceProvider persistence = new(
-            new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
-            conversations,
-            messages);
-        AgentConversationService service = CreateService(persistence, now);
-
-        // Act
-        AgentChatMessageCommitResult result = await service.CommitRunMessagesAsync(
-            ownerUserId,
-            agentId,
-            conversationId,
-            "run-a",
-            [new ChatMessage(ChatRole.User, "123456789012345678901234567890more"), new ChatMessage(ChatRole.Assistant, "answer")]);
-
-        // Assert
-        Assert.AreEqual(AgentChatMessageCommitResult.Committed, result);
-        Assert.HasCount(2, messages.AddedMessages);
-        CollectionAssert.AreEqual(new int?[] { 0, 1 }, messages.AddedMessages.Select(message => message.RunMessageIndex).ToArray());
-        Assert.AreEqual("123456789012345678901234567890", conversations.UpdatedConversation?.Title);
-        Assert.AreEqual("run-a", conversations.UpdatedConversation?.LastCommittedRunId);
-        Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
-    }
-
     private static AgentConversationService CreateService(FakePersistenceProvider persistence, DateTimeOffset now) =>
         new(
             persistence,
             new FixedTimeProvider(now),
-            new UnsupportedBuildService());
+            new UnsupportedBuildService(),
+            new InkwellAgentSessionStateStore(
+                persistence,
+                new FixedTimeProvider(now),
+                NullLogger<InkwellAgentSessionStateStore>.Instance));
 
     private static AgentDefinition CreateAgent(Guid id, Guid ownerUserId, Guid publishedVersionId, bool isShared) => new()
     {
@@ -131,7 +102,6 @@ public sealed class AgentConversationServiceTests
     private static AgentConversation CreateConversation(Guid id, Guid agentId, Guid ownerUserId, DateTimeOffset now) => new()
     {
         Id = id,
-        SessionKey = id.ToString("D"),
         AgentId = agentId,
         AgentVersionId = Guid.CreateVersion7(),
         OwnerUserId = ownerUserId,
@@ -143,6 +113,38 @@ public sealed class AgentConversationServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class FakeSessionStateRepository : IAgentSessionStateRepository
+    {
+        private readonly Dictionary<Guid, AgentSessionState> _states = [];
+
+        public IReadOnlyDictionary<Guid, AgentSessionState> States => this._states;
+
+        public Task<AgentSessionState> AddSessionState(AgentSessionState sessionState, CancellationToken ct = default)
+        {
+            this._states[sessionState.ConversationId] = sessionState;
+
+            return Task.FromResult(sessionState);
+        }
+
+        public Task<AgentSessionState?> FindSessionStateByConversation(Guid conversationId, CancellationToken ct = default) =>
+            Task.FromResult(this._states.TryGetValue(conversationId, out AgentSessionState? state) ? state : null);
+
+        public Task<bool> UpdateSessionState(Guid conversationId, string sessionState, DateTimeOffset updatedTime, CancellationToken ct = default)
+        {
+            if (!this._states.TryGetValue(conversationId, out AgentSessionState? existing))
+            {
+                return Task.FromResult(false);
+            }
+
+            this._states[conversationId] = existing with { SessionState = sessionState, UpdatedTime = updatedTime };
+
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> DeleteSessionState(Guid conversationId, CancellationToken ct = default) =>
+            Task.FromResult(this._states.Remove(conversationId));
     }
 
     private sealed class UnsupportedBuildService : IAgentBuildService
@@ -220,8 +222,6 @@ public sealed class AgentConversationServiceTests
             Task.FromResult(this.ExistingConversation is { } conversation && conversation.Id == conversationId
                 ? conversation
                 : throw new KeyNotFoundException());
-
-        public Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default) => throw new NotSupportedException();
 

@@ -120,10 +120,10 @@ public sealed class RoutingAgentTests
     }
 
     /// <summary>
-    /// 验证绑定产品会话的正式流式运行会提交消息和 Session 检查点。
+    /// 验证绑定产品会话的正式流式运行会把路由与身份上下文透传给会话服务。
     /// </summary>
     [TestMethod]
-    public async Task RunStreamingAsync_PublishedConversation_CommitsMessagesAndSessionStateAsync()
+    public async Task RunStreamingAsync_PublishedConversation_ForwardsRoutingContextAsync()
     {
         // Arrange
         Guid agentId = Guid.CreateVersion7();
@@ -134,7 +134,6 @@ public sealed class RoutingAgentTests
         RecordingAgentConversationService conversationService = new(new AgentConversation
         {
             Id = conversationId,
-            SessionKey = conversationId.ToString("D"),
             AgentId = agentId,
             AgentVersionId = versionId,
             OwnerUserId = ownerUserId,
@@ -163,10 +162,12 @@ public sealed class RoutingAgentTests
         }
 
         // Assert
-        Assert.HasCount(1, conversationService.CommittedBatches);
-        Assert.HasCount(2, conversationService.CommittedBatches[0].Messages);
-        Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.User, conversationService.CommittedBatches[0].Messages[0].Role);
-        Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.Assistant, conversationService.CommittedBatches[0].Messages[1].Role);
+        Assert.HasCount(1, conversationService.StreamingRuns);
+        Assert.AreEqual(ownerUserId, conversationService.StreamingRuns[0].OwnerUserId);
+        Assert.AreEqual(agentId, conversationService.StreamingRuns[0].AgentId);
+        Assert.AreEqual(conversationId, conversationService.StreamingRuns[0].ConversationId);
+        Assert.HasCount(1, conversationService.StreamingRuns[0].Messages);
+        Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.User, conversationService.StreamingRuns[0].Messages[0].Role);
     }
 
     private sealed class RecordingAgentBuildService : IAgentBuildService
@@ -222,7 +223,7 @@ public sealed class RoutingAgentTests
 
     private sealed class RecordingAgentConversationService(AgentConversation conversation) : IAgentConversationService
     {
-        public List<(string ExecutionId, IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> Messages)> CommittedBatches { get; } = [];
+        public List<(Guid OwnerUserId, Guid AgentId, Guid ConversationId, IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> Messages)> StreamingRuns { get; } = [];
 
         public Task<AgentConversation> CreateConversationAsync(Guid agentId, Guid ownerUserId, CancellationToken ct = default) =>
             Task.FromResult(conversation);
@@ -251,18 +252,6 @@ public sealed class RoutingAgentTests
         public Task DeleteConversationAsync(Guid ownerUserId, Guid agentId, Guid conversationId, CancellationToken ct = default) =>
             Task.CompletedTask;
 
-        public Task<AgentChatMessageCommitResult> CommitRunMessagesAsync(
-            Guid ownerUserId,
-            Guid agentId,
-            Guid conversationId,
-            string executionId,
-            IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> messages,
-            CancellationToken ct = default)
-        {
-            this.CommittedBatches.Add((executionId, messages));
-            return Task.FromResult(AgentChatMessageCommitResult.Committed);
-        }
-
         public Task<AgentResponse> RunAsync(
             Guid ownerUserId,
             Guid agentId,
@@ -280,15 +269,8 @@ public sealed class RoutingAgentTests
             AgentRunOptions? options = null,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            string executionId = Guid.CreateVersion7().ToString("D");
-            Microsoft.Extensions.AI.ChatMessage assistantMessage = new(Microsoft.Extensions.AI.ChatRole.Assistant, "world");
-            _ = await this.CommitRunMessagesAsync(
-                ownerUserId,
-                agentId,
-                conversationId,
-                executionId,
-                [.. messages, assistantMessage],
-                cancellationToken);
+            this.StreamingRuns.Add((ownerUserId, agentId, conversationId, messages));
+            await Task.CompletedTask;
             yield return new AgentResponseUpdate(Microsoft.Extensions.AI.ChatRole.Assistant, "world");
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -73,32 +73,6 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "agent_versions",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    agent_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    version_number = table.Column<int>(type: "integer", nullable: false),
-                    snapshot = table.Column<string>(type: "jsonb", nullable: false),
-                    created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    change_summary = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    created_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    published_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_agent_versions", x => x.id);
-                    table.UniqueConstraint("ak_agent_versions_agent_id_id", x => new { x.agent_id, x.id });
-                    table.ForeignKey(
-                        name: "fk_agent_versions_agents_agent_id",
-                        column: x => x.agent_id,
-                        principalTable: "agents",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "agent_skills",
                 columns: table => new
                 {
@@ -125,11 +99,42 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "agent_versions",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    agent_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    version_number = table.Column<int>(type: "integer", nullable: false),
+                    snapshot = table.Column<string>(type: "jsonb", nullable: false),
+                    owner_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    change_summary = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    created_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    published_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_agent_versions", x => x.id);
+                    table.UniqueConstraint("ak_agent_versions_agent_id_id", x => new { x.agent_id, x.id });
+                    table.ForeignKey(
+                        name: "fk_agent_versions_agents_agent_id",
+                        column: x => x.agent_id,
+                        principalTable: "agents",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_agent_versions_users_owner_user_id",
+                        column: x => x.owner_user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "agent_conversations",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    session_key = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     agent_id = table.Column<Guid>(type: "uuid", nullable: false),
                     agent_version_id = table.Column<Guid>(type: "uuid", nullable: false),
                     owner_user_id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -174,6 +179,27 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "agent_session_states",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    conversation_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    session_state = table.Column<string>(type: "jsonb", nullable: false),
+                    created_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_agent_session_states", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_agent_session_states_agent_conversations_conversation_id",
+                        column: x => x.conversation_id,
+                        principalTable: "agent_conversations",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "ix_agent_chat_messages_conversation_id_sequence_number",
                 table: "agent_chat_messages",
@@ -201,9 +227,9 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 column: "owner_user_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_agent_conversations_session_key",
-                table: "agent_conversations",
-                column: "session_key",
+                name: "ix_agent_session_states_conversation_id",
+                table: "agent_session_states",
+                column: "conversation_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -222,6 +248,11 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 table: "agent_versions",
                 columns: new[] { "agent_id", "version_number" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_agent_versions_owner_user_id",
+                table: "agent_versions",
+                column: "owner_user_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_agents_current_published_version_id",
@@ -262,6 +293,9 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 name: "agent_chat_messages");
 
             migrationBuilder.DropTable(
+                name: "agent_session_states");
+
+            migrationBuilder.DropTable(
                 name: "agent_skills");
 
             migrationBuilder.DropTable(
@@ -271,13 +305,13 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                 name: "agent_conversations");
 
             migrationBuilder.DropTable(
-                name: "users");
-
-            migrationBuilder.DropTable(
                 name: "agent_versions");
 
             migrationBuilder.DropTable(
                 name: "agents");
+
+            migrationBuilder.DropTable(
+                name: "users");
         }
     }
 }

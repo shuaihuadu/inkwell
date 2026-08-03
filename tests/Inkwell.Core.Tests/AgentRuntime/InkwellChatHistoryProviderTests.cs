@@ -25,7 +25,7 @@ public sealed class InkwellChatHistoryProviderTests
         RecordingPersistenceProvider persistence = new(repository, conversations);
         InkwellChatHistoryProvider provider = new(
             persistence,
-            new AgentConversationMessageCommitter(persistence, TimeProvider.System),
+            TimeProvider.System,
             10);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
@@ -64,7 +64,7 @@ public sealed class InkwellChatHistoryProviderTests
         RecordingPersistenceProvider persistence = new(repository, conversations);
         InkwellChatHistoryProvider provider = new(
             persistence,
-            new AgentConversationMessageCommitter(persistence, TimeProvider.System));
+            TimeProvider.System);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(
@@ -107,7 +107,7 @@ public sealed class InkwellChatHistoryProviderTests
         RecordingPersistenceProvider persistence = new(repository, conversations);
         InkwellChatHistoryProvider provider = new(
             persistence,
-            new AgentConversationMessageCommitter(persistence, TimeProvider.System));
+            TimeProvider.System);
         TestAgent agent = new();
         AgentSession session = await agent.CreateSessionAsync();
         InkwellChatHistoryProvider.AttachSession(
@@ -185,7 +185,6 @@ public sealed class InkwellChatHistoryProviderTests
     private static AgentConversation CreateConversation(Guid conversationId) => new()
     {
         Id = conversationId,
-        SessionKey = conversationId.ToString("D"),
         AgentId = Guid.CreateVersion7(),
         AgentVersionId = Guid.CreateVersion7(),
         OwnerUserId = Guid.CreateVersion7(),
@@ -276,9 +275,6 @@ public sealed class InkwellChatHistoryProviderTests
         }
 
         public Task<AgentConversation> AddConversation(AgentConversation conversation, CancellationToken ct = default) =>
-            throw new NotSupportedException();
-
-        public Task<AgentConversation> GetConversationBySessionKey(string sessionKey, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public Task<PagedResult<AgentConversationListItem>> ListConversations(Guid agentId, Guid ownerUserId, Pagination pagination, CancellationToken ct = default) =>

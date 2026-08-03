@@ -13,6 +13,7 @@ public static class ConversationBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.TryAddScoped<InkwellAgentSessionStateStore>();
         builder.Services.TryAddScoped<IAgentConversationService, AgentConversationService>();
 
         return builder;

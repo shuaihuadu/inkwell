@@ -1,7 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Data;
-using System.Text.Json;
+using Inkwell.Persistence;
 using Inkwell.Persistence.EFCore;
 using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -117,13 +117,17 @@ public sealed class AgentConversationPostgresRepositoryTests
         await using ServiceProvider provider = BuildServiceProvider();
         InkwellDbContext db = provider.GetRequiredService<InkwellDbContext>();
         _ = await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE agent_chat_messages, agent_conversations, agent_versions, agents CASCADE;");
+            "TRUNCATE TABLE agent_chat_messages, agent_session_states, agent_conversations, agent_versions, agents, users CASCADE;");
     }
 
     private static async Task<SeededConversation> SeedConversationAsync()
     {
         await using ServiceProvider provider = BuildServiceProvider();
-        InkwellDbContext db = provider.GetRequiredService<InkwellDbContext>();
+        IUserRepository users = provider.GetRequiredService<IUserRepository>();
+        IAgentRepository agents = provider.GetRequiredService<IAgentRepository>();
+        IAgentVersionRepository versions = provider.GetRequiredService<IAgentVersionRepository>();
+        IAgentConversationRepository conversations = provider.GetRequiredService<IAgentConversationRepository>();
+
         Guid agentId = Guid.CreateVersion7();
         Guid versionId = Guid.CreateVersion7();
         Guid ownerUserId = Guid.CreateVersion7();
@@ -133,38 +137,54 @@ public sealed class AgentConversationPostgresRepositoryTests
         {
             ModelOptions = new AgentModelOptions { ModelId = "test-model" },
         };
-        AgentSnapshot snapshot = new()
+
+        _ = await users.AddUser(new User
         {
+            Id = ownerUserId,
+            Username = $"owner-{ownerUserId:N}"[..20],
+            PasswordHash = "hash",
+            CreatedTime = createdTime,
+            UpdatedTime = createdTime,
+        });
+        _ = await agents.AddAgent(new AgentDefinition
+        {
+            Id = agentId,
+            OwnerUserId = ownerUserId,
             Name = "Conversation agent",
             Instructions = "Test conversation persistence.",
             BuildOptions = buildOptions,
-        };
-        string buildOptionsJson = JsonSerializer.Serialize(buildOptions);
-        string snapshotJson = JsonSerializer.Serialize(snapshot);
-        await db.Database.ExecuteSqlInterpolatedAsync($$"""
-            INSERT INTO agents
-                (id, owner_user_id, name, avatar_uri, description, instructions, build_options,
-                 current_published_version_id, latest_published_version_number, is_shared,
-                 shared_revoked_by_admin_time, created_time, updated_time)
-            VALUES
-                ({{agentId}}, {{ownerUserId}}, 'Conversation agent', NULL, NULL,
-                 'Test conversation persistence.', CAST({{buildOptionsJson}} AS jsonb), {{versionId}}, 1, FALSE,
-                 NULL, {{createdTime}}, {{createdTime}});
+            CurrentPublishedVersionId = versionId,
+            LatestPublishedVersionNumber = 1,
+            CreatedTime = createdTime,
+            UpdatedTime = createdTime,
+        });
+        _ = await versions.AddVersionAsync(new AgentVersion
+        {
+            Id = versionId,
+            AgentId = agentId,
+            VersionNumber = 1,
+            Snapshot = new AgentSnapshot
+            {
+                Name = "Conversation agent",
+                Instructions = "Test conversation persistence.",
+                BuildOptions = buildOptions,
+            },
+            OwnerUserId = ownerUserId,
+            CreatedTime = createdTime,
+            UpdatedTime = createdTime,
+            PublishedTime = createdTime,
+        });
+        _ = await conversations.AddConversation(new AgentConversation
+        {
+            Id = conversationId,
+            AgentId = agentId,
+            AgentVersionId = versionId,
+            OwnerUserId = ownerUserId,
+            LastActivityTime = createdTime,
+            CreatedTime = createdTime,
+            UpdatedTime = createdTime,
+        });
 
-            INSERT INTO agent_versions
-                (id, agent_id, version_number, snapshot, created_by_user_id, change_summary,
-                 created_time, updated_time, published_time)
-            VALUES
-                ({{versionId}}, {{agentId}}, 1, CAST({{snapshotJson}} AS jsonb), {{ownerUserId}}, NULL,
-                 {{createdTime}}, {{createdTime}}, {{createdTime}});
-
-            INSERT INTO agent_conversations
-                (id, session_key, agent_id, agent_version_id, owner_user_id, title,
-                 last_committed_run_id, last_activity_time, created_time, updated_time)
-            VALUES
-                ({{conversationId}}, {{conversationId.ToString("D")}}, {{agentId}}, {{versionId}}, {{ownerUserId}}, NULL,
-                 NULL, {{createdTime}}, {{createdTime}}, {{createdTime}});
-            """);
         return new SeededConversation(conversationId, createdTime);
     }
 

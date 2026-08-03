@@ -10,7 +10,6 @@ internal static class AgentConversationMappingExtensions
         return new AgentConversation
         {
             Id = entity.Id,
-            SessionKey = entity.SessionKey,
             AgentId = entity.AgentId,
             AgentVersionId = entity.AgentVersionId,
             OwnerUserId = entity.OwnerUserId,
@@ -28,7 +27,6 @@ internal static class AgentConversationMappingExtensions
         return new AgentConversationEntity
         {
             Id = model.Id,
-            SessionKey = model.SessionKey,
             AgentId = model.AgentId,
             AgentVersionId = model.AgentVersionId,
             OwnerUserId = model.OwnerUserId,
