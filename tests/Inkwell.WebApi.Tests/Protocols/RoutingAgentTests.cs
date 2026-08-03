@@ -1,6 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using System.Diagnostics;
 using System.Security.Claims;
+using AGUI.Abstractions;
 using Inkwell.WebApi.Protocols;
 
 namespace Inkwell.WebApi.Tests.Protocols;
@@ -168,6 +170,212 @@ public sealed class RoutingAgentTests
         Assert.AreEqual(conversationId, conversationService.StreamingRuns[0].ConversationId);
         Assert.HasCount(1, conversationService.StreamingRuns[0].Messages);
         Assert.AreEqual(Microsoft.Extensions.AI.ChatRole.User, conversationService.StreamingRuns[0].Messages[0].Role);
+    }
+
+    /// <summary>
+    /// 验证未携带请求头时，会话标识取自 AG-UI 协议的 threadId。
+    /// </summary>
+    [TestMethod]
+    public async Task RunStreamingAsync_AGUIThreadId_ResolvesConversationAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        RecordingAgentBuildService buildService = new();
+        RecordingAgentConversationService conversationService = new(new AgentConversation
+        {
+            Id = conversationId,
+            AgentId = agentId,
+            AgentVersionId = Guid.CreateVersion7(),
+            OwnerUserId = ownerUserId,
+            LastActivityTime = DateTimeOffset.UtcNow,
+            CreatedTime = DateTimeOffset.UtcNow,
+            UpdatedTime = DateTimeOffset.UtcNow,
+        });
+        ServiceCollection services = new();
+        services.AddSingleton<IAgentBuildService>(buildService);
+        services.AddSingleton<IAgentConversationService>(conversationService);
+        services.AddSingleton(TimeProvider.System);
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
+        HttpContextAccessor accessor = new() { HttpContext = httpContext };
+        RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
+        Microsoft.Extensions.AI.ChatOptions chatOptions = new()
+        {
+            AdditionalProperties = new Microsoft.Extensions.AI.AdditionalPropertiesDictionary
+            {
+                // AGUI.Server.AGUIConstants.RunAgentInputKey 为 internal，此处使用其字面值。
+                ["agui_input"] = new RunAgentInput
+                {
+                    ThreadId = conversationId.ToString(),
+                    RunId = Guid.CreateVersion7().ToString(),
+                },
+            },
+        };
+
+        // Act
+        await foreach (Microsoft.Agents.AI.AgentResponseUpdate _ in agent.RunStreamingAsync(
+            [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")],
+            options: new ChatClientAgentRunOptions(chatOptions)))
+        {
+        }
+
+        // Assert
+        Assert.HasCount(1, conversationService.StreamingRuns);
+        Assert.AreEqual(conversationId, conversationService.StreamingRuns[0].ConversationId);
+        Assert.IsEmpty(buildService.Requests);
+    }
+
+    /// <summary>
+    /// 验证 AG-UI threadId 无法解析为会话标识时拒绝请求，而不是降级为不落库的试运行。
+    /// </summary>
+    [TestMethod]
+    public async Task RunStreamingAsync_InvalidAGUIThreadId_RejectsRequestAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
+        RecordingAgentBuildService buildService = new();
+        ServiceCollection services = new();
+        services.AddSingleton<IAgentBuildService>(buildService);
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
+        HttpContextAccessor accessor = new() { HttpContext = httpContext };
+        RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
+        Microsoft.Extensions.AI.ChatOptions chatOptions = new()
+        {
+            AdditionalProperties = new Microsoft.Extensions.AI.AdditionalPropertiesDictionary
+            {
+                // 社区 SDK 允许非 UUID 的 threadId，例如 Kotlin SDK 生成的 "id_1785283200000"。
+                ["agui_input"] = new RunAgentInput
+                {
+                    ThreadId = "id_1785283200000",
+                    RunId = Guid.CreateVersion7().ToString(),
+                },
+            },
+        };
+
+        // Act
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+        {
+            await foreach (Microsoft.Agents.AI.AgentResponseUpdate _ in agent.RunStreamingAsync(
+                [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")],
+                options: new ChatClientAgentRunOptions(chatOptions)))
+            {
+            }
+        });
+
+        // Assert
+        Assert.Contains("threadId", exception.Message);
+        Assert.IsEmpty(buildService.Requests);
+    }
+
+    /// <summary>
+    /// 验证会话标识请求头格式非法时拒绝请求，而不是降级为不落库的试运行。
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_InvalidConversationIdHeader_RejectsRequestAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
+        RecordingAgentBuildService buildService = new();
+        ServiceCollection services = new();
+        services.AddSingleton<IAgentBuildService>(buildService);
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.Request.Headers["X-Inkwell-Conversation-Id"] = "not-a-guid";
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
+        HttpContextAccessor accessor = new() { HttpContext = httpContext };
+        RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
+
+        // Act
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+            agent.RunAsync([new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")]));
+
+        // Assert
+        Assert.Contains("X-Inkwell-Conversation-Id", exception.Message);
+        Assert.IsEmpty(buildService.Requests);
+    }
+
+    /// <summary>
+    /// 验证客户端 AG-UI runId 以截断后的 trace 标签记录，供前后端日志对账。
+    /// </summary>
+    [TestMethod]
+    public async Task RunStreamingAsync_AGUIRunId_RecordsTruncatedProtocolTagsAsync()
+    {
+        // Arrange
+        Guid agentId = Guid.CreateVersion7();
+        Guid ownerUserId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        string oversizedRunId = new('r', 80);
+        string parentRunId = "parent-run";
+        RecordingAgentBuildService buildService = new();
+        RecordingAgentConversationService conversationService = new(new AgentConversation
+        {
+            Id = conversationId,
+            AgentId = agentId,
+            AgentVersionId = Guid.CreateVersion7(),
+            OwnerUserId = ownerUserId,
+            LastActivityTime = DateTimeOffset.UtcNow,
+            CreatedTime = DateTimeOffset.UtcNow,
+            UpdatedTime = DateTimeOffset.UtcNow,
+        });
+        ServiceCollection services = new();
+        services.AddSingleton<IAgentBuildService>(buildService);
+        services.AddSingleton<IAgentConversationService>(conversationService);
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.RouteValues["agentId"] = agentId.ToString();
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, ownerUserId.ToString())],
+            "test"));
+        HttpContextAccessor accessor = new() { HttpContext = httpContext };
+        RoutingAgent agent = new(accessor, serviceProvider.GetRequiredService<IServiceScopeFactory>());
+        Microsoft.Extensions.AI.ChatOptions chatOptions = new()
+        {
+            AdditionalProperties = new Microsoft.Extensions.AI.AdditionalPropertiesDictionary
+            {
+                ["agui_input"] = new RunAgentInput
+                {
+                    ThreadId = conversationId.ToString(),
+                    RunId = oversizedRunId,
+                    ParentRunId = parentRunId,
+                },
+            },
+        };
+        using ActivitySource activitySource = new(nameof(RoutingAgentTests));
+        using ActivityListener listener = new()
+        {
+            ShouldListenTo = source => source.Name == nameof(RoutingAgentTests),
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+        ActivitySource.AddActivityListener(listener);
+        using Activity? activity = activitySource.StartActivity("run");
+
+        // Act
+        await foreach (Microsoft.Agents.AI.AgentResponseUpdate _ in agent.RunStreamingAsync(
+            [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "hello")],
+            options: new ChatClientAgentRunOptions(chatOptions)))
+        {
+        }
+
+        // Assert
+        Assert.IsNotNull(activity);
+        Assert.AreEqual(oversizedRunId[..64], activity.GetTagItem("agui.protocol_run_id"));
+        Assert.AreEqual(parentRunId, activity.GetTagItem("agui.protocol_parent_run_id"));
     }
 
     private sealed class RecordingAgentBuildService : IAgentBuildService

@@ -28,15 +28,17 @@ upstream:
 >
 > **2026-07-16 路由 Session 删除 errata**：`RoutingAgentSession` / `RoutingAgentSessionState` 及其版本固定、内部 Session 序列化逻辑已删除，实际 Agent Session 方案等待后续讨论。当前 `RoutingAgent` 是无状态代理：Create/Serialize/Deserialize 仅满足 MAF 抽象的空占位契约，每次 Run 按 URL 中的 `agentId` 与认证用户重新解析当前发布版本并调用实际 Agent，且不向实际 Agent 传递 Session。本行为是临时路由实现，不覆盖产品 Conversation 已保存的版本不变量，也不构成最终 Session 连续性设计。
 >
-> **2026-07-20 Session checkpoint 删除 errata**：正式 Conversation 不再保存或恢复 `AgentSessionState`。Core 每轮用锁定的 `AgentVersionId` 构建 Agent 并创建新 MAF Session，历史由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复；删除和清空操作只处理消息与 Conversation 派生字段。下方关于 Session 检查点、状态失效和服务端 `SerializedState` 的描述均已过期。
+> **2026-07-20 Session checkpoint 删除 errata（已被 2026-07-26 errata 撤销）**：正式 Conversation 不再保存或恢复 `AgentSessionState`。Core 每轮用锁定的 `AgentVersionId` 构建 Agent 并创建新 MAF Session，历史由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复；删除和清空操作只处理消息与 Conversation 派生字段。下方关于 Session 检查点、状态失效和服务端 `SerializedState` 的描述均已过期。
+>
+> **2026-07-26 Session checkpoint 恢复 errata**：`AgentSessionState` 持久化重新引入，取代上一条 2026-07-20 errata。`AgentSessionStates` 表以 `SessionKey`（`AgentConversation.SessionKey`，`Guid` 的 `"N"` 格式）为唯一键，外键指向 `AgentConversations.SessionKey` 并级联删除。Core 侧由 `InkwellAgentSessionStateStore`（继承 MAF `AgentSessionStore`）独占该表的行生命周期：首次保存时建行、删除会话状态时删行，调用方不预建空行。跨轮历史仍由 `InkwellChatHistoryProvider` 从 `AgentChatMessage` 恢复，两者并存互不替代。该 Store 以**非 keyed** 方式注册且必须保持非 keyed——MAF AG-UI / A2A Hosting 通过 `GetKeyedService<AgentSessionStore>(agent.Name)` 解析并强制包裹 `IsolationKeyScopedAgentSessionStore`，后者把 id 改写为 `"{isolationKey}::{sessionStoreId}"`，会同时违反本表 `SessionKey` 的 32 字符长度上限与外键约束。
+>
+> **2026-08-03 会话标识统一与路由解析 errata**：`SessionKey` 整体移除，取代上方 2026-07-15 与 2026-07-26 两条 errata 中涉及该字段与 `InkwellAgentSessionStore` 的部分。当前契约为：一、`agent_session_states` 以 `ConversationId`（`Guid`）为唯一键，外键直接指向 `agent_conversations.Id` 主键并级联删除；二、`InkwellAgentSessionStateStore` **不再继承** MAF `AgentSessionStore`，按具体类型注册为 Scoped 服务，因此上一条 errata 中「必须保持非 keyed」的约束不再是防御性要求，而是类型层面已不可能被 MAF Hosting 解析；三、`RunAgentInput.ThreadId` 与 `AgentConversation.Id` 同值，`RoutingAgent` 按「`X-Inkwell-Agent-Run-Mode: draft` → `X-Inkwell-Conversation-Id` 请求头 → AG-UI `threadId`」的顺序解析会话；四、三者皆未提供时按已发布 Agent 的临时试运行处理，但**显式提供却无法解析为 `Guid` 时必须抛 `ArgumentException`**，由 `ApiExceptionHandler` 映射为 `400`，不得静默降级为不落库的试运行；协议只要求 `threadId` 为字符串，社区 SDK（如 Kotlin 的 `id_<epochMillis>`）会产生非 UUID 值，该分支必须显式拒绝而非放行。
 >
 > **2026-07-16 WebApi/Core 构建边界 errata**：上段“重新解析当前发布版本”由 Core `IAgentBuildService` 完成。`RoutingAgent` 只从 Route 读取 `agentId`、从 Claims 读取 `requestingUserId`，随后调用一次 `BuildPublishedAsync` 并转发 MAF Run；版本授权、Snapshot 绑定解析和 Factory 构建均不在 WebApi 实现。该边界取代下方任何由协议入口直接组合 `IAgentVersionService` / `IAgentBuildOptionsResolver` / `IAgentFactory` 的描述。
 >
-> **2026-07-15 技术方向与待定路由**：AG-UI 直接使用 MAF `MapAGUI`，不增加 Inkwell 自建 Run DTO、协议状态机或 SSE 编码器；会话连续性由 `RunAgentInput.ThreadId` → `AgentSessionStore` 原生链路承接。具体挂载路径尚未由 Owner 拍板：当前代码是 `/agent/{agentId}`，ADR-012 仍描述 `/api/runs`，`/api/agents/{agentId}/agui` 仅为候选，不得写入 H5 brief 作为既定契约。
+> **2026-07-15 技术方向与待定路由**：AG-UI 直接使用 MAF `MapAGUIServer`，不增加 Inkwell 自建 Run DTO、协议状态机或 SSE 编码器；会话连续性由 `RunAgentInput.ThreadId` → `AgentSessionStore` 原生链路承接。具体挂载路径尚未由 Owner 拍板：当前代码是 `/agent/{agentId}`，ADR-012 仍描述 `/api/runs`，`/api/agents/{agentId}/agui` 仅为候选，不得写入 H5 brief 作为既定契约。
 >
 > **2026-07-16 协议核验修正**：后端输入设计以 `@ag-ui/client@0.0.57` / `@ag-ui/core@0.0.57` 的实际发布包为准。`HttpAgent` 对标准 `RunAgentInput` 直接执行 `JSON.stringify(input)`；请求体固定包含 `threadId`、`runId`、`state`、`messages`、`tools`、`context`、`forwardedProps`，可选包含 `parentRunId`、`resume`。SDK 从 `HttpAgent` 实例取完整 `messages` 快照（仅过滤 `role = activity`），并非只发送本轮新增消息。本修正撤销下文基于异步调用链 accessor / `AsyncLocal` 传递 Run Context 的方案；服务端直接绑定 MAF 使用的 `AGUI.Abstractions.RunAgentInput`，不再设计第二套接收 Model。
->
-> **MAF API 版本提示**：Inkwell 当前锁定包与代码使用 `MapAGUI`；同工作区最新 MAF `main` 源码使用 `MapAGUIServer`。实现升级后以实际恢复版本的公开 API 和编译结果为准；本文后续以最新源码名 `MapAGUIServer` 描述 endpoint builder 行为。
 >
 > **DTO / AgentRun 边界**：AG-UI 请求直接绑定实际 MAF 版本的 `AGUI.Abstractions.RunAgentInput`，响应直接使用 Hosting 生成的标准 SSE 事件；禁止增加 Inkwell `AgentRunRequest` / `AgentRunResponse` / `AgentRunEvent` 中转 DTO。`ExecutionId` 是服务端内部执行关联 ID，不产生产品 `AgentRun` Model、Entity 或 CRUD endpoint。运行中状态由 Conversation 租约表示，最终消息与 Session 检查点分别进入既有两张子表，诊断事件留给 Traces 模块。
 
