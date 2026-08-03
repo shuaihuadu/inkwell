@@ -15,7 +15,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
-    <!--<TreatWarningsAsErrors>true</TreatWarningsAsErrors>-->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- .editorconfig 里的 csharp_style_var_*/dotnet_style_qualification_for_* 等代码风格规则
          需要这个开关才会在 dotnet build 时真正生效（否则只在 IDE/dotnet format 里提示，不影响编译）。 -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
