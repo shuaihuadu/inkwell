@@ -123,6 +123,14 @@ internal sealed class InkwellChatHistoryProvider(
                 $"User '{ownerUserId}' cannot access conversation '{conversationId}' for agent '{agentId}'.");
         }
 
+        IReadOnlyList<AgentChatMessage> committedMessages = await this._messages
+            .ListMessagesByRun(conversationId, executionId, cancellationToken)
+            .ConfigureAwait(false);
+        if (committedMessages.Count > 0)
+        {
+            return;
+        }
+
         List<AgentChatMessage> batch = new(messages.Count);
         for (int index = 0; index < messages.Count; index++)
         {

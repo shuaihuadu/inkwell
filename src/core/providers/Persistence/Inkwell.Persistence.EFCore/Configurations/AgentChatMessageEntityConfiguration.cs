@@ -10,6 +10,7 @@ internal sealed class AgentChatMessageEntityConfiguration : IEntityTypeConfigura
     {
         builder.HasKey(message => message.Id);
         builder.HasIndex(message => new { message.ConversationId, message.SequenceNumber }).IsUnique();
+        builder.HasIndex(message => new { message.ConversationId, message.RunId, message.RunMessageIndex }).IsUnique();
         builder.Property(message => message.RunId).HasMaxLength(64);
         builder.Property(message => message.Message).IsRequired();
     }

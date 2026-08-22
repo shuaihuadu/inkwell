@@ -71,6 +71,28 @@ public sealed class AgentConversationPostgresRepositoryTests
         CollectionAssert.AreEqual(new int?[] { 0, 1 }, byRun.Select(message => message.RunMessageIndex).ToArray());
     }
 
+    /// <summary>验证同一会话、Run 和消息索引不能重复持久化。</summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task MessageCrud_AddDuplicateRunMessage_ThrowsDatabaseUpdateExceptionAsync()
+    {
+        // Arrange
+        await ResetDatabaseAsync();
+        SeededConversation seeded = await SeedConversationAsync();
+        DateTimeOffset now = seeded.CreatedTime.AddMinutes(1);
+        await using ServiceProvider provider = BuildServiceProvider();
+        IAgentChatMessageRepository messages = provider.GetRequiredService<IAgentChatMessageRepository>();
+        _ = await messages.AddMessages(
+            [CreateMessage(seeded.ConversationId, "run-a", 0, new ChatMessage(ChatRole.User, "first"), now)]);
+
+        // Act
+        Task ActAsync() => messages.AddMessages(
+            [CreateMessage(seeded.ConversationId, "run-a", 0, new ChatMessage(ChatRole.User, "duplicate"), now)]);
+
+        // Assert
+        _ = await Assert.ThrowsExactlyAsync<DbUpdateException>(ActAsync);
+    }
+
     /// <summary>验证 Repository CRUD 在事务失败时整体回滚。</summary>
     /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]

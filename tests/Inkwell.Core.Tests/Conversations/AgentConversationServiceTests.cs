@@ -74,6 +74,64 @@ public sealed class AgentConversationServiceTests
         _ = await Assert.ThrowsExactlyAsync<UnauthorizedAccessException>(ActAsync);
     }
 
+    /// <summary>验证删除单条消息会同步失效 Session 检查点并重置会话派生字段。</summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task DeleteMessageAsync_WithExistingMessage_DeletesSessionStateAndUpdatesConversationAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        Guid agentId = Guid.CreateVersion7();
+        Guid conversationId = Guid.CreateVersion7();
+        Guid messageId = Guid.CreateVersion7();
+        DateTimeOffset originalTime = new(2026, 7, 16, 0, 0, 0, TimeSpan.Zero);
+        DateTimeOffset now = originalTime.AddMinutes(1);
+        AgentConversation conversation = CreateConversation(conversationId, agentId, ownerUserId, originalTime) with
+        {
+            Title = "Existing title",
+            LastCommittedRunId = "existing-run",
+        };
+        FakeConversationRepository conversations = new() { ExistingConversation = conversation };
+        FakeMessageRepository messages = new();
+        messages.AddedMessages.Add(new AgentChatMessage
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            Message = new ChatMessage(ChatRole.User, "Delete me"),
+            SequenceNumber = 1,
+            CreatedTime = originalTime,
+            UpdatedTime = originalTime,
+        });
+        FakeSessionStateRepository sessionStates = new();
+        _ = await sessionStates.AddSessionState(new AgentSessionState
+        {
+            Id = Guid.CreateVersion7(),
+            ConversationId = conversationId,
+            SessionState = "{}",
+            CreatedTime = originalTime,
+            UpdatedTime = originalTime,
+        });
+        FakePersistenceProvider persistence = new(
+            new FakeAgentRepository(CreateAgent(agentId, ownerUserId, conversation.AgentVersionId, isShared: false)),
+            conversations,
+            messages,
+            sessionStates);
+        AgentConversationService service = CreateService(persistence, now);
+
+        // Act
+        await service.DeleteMessageAsync(ownerUserId, agentId, conversationId, messageId);
+
+        // Assert
+        Assert.IsEmpty(messages.AddedMessages);
+        Assert.IsEmpty(sessionStates.States);
+        Assert.IsNotNull(conversations.UpdatedConversation);
+        Assert.IsNull(conversations.UpdatedConversation.Title);
+        Assert.IsNull(conversations.UpdatedConversation.LastCommittedRunId);
+        Assert.AreEqual(now, conversations.UpdatedConversation.LastActivityTime);
+        Assert.AreEqual(now, conversations.UpdatedConversation.UpdatedTime);
+        Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);
+    }
+
     private static AgentConversationService CreateService(FakePersistenceProvider persistence, DateTimeOffset now) =>
         new(
             persistence,
@@ -256,7 +314,13 @@ public sealed class AgentConversationServiceTests
             return Task.FromResult(messages);
         }
 
-        public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default)
+        {
+            int removed = this.AddedMessages.RemoveAll(message =>
+                message.ConversationId == conversationId && message.Id == messageId);
+
+            return Task.FromResult(removed == 1);
+        }
 
         public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();
     }

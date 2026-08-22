@@ -94,6 +94,47 @@ public sealed class InkwellChatHistoryProviderTests
     }
 
     /// <summary>
+    /// 验证相同执行标识的重复成功回调不会重复写入消息或更新会话。
+    /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task InvokedAsync_WithCommittedExecution_DoesNotAppendDuplicateMessagesAsync()
+    {
+        // Arrange
+        Guid sessionId = Guid.CreateVersion7();
+        string executionId = Guid.CreateVersion7().ToString("D");
+        FakeMessageRepository repository = new([]);
+        FakeConversationRepository conversations = new(CreateConversation(sessionId));
+        RecordingPersistenceProvider persistence = new(repository, conversations);
+        InkwellChatHistoryProvider provider = new(persistence, TimeProvider.System);
+        TestAgent agent = new();
+        AgentSession session = await agent.CreateSessionAsync();
+        ChatMessage request = new(ChatRole.User, "question");
+        ChatMessage response = new(ChatRole.Assistant, "answer");
+        ChatHistoryProvider.InvokedContext context = new(agent, session, [request], [response]);
+
+        // Act
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            executionId);
+        await provider.InvokedAsync(context);
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            executionId);
+        await provider.InvokedAsync(context);
+
+        // Assert
+        Assert.HasCount(2, repository.AddedMessages);
+        Assert.AreEqual(1, conversations.UpdateCount);
+    }
+
+    /// <summary>
     /// 验证失败调用由 MAF 基类拦截，不写入聊天历史。
     /// </summary>
     /// <returns>表示异步测试操作的任务。</returns>
@@ -265,12 +306,15 @@ public sealed class InkwellChatHistoryProviderTests
 
         public AgentConversation? UpdatedConversation { get; private set; }
 
+        public int UpdateCount { get; private set; }
+
         public Task<AgentConversation> GetConversation(Guid conversationId, CancellationToken ct = default) =>
             Task.FromResult(this.UpdatedConversation ?? this.Conversation);
 
         public Task UpdateConversation(AgentConversation conversation, CancellationToken ct = default)
         {
             this.UpdatedConversation = conversation;
+            this.UpdateCount++;
             return Task.CompletedTask;
         }
 

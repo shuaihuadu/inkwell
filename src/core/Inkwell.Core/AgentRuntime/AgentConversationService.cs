@@ -79,6 +79,7 @@ internal sealed class AgentConversationService(
                     throw new KeyNotFoundException($"Agent chat message not found: id={messageId}");
                 }
 
+                await sessionStateStore.DeleteSessionStateAsync(conversationId, innerCt).ConfigureAwait(false);
                 IReadOnlyList<AgentChatMessage> remainingMessages = await this._messages.ListAllMessagesByConversation(conversationId, innerCt).ConfigureAwait(false);
                 AgentConversation updated = conversation with
                 {
