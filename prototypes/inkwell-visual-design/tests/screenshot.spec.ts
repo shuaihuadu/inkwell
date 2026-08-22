@@ -178,6 +178,151 @@ test.describe("Agent Design Page", () => {
         });
     });
 
+    test("shows the same AG-UI run summary in chat and trial", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        const consoleErrors: string[] = [];
+        page.on("console", (message) => {
+            if (message.type() === "error") consoleErrors.push(message.text());
+        });
+        page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+        await page.goto("/shell");
+        await page.getByText("客服助手", { exact: true }).first().click();
+        await page.getByText("调研一下行业报告模板", { exact: true }).click();
+        await expect(page.getByText("工具调用", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("4 项已完成", { exact: true }),
+        ).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("10-agent-chat-agui-run.png"),
+            fullPage: true,
+        });
+
+        await page.getByRole("button", { name: "返回 Agent 空间" }).click();
+        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        await page.getByRole("button", { name: "试运行" }).click();
+        await page.getByRole("button", { name: "研究框架" }).click();
+        await expect(page.getByText("4 项已完成", { exact: true })).toBeVisible(
+            {
+                timeout: 10_000,
+            },
+        );
+        await expect(
+            page.getByText(/已完成关于.*整理一份竞品研究框架.*的研究/),
+        ).toBeVisible({ timeout: 10_000 });
+        const trialRunSummary = page.getByText("工具调用", { exact: true });
+        await trialRunSummary.scrollIntoViewIfNeeded();
+        await expect(trialRunSummary).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("11-agent-trial-agui-run.png"),
+            fullPage: true,
+        });
+
+        expect(consoleErrors).toEqual([]);
+    });
+
+    test("shows complete tool call states in trial and chat", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        const consoleErrors: string[] = [];
+        page.on("console", (message) => {
+            if (message.type() === "error") consoleErrors.push(message.text());
+        });
+        page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+        await page.goto("/shell");
+        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        await page.getByRole("button", { name: "试运行" }).click();
+        await page.getByRole("button", { name: "工具调用" }).click();
+        await expect(page.getByText("调用中", { exact: true })).toBeVisible();
+        await expect(page.getByText("参数", { exact: true })).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("12-agent-trial-tool-calling.png"),
+            fullPage: true,
+        });
+
+        await expect(page.getByText("1 项失败", { exact: true })).toBeVisible({
+            timeout: 10_000,
+        });
+        await expect(page.getByText("失败原因", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText(/知识库检索已完成；网页搜索调用失败后/),
+        ).toBeVisible({ timeout: 10_000 });
+        await expect(
+            page.locator(".ant-sender-actions-btn-loading-button"),
+        ).toBeHidden();
+        await expect(page.getByText("结果", { exact: true })).toBeVisible();
+        await page
+            .getByText("工具调用", { exact: true })
+            .first()
+            .scrollIntoViewIfNeeded();
+        await page.screenshot({
+            path: screenshotPath("13-agent-trial-tool-complete.png"),
+            fullPage: true,
+        });
+        await page
+            .getByText("失败原因", { exact: true })
+            .scrollIntoViewIfNeeded();
+        await page.screenshot({
+            path: screenshotPath("15-agent-trial-tool-failure-detail.png"),
+            fullPage: true,
+        });
+
+        await page.goto("/shell");
+        await page.getByText("客服助手", { exact: true }).first().click();
+        const chatInput = page.getByPlaceholder(
+            "输入消息，Enter 发送，Shift+Enter 换行",
+        );
+        await chatInput.fill("展示工具调用示例");
+        await chatInput.press("Enter");
+        await expect(page.getByText("1 项失败", { exact: true })).toBeVisible({
+            timeout: 10_000,
+        });
+        await expect(page.getByText("失败原因", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText(/知识库检索已完成；网页搜索调用失败后/),
+        ).toBeVisible({ timeout: 10_000 });
+        await expect(
+            page.locator(".ant-sender-actions-btn-loading-button"),
+        ).toBeHidden();
+        await expect(page.getByText("结果", { exact: true })).toBeVisible();
+        for (const shortcut of [
+            "整理一份竞品研究框架",
+            "为调研报告设计目录",
+            "帮我优化一段产品介绍文案",
+            "展示工具调用示例",
+        ]) {
+            await expect(
+                page.getByText(shortcut, { exact: true }).last(),
+            ).toBeVisible();
+        }
+        await page
+            .getByText("工具调用", { exact: true })
+            .first()
+            .scrollIntoViewIfNeeded();
+        await page.screenshot({
+            path: screenshotPath("14-agent-chat-tool-complete.png"),
+            fullPage: true,
+        });
+        const appearanceSwitch = page.getByRole("switch", {
+            name: "切换外观",
+        });
+        await appearanceSwitch.click();
+        await expect(appearanceSwitch).toBeChecked();
+        await expect(
+            page.getByText("展示工具调用示例", { exact: true }).last(),
+        ).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("16-agent-chat-tool-dark.png"),
+            fullPage: true,
+        });
+
+        expect(consoleErrors).toEqual([]);
+    });
+
     test("delete action requires confirmation", async ({ page }, testInfo) => {
         test.skip(testInfo.project.name !== "desktop-hd");
         await page.goto("/agent");

@@ -72,8 +72,10 @@ import { ChatAttachmentsHeader } from "../chat/ChatAttachmentsHeader";
 import {
     isHarnessTrigger,
     isAgentLoopTrigger,
+    isToolCallTrigger,
     runHarnessDemo,
     runAgentLoopDemo,
+    runToolCallDemo,
 } from "../chat/harnessDemo";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1310,6 +1312,7 @@ const DRAWER_PROMPTS = [
     { key: "d1", description: "整理一份竞品研究框架" },
     { key: "d2", description: "分析这份资料的关键结论" },
     { key: "d3", description: "为调研报告设计目录" },
+    { key: "d4", description: "展示工具调用示例" },
 ];
 
 const DRAWER_SESSIONS: ConversationItemType[] = [
@@ -1358,7 +1361,11 @@ function CopilotPanel({
     const handleUserSubmit = (value: string) => {
         const trimmed = value.trim();
         if (!trimmed || replying) return;
-        if (isHarnessTrigger(trimmed) || isAgentLoopTrigger(trimmed)) {
+        if (
+            isHarnessTrigger(trimmed) ||
+            isAgentLoopTrigger(trimmed) ||
+            isToolCallTrigger(trimmed)
+        ) {
             const userMessage: ChatMessage = {
                 id: `u-${Date.now()}`,
                 role: "user",
@@ -1367,7 +1374,9 @@ function CopilotPanel({
             };
             setMessages((prev) => [...prev, userMessage]);
             setInput("");
-            if (isAgentLoopTrigger(trimmed)) {
+            if (isToolCallTrigger(trimmed)) {
+                runToolCallDemo(setMessages, setReplying);
+            } else if (isAgentLoopTrigger(trimmed)) {
                 runAgentLoopDemo(trimmed, setMessages, setReplying);
             } else {
                 runHarnessDemo(trimmed, setMessages, setReplying);
@@ -1572,6 +1581,13 @@ function CopilotPanel({
                             }
                         >
                             报告目录
+                        </Button>
+                        <Button
+                            size="small"
+                            icon={<AppstoreAddOutlined />}
+                            onClick={() => handleUserSubmit("展示工具调用示例")}
+                        >
+                            工具调用
                         </Button>
                     </Space>
                     <Sender

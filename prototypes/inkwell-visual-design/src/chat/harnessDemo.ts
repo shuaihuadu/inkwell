@@ -21,6 +21,7 @@ import type { AGUIEvent } from "./agui/types";
 
 const TRIGGER_KEYWORDS = ["研究", "调研", "分析一下", "深度"];
 const LOOP_TRIGGER_KEYWORDS = ["优化", "改进", "迭代", "精简", "润色"];
+const TOOL_CALL_TRIGGER = "工具调用示例";
 
 /** 判断一句用户输入是否应该触发 Harness 演示流程，而不是走普通的单条 mock 回复。 */
 export function isHarnessTrigger(text: string): boolean {
@@ -31,6 +32,226 @@ export function isHarnessTrigger(text: string): boolean {
  * 驱动的"迭代优化直到评估器满意"场景，跟 Harness 的 plan→execute 是两种不同的自主循环）。 */
 export function isAgentLoopTrigger(text: string): boolean {
     return LOOP_TRIGGER_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
+/** 判断是否触发独立的工具调用完整状态演示。 */
+export function isToolCallTrigger(text: string): boolean {
+    return text.includes(TOOL_CALL_TRIGGER);
+}
+
+/**
+ * 播放一次工具调用完整状态演示：知识库检索成功，网页搜索失败，Agent 基于已有结果继续回复。
+ */
+export function runToolCallDemo(
+    setMessages: SetMessages,
+    setReplying: (v: boolean) => void,
+): void {
+    const timestamp = Date.now();
+    const runId = `run-${timestamp}`;
+    const reasoningId = `reasoning-${timestamp}`;
+    const activityId = `tools-${timestamp}`;
+    const knowledgeToolId = `tool-${timestamp + 1}`;
+    const webToolId = `tool-${timestamp + 2}`;
+    const finalMessageId = `a-${timestamp + 3}`;
+    const finalReply =
+        "知识库检索已完成；网页搜索调用失败后，本轮没有中断，已基于内部资料继续生成回答。完整调用记录可在 Trace 中查看。";
+
+    const timeline: Array<{ at: number; event: AGUIEvent }> = [
+        { at: 0, event: { type: "RUN_STARTED", threadId: runId, runId } },
+        { at: 0, event: { type: "REASONING_START", messageId: reasoningId } },
+        {
+            at: 0,
+            event: {
+                type: "REASONING_MESSAGE_START",
+                messageId: reasoningId,
+                role: "reasoning",
+            },
+        },
+        {
+            at: 350,
+            event: {
+                type: "REASONING_MESSAGE_CONTENT",
+                messageId: reasoningId,
+                delta: "先检索内部知识库，再尝试补充外部公开资料；单个工具失败时继续使用已有结果。",
+            },
+        },
+        {
+            at: 350,
+            event: { type: "REASONING_MESSAGE_END", messageId: reasoningId },
+        },
+        { at: 350, event: { type: "REASONING_END", messageId: reasoningId } },
+        {
+            at: 350,
+            event: {
+                type: "TOOL_CALL_START",
+                toolCallId: knowledgeToolId,
+                toolCallName: "knowledge_base_search",
+                parentMessageId: activityId,
+            },
+        },
+        {
+            at: 350,
+            event: {
+                type: "TOOL_CALL_ARGS",
+                toolCallId: knowledgeToolId,
+                delta: '{"query":"Agent Framework 工具调用","topK":3}',
+            },
+        },
+        {
+            at: 350,
+            event: {
+                type: "ACTIVITY_SNAPSHOT",
+                messageId: activityId,
+                activityType: "harness",
+                content: {
+                    steps: [
+                        {
+                            key: "knowledge-search",
+                            title: "调用工具：知识库检索",
+                            description: "调用中",
+                            parameters:
+                                '{"query":"Agent Framework 工具调用","topK":3}',
+                            defaultExpanded: true,
+                            status: "loading",
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            at: 1100,
+            event: { type: "TOOL_CALL_END", toolCallId: knowledgeToolId },
+        },
+        {
+            at: 1100,
+            event: {
+                type: "TOOL_CALL_RESULT",
+                messageId: activityId,
+                toolCallId: knowledgeToolId,
+                content:
+                    "找到 3 条内部资料，已提取工具注册、调用与错误处理要点。",
+            },
+        },
+        {
+            at: 1100,
+            event: {
+                type: "ACTIVITY_DELTA",
+                messageId: activityId,
+                activityType: "harness",
+                patch: [
+                    {
+                        op: "replace",
+                        path: "/steps/0",
+                        value: {
+                            key: "knowledge-search",
+                            title: "调用工具：知识库检索",
+                            description: "调用成功",
+                            parameters:
+                                '{"query":"Agent Framework 工具调用","topK":3}',
+                            result: "找到 3 条内部资料，已提取工具注册、调用与错误处理要点。",
+                            defaultExpanded: true,
+                            status: "success",
+                        },
+                    },
+                    {
+                        op: "add",
+                        path: "/steps/-",
+                        value: {
+                            key: "web-search",
+                            title: "调用工具：网页搜索",
+                            description: "调用中",
+                            parameters:
+                                '{"query":"AG-UI tool events","maxResults":5}',
+                            defaultExpanded: true,
+                            status: "loading",
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            at: 1100,
+            event: {
+                type: "TOOL_CALL_START",
+                toolCallId: webToolId,
+                toolCallName: "web_search",
+                parentMessageId: activityId,
+            },
+        },
+        {
+            at: 1100,
+            event: {
+                type: "TOOL_CALL_ARGS",
+                toolCallId: webToolId,
+                delta: '{"query":"AG-UI tool events","maxResults":5}',
+            },
+        },
+        { at: 1850, event: { type: "TOOL_CALL_END", toolCallId: webToolId } },
+        {
+            at: 1850,
+            event: {
+                type: "TOOL_CALL_RESULT",
+                messageId: activityId,
+                toolCallId: webToolId,
+                content: "上游服务请求超时，请稍后重试。",
+            },
+        },
+        {
+            at: 1850,
+            event: {
+                type: "ACTIVITY_DELTA",
+                messageId: activityId,
+                activityType: "harness",
+                patch: [
+                    {
+                        op: "replace",
+                        path: "/steps/1",
+                        value: {
+                            key: "web-search",
+                            title: "调用工具：网页搜索",
+                            description: "调用失败",
+                            parameters:
+                                '{"query":"AG-UI tool events","maxResults":5}',
+                            error: "上游服务请求超时，请稍后重试。",
+                            defaultExpanded: true,
+                            status: "error",
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            at: 1850,
+            event: {
+                type: "TEXT_MESSAGE_START",
+                messageId: finalMessageId,
+                role: "assistant",
+            },
+        },
+        {
+            at: 1850,
+            event: {
+                type: "CUSTOM",
+                name: "usage",
+                value: "用量 — 输入 760 · 输出 180 · 总计 940 tokens",
+            },
+        },
+        ...streamingTextEvents(finalMessageId, finalReply, 1850),
+    ];
+    const streamEndAt = 1850 + streamingDuration(finalReply);
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "TEXT_MESSAGE_END", messageId: finalMessageId },
+    });
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "RUN_FINISHED", threadId: runId, runId },
+    });
+
+    playAGUITimeline(
+        timeline,
+        createAGUIEventHandler(setMessages, setReplying),
+    );
 }
 
 /**
@@ -67,7 +288,14 @@ export function runHarnessDemo(
     const timeline: Array<{ at: number; event: AGUIEvent }> = [
         { at: 0, event: { type: "RUN_STARTED", threadId: runId, runId } },
         { at: 0, event: { type: "REASONING_START", messageId: reasoningId } },
-        { at: 0, event: { type: "REASONING_MESSAGE_START", messageId: reasoningId, role: "reasoning" } },
+        {
+            at: 0,
+            event: {
+                type: "REASONING_MESSAGE_START",
+                messageId: reasoningId,
+                role: "reasoning",
+            },
+        },
 
         // 1. 思考完成 → harness activity 出现，"制定计划"节点 loading
         {
@@ -78,7 +306,10 @@ export function runHarnessDemo(
                 delta: `用户想了解"${userText}"，需要先明确范围和目标读者，再决定用哪些工具检索外部资料、哪些结论需要交叉核对。`,
             },
         },
-        { at: 600, event: { type: "REASONING_MESSAGE_END", messageId: reasoningId } },
+        {
+            at: 600,
+            event: { type: "REASONING_MESSAGE_END", messageId: reasoningId },
+        },
         { at: 600, event: { type: "REASONING_END", messageId: reasoningId } },
         {
             at: 600,
@@ -86,7 +317,15 @@ export function runHarnessDemo(
                 type: "ACTIVITY_SNAPSHOT",
                 messageId: harnessId,
                 activityType: "harness",
-                content: { steps: [{ key: "plan", title: "制定研究计划", status: "loading" }] },
+                content: {
+                    steps: [
+                        {
+                            key: "plan",
+                            title: "制定研究计划",
+                            status: "loading",
+                        },
+                    ],
+                },
             },
         },
 
@@ -98,23 +337,56 @@ export function runHarnessDemo(
                 messageId: harnessId,
                 activityType: "harness",
                 patch: [
-                    { op: "replace", path: "/steps/0", value: { key: "plan", title: "制定研究计划", status: "success" } },
+                    {
+                        op: "replace",
+                        path: "/steps/0",
+                        value: {
+                            key: "plan",
+                            title: "制定研究计划",
+                            status: "success",
+                        },
+                    },
                 ],
             },
         },
-        { at: 1300, event: { type: "TOOL_CALL_START", toolCallId: tool1Id, toolCallName: "web_search", parentMessageId: harnessId } },
+        {
+            at: 1300,
+            event: {
+                type: "TOOL_CALL_START",
+                toolCallId: tool1Id,
+                toolCallName: "web_search",
+                parentMessageId: harnessId,
+            },
+        },
         {
             at: 1300,
             event: {
                 type: "ACTIVITY_DELTA",
                 messageId: harnessId,
                 activityType: "harness",
-                patch: [{ op: "add", path: "/steps/-", value: { key: "tool-1", title: "调用工具：网页搜索", status: "loading" } }],
+                patch: [
+                    {
+                        op: "add",
+                        path: "/steps/-",
+                        value: {
+                            key: "tool-1",
+                            title: "调用工具：网页搜索",
+                            status: "loading",
+                        },
+                    },
+                ],
             },
         },
 
         // 3. 第一个工具调用完成 → 第二个工具调用 loading
-        { at: 1900, event: { type: "TOOL_CALL_ARGS", toolCallId: tool1Id, delta: "查询关键词与来源筛选" } },
+        {
+            at: 1900,
+            event: {
+                type: "TOOL_CALL_ARGS",
+                toolCallId: tool1Id,
+                delta: "查询关键词与来源筛选",
+            },
+        },
         { at: 1900, event: { type: "TOOL_CALL_END", toolCallId: tool1Id } },
         {
             at: 1900,
@@ -146,19 +418,44 @@ export function runHarnessDemo(
                 ],
             },
         },
-        { at: 1900, event: { type: "TOOL_CALL_START", toolCallId: tool2Id, toolCallName: "knowledge_base_search", parentMessageId: harnessId } },
+        {
+            at: 1900,
+            event: {
+                type: "TOOL_CALL_START",
+                toolCallId: tool2Id,
+                toolCallName: "knowledge_base_search",
+                parentMessageId: harnessId,
+            },
+        },
         {
             at: 1900,
             event: {
                 type: "ACTIVITY_DELTA",
                 messageId: harnessId,
                 activityType: "harness",
-                patch: [{ op: "add", path: "/steps/-", value: { key: "tool-2", title: "调用工具：知识库检索", status: "loading" } }],
+                patch: [
+                    {
+                        op: "add",
+                        path: "/steps/-",
+                        value: {
+                            key: "tool-2",
+                            title: "调用工具：知识库检索",
+                            status: "loading",
+                        },
+                    },
+                ],
             },
         },
 
         // 4. 第二个工具调用完成 → 出现任务清单
-        { at: 2500, event: { type: "TOOL_CALL_ARGS", toolCallId: tool2Id, delta: "匹配内部历史资料" } },
+        {
+            at: 2500,
+            event: {
+                type: "TOOL_CALL_ARGS",
+                toolCallId: tool2Id,
+                delta: "匹配内部历史资料",
+            },
+        },
         { at: 2500, event: { type: "TOOL_CALL_END", toolCallId: tool2Id } },
         {
             at: 2500,
@@ -166,7 +463,8 @@ export function runHarnessDemo(
                 type: "TOOL_CALL_RESULT",
                 messageId: harnessId,
                 toolCallId: tool2Id,
-                content: "在知识库中找到相关的历史研究记录，补充到本轮参考资料里，避免重复调研。",
+                content:
+                    "在知识库中找到相关的历史研究记录，补充到本轮参考资料里，避免重复调研。",
             },
         },
         {
@@ -198,9 +496,21 @@ export function runHarnessDemo(
                 activityType: "todos",
                 content: {
                     todos: [
-                        { key: "t1", label: "梳理资料来源与关键结论", status: "in-progress" },
-                        { key: "t2", label: "交叉核对存在分歧的信息点", status: "pending" },
-                        { key: "t3", label: "整理成结构化报告草稿", status: "pending" },
+                        {
+                            key: "t1",
+                            label: "梳理资料来源与关键结论",
+                            status: "in-progress",
+                        },
+                        {
+                            key: "t2",
+                            label: "交叉核对存在分歧的信息点",
+                            status: "pending",
+                        },
+                        {
+                            key: "t3",
+                            label: "整理成结构化报告草稿",
+                            status: "pending",
+                        },
                     ],
                 },
             },
@@ -214,8 +524,24 @@ export function runHarnessDemo(
                 messageId: todosId,
                 activityType: "todos",
                 patch: [
-                    { op: "replace", path: "/todos/0", value: { key: "t1", label: "梳理资料来源与关键结论", status: "done" } },
-                    { op: "replace", path: "/todos/1", value: { key: "t2", label: "交叉核对存在分歧的信息点", status: "in-progress" } },
+                    {
+                        op: "replace",
+                        path: "/todos/0",
+                        value: {
+                            key: "t1",
+                            label: "梳理资料来源与关键结论",
+                            status: "done",
+                        },
+                    },
+                    {
+                        op: "replace",
+                        path: "/todos/1",
+                        value: {
+                            key: "t2",
+                            label: "交叉核对存在分歧的信息点",
+                            status: "in-progress",
+                        },
+                    },
                 ],
             },
         },
@@ -226,8 +552,24 @@ export function runHarnessDemo(
                 messageId: todosId,
                 activityType: "todos",
                 patch: [
-                    { op: "replace", path: "/todos/1", value: { key: "t2", label: "交叉核对存在分歧的信息点", status: "done" } },
-                    { op: "replace", path: "/todos/2", value: { key: "t3", label: "整理成结构化报告草稿", status: "in-progress" } },
+                    {
+                        op: "replace",
+                        path: "/todos/1",
+                        value: {
+                            key: "t2",
+                            label: "交叉核对存在分歧的信息点",
+                            status: "done",
+                        },
+                    },
+                    {
+                        op: "replace",
+                        path: "/todos/2",
+                        value: {
+                            key: "t3",
+                            label: "整理成结构化报告草稿",
+                            status: "in-progress",
+                        },
+                    },
                 ],
             },
         },
@@ -239,7 +581,17 @@ export function runHarnessDemo(
                 type: "ACTIVITY_DELTA",
                 messageId: todosId,
                 activityType: "todos",
-                patch: [{ op: "replace", path: "/todos/2", value: { key: "t3", label: "整理成结构化报告草稿", status: "done" } }],
+                patch: [
+                    {
+                        op: "replace",
+                        path: "/todos/2",
+                        value: {
+                            key: "t3",
+                            label: "整理成结构化报告草稿",
+                            status: "done",
+                        },
+                    },
+                ],
             },
         },
         {
@@ -248,7 +600,17 @@ export function runHarnessDemo(
                 type: "ACTIVITY_DELTA",
                 messageId: harnessId,
                 activityType: "harness",
-                patch: [{ op: "add", path: "/steps/-", value: { key: "wrap-up", title: "整理结果", status: "loading" } }],
+                patch: [
+                    {
+                        op: "add",
+                        path: "/steps/-",
+                        value: {
+                            key: "wrap-up",
+                            title: "整理结果",
+                            status: "loading",
+                        },
+                    },
+                ],
             },
         },
 
@@ -259,21 +621,51 @@ export function runHarnessDemo(
                 type: "ACTIVITY_DELTA",
                 messageId: harnessId,
                 activityType: "harness",
-                patch: [{ op: "replace", path: "/steps/3", value: { key: "wrap-up", title: "整理结果", status: "success" } }],
+                patch: [
+                    {
+                        op: "replace",
+                        path: "/steps/3",
+                        value: {
+                            key: "wrap-up",
+                            title: "整理结果",
+                            status: "success",
+                        },
+                    },
+                ],
             },
         },
-        { at: 4900, event: { type: "TEXT_MESSAGE_START", messageId: finalMessageId, role: "assistant" } },
         {
             at: 4900,
-            event: { type: "CUSTOM", name: "usage", value: "用量 — 输入 1.2k · 输出 340 · 总计 1.5k tokens" },
+            event: {
+                type: "TEXT_MESSAGE_START",
+                messageId: finalMessageId,
+                role: "assistant",
+            },
+        },
+        {
+            at: 4900,
+            event: {
+                type: "CUSTOM",
+                name: "usage",
+                value: "用量 — 输入 1.2k · 输出 340 · 总计 1.5k tokens",
+            },
         },
         ...streamingTextEvents(finalMessageId, finalReply, 4900),
     ];
     const streamEndAt = 4900 + streamingDuration(finalReply);
-    timeline.push({ at: streamEndAt, event: { type: "TEXT_MESSAGE_END", messageId: finalMessageId } });
-    timeline.push({ at: streamEndAt, event: { type: "RUN_FINISHED", threadId: runId, runId } });
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "TEXT_MESSAGE_END", messageId: finalMessageId },
+    });
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "RUN_FINISHED", threadId: runId, runId },
+    });
 
-    playAGUITimeline(timeline, createAGUIEventHandler(setMessages, setReplying));
+    playAGUITimeline(
+        timeline,
+        createAGUIEventHandler(setMessages, setReplying),
+    );
 }
 
 /**
@@ -310,7 +702,15 @@ export function runAgentLoopDemo(
                 type: "ACTIVITY_SNAPSHOT",
                 messageId: loopId,
                 activityType: "loop",
-                content: { steps: [{ key: "round-1", title: "第 1 轮：生成初稿", status: "loading" }] },
+                content: {
+                    steps: [
+                        {
+                            key: "round-1",
+                            title: "第 1 轮：生成初稿",
+                            status: "loading",
+                        },
+                    ],
+                },
             },
         },
 
@@ -354,7 +754,17 @@ export function runAgentLoopDemo(
                 type: "ACTIVITY_DELTA",
                 messageId: loopId,
                 activityType: "loop",
-                patch: [{ op: "add", path: "/steps/-", value: { key: "round-2", title: "第 2 轮：根据反馈修改", status: "loading" } }],
+                patch: [
+                    {
+                        op: "add",
+                        path: "/steps/-",
+                        value: {
+                            key: "round-2",
+                            title: "第 2 轮：根据反馈修改",
+                            status: "loading",
+                        },
+                    },
+                ],
             },
         },
 
@@ -369,7 +779,12 @@ export function runAgentLoopDemo(
                     {
                         op: "replace",
                         path: "/steps/2",
-                        value: { key: "round-2", title: "第 2 轮：根据反馈修改", detail: draft2, status: "success" },
+                        value: {
+                            key: "round-2",
+                            title: "第 2 轮：根据反馈修改",
+                            detail: draft2,
+                            status: "success",
+                        },
                     },
                     {
                         op: "add",
@@ -386,13 +801,28 @@ export function runAgentLoopDemo(
         },
 
         // 4. 最终流式回复
-        { at: 3200, event: { type: "TEXT_MESSAGE_START", messageId: finalMessageId, role: "assistant" } },
+        {
+            at: 3200,
+            event: {
+                type: "TEXT_MESSAGE_START",
+                messageId: finalMessageId,
+                role: "assistant",
+            },
+        },
         ...streamingTextEvents(finalMessageId, finalReply, 3200),
     ];
     const streamEndAt = 3200 + streamingDuration(finalReply);
-    timeline.push({ at: streamEndAt, event: { type: "TEXT_MESSAGE_END", messageId: finalMessageId } });
-    timeline.push({ at: streamEndAt, event: { type: "RUN_FINISHED", threadId: runId, runId } });
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "TEXT_MESSAGE_END", messageId: finalMessageId },
+    });
+    timeline.push({
+        at: streamEndAt,
+        event: { type: "RUN_FINISHED", threadId: runId, runId },
+    });
 
-    playAGUITimeline(timeline, createAGUIEventHandler(setMessages, setReplying));
+    playAGUITimeline(
+        timeline,
+        createAGUIEventHandler(setMessages, setReplying),
+    );
 }
-

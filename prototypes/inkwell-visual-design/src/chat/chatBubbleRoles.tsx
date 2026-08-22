@@ -68,7 +68,12 @@ export function createChatBubbleRoles(onRetry?: () => void): BubbleListProps["ro
             placement: "start",
             variant: "borderless",
             avatar: false,
-            contentRender: () => <HarnessThoughtChain steps={data.extraInfo?.harnessSteps ?? []} />,
+            contentRender: () => (
+                <HarnessThoughtChain
+                    steps={data.extraInfo?.harnessSteps ?? []}
+                    title="工具调用"
+                />
+            ),
         }),
         loop: (data: BubbleItemType) => ({
             placement: "start",
@@ -77,7 +82,12 @@ export function createChatBubbleRoles(onRetry?: () => void): BubbleListProps["ro
             // Agent Loop（`LoopAgent` + `LoopEvaluator` 驱动的"第 N 轮迭代 → 评估器给 continue/stop
             // 反馈"循环）跟 Harness 的 plan→execute 步骤链视觉形态完全一致，直接复用同一个
             // ThoughtChain 承载组件，只是步骤内容语义不同（迭代轮次 + 评估反馈，而不是工具调用）。
-            contentRender: () => <HarnessThoughtChain steps={data.extraInfo?.loopSteps ?? []} />,
+            contentRender: () => (
+                <HarnessThoughtChain
+                    steps={data.extraInfo?.loopSteps ?? []}
+                    title="Agent Loop"
+                />
+            ),
         }),
         todos: (data: BubbleItemType) => ({
             placement: "start",

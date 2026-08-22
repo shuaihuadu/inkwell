@@ -31,8 +31,10 @@ import { ChatAttachmentsHeader } from "../chat/ChatAttachmentsHeader";
 import {
     isHarnessTrigger,
     isAgentLoopTrigger,
+    isToolCallTrigger,
     runHarnessDemo,
     runAgentLoopDemo,
+    runToolCallDemo,
 } from "../chat/harnessDemo";
 import {
     assistantTextEvents,
@@ -66,6 +68,7 @@ const QUICK_PROMPTS = [
     { key: "qp1", description: "整理一份竞品研究框架" },
     { key: "qp2", description: "为调研报告设计目录" },
     { key: "qp3", description: "帮我优化一段产品介绍文案" },
+    { key: "qp4", description: "展示工具调用示例" },
 ];
 
 function mockConversation(sessionId: string, agentName: string): ChatMessage[] {
@@ -292,7 +295,10 @@ function mockConversation(sessionId: string, agentName: string): ChatMessage[] {
                     content: "你好，可以先自我介绍一下你能帮我做什么吗？",
                     time: "10:02",
                 },
-                { kind: "events", events: assistantTextEvents("s1-ai", finalReply) },
+                {
+                    kind: "events",
+                    events: assistantTextEvents("s1-ai", finalReply),
+                },
             ];
             return replaySeed(steps).map((m, i) => ({
                 ...m,
@@ -363,7 +369,11 @@ export default function AgentChatPage({
     const handleUserSubmit = (value: string) => {
         const trimmed = value.trim();
         if (!trimmed || replying) return;
-        if (isHarnessTrigger(trimmed) || isAgentLoopTrigger(trimmed)) {
+        if (
+            isHarnessTrigger(trimmed) ||
+            isAgentLoopTrigger(trimmed) ||
+            isToolCallTrigger(trimmed)
+        ) {
             const userMessage: ChatMessage = {
                 id: `u-${Date.now()}`,
                 role: "user",
@@ -372,7 +382,9 @@ export default function AgentChatPage({
             };
             setMessages((prev) => [...prev, userMessage]);
             setInput("");
-            if (isAgentLoopTrigger(trimmed)) {
+            if (isToolCallTrigger(trimmed)) {
+                runToolCallDemo(setMessages, setReplying);
+            } else if (isAgentLoopTrigger(trimmed)) {
                 runAgentLoopDemo(trimmed, setMessages, setReplying);
             } else {
                 runHarnessDemo(trimmed, setMessages, setReplying);
@@ -601,6 +613,35 @@ export default function AgentChatPage({
                             </>
                         )}
                         <div style={{ width: "100%" }}>
+                            {!isEmpty && (
+                                <Prompts
+                                    items={QUICK_PROMPTS}
+                                    wrap
+                                    onItemClick={(info) =>
+                                        handleUserSubmit(
+                                            info.data.description as string,
+                                        )
+                                    }
+                                    style={{
+                                        marginBottom: 10,
+                                        paddingInline: token.paddingXS,
+                                    }}
+                                    styles={{
+                                        item: {
+                                            paddingBlock: 5,
+                                            paddingInline: 10,
+                                            fontSize: 12,
+                                            color: token.colorText,
+                                            background:
+                                                token.colorFillSecondary,
+                                            border: `1px solid ${token.colorBorder}`,
+                                        },
+                                        itemContent: {
+                                            color: token.colorText,
+                                        },
+                                    }}
+                                />
+                            )}
                             <Sender
                                 suffix={false}
                                 value={input}
