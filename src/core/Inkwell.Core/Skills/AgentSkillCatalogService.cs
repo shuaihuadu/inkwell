@@ -38,6 +38,8 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
             throw new ArgumentException("SKILL.md frontmatter is missing or invalid.", nameof(request));
         }
 
+        ValidateEditableFields(name, description, contentMarkdown);
+
         ValidatePackageStructure(
             request.PackageEntries,
             out IReadOnlyList<Uri>? referenceUris,
@@ -203,9 +205,16 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
 
     private static void ValidateEditableFields(string name, string description, string content)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 64)
         {
-            throw new ArgumentException("Name must be between 1 and 80 characters.", nameof(name));
+            throw new ArgumentException("Name must be between 1 and 64 characters.", nameof(name));
+        }
+
+        if (!SkillNameRegex().IsMatch(name))
+        {
+            throw new ArgumentException(
+                "Name must use only lowercase letters, numbers, and hyphens, and must not start or end with a hyphen or contain consecutive hyphens.",
+                nameof(name));
         }
 
         if (string.IsNullOrWhiteSpace(description) || description.Length > 240)
@@ -223,4 +232,7 @@ internal sealed partial class AgentSkillCatalogService(IPersistenceProvider pers
 
     [GeneratedRegex(@"\A---\s*\n(?<frontmatter>.*?)\n---\s*\n", RegexOptions.Singleline)]
     private static partial Regex FrontmatterRegex();
+
+    [GeneratedRegex("^[a-z0-9]([a-z0-9]*-[a-z0-9])*[a-z0-9]*$")]
+    private static partial Regex SkillNameRegex();
 }

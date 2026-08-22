@@ -10,34 +10,36 @@ import {
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
-    AgentDefinition,
-    AgentConversation,
-    AgentConversationListItem,
+    ActiveAgentChatRun,
     AgentAvatarUploadFile,
     AgentAvatarUploadResponse,
+    AgentConversation,
+    AgentConversationListItem,
+    AgentDefinition,
     AgentListItem,
-    AgentUpsertRequest,
-    AgentVersion,
     AgentSkillDefinition,
     AgentSkillUpdateRequest,
     AgentSkillUploadFile,
     AgentToolDefinition,
+    AgentUpsertRequest,
+    AgentVersion,
     AppMetadata,
     AuthIdentity,
     AuthSnapshot,
     AuthStatus,
+    ChangePasswordRequest,
+    ChatMessage,
+    ChatRequest,
     ChatRunError,
     ChatRunSnapshot,
-    ChatRequest,
-    ChatMessage,
-    ChangePasswordRequest,
     CreateAccountRequest,
     IssuedCredential,
+    LLMModel,
+    LLMModelTestResult,
+    LLMProviderManagementInfo,
     LoginRequest,
     LoginResult,
-    LLMModel,
-    LLMProviderManagementInfo,
-    LLMModelTestResult,
+    SkillRunActivity,
     UnlockResult,
     UserListItem,
 } from "../src/shared/network/contracts.js";
@@ -64,7 +66,13 @@ let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
 let idleLockTimer: NodeJS.Timeout | null = null;
 const chatRuns = new Map<
     string,
-    { controller: AbortController; snapshot: ChatRunSnapshot }
+    {
+        agentId: string;
+        conversationId: string | null;
+        controller: AbortController;
+        userMessage: ChatMessage;
+        snapshot: ChatRunSnapshot;
+    }
 >();
 const completedChatRunIds: string[] = [];
 
@@ -80,10 +88,40 @@ interface PagedApiResponse<T> {
 interface AgentChatMessageApiResponse {
     id: string;
     message: {
-        role: string;
+        role?: string;
+        Role?: string;
         text?: string | null;
-        contents?: Array<{ text?: string | null }>;
+        Text?: string | null;
+        contents?: AgentChatMessageContentApiResponse[];
+        Contents?: AgentChatMessageContentApiResponse[];
     };
+}
+
+interface AgentChatMessageContentApiResponse {
+    $type?: string;
+    text?: string | null;
+    Text?: string | null;
+    name?: string;
+    Name?: string;
+    callId?: string;
+    CallId?: string;
+    arguments?: unknown;
+    Arguments?: unknown;
+}
+
+interface ChatCompletionToolCall {
+    index?: number;
+    id?: string;
+    function?: {
+        name?: string;
+        arguments?: string;
+    };
+}
+
+interface PendingToolCall {
+    id?: string;
+    name: string;
+    arguments: string;
 }
 
 class ApiRequestError extends Error {
@@ -106,8 +144,165 @@ class ChatRunFailure extends Error {
 
 const copyChatRunSnapshot = (snapshot: ChatRunSnapshot): ChatRunSnapshot => ({
     ...snapshot,
+    skillActivities: snapshot.skillActivities.map((activity) => ({
+        ...activity,
+    })),
     ...(snapshot.error ? { error: { ...snapshot.error } } : {}),
 });
+
+const copyActiveAgentChatRun = (
+    run: ActiveAgentChatRun,
+): ActiveAgentChatRun => ({
+    ...run,
+    userMessage: {
+        ...run.userMessage,
+        ...(run.userMessage.skillActivities
+            ? {
+                  skillActivities: run.userMessage.skillActivities.map(
+                      (activity) => ({ ...activity }),
+                  ),
+              }
+            : {}),
+    },
+    snapshot: copyChatRunSnapshot(run.snapshot),
+});
+
+const toSkillRunActivity = (
+    toolCall: ChatCompletionToolCall,
+): SkillRunActivity | null => {
+    const functionName = toolCall.function?.name;
+    if (
+        functionName !== "load_skill" &&
+        functionName !== "read_skill_resource" &&
+        functionName !== "run_skill_script"
+    ) {
+        return null;
+    }
+
+    let argumentsValue: Record<string, unknown> = {};
+    try {
+        argumentsValue = JSON.parse(
+            toolCall.function?.arguments ?? "{}",
+        ) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+
+    const skillNameValue =
+        argumentsValue.skillName ?? argumentsValue.skill_name;
+    if (typeof skillNameValue !== "string" || !skillNameValue.trim()) {
+        return null;
+    }
+
+    const targetValue =
+        functionName === "read_skill_resource"
+            ? (argumentsValue.resourceName ?? argumentsValue.resource_name)
+            : functionName === "run_skill_script"
+              ? (argumentsValue.scriptName ?? argumentsValue.script_name)
+              : undefined;
+    const type =
+        functionName === "load_skill"
+            ? "skill-loaded"
+            : functionName === "read_skill_resource"
+              ? "skill-resource-read"
+              : "skill-script-run";
+
+    return {
+        callId:
+            toolCall.id ??
+            `${functionName}:${skillNameValue}:${typeof targetValue === "string" ? targetValue : ""}`,
+        type,
+        skillName: skillNameValue,
+        argumentsJson: toolCall.function?.arguments ?? "{}",
+        status: "loading",
+        ...(typeof targetValue === "string" && targetValue.trim()
+            ? { targetName: targetValue }
+            : {}),
+    };
+};
+
+const getPersistedSkillActivities = (
+    contents: AgentChatMessageContentApiResponse[] | undefined,
+): SkillRunActivity[] =>
+    (contents ?? [])
+        .filter((content) => content.$type === "functionCall")
+        .map((content) =>
+            toSkillRunActivity({
+                id: content.callId ?? content.CallId,
+                function: {
+                    name: content.name ?? content.Name,
+                    arguments: JSON.stringify(
+                        content.arguments ?? content.Arguments ?? {},
+                    ),
+                },
+            }),
+        )
+        .filter((activity): activity is SkillRunActivity => activity !== null)
+        .map((activity) => ({ ...activity, status: "success" }));
+
+const normalizePersistedChatMessages = (
+    items: AgentChatMessageApiResponse[],
+): ChatMessage[] => {
+    const messages: ChatMessage[] = [];
+    let pendingSkillActivities: SkillRunActivity[] = [];
+    let pendingMessageId: string | undefined;
+
+    const flushPendingActivities = (): void => {
+        if (pendingSkillActivities.length === 0) return;
+        messages.push({
+            id: pendingMessageId,
+            role: "assistant",
+            content: "",
+            skillActivities: pendingSkillActivities,
+        });
+        pendingSkillActivities = [];
+        pendingMessageId = undefined;
+    };
+
+    for (const { id, message } of items) {
+        const role = message.role ?? message.Role;
+        const contents = message.contents ?? message.Contents ?? [];
+        const skillActivities = getPersistedSkillActivities(contents);
+        const content =
+            message.text ??
+            message.Text ??
+            contents.map((item) => item.text ?? item.Text ?? "").join("");
+
+        if (skillActivities.length > 0) {
+            pendingMessageId ??= id;
+            pendingSkillActivities = [
+                ...pendingSkillActivities,
+                ...skillActivities.filter(
+                    (activity) =>
+                        !pendingSkillActivities.some(
+                            (current) => current.callId === activity.callId,
+                        ),
+                ),
+            ];
+        }
+
+        if (role === "user") {
+            flushPendingActivities();
+            if (content.trim()) messages.push({ id, role, content });
+            continue;
+        }
+
+        if (role !== "assistant" || !content.trim()) continue;
+        messages.push({
+            id,
+            role,
+            content,
+            ...(pendingSkillActivities.length > 0
+                ? { skillActivities: pendingSkillActivities }
+                : {}),
+        });
+        pendingSkillActivities = [];
+        pendingMessageId = undefined;
+    }
+
+    flushPendingActivities();
+    return messages;
+};
 
 const broadcastChatRun = (snapshot: ChatRunSnapshot): void => {
     const value = copyChatRunSnapshot(snapshot);
@@ -127,6 +322,16 @@ const finishChatRun = (
     run.snapshot = {
         ...run.snapshot,
         status,
+        skillActivities: run.snapshot.skillActivities.map((activity) => ({
+            ...activity,
+            status:
+                status === "completed"
+                    ? "success"
+                    : status === "stopped"
+                      ? "abort"
+                      : "error",
+            ...(error ? { error: error.reason } : {}),
+        })),
         ...(error ? { error } : {}),
     };
     broadcastChatRun(run.snapshot);
@@ -553,8 +758,13 @@ const registerApiHandlers = (): void => {
     ipcMain.handle("inkwell:open-external", async (_event, url: string) => {
         requireAuthenticated();
         const externalUrl = new URL(url);
-        if (externalUrl.protocol !== "https:" && externalUrl.protocol !== "http:") {
-            throw new Error("Only HTTP and HTTPS URLs can be opened externally.");
+        if (
+            externalUrl.protocol !== "https:" &&
+            externalUrl.protocol !== "http:"
+        ) {
+            throw new Error(
+                "Only HTTP and HTTPS URLs can be opened externally.",
+            );
         }
 
         await shell.openExternal(externalUrl.toString());
@@ -573,16 +783,13 @@ const registerApiHandlers = (): void => {
             });
         },
     );
-    ipcMain.handle(
-        "inkwell:unlock-account",
-        (_event, userId: string) => {
-            requireAdmin();
-            return request<void>(
-                `/api/auth/accounts/${encodeURIComponent(userId)}/unlock`,
-                { method: "POST" },
-            );
-        },
-    );
+    ipcMain.handle("inkwell:unlock-account", (_event, userId: string) => {
+        requireAdmin();
+        return request<void>(
+            `/api/auth/accounts/${encodeURIComponent(userId)}/unlock`,
+            { method: "POST" },
+        );
+    });
     ipcMain.handle("inkwell:disable-account", (_event, userId: string) => {
         requireAdmin();
         return request<void>(
@@ -652,7 +859,10 @@ const registerApiHandlers = (): void => {
     );
     ipcMain.handle(
         "inkwell:upload-agent-avatar",
-        (_event, file: AgentAvatarUploadFile): Promise<AgentAvatarUploadResponse> => {
+        (
+            _event,
+            file: AgentAvatarUploadFile,
+        ): Promise<AgentAvatarUploadResponse> => {
             requireAuthenticated();
             const body = new FormData();
             body.append(
@@ -722,7 +932,10 @@ const registerApiHandlers = (): void => {
     );
     ipcMain.handle(
         "inkwell:list-agent-conversations",
-        async (_event, agentId: string): Promise<AgentConversationListItem[]> => {
+        async (
+            _event,
+            agentId: string,
+        ): Promise<AgentConversationListItem[]> => {
             requireAuthenticated();
             return requestAllPages<AgentConversationListItem>(
                 `/api/agents/${encodeURIComponent(agentId)}/conversations`,
@@ -740,16 +953,7 @@ const registerApiHandlers = (): void => {
             const items = await requestAllPages<AgentChatMessageApiResponse>(
                 `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/messages`,
             );
-            return items.map(({ id, message }) => ({
-                id,
-                role: message.role === "assistant" ? "assistant" : "user",
-                content:
-                    message.text ??
-                    message.contents
-                        ?.map((content) => content.text ?? "")
-                        .join("") ??
-                    "",
-            }));
+            return normalizePersistedChatMessages(items);
         },
     );
     ipcMain.handle(
@@ -769,11 +973,7 @@ const registerApiHandlers = (): void => {
     );
     ipcMain.handle(
         "inkwell:clear-agent-conversation",
-        (
-            _event,
-            agentId: string,
-            conversationId: string,
-        ): Promise<void> => {
+        (_event, agentId: string, conversationId: string): Promise<void> => {
             requireAuthenticated();
             return request<void>(
                 `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/clear`,
@@ -783,11 +983,7 @@ const registerApiHandlers = (): void => {
     );
     ipcMain.handle(
         "inkwell:delete-agent-conversation",
-        (
-            _event,
-            agentId: string,
-            conversationId: string,
-        ): Promise<void> => {
+        (_event, agentId: string, conversationId: string): Promise<void> => {
             requireAuthenticated();
             return request<void>(
                 `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}`,
@@ -802,7 +998,9 @@ const registerApiHandlers = (): void => {
             requireAuthenticated();
             const existingRun = chatRuns.get(input.requestId);
             if (existingRun?.snapshot.status === "running") {
-                throw new Error("A chat run with this request ID is already running.");
+                throw new Error(
+                    "A chat run with this request ID is already running.",
+                );
             }
             for (
                 let index = completedChatRunIds.indexOf(input.requestId);
@@ -813,12 +1011,25 @@ const registerApiHandlers = (): void => {
             }
 
             const controller = new AbortController();
-            const run = {
+            const run: {
+                agentId: string;
+                conversationId: string | null;
+                controller: AbortController;
+                userMessage: ChatMessage;
+                snapshot: ChatRunSnapshot;
+            } = {
+                agentId: input.agentId,
+                conversationId: input.conversationId,
                 controller,
+                userMessage: input.messages.at(-1) ?? {
+                    role: "user",
+                    content: "",
+                },
                 snapshot: {
                     requestId: input.requestId,
                     status: "running" as const,
                     content: "",
+                    skillActivities: [],
                 },
             };
             chatRuns.set(input.requestId, run);
@@ -878,6 +1089,7 @@ const registerApiHandlers = (): void => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = "";
+                const pendingToolCalls = new Map<number, PendingToolCall>();
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -895,10 +1107,62 @@ const registerApiHandlers = (): void => {
                         try {
                             const chunk = JSON.parse(data) as {
                                 choices?: Array<{
-                                    delta?: { content?: string };
+                                    delta?: {
+                                        content?: string;
+                                        tool_calls?: ChatCompletionToolCall[];
+                                    };
                                 }>;
                             };
                             content = chunk.choices?.[0]?.delta?.content;
+                            const toolCalls =
+                                chunk.choices?.[0]?.delta?.tool_calls ?? [];
+                            const newActivities = toolCalls
+                                .map((toolCall, position) => {
+                                    const key = toolCall.index ?? position;
+                                    const current = pendingToolCalls.get(
+                                        key,
+                                    ) ?? {
+                                        name: "",
+                                        arguments: "",
+                                    };
+                                    const next: PendingToolCall = {
+                                        id: toolCall.id ?? current.id,
+                                        name:
+                                            current.name +
+                                            (toolCall.function?.name ?? ""),
+                                        arguments:
+                                            current.arguments +
+                                            (toolCall.function?.arguments ??
+                                                ""),
+                                    };
+                                    pendingToolCalls.set(key, next);
+                                    return toSkillRunActivity({
+                                        id: next.id,
+                                        function: {
+                                            name: next.name,
+                                            arguments: next.arguments,
+                                        },
+                                    });
+                                })
+                                .filter(
+                                    (activity): activity is SkillRunActivity =>
+                                        activity !== null &&
+                                        !run.snapshot.skillActivities.some(
+                                            (existing) =>
+                                                existing.callId ===
+                                                activity.callId,
+                                        ),
+                                );
+                            if (newActivities.length > 0) {
+                                run.snapshot = {
+                                    ...run.snapshot,
+                                    skillActivities: [
+                                        ...run.snapshot.skillActivities,
+                                        ...newActivities,
+                                    ],
+                                };
+                                broadcastChatRun(run.snapshot);
+                            }
                         } catch {
                             throw new ChatRunFailure({
                                 code: "STREAM_ERROR",
@@ -940,6 +1204,27 @@ const registerApiHandlers = (): void => {
             requireAuthenticated();
             const snapshot = chatRuns.get(requestId)?.snapshot;
             return snapshot ? copyChatRunSnapshot(snapshot) : null;
+        },
+    );
+    ipcMain.handle(
+        "inkwell:get-active-agent-chat-run",
+        (_event, agentId: string): ActiveAgentChatRun | null => {
+            requireAuthenticated();
+            const run = Array.from(chatRuns.values())
+                .reverse()
+                .find(
+                    (candidate) =>
+                        candidate.agentId === agentId &&
+                        candidate.snapshot.status === "running",
+                );
+            return run
+                ? copyActiveAgentChatRun({
+                      agentId: run.agentId,
+                      conversationId: run.conversationId,
+                      userMessage: run.userMessage,
+                      snapshot: run.snapshot,
+                  })
+                : null;
         },
     );
     ipcMain.handle(

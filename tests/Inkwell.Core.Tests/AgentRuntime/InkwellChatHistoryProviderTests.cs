@@ -50,6 +50,53 @@ public sealed class InkwellChatHistoryProviderTests
     }
 
     /// <summary>
+    /// 验证历史中遗留的 Skill 工具审批被移除，同时保留同一消息中的普通内容。
+    /// </summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task InvokingAsync_WithSkillToolApprovals_RemovesApprovalsAndPreservesContentAsync()
+    {
+        // Arrange
+        Guid sessionId = Guid.CreateVersion7();
+        ToolApprovalRequestContent loadApproval = new(
+            "approval-1",
+            new FunctionCallContent("call-1", AgentSkillsProvider.LoadSkillToolName));
+        ToolApprovalRequestContent readApproval = new(
+            "approval-2",
+            new FunctionCallContent("call-2", AgentSkillsProvider.ReadSkillResourceToolName));
+        ToolApprovalRequestContent scriptApproval = new(
+            "approval-3",
+            new FunctionCallContent("call-3", AgentSkillsProvider.RunSkillScriptToolName));
+        ChatMessage historicalMessage = new(
+            ChatRole.Assistant,
+            [new TextContent("Preparing skill guidance."), loadApproval, readApproval, scriptApproval]);
+        FakeMessageRepository repository = new([historicalMessage]);
+        FakeConversationRepository conversations = new(CreateConversation(sessionId));
+        InkwellChatHistoryProvider provider = new(
+            new RecordingPersistenceProvider(repository, conversations),
+            TimeProvider.System);
+        TestAgent agent = new();
+        AgentSession session = await agent.CreateSessionAsync();
+        InkwellChatHistoryProvider.AttachSession(
+            session,
+            sessionId,
+            conversations.Conversation.OwnerUserId,
+            conversations.Conversation.AgentId,
+            Guid.CreateVersion7().ToString("D"));
+        ChatMessage requestMessage = new(ChatRole.User, "continue");
+        ChatHistoryProvider.InvokingContext context = new(agent, session, [requestMessage]);
+
+        // Act
+        List<ChatMessage> messages = [.. await provider.InvokingAsync(context)];
+
+        // Assert
+        Assert.HasCount(2, messages);
+        Assert.AreEqual("Preparing skill guidance.", messages[0].Text);
+        Assert.IsFalse(messages[0].Contents.Any(content => content is ToolApprovalRequestContent));
+        Assert.AreSame(requestMessage, messages[1]);
+    }
+
+    /// <summary>
     /// 验证成功调用把请求和响应作为一个可串行化事务批次保存。
     /// </summary>
     /// <returns>表示异步测试操作的任务。</returns>

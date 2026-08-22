@@ -1,42 +1,37 @@
 import {
-    AppstoreAddOutlined,
     ArrowLeftOutlined,
     ClearOutlined,
     CloseOutlined,
     CommentOutlined,
     DeleteOutlined,
-    FileSearchOutlined,
+    EyeOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
-    PaperClipOutlined,
     PlusOutlined,
     RobotOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
-    Bubble,
     Conversations,
     Prompts,
-    Sender,
     Welcome,
     type ConversationItemType,
 } from "@ant-design/x";
-import { XMarkdown } from "@ant-design/x-markdown";
 import {
     Avatar,
     Button,
     Empty,
-    Flex,
     message,
     Modal,
-    Space,
     Tag,
     Tooltip,
     Typography,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
+    ActiveAgentChatRun,
     AgentConversationListItem,
     AgentListItem,
     ChatMessage,
@@ -44,6 +39,9 @@ import type {
     ChatRunSnapshot,
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
+import { ChatComposer } from "./chat-composer";
+import { ChatMessageList } from "./chat-message-list";
+import { ChatQuickPrompts } from "./chat-quick-prompts";
 
 interface ChatPanelProps {
     agent: AgentListItem | null;
@@ -56,12 +54,6 @@ const TrialPrompts = [
     "整理一份竞品研究框架",
     "分析这份资料的关键结论",
     "为调研报告设计目录",
-];
-
-const ChatPrompts = [
-    { key: "research", description: "整理一份竞品研究框架" },
-    { key: "outline", description: "为调研报告设计目录" },
-    { key: "rewrite", description: "帮我优化一段产品介绍文案" },
 ];
 
 type LocalConversation = ConversationItemType & {
@@ -77,6 +69,46 @@ const toConversationItem = (
     label: conversation.title ?? "新会话",
     group: "历史会话",
 });
+
+const restoreActiveRunMessages = (
+    persistedMessages: ChatMessage[],
+    run: ActiveAgentChatRun,
+): ChatMessage[] => {
+    const matchingUserIndex = persistedMessages.findLastIndex(
+        (message) =>
+            message.role === "user" &&
+            message.content === run.userMessage.content,
+    );
+    const messagesBeforeAssistant =
+        matchingUserIndex >= 0
+            ? persistedMessages.slice(0, matchingUserIndex + 1)
+            : [...persistedMessages, run.userMessage];
+    const persistedActivities =
+        matchingUserIndex >= 0
+            ? persistedMessages
+                  .slice(matchingUserIndex + 1)
+                  .flatMap((message) => message.skillActivities ?? [])
+            : [];
+    const activities = [
+        ...persistedActivities,
+        ...run.snapshot.skillActivities.filter(
+            (activity) =>
+                !persistedActivities.some(
+                    (persisted) => persisted.callId === activity.callId,
+                ),
+        ),
+    ];
+
+    return [
+        ...messagesBeforeAssistant,
+        {
+            role: "assistant",
+            content: run.snapshot.content,
+            ...(activities.length > 0 ? { skillActivities: activities } : {}),
+            runStatus: run.snapshot.status,
+        },
+    ];
+};
 
 export function ChatPanel({
     agent,
@@ -96,6 +128,7 @@ export function ChatPanel({
     const [activeConversationKey, setActiveConversationKey] = useState<
         string | null
     >(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
     const [messageApi, contextHolder] = message.useMessage();
     const authStatus = useAuthStore((state) => state.status);
     const agentDetailsQuery = useQuery({
@@ -108,6 +141,11 @@ export function ChatPanel({
         queryFn: () => desktopApi.listAgentVersions(agent!.id),
         enabled: variant === "full" && Boolean(agent),
     });
+    const toolsQuery = useQuery({
+        queryKey: ["tools", "agent-details"],
+        queryFn: desktopApi.listTools,
+        enabled: variant === "full" && Boolean(agent),
+    });
     const activeConversation = activeConversationKey
         ? conversations.find((item) => item.key === activeConversationKey)
         : undefined;
@@ -116,31 +154,62 @@ export function ChatPanel({
               (version) => version.id === activeConversation.agentVersionId,
           )?.versionNumber
         : undefined;
+    const detailVersion = activeConversation
+        ? (agentVersionsQuery.data?.find(
+              (version) => version.id === activeConversation.agentVersionId,
+          ) ?? null)
+        : (agentVersionsQuery.data?.find(
+              (version) =>
+                  version.id ===
+                  agentDetailsQuery.data?.currentPublishedVersionId,
+          ) ?? null);
 
     useEffect(() => {
         if (variant !== "full" || !agent) return;
 
         let disposed = false;
-        void desktopApi
-            .listAgentConversations(agent.id)
-            .then(async (items) => {
+        void Promise.all([
+            desktopApi.listAgentConversations(agent.id),
+            desktopApi.getActiveAgentChatRun(agent.id),
+        ])
+            .then(async ([items, activeRun]) => {
                 if (disposed) return;
                 setConversations(items.map(toConversationItem));
-                const first = items[0];
-                if (!first) {
+                const selectedConversation =
+                    (activeRun?.conversationId
+                        ? items.find(
+                              (item) => item.id === activeRun.conversationId,
+                          )
+                        : undefined) ?? items[0];
+                if (!selectedConversation) {
                     setActiveConversationKey(null);
                     setMessages([]);
+                    setActiveRequestId(null);
+                    setLatestRequestId(null);
                     return;
                 }
 
                 const persistedMessages =
                     await desktopApi.getAgentConversationMessages(
                         agent.id,
-                        first.id,
+                        selectedConversation.id,
                     );
                 if (disposed) return;
-                setActiveConversationKey(first.id);
-                setMessages(persistedMessages);
+                setActiveConversationKey(selectedConversation.id);
+                if (
+                    activeRun?.conversationId === selectedConversation.id &&
+                    activeRun.snapshot.status === "running"
+                ) {
+                    setMessages(
+                        restoreActiveRunMessages(persistedMessages, activeRun),
+                    );
+                    setActiveRequestId(activeRun.snapshot.requestId);
+                    setLatestRequestId(activeRun.snapshot.requestId);
+                } else {
+                    setMessages(persistedMessages);
+                    setActiveRequestId(null);
+                    setLatestRequestId(null);
+                }
             })
             .catch((reason: unknown) => {
                 if (!disposed) {
@@ -157,57 +226,87 @@ export function ChatPanel({
         };
     }, [agent, messageApi, variant]);
 
-    const applySnapshot = useCallback((
-        snapshot: ChatRunSnapshot,
-        originalInput?: string,
-    ): void => {
-        setMessages((current) =>
-            current.map((item, index) =>
-                index === current.length - 1 && item.role === "assistant"
-                    ? { ...item, content: snapshot.content }
-                    : item,
-            ),
-        );
-        if (snapshot.status === "failed" && snapshot.error) {
-            setChatError((current) => ({
-                ...snapshot.error!,
-                input: originalInput ?? current?.input ?? "",
-            }));
-        } else if (snapshot.status !== "running") {
-            setChatError(null);
-        }
-        if (snapshot.status !== "running") {
-            setActiveRequestId((current) =>
-                current === snapshot.requestId ? null : current,
+    const applySnapshot = useCallback(
+        (snapshot: ChatRunSnapshot, originalInput?: string): void => {
+            setMessages((current) =>
+                current.map((item, index) =>
+                    index === current.length - 1 && item.role === "assistant"
+                        ? {
+                              ...item,
+                              content: snapshot.content,
+                              skillActivities: snapshot.skillActivities,
+                              runStatus: snapshot.status,
+                          }
+                        : item,
+                ),
             );
-        }
-    }, []);
-
-    const refreshPersistedConversation = useCallback(async (
-        conversationKey: string,
-    ): Promise<void> => {
-        if (!agent || variant !== "full") return;
-        try {
-            const [persistedMessages, persistedConversations] =
-                await Promise.all([
-                    desktopApi.getAgentConversationMessages(
-                        agent.id,
-                        conversationKey,
-                    ),
-                    desktopApi.listAgentConversations(agent.id),
-                ]);
-            if (persistedMessages.at(-1)?.role === "assistant") {
-                setMessages(persistedMessages);
+            if (snapshot.status === "failed" && snapshot.error) {
+                setChatError((current) => ({
+                    ...snapshot.error!,
+                    input: originalInput ?? current?.input ?? "",
+                }));
+            } else if (snapshot.status !== "running") {
+                setChatError(null);
             }
-            setConversations(persistedConversations.map(toConversationItem));
-        } catch (reason) {
-            void messageApi.error(
-                reason instanceof Error
-                    ? reason.message
-                    : "会话历史刷新失败。",
-            );
-        }
-    }, [agent, messageApi, variant]);
+            if (snapshot.status !== "running") {
+                setActiveRequestId((current) =>
+                    current === snapshot.requestId ? null : current,
+                );
+            }
+        },
+        [],
+    );
+
+    const refreshPersistedConversation = useCallback(
+        async (conversationKey: string): Promise<void> => {
+            if (!agent || variant !== "full") return;
+            try {
+                const [persistedMessages, persistedConversations] =
+                    await Promise.all([
+                        desktopApi.getAgentConversationMessages(
+                            agent.id,
+                            conversationKey,
+                        ),
+                        desktopApi.listAgentConversations(agent.id),
+                    ]);
+                if (persistedMessages.at(-1)?.role === "assistant") {
+                    setMessages((current) => {
+                        const skillActivities =
+                            current.at(-1)?.skillActivities ?? [];
+                        if (
+                            skillActivities.length === 0 ||
+                            persistedMessages.some(
+                                (message) => message.skillActivities?.length,
+                            )
+                        ) {
+                            return persistedMessages;
+                        }
+
+                        const targetIndex = persistedMessages.findLastIndex(
+                            (message) =>
+                                message.role === "assistant" &&
+                                message.content.trim().length > 0,
+                        );
+                        return persistedMessages.map((message, index) =>
+                            index === targetIndex
+                                ? { ...message, skillActivities }
+                                : message,
+                        );
+                    });
+                }
+                setConversations(
+                    persistedConversations.map(toConversationItem),
+                );
+            } catch (reason) {
+                void messageApi.error(
+                    reason instanceof Error
+                        ? reason.message
+                        : "会话历史刷新失败。",
+                );
+            }
+        },
+        [agent, messageApi, variant],
+    );
 
     useEffect(
         () =>
@@ -224,10 +323,7 @@ export function ChatPanel({
         void desktopApi.getChatRun(latestRequestId).then((snapshot) => {
             if (!snapshot) return;
             applySnapshot(snapshot);
-            if (
-                snapshot.status !== "running" &&
-                activeConversationKey
-            ) {
+            if (snapshot.status !== "running" && activeConversationKey) {
                 void refreshPersistedConversation(activeConversationKey);
             }
         });
@@ -257,8 +353,9 @@ export function ChatPanel({
         setLatestRequestId(requestId);
         try {
             if (variant === "full" && !conversationKey) {
-                const conversation =
-                    await desktopApi.createAgentConversation(agent.id);
+                const conversation = await desktopApi.createAgentConversation(
+                    agent.id,
+                );
                 conversationKey = conversation.id;
                 setActiveConversationKey(conversation.id);
                 setConversations((current) => [
@@ -271,8 +368,7 @@ export function ChatPanel({
                 requestId,
                 agentId: agent.id,
                 runMode,
-                conversationId:
-                    variant === "full" ? conversationKey : null,
+                conversationId: variant === "full" ? conversationKey : null,
                 messages: variant === "full" ? [userMessage] : history,
             });
         } catch (reason) {
@@ -310,6 +406,14 @@ export function ChatPanel({
 
     const retry = (): void => {
         if (chatError?.input) void send(chatError.input);
+    };
+
+    const regenerate = (assistantMessageIndex: number): void => {
+        if (activeRequestId) return;
+        const sourceMessage = messages
+            .slice(0, assistantMessageIndex)
+            .findLast((chatMessage) => chatMessage.role === "user");
+        if (sourceMessage?.content) void send(sourceMessage.content);
     };
 
     const startNewConversation = (): void => {
@@ -361,7 +465,9 @@ export function ChatPanel({
         if (next) await switchConversation(String(next.key));
     };
 
-    const reloadConversation = async (conversationKey: string): Promise<void> => {
+    const reloadConversation = async (
+        conversationKey: string,
+    ): Promise<void> => {
         if (!agent) return;
         const [persistedMessages, persistedConversations] = await Promise.all([
             desktopApi.getAgentConversationMessages(agent.id, conversationKey),
@@ -411,110 +517,6 @@ export function ChatPanel({
         });
     };
 
-    const confirmDeleteMessage = (messageId: string): void => {
-        if (!agent || !activeConversationKey || activeRequestId) return;
-        const agentId = agent.id;
-        const conversationKey = activeConversationKey;
-        Modal.confirm({
-            title: "删除这条消息？",
-            content: "消息将被永久删除，操作不可恢复。",
-            okText: "确认删除",
-            okButtonProps: { danger: true },
-            cancelText: "取消",
-            onOk: async () => {
-                try {
-                    await desktopApi.deleteAgentConversationMessage(
-                        agentId,
-                        conversationKey,
-                        messageId,
-                    );
-                    await reloadConversation(conversationKey);
-                } catch (reason) {
-                    void messageApi.error(
-                        reason instanceof Error
-                            ? reason.message
-                            : "删除消息失败。",
-                    );
-                    throw reason;
-                }
-            },
-        });
-    };
-
-    const renderMessages = () => (
-        <Bubble.List
-            className="chat-bubble-list"
-            items={messages.map((item, index) => ({
-                key: `${item.role}-${index}`,
-                role: item.role,
-                content: item.content,
-                loading:
-                    item.role === "assistant" &&
-                    !item.content &&
-                    Boolean(activeRequestId),
-                contentRender:
-                    item.role === "assistant"
-                        ? (content) => (
-                              <Space direction="vertical" size={8}>
-                                  {String(content) && (
-                                      <XMarkdown
-                                          content={String(content)}
-                                          streaming={{
-                                              hasNextChunk:
-                                                  Boolean(activeRequestId) &&
-                                                  index === messages.length - 1,
-                                          }}
-                                      />
-                                  )}
-                                  {chatError &&
-                                      index === messages.length - 1 && (
-                                          <Flex vertical gap={4}>
-                                              <Typography.Text type="danger" strong>
-                                                  {chatError.code}
-                                              </Typography.Text>
-                                              <Typography.Text>
-                                                  {chatError.reason}
-                                              </Typography.Text>
-                                              <Button
-                                                  className="chat-retry-button"
-                                                  size="small"
-                                                  aria-label="重试失败消息"
-                                                  onClick={retry}
-                                              >
-                                                  重试
-                                              </Button>
-                                          </Flex>
-                                      )}
-                              </Space>
-                          )
-                        : undefined,
-                footer: item.id ? (
-                    <Tooltip title="删除消息">
-                        <Button
-                            type="text"
-                            size="small"
-                            danger
-                            aria-label={`删除第 ${index + 1} 条消息`}
-                            icon={<DeleteOutlined />}
-                            disabled={Boolean(activeRequestId)}
-                            onClick={() => confirmDeleteMessage(item.id!)}
-                        />
-                    </Tooltip>
-                ) : undefined,
-            }))}
-            role={{
-                user: {
-                    placement: "end",
-                    variant: "filled",
-                },
-                assistant: {
-                    placement: "start",
-                    variant: "outlined",
-                },
-            }}
-        />
-    );
-
     if (!agent)
         return (
             <section className="chat-panel chat-empty">
@@ -550,24 +552,48 @@ export function ChatPanel({
                     <Tag>
                         {activeConversation
                             ? activeConversationVersionNumber === undefined
-                                ? "会话版本加载中"
-                                : `会话版本 v${activeConversationVersionNumber}`
-                            : `新会话将使用 v${agent.latestPublishedVersionNumber}`}
+                                ? "版本加载中"
+                                : `版本：v${activeConversationVersionNumber}`
+                            : `版本：v${agent.latestPublishedVersionNumber}`}
                     </Tag>
-                    <Tooltip title="清空当前会话">
-                        <Button
-                            type="text"
-                            aria-label="清空当前会话"
-                            icon={<ClearOutlined />}
-                            disabled={
-                                !activeConversationKey ||
-                                messages.length === 0 ||
-                                Boolean(activeRequestId)
-                            }
-                            onClick={confirmClearConversation}
-                        />
-                    </Tooltip>
+                    <div className="chat-page-header-actions">
+                        <Tooltip title="查看 Agent 详情">
+                            <Button
+                                type="text"
+                                aria-label="查看 Agent 详情"
+                                icon={<EyeOutlined />}
+                                loading={
+                                    agentDetailsQuery.isLoading ||
+                                    agentVersionsQuery.isLoading ||
+                                    toolsQuery.isLoading
+                                }
+                                disabled={!detailVersion}
+                                onClick={() => setDetailsOpen(true)}
+                            />
+                        </Tooltip>
+                        <Tooltip title="清空当前会话">
+                            <Button
+                                type="text"
+                                aria-label="清空当前会话"
+                                icon={<ClearOutlined />}
+                                disabled={
+                                    !activeConversationKey ||
+                                    messages.length === 0 ||
+                                    Boolean(activeRequestId)
+                                }
+                                onClick={confirmClearConversation}
+                            />
+                        </Tooltip>
+                    </div>
                 </header>
+
+                <AgentDetailsDrawer
+                    open={detailsOpen}
+                    version={detailVersion}
+                    tools={toolsQuery.data ?? []}
+                    statusLabel={null}
+                    onClose={() => setDetailsOpen(false)}
+                />
 
                 <div className="chat-page-body">
                     <aside
@@ -654,55 +680,47 @@ export function ChatPanel({
 
                     <div className="chat-main">
                         {messages.length > 0 ? (
-                            <div className="chat-full-messages">
-                                {renderMessages()}
-                            </div>
+                            <>
+                                <div className="chat-full-messages">
+                                    <ChatMessageList
+                                        messages={messages}
+                                        activeRequestId={activeRequestId}
+                                        error={chatError}
+                                        onRegenerate={regenerate}
+                                        onRetry={retry}
+                                    />
+                                </div>
+                                <ChatComposer
+                                    variant="full"
+                                    value={draft}
+                                    loading={Boolean(activeRequestId)}
+                                    showPrompts
+                                    onChange={setDraft}
+                                    onSubmit={(value) => void send(value)}
+                                    onCancel={stop}
+                                />
+                            </>
                         ) : (
                             <div className="chat-full-empty">
                                 <Typography.Title level={3}>
                                     {agent.name}
                                 </Typography.Title>
-                                <Prompts
-                                    items={ChatPrompts}
-                                    wrap
-                                    onItemClick={(info) =>
-                                        void send(String(info.data.description))
-                                    }
+                                <ChatQuickPrompts
+                                    variant="full"
+                                    compact={false}
+                                    onSelect={(prompt) => void send(prompt)}
+                                />
+                                <ChatComposer
+                                    variant="full"
+                                    value={draft}
+                                    loading={Boolean(activeRequestId)}
+                                    showPrompts={false}
+                                    onChange={setDraft}
+                                    onSubmit={(value) => void send(value)}
+                                    onCancel={stop}
                                 />
                             </div>
                         )}
-                        <div className="chat-full-composer">
-                            <Sender
-                                className="chat-sender"
-                                suffix={false}
-                                autoSize={{
-                                    minRows: messages.length === 0 ? 2 : 1,
-                                    maxRows: 6,
-                                }}
-                                placeholder="输入消息，Enter 发送，Shift + Enter 换行"
-                                value={draft}
-                                onChange={setDraft}
-                                onSubmit={(value) => void send(value)}
-                                onCancel={stop}
-                                loading={Boolean(activeRequestId)}
-                                allowSpeech
-                                footer={(actionNode) => (
-                                    <Flex
-                                        justify="space-between"
-                                        align="center"
-                                    >
-                                        <Tooltip title="添加附件">
-                                            <Button
-                                                type="text"
-                                                aria-label="添加附件"
-                                                icon={<PaperClipOutlined />}
-                                            />
-                                        </Tooltip>
-                                        {actionNode}
-                                    </Flex>
-                                )}
-                            />
-                        </div>
                     </div>
                 </div>
             </section>
@@ -785,58 +803,29 @@ export function ChatPanel({
                         </div>
                     )
                 ) : (
-                    renderMessages()
+                    <ChatMessageList
+                        messages={messages}
+                        activeRequestId={activeRequestId}
+                        error={chatError}
+                        onRegenerate={regenerate}
+                        onRetry={retry}
+                    />
                 )}
             </div>
-            <div className="composer">
-                {variant === "trial" && (
-                    <div className="chat-trial-shortcuts">
-                        <Button
-                            size="small"
-                            icon={<FileSearchOutlined />}
-                            onClick={() => void send("整理一份竞品研究框架")}
-                        >
-                            研究框架
-                        </Button>
-                        <Button
-                            size="small"
-                            icon={<AppstoreAddOutlined />}
-                            onClick={() => void send("为调研报告设计目录")}
-                        >
-                            报告目录
-                        </Button>
-                    </div>
-                )}
-                <Sender
-                    className="chat-sender"
-                    suffix={false}
-                    autoSize={{ minRows: 2, maxRows: 5 }}
-                    placeholder="输入消息，Enter 发送，Shift + Enter 换行"
-                    value={draft}
-                    onChange={setDraft}
-                    onSubmit={(value) => void send(value)}
-                    onCancel={stop}
-                    loading={Boolean(activeRequestId)}
-                    allowSpeech
-                    footer={(actionNode) => (
-                        <Flex justify="space-between" align="center">
-                            <Space size={8}>
-                                <Button
-                                    type="text"
-                                    aria-label="添加附件"
-                                    icon={<PaperClipOutlined />}
-                                />
-                                <Typography.Text type="secondary">
-                                    {runMode === "draft"
-                                        ? "当前使用已保存草稿"
-                                        : `当前使用已发布版本 v${agent.latestPublishedVersionNumber}`}
-                                </Typography.Text>
-                            </Space>
-                            {actionNode}
-                        </Flex>
-                    )}
-                />
-            </div>
+            <ChatComposer
+                variant="trial"
+                value={draft}
+                loading={Boolean(activeRequestId)}
+                showPrompts
+                versionLabel={
+                    runMode === "draft"
+                        ? "当前使用已保存草稿"
+                        : `当前使用已发布版本 v${agent.latestPublishedVersionNumber}`
+                }
+                onChange={setDraft}
+                onSubmit={(value) => void send(value)}
+                onCancel={stop}
+            />
         </section>
     );
 }

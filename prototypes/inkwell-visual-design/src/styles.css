@@ -30,7 +30,8 @@
 }
 
 .inkwell-agent-avatar-editor:hover .inkwell-agent-avatar-editor-overlay,
-.inkwell-agent-avatar-editor:focus-visible .inkwell-agent-avatar-editor-overlay {
+.inkwell-agent-avatar-editor:focus-visible
+    .inkwell-agent-avatar-editor-overlay {
     opacity: 1;
 }
 
@@ -198,6 +199,73 @@ body,
     justify-content: space-between;
     gap: 16px;
     padding-top: 16px;
+}
+
+.inkwell-agent-chat-details-button {
+    margin-left: auto;
+}
+
+.inkwell-agent-details-identity {
+    display: flex;
+    padding: 20px 24px;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.inkwell-agent-details-identity-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.inkwell-agent-details-content {
+    padding: 4px 24px 28px;
+}
+
+.inkwell-agent-details-section {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.inkwell-agent-details-section:last-child {
+    border-bottom: 0;
+}
+
+.inkwell-agent-details-section-title {
+    margin-bottom: 14px;
+}
+
+.inkwell-agent-details-section-title .anticon {
+    color: var(--ant-color-primary);
+}
+
+.inkwell-agent-details-instructions {
+    position: relative;
+    padding: 14px 16px;
+    overflow: hidden;
+    border-radius: 6px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    transition: max-height 180ms ease;
+}
+
+.inkwell-agent-details-instructions.collapsed {
+    max-height: 128px;
+}
+
+.inkwell-agent-details-instructions.expanded {
+    max-height: min(52vh, 520px);
+    overflow: auto;
+}
+
+.inkwell-agent-details-instructions-count {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.inkwell-agent-details-instructions-toggle.ant-btn {
+    height: 28px;
+    margin-top: 6px;
+    padding-inline: 0;
 }
 
 .inkwell-skill-editor textarea {

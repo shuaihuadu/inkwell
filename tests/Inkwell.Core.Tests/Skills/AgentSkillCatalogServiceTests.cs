@@ -41,6 +41,33 @@ public sealed class AgentSkillCatalogServiceTests
     }
 
     /// <summary>
+    /// 验证上传的 Skill 名称不符合 Agent Skills 规范时立即拒绝，而不是推迟到 Agent 构建阶段。
+    /// </summary>
+    [TestMethod]
+    public async Task UploadSkillAsync_WithInvalidSkillName_ThrowsArgumentExceptionAsync()
+    {
+        // Arrange
+        AgentSkillCatalogService service = CreateService(new InMemoryAgentSkillRepository());
+        AgentSkillUploadRequest request = new()
+        {
+            SkillMdContent = """
+                ---
+                name: 代码评审
+                description: Reviews code changes.
+                ---
+                # Code review
+                """,
+        };
+
+        // Act
+        Task ActAsync() => service.UploadSkillAsync(request, Guid.CreateVersion7());
+
+        // Assert
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(ActAsync);
+        StringAssert.Contains(exception.Message, "lowercase letters, numbers, and hyphens");
+    }
+
+    /// <summary>
     /// 验证 Owner 更新可编辑字段时保留只读资源。
     /// </summary>
     [TestMethod]
@@ -72,6 +99,33 @@ public sealed class AgentSkillCatalogServiceTests
         Assert.AreEqual("# Updated", result.Content);
         Assert.HasCount(1, result.ReferenceFileUris);
         Assert.AreEqual(referenceUri, result.ReferenceFileUris[0]);
+    }
+
+    /// <summary>
+    /// 验证编辑 Skill 时同样拒绝不符合 Agent Skills 规范的名称。
+    /// </summary>
+    [TestMethod]
+    public async Task UpdateSkillAsync_WithInvalidSkillName_ThrowsArgumentExceptionAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        AgentSkillDefinition existing = CreateSkill(ownerUserId);
+        AgentSkillCatalogService service = CreateService(new InMemoryAgentSkillRepository(existing));
+        AgentSkillUpdateRequest request = new(
+            "Invalid_Name",
+            existing.Description,
+            existing.Content);
+
+        // Act
+        Task ActAsync() => service.UpdateSkillAsync(
+            existing.Id,
+            request,
+            ownerUserId,
+            actorIsAdmin: false);
+
+        // Assert
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(ActAsync);
+        StringAssert.Contains(exception.Message, "lowercase letters, numbers, and hyphens");
     }
 
     /// <summary>

@@ -133,10 +133,17 @@ internal sealed class AgentFactory(
 
         if (skillDefinitions.Length > 0)
         {
-            List<AgentSkill> skills = skillDefinitions
-                .Select(definition => (AgentSkill)new AgentInlineSkill(definition.Name, definition.Description, definition.Content))
-                .ToList();
-            contextProviders.Add(new AgentSkillsProvider(skills));
+            List<AgentSkill> skills = [.. skillDefinitions.Select(definition => (AgentSkill)new AgentInlineSkill(definition.Name, definition.Description, definition.Content))];
+            AgentSkillsProvider skillsProvider = new AgentSkillsProviderBuilder()
+                .UseSkills(skills)
+                .UseOptions(static options =>
+                {
+                    options.DisableLoadSkillApproval = true;
+                    options.DisableReadSkillResourceApproval = true;
+                    options.DisableRunSkillScriptApproval = true;
+                })
+                .Build();
+            contextProviders.Add(skillsProvider);
         }
 
         return contextProviders;

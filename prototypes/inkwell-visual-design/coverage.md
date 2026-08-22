@@ -2,14 +2,17 @@
 
 ## UI-004 / UI-005 · AG-UI 运行过程统一（2026-08-22）
 
-| UI-NNN | ui-spec 节标题               | 原型文件 / 路由                                                            | 对应状态                                                  | 截图                                                                                                 |
-| ------ | ---------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · `/shell` → 编辑 Agent → 试运行           | Harness 完成态：思考、工具调用、Todos、回复、Token 用量   | `screenshots/11-agent-trial-agui-run.png`                                                            |
-| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · `/shell` → 已发布 Agent → Harness 历史会话 | Harness 完成态：思考、工具调用、Todos、回复、Token 用量   | `screenshots/10-agent-chat-agui-run.png`                                                             |
-| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · 试运行 → 工具调用                        | 工具调用中：当前工具、参数、加载状态                      | `screenshots/12-agent-trial-tool-calling.png`                                                        |
-| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · 试运行 → 工具调用                        | 工具调用完成：成功结果 + 失败原因 + 继续回复              | `screenshots/13-agent-trial-tool-complete.png`、`screenshots/15-agent-trial-tool-failure-detail.png` |
-| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · 输入“展示工具调用示例”                     | 工具调用完成：成功结果 + 失败原因 + 继续回复 + Token 用量 | `screenshots/14-agent-chat-tool-complete.png`                                                        |
-| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · 暗色模式                                   | 工具参数、结果、状态与常驻快捷指令暗色对比度              | `screenshots/16-agent-chat-tool-dark.png`                                                            |
+| UI-NNN | ui-spec 节标题               | 原型文件 / 路由                                                            | 对应状态                                                  | 截图                                                                                                         |
+| ------ | ---------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · `/shell` → 编辑 Agent → 试运行           | Harness 完成态：思考、工具调用、Todos、回复、Token 用量   | `screenshots/11-agent-trial-agui-run.png`                                                                    |
+| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · `/shell` → 已发布 Agent → Harness 历史会话 | Harness 完成态：思考、工具调用、Todos、回复、Token 用量   | `screenshots/10-agent-chat-agui-run.png`                                                                     |
+| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · 试运行 → 工具调用                        | 工具调用中：当前工具、参数、加载状态                      | `screenshots/12-agent-trial-tool-calling.png`                                                                |
+| UI-004 | Agent 配置 / 详情页 · 试运行 | `src/pages/AgentDesignPage.tsx` · 试运行 → 工具调用                        | 工具调用完成：成功结果 + 失败原因 + 继续回复              | `screenshots/13-agent-trial-tool-complete.png`、`screenshots/15-agent-trial-tool-failure-detail.png`         |
+| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · 输入“展示工具调用示例”                     | 工具调用完成：成功结果 + 失败原因 + 继续回复 + Token 用量 | `screenshots/14-agent-chat-tool-complete.png`                                                                |
+| UI-005 | Agent 对话页                 | `src/pages/AgentChatPage.tsx` · 暗色模式                                   | 工具参数、结果、状态与常驻快捷指令暗色对比度              | `screenshots/16-agent-chat-tool-dark.png`                                                                    |
+| UI-005 | Agent 对话页 · Agent 详情    | `src/pages/AgentChatPage.tsx` · 顶栏查看按钮                               | 当前会话版本的完整只读配置                                | `screenshots/17-agent-chat-readonly-details.png`                                                             |
+| UI-005 | Agent 对话页 · Instructions  | `src/components/AgentDetailsDrawer.tsx` · Agent 详情                       | 超长内容折叠 / 展开、字符数与完整复制                     | `screenshots/17-agent-chat-readonly-details.png`、`screenshots/19-agent-chat-long-instructions-expanded.png` |
+| UI-008 | Agent 版本 · 版本详情        | `src/pages/AgentDesignPage.tsx` · 版本列表 → 查看                          | 历史版本的完整只读配置与版本操作                          | `screenshots/18-agent-version-readonly-details.png`                                                          |
 
 两处继续共用 `chatBubbleRoles.tsx`、`HarnessThoughtChain.tsx` 与同一套 AG-UI reducer。工具调用区域新增统一的状态汇总：执行中显示当前步骤，失败显示失败数量，完成显示完成数量；只有执行中或失败步骤默认展开，已完成步骤保留可点击详情但默认收起。原始 AG-UI 事件和完整入出参不在聊天流展开，仍归 UI-007 Trace。
 
@@ -18,6 +21,10 @@
 正式聊天窗口按 Ant Design X `Prompts` 的用途，在空状态展示完整推荐问题，并在已有消息时于 `Sender` 上方保留同一组紧凑、可换行的快捷指令；点击后直接走统一的 `handleUserSubmit`。当前只有四个固定且与 Agent 能力直接相关的动作，不引入额外命令层级。若后续快捷指令扩展为动态 Tool / Skill 目录，再按 Sender 官方“输入 `@` 唤起快捷指令”模式升级为可搜索命令面板。
 
 暗色模式下，常驻 `Prompts` 使用 `colorFillSecondary`、`colorBorder` 与 `colorText` 形成稳定层级；工具参数使用 `colorFillSecondary` + `colorBorderSecondary` 的块级等宽文本容器。两者均由当前主题 Token 驱动，不写死浅色或暗色值。
+
+Agent 对话页顶栏新增“查看 Agent 详情”图标按钮，点击后展示当前会话绑定版本的只读详情。聊天顶栏与详情头部都用单个“版本：vN”标签表达绑定版本，不再拆成含义重复的“会话版本”与版本号。版本历史的“查看”入口复用同一个 `AgentDetailsDrawer`：顶部统一显示 Agent 身份、历史状态和版本，正文按版本概览、Instructions、模型与上下文、工具、Skills 分区；版本页可通过插槽保留比较与回滚，聊天页不显示任何写操作。
+
+Instructions 对超长内容默认展示约 5 行预览，并显示字符数；“展开全文”会扩大阅读区并在必要时允许区内滚动，但最高不超过 Drawer 可用视口的 52%，避免遮蔽后续配置。“复制 Instructions”始终复制完整原文而非当前可见片段，并提供成功或失败反馈。切换版本或重新打开详情时恢复折叠态。
 
 已知缺口：无 `<未实现>` 或 `<缺截图>` 项。
 

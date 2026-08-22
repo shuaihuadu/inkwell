@@ -5,8 +5,6 @@ import {
     Card,
     Checkbox,
     Col,
-    Descriptions,
-    Drawer,
     Flex,
     Form,
     Input,
@@ -28,6 +26,11 @@ import {
     theme as antdTheme,
     Segmented,
 } from "antd";
+import {
+    AgentDetailsDrawer,
+    type AgentDetailsSnapshot,
+    type AgentDetailsVersion,
+} from "../components/AgentDetailsDrawer";
 import {
     SaveOutlined,
     CloudUploadOutlined,
@@ -787,24 +790,8 @@ function SectionSkills({
 // 原型不单独跳转到 UI-008 独立页面（“版本”区段本身即等价于同一 Agent 上下文内的 UI-008，
 // 详见 ui-spec.md §4.4“‘版本’：跳 UI-008 版本视图（同一个 Agent 上下文）”），因此直接在本区段
 // 内列出全部版本，2026-07-15 移除原先的“查看版本历史”跳转按钮。
-interface VersionSnapshot {
-    name: string;
-    description: string;
-    instructions: string;
-    model: string;
-    temperature: number;
-    tools: string[];
-    skills: string[];
-}
-
-interface VersionItem {
-    version: string;
-    status: string;
-    savedAt: string;
-    savedBy: string;
-    summary: string;
-    snapshot: VersionSnapshot;
-}
+type VersionSnapshot = AgentDetailsSnapshot;
+type VersionItem = AgentDetailsVersion;
 
 const MOCK_VERSIONS: VersionItem[] = [
     {
@@ -1020,11 +1007,10 @@ function SectionVersion({ readonly }: { readonly: boolean }) {
                 ]}
             />
 
-            <Drawer
+            <AgentDetailsDrawer
                 open={detailOpen}
                 onClose={() => setDetailOpen(false)}
-                title={`${selectedVersion.version} 版本详情`}
-                size={560}
+                version={selectedVersion}
                 extra={
                     <Space>
                         {versions.findIndex(
@@ -1065,71 +1051,21 @@ function SectionVersion({ readonly }: { readonly: boolean }) {
                         )}
                     </Space>
                 }
-            >
-                <Descriptions
-                    column={1}
-                    size="small"
-                    items={[
-                        {
-                            key: "status",
-                            label: "状态",
-                            children: selectedVersion.status,
-                        },
-                        {
-                            key: "savedAt",
-                            label: "保存时间",
-                            children: selectedVersion.savedAt,
-                        },
-                        {
-                            key: "savedBy",
-                            label: "发布人",
-                            children: selectedVersion.savedBy,
-                        },
-                        {
-                            key: "summary",
-                            label: "变更摘要",
-                            children: selectedVersion.summary,
-                        },
-                    ]}
-                />
-                <Typography.Title level={5} style={{ marginTop: 24 }}>
-                    配置快照
-                </Typography.Title>
-                {VERSION_FIELDS.map((field) => (
-                    <div
-                        key={field.key}
-                        style={{
-                            padding: "10px 0",
-                            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                        }}
-                    >
-                        <Typography.Text
-                            type="secondary"
-                            style={{ display: "block", fontSize: 12 }}
-                        >
-                            {field.label}
-                        </Typography.Text>
-                        <Typography.Text>
-                            {formatVersionValue(
-                                selectedVersion.snapshot[field.key],
-                            )}
-                        </Typography.Text>
-                    </div>
-                ))}
-                {!readonly &&
-                    selectedVersion.version !== versions[0].version && (
+                footer={
+                    !readonly &&
+                    selectedVersion.version !== versions[0].version ? (
                         <Button
                             danger
                             block
                             icon={<RollbackOutlined />}
                             loading={rollingBack}
-                            style={{ marginTop: 24 }}
                             onClick={() => rollbackVersion(selectedVersion)}
                         >
                             回滚到本版
                         </Button>
-                    )}
-            </Drawer>
+                    ) : undefined
+                }
+            />
 
             <Modal
                 open={compareOpen}

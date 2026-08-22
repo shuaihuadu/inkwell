@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace Inkwell;
@@ -32,6 +33,8 @@ internal sealed class InkwellAgentSessionStateStore(
     TimeProvider timeProvider,
     ILogger<InkwellAgentSessionStateStore> logger)
 {
+    private const string PendingApprovalRequestsStateKey = "_pendingApprovalRequests";
+
     private readonly IAgentSessionStateRepository _sessionStates = persistence.GetRepository<IAgentSessionStateRepository>();
 
     /// <summary>
@@ -63,10 +66,38 @@ internal sealed class InkwellAgentSessionStateStore(
         try
         {
             using JsonDocument document = JsonDocument.Parse(state.SessionState);
-
-            return await agent
-                .DeserializeSessionAsync(document.RootElement, cancellationToken: cancellationToken)
+            AgentSession session = await agent
+                .DeserializeSessionAsync(document.RootElement, AgentSessionJsonOptions.Default, cancellationToken)
                 .ConfigureAwait(false);
+
+            if (session.StateBag.TryGetValue<List<ToolApprovalRequestContent>>(
+                PendingApprovalRequestsStateKey,
+                out List<ToolApprovalRequestContent>? pendingApprovals,
+                AgentSessionJsonOptions.Default)
+                && pendingApprovals is not null)
+            {
+                List<ToolApprovalRequestContent> supportedApprovals =
+                [.. pendingApprovals.Where(static approval => approval.ToolCall is not FunctionCallContent
+                {
+                    Name: AgentSkillsProvider.LoadSkillToolName
+                        or AgentSkillsProvider.ReadSkillResourceToolName
+                        or AgentSkillsProvider.RunSkillScriptToolName,
+                })];
+
+                if (supportedApprovals.Count == 0)
+                {
+                    _ = session.StateBag.TryRemoveValue(PendingApprovalRequestsStateKey);
+                }
+                else if (supportedApprovals.Count != pendingApprovals.Count)
+                {
+                    session.StateBag.SetValue(
+                        PendingApprovalRequestsStateKey,
+                        supportedApprovals,
+                        AgentSessionJsonOptions.Default);
+                }
+            }
+
+            return session;
         }
         catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
         {
@@ -95,7 +126,7 @@ internal sealed class InkwellAgentSessionStateStore(
         ArgumentNullException.ThrowIfNull(session);
 
         JsonElement serialized = await agent
-            .SerializeSessionAsync(session, cancellationToken: cancellationToken)
+            .SerializeSessionAsync(session, AgentSessionJsonOptions.Default, cancellationToken)
             .ConfigureAwait(false);
 
         string content = serialized.GetRawText();

@@ -954,6 +954,63 @@ textarea {
 .chat-page-header .ant-tag {
     margin: 0;
 }
+.chat-page-header-actions {
+    display: flex;
+    margin-left: auto;
+    align-items: center;
+    gap: 2px;
+}
+.agent-details-identity {
+    display: flex;
+    padding: 20px 24px;
+    align-items: flex-start;
+    gap: 14px;
+}
+.agent-details-identity-copy {
+    min-width: 0;
+    flex: 1;
+}
+.agent-details-content {
+    padding: 4px 24px 28px;
+}
+.agent-details-section {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--shell-border);
+}
+.agent-details-section:last-child {
+    border-bottom: 0;
+}
+.agent-details-section-title {
+    margin-bottom: 14px;
+}
+.agent-details-section-title .anticon {
+    color: var(--primary);
+}
+.agent-details-instructions {
+    position: relative;
+    padding: 14px 16px;
+    overflow: hidden;
+    border-radius: 6px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    transition: max-height 180ms ease;
+}
+.agent-details-instructions.collapsed {
+    max-height: 128px;
+}
+.agent-details-instructions.expanded {
+    max-height: min(52vh, 520px);
+    overflow: auto;
+}
+.agent-details-instructions-count {
+    font-size: 12px;
+    white-space: nowrap;
+}
+.agent-details-instructions-toggle.ant-btn {
+    height: 28px;
+    margin-top: 6px;
+    padding-inline: 0;
+}
 .chat-page-body {
     display: flex;
     min-width: 0;
@@ -1037,16 +1094,77 @@ textarea {
     max-width: 640px;
     justify-content: center;
 }
-.chat-full-composer {
+.chat-full-empty > .chat-quick-prompts-full {
+    margin-bottom: 20px;
+}
+.chat-composer-full {
     display: flex;
     width: 100%;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    flex-direction: column;
     flex: 0 0 auto;
     padding: 16px 8px 20px;
 }
-.chat-full-composer .chat-sender {
-    width: min(100%, 760px);
+.chat-full-empty .chat-composer-full {
+    padding: 0 8px;
+}
+.chat-quick-prompts {
+    font-family: inherit;
+    letter-spacing: 0;
+}
+.chat-quick-prompts-full {
+    width: 100%;
+    margin-bottom: 10px;
+    padding-inline: 8px;
+}
+.chat-composer-full .chat-sender {
+    width: 100%;
+}
+.skill-activity-chain {
+    width: min(100%, 620px);
+    min-width: 280px;
+    padding-block: 4px;
+}
+.skill-activity-chain .activity-summary {
+    font-size: 12px;
+}
+.skill-activity-chain .ant-thought-chain-item-description,
+.skill-activity-chain .ant-thought-chain-item-content {
+    font-size: 12px;
+}
+.skill-activity-detail {
+    max-width: 560px;
+}
+.skill-activity-parameters {
+    display: block;
+    padding: 6px 8px;
+    border: 1px solid var(--shell-border);
+    border-radius: 4px;
+    background: var(--shell-soft);
+    font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.chat-run-status {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+}
+.chat-message-content > :first-child,
+.chat-message-content .x-markdown > :first-child {
+    margin-top: 0;
+}
+.chat-message-content > :last-child,
+.chat-message-content .x-markdown > :last-child {
+    margin-bottom: 0;
+}
+.chat-message-actions {
+    min-height: 24px;
+}
+.chat-bubble-list .ant-bubble-footer {
+    margin-block-start: 8px;
 }
 .agent-editor-page {
     display: flex;
@@ -1467,6 +1585,7 @@ textarea {
 .chat-panel-trial .message-list {
     min-height: 0;
     padding: 0;
+    overflow: hidden;
 }
 .chat-trial-welcome-icon {
     display: flex;
@@ -1479,18 +1598,14 @@ textarea {
     background: var(--primary-soft);
     font-weight: 700;
 }
-.chat-panel-trial .composer {
+.chat-composer-trial {
     display: block;
     margin: 0;
     padding: 10px 16px 16px;
-    border-width: 1px 0 0;
-    border-radius: 0;
-    box-shadow: none;
+    border-top: 1px solid var(--shell-border);
+    background: var(--shell-panel);
 }
-.chat-trial-shortcuts {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.chat-quick-prompts-trial {
     margin-bottom: 10px;
 }
 .chat-panel-trial .ant-sender-footer .ant-typography {
@@ -1581,23 +1696,6 @@ textarea {
 .typing::after {
     content: "...";
     animation: pulse 1.2s infinite;
-}
-.composer {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: end;
-    gap: 12px;
-    margin: 0 clamp(20px, 5vw, 70px) 24px;
-    padding: 10px 10px 10px 14px;
-    border: 1px solid var(--shell-border);
-    border-radius: 8px;
-    background: var(--shell-panel);
-    box-shadow: 0 8px 30px var(--shell-shadow);
-}
-.composer textarea {
-    border: 0 !important;
-    box-shadow: none !important;
-    resize: none;
 }
 .chat-sender .ant-sender-input:focus,
 .chat-sender .ant-sender-input:focus-visible {

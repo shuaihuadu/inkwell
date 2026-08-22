@@ -25,8 +25,6 @@ import {
     Button,
     Card,
     Checkbox,
-    Descriptions,
-    Drawer,
     Empty,
     Flex,
     Form,
@@ -47,6 +45,7 @@ import {
     theme,
 } from "antd";
 import { Fragment, useEffect, useState } from "react";
+import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
     AgentDefinition,
@@ -971,8 +970,7 @@ function VersionHistorySection({
     const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
 
-    if (versions.length === 0)
-        return <Empty description="此 Agent 尚未发布" />;
+    if (versions.length === 0) return <Empty description="此 Agent 尚未发布" />;
 
     const latestVersionNumber =
         agent?.latestPublishedVersionNumber ??
@@ -991,8 +989,7 @@ function VersionHistorySection({
     const confirmRollback = (version: AgentVersion): void => {
         modal.confirm({
             title: `回滚到 v${version.versionNumber}？`,
-            content:
-                "将基于该历史版本生成一个新的发布版本，不会覆盖版本历史。",
+            content: "将基于该历史版本生成一个新的发布版本，不会覆盖版本历史。",
             okText: "确认回滚",
             cancelText: "取消",
             okButtonProps: { danger: true },
@@ -1117,15 +1114,16 @@ function VersionHistorySection({
                 ]}
             />
 
-            <Drawer
+            <AgentDetailsDrawer
                 open={detailTarget !== null}
                 onClose={() => setDetailTarget(null)}
-                title={
-                    detailTarget
-                        ? `v${detailTarget.versionNumber} 版本详情`
-                        : undefined
+                version={detailTarget}
+                tools={tools}
+                statusLabel={
+                    detailTarget && isPublished(detailTarget)
+                        ? "已发布"
+                        : "历史版本"
                 }
-                width={560}
                 extra={
                     detailTarget && (
                         <Space>
@@ -1161,84 +1159,20 @@ function VersionHistorySection({
                         </Space>
                     )
                 }
-            >
-                {detailTarget && (
-                    <>
-                        <Descriptions
-                            column={1}
-                            size="small"
-                            items={[
-                                {
-                                    key: "status",
-                                    label: "状态",
-                                    children: isPublished(detailTarget)
-                                        ? "已发布"
-                                        : "历史版本",
-                                },
-                                {
-                                    key: "createdTime",
-                                    label: "保存时间",
-                                    children: new Date(
-                                        detailTarget.createdTime,
-                                    ).toLocaleString("zh-CN"),
-                                },
-                                {
-                                    key: "savedBy",
-                                    label: "发布人",
-                                    children: savedBy(detailTarget),
-                                },
-                                {
-                                    key: "summary",
-                                    label: "变更摘要",
-                                    children: detailTarget.changeSummary || "-",
-                                },
-                            ]}
-                        />
-                        <Typography.Title
-                            level={5}
-                            style={{ marginTop: 24 }}
+                footer={
+                    detailTarget && !readonly && !isPublished(detailTarget) ? (
+                        <Button
+                            danger
+                            block
+                            icon={<RollbackOutlined />}
+                            loading={rollbackPending}
+                            onClick={() => confirmRollback(detailTarget)}
                         >
-                            配置快照
-                        </Typography.Title>
-                        {versionSnapshotFields(detailTarget.snapshot, tools).map(
-                            (field) => (
-                                <div
-                                    key={field.label}
-                                    style={{
-                                        padding: "10px 0",
-                                        borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                                    }}
-                                >
-                                    <Typography.Text
-                                        type="secondary"
-                                        style={{
-                                            display: "block",
-                                            fontSize: 12,
-                                        }}
-                                    >
-                                        {field.label}
-                                    </Typography.Text>
-                                    <Typography.Text>
-                                        {field.value}
-                                    </Typography.Text>
-                                </div>
-                            ),
-                        )}
-                        {!readonly && !isPublished(detailTarget) && (
-                            <Button
-                                danger
-                                block
-                                icon={<RollbackOutlined />}
-                                loading={rollbackPending}
-                                style={{ marginTop: 24 }}
-                                onClick={() => confirmRollback(detailTarget)}
-                            >
-                                回滚到本版
-                            </Button>
-                        )}
-                    </>
-                )}
-            </Drawer>
+                            回滚到本版
+                        </Button>
+                    ) : undefined
+                }
+            />
 
             <Modal
                 open={compareOpen}

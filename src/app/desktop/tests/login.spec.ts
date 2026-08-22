@@ -244,8 +244,18 @@ test("shows authentication errors and enters the workspace after login", async (
     const chatRunModes: (string | undefined)[] = [];
     const chatConversationIds: (string | undefined)[] = [];
     const conversationId = "0198a96d-19e4-7000-8000-000000000401";
-    const historicalAgentVersionId =
-        "0198a96d-19e4-7000-8000-000000000304";
+    const historicalAgentVersionId = "0198a96d-19e4-7000-8000-000000000304";
+    const historicalAgentInstructions = [
+        "你是研发助手 v2，负责基于当前会话上下文整理可靠的研发结论。",
+        "调用工具前先说明目的，调用后明确区分工具结果与推断。",
+        "输出必须包含结论、依据、风险和后续行动。",
+        "遇到缺失信息时直接列出待确认项，不得虚构实现细节。",
+        "引用代码时给出准确路径，并优先提供可执行的验证步骤。",
+        "对于破坏性操作，必须先说明影响范围并等待确认。",
+        "保持表达简洁，避免重复用户已经明确提供的背景。",
+        "长任务按阶段报告进展，但不要用无信息量的状态更新刷屏。",
+        "最终回答应清楚说明已完成内容、验证结果和剩余风险。",
+    ].join("\n");
     let conversationCreated = true;
     let persistedConversationMessages: Array<Record<string, unknown>> = [];
     const capturedPayloads: {
@@ -310,11 +320,47 @@ test("shows authentication errors and enters the workspace after login", async (
                 JSON.stringify([
                     {
                         id: publishedAgent.currentPublishedVersionId,
+                        agentId: publishedAgent.id,
                         versionNumber: 3,
+                        snapshot: {
+                            name: publishedAgent.name,
+                            avatarUri: publishedAgent.avatarUri,
+                            description: "最新发布的研发助手配置。",
+                            instructions: "使用最新 v3 流程回答研发问题。",
+                            buildOptions: publishedAgent.buildOptions,
+                        },
+                        ownerUserId: publishedAgent.ownerUserId,
+                        ownerUserName: "admin",
+                        changeSummary: "更新到第三版",
+                        createdTime: "2026-07-20T08:00:00Z",
+                        updatedTime: "2026-07-20T08:00:00Z",
+                        publishedTime: "2026-07-20T08:00:00Z",
                     },
                     {
                         id: historicalAgentVersionId,
+                        agentId: publishedAgent.id,
                         versionNumber: 2,
+                        snapshot: {
+                            name: publishedAgent.name,
+                            avatarUri: publishedAgent.avatarUri,
+                            description: "当前会话绑定的研发助手第二版。",
+                            instructions: historicalAgentInstructions,
+                            buildOptions: {
+                                ...publishedAgent.buildOptions,
+                                toolBindings: [
+                                    {
+                                        toolId: "0198a96d-19e4-7000-8000-000000000101",
+                                        parametersJson: null,
+                                    },
+                                ],
+                            },
+                        },
+                        ownerUserId: publishedAgent.ownerUserId,
+                        ownerUserName: "admin",
+                        changeSummary: "稳定研发分析流程",
+                        createdTime: "2026-07-19T08:00:00Z",
+                        updatedTime: "2026-07-19T08:00:00Z",
+                        publishedTime: "2026-07-19T08:00:00Z",
                     },
                 ]),
             );
@@ -439,10 +485,11 @@ test("shows authentication errors and enters the workspace after login", async (
             request.method === "DELETE"
         ) {
             conversationMessageDeletes += 1;
-            persistedConversationMessages = persistedConversationMessages.filter(
-                (item) =>
-                    item.id !== "0198a96d-19e4-7000-8000-000000000403",
-            );
+            persistedConversationMessages =
+                persistedConversationMessages.filter(
+                    (item) =>
+                        item.id !== "0198a96d-19e4-7000-8000-000000000403",
+                );
             response.statusCode = 204;
             response.end();
             return;
@@ -1069,9 +1116,68 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByText("模型：gpt-5.4", { exact: true }),
         ).toBeVisible();
+        await expect(page.getByText("版本：v2", { exact: true })).toBeVisible();
+        await expect(page.getByText("会话版本", { exact: false })).toHaveCount(
+            0,
+        );
+        await page.evaluate(() => {
+            Object.defineProperty(navigator, "clipboard", {
+                configurable: true,
+                value: {
+                    writeText: async (text: string) => {
+                        window.sessionStorage.setItem(
+                            "copied-instructions",
+                            text,
+                        );
+                    },
+                },
+            });
+        });
+        await page
+            .getByRole("button", { name: "查看 Agent 详情" })
+            .dispatchEvent("click");
+        const chatAgentDetails = page.getByRole("dialog", {
+            name: "Agent 详情",
+        });
+        await expect(chatAgentDetails).toBeVisible();
         await expect(
-            page.getByText("会话版本 v2", { exact: true }),
+            chatAgentDetails.getByText("版本：v2", { exact: true }),
         ).toBeVisible();
+        await expect(
+            chatAgentDetails.getByText("当前会话绑定的研发助手第二版。", {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            chatAgentDetails.getByText("最新发布的研发助手配置。", {
+                exact: true,
+            }),
+        ).toHaveCount(0);
+        await expect(
+            chatAgentDetails.getByText("已发布", { exact: true }),
+        ).toHaveCount(0);
+        await expect(
+            chatAgentDetails.getByRole("button", { name: "展开全文" }),
+        ).toBeVisible();
+        await chatAgentDetails
+            .getByRole("button", { name: "展开全文" })
+            .dispatchEvent("click");
+        await expect(
+            chatAgentDetails.getByRole("button", { name: "收起" }),
+        ).toBeVisible();
+        await chatAgentDetails
+            .getByRole("button", { name: "复制 Instructions" })
+            .dispatchEvent("click");
+        await expect(page.getByText("Instructions 已复制")).toBeVisible();
+        expect(
+            await page.evaluate(() =>
+                window.sessionStorage.getItem("copied-instructions"),
+            ),
+        ).toBe(historicalAgentInstructions);
+        await chatAgentDetails
+            .getByRole("button", { name: "关闭 Agent 详情" })
+            .dispatchEvent("click");
+        await expect(chatAgentDetails).toBeHidden();
         await expect.poll(() => conversationPageTwoRequests).toBeGreaterThan(0);
         await expect(
             page
@@ -1107,19 +1213,117 @@ test("shows authentication errors and enters the workspace after login", async (
                 .locator(".chat-history")
                 .getByText("验证正式发布版", { exact: true }),
         ).toBeVisible();
-        await page
-            .getByRole("button", { name: "删除第 2 条消息" })
-            .dispatchEvent("click");
-        const deleteMessageDialog = page.getByRole("dialog", {
-            name: "删除这条消息？",
-        });
-        await deleteMessageDialog
-            .getByRole("button", { name: "确认删除" })
-            .dispatchEvent("click");
-        await expect.poll(() => conversationMessageDeletes).toBe(1);
+        const chatQuickPrompts = page.locator(
+            ".chat-quick-prompts-full .ant-prompts-item",
+        );
+        await expect(chatQuickPrompts).toHaveCount(4);
+        await expect(chatQuickPrompts.first()).toHaveCSS(
+            "font-family",
+            '"PingFang SC", "Microsoft YaHei", sans-serif',
+        );
+        await expect(chatQuickPrompts.first()).toHaveCSS("font-size", "12px");
+        await expect(chatQuickPrompts.first()).toHaveCSS("font-weight", "400");
+        await expect(chatQuickPrompts.first()).toHaveCSS(
+            "background-color",
+            "rgba(0, 0, 0, 0.06)",
+        );
+        await expect(chatQuickPrompts.first()).toHaveCSS(
+            "border",
+            "1px solid rgb(211, 206, 218)",
+        );
+        const publishedBubbles = page.locator(
+            ".chat-full-messages .ant-bubble",
+        );
+        await expect(publishedBubbles).toHaveCount(2);
         await expect(
-            page.locator(".chat-full-messages .x-markdown h1"),
-        ).toHaveCount(0);
+            publishedBubbles.first().locator(".x-markdown"),
+        ).toBeVisible();
+        await expect(
+            publishedBubbles.last().locator(".x-markdown"),
+        ).toBeVisible();
+        const publishedBubbleMetrics = await publishedBubbles.evaluateAll(
+            (elements) =>
+                elements.map((element) => {
+                    const content = element.querySelector(
+                        ".ant-bubble-content",
+                    ) as HTMLElement;
+                    const body = element.querySelector(
+                        ".ant-bubble-body",
+                    ) as HTMLElement;
+                    const bubbleStyles = getComputedStyle(element);
+                    const styles = getComputedStyle(content);
+                    return {
+                        rowWidth: element.getBoundingClientRect().width,
+                        bodyWidth: body.getBoundingClientRect().width,
+                        width: content.getBoundingClientRect().width,
+                        maxWidth: styles.maxWidth,
+                        padding: styles.padding,
+                        paddingInlineEnd: Number.parseFloat(
+                            bubbleStyles.paddingInlineEnd,
+                        ),
+                    };
+                }),
+        );
+        const publishedScrollWidth = await page
+            .locator(".chat-full-messages .ant-bubble-list-scroll-box")
+            .evaluate((element) => element.clientWidth);
+        expect(publishedBubbleMetrics.every(({ width }) => width > 0)).toBe(
+            true,
+        );
+        expect(
+            publishedBubbleMetrics.every(
+                ({ width }) => width <= publishedScrollWidth,
+            ),
+        ).toBe(true);
+        expect(publishedBubbleMetrics.map(({ maxWidth }) => maxWidth)).toEqual([
+            "100%",
+            "100%",
+        ]);
+        const publishedAssistantMetrics = publishedBubbleMetrics[1];
+        expect(publishedAssistantMetrics.paddingInlineEnd).toBeCloseTo(
+            publishedAssistantMetrics.rowWidth * 0.15,
+            0,
+        );
+        expect(publishedAssistantMetrics.bodyWidth).toBeLessThanOrEqual(
+            publishedAssistantMetrics.rowWidth * 0.85 + 1,
+        );
+        expect(
+            new Set(publishedBubbleMetrics.map(({ padding }) => padding)).size,
+        ).toBe(1);
+        const publishedMarkdownStyles = await publishedBubbles
+            .locator(".x-markdown")
+            .evaluateAll((elements) =>
+                elements.map((element) => {
+                    const styles = getComputedStyle(element);
+                    return {
+                        fontFamily: styles.fontFamily,
+                        fontSize: styles.fontSize,
+                        lineHeight: styles.lineHeight,
+                    };
+                }),
+            );
+        expect(publishedMarkdownStyles[0]).toEqual(publishedMarkdownStyles[1]);
+        const publishedActions = publishedBubbles
+            .last()
+            .locator(".chat-message-actions");
+        await expect(publishedActions.locator(".ant-actions-icon")).toHaveCount(
+            1,
+        );
+        await expect(page.getByLabel("复制第 2 条消息")).toBeVisible();
+        await expect(
+            publishedActions.locator(".ant-actions-feedback-item-like"),
+        ).toBeVisible();
+        await expect(
+            publishedActions.locator(".ant-actions-feedback-item-dislike"),
+        ).toBeVisible();
+        await publishedActions
+            .locator(".ant-actions-feedback-item-like")
+            .dispatchEvent("click");
+        await expect(
+            publishedActions.locator(".ant-actions-feedback-item-like"),
+        ).toHaveClass(/ant-actions-feedback-item-like-active/);
+        await expect(page.getByLabel(/删除第 \d+ 条消息/)).toHaveCount(0);
+        expect(conversationMessageDeletes).toBe(0);
         await page
             .getByRole("button", { name: "清空当前会话" })
             .dispatchEvent("click");
@@ -1145,7 +1349,9 @@ test("shows authentication errors and enters the workspace after login", async (
             .getByRole("button", { name: "新建会话" })
             .dispatchEvent("click");
         await expect(
-            page.getByText("新会话将使用 v3", { exact: true }),
+            page
+                .locator(".chat-page-header")
+                .getByText("版本：v3", { exact: true }),
         ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "研发助手" }),
@@ -1521,7 +1727,7 @@ test("shows authentication errors and enters the workspace after login", async (
             name: "SKILL.md",
             mimeType: "text/markdown",
             buffer: Buffer.from(
-                "---\nname: 合同审查规范\ndescription: 按团队法务标准识别合同风险并输出分级建议。\n---\n# 合同审查规范",
+                "---\nname: contract-review\ndescription: 按团队法务标准识别合同风险并输出分级建议。\n---\n# 合同审查规范",
             ),
         });
         await expect(uploadDialog.getByText("SKILL.md 解析预览")).toBeVisible();
@@ -2011,6 +2217,80 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(assistantMarkdown.locator("pre code")).toContainText(
             "const markdownEnabled = true;",
         );
+        const trialBubbles = page.locator(
+            ".chat-panel-trial .chat-bubble-list .ant-bubble",
+        );
+        await expect(trialBubbles.first().locator(".x-markdown")).toBeVisible();
+        const trialBubbleMetrics = await trialBubbles.evaluateAll((elements) =>
+            elements.map((element) => {
+                const content = element.querySelector(
+                    ".ant-bubble-content",
+                ) as HTMLElement;
+                const body = element.querySelector(
+                    ".ant-bubble-body",
+                ) as HTMLElement;
+                const bubbleStyles = getComputedStyle(element);
+                const styles = getComputedStyle(content);
+                return {
+                    rowWidth: element.getBoundingClientRect().width,
+                    bodyWidth: body.getBoundingClientRect().width,
+                    width: content.getBoundingClientRect().width,
+                    maxWidth: styles.maxWidth,
+                    padding: styles.padding,
+                    paddingInlineEnd: Number.parseFloat(
+                        bubbleStyles.paddingInlineEnd,
+                    ),
+                };
+            }),
+        );
+        const trialScrollWidth = await page
+            .locator(".chat-panel-trial .ant-bubble-list-scroll-box")
+            .evaluate((element) => element.clientWidth);
+        expect(
+            trialBubbleMetrics.every(
+                ({ width }) => width > 0 && width <= trialScrollWidth,
+            ),
+        ).toBe(true);
+        expect(trialBubbleMetrics.map(({ maxWidth }) => maxWidth)).toEqual([
+            "100%",
+            "100%",
+        ]);
+        const trialAssistantMetrics = trialBubbleMetrics[1];
+        expect(trialAssistantMetrics.paddingInlineEnd).toBeCloseTo(
+            trialAssistantMetrics.rowWidth * 0.15,
+            0,
+        );
+        expect(trialAssistantMetrics.bodyWidth).toBeLessThanOrEqual(
+            trialAssistantMetrics.rowWidth * 0.85 + 1,
+        );
+        expect(
+            new Set(trialBubbleMetrics.map(({ padding }) => padding)).size,
+        ).toBe(1);
+        const trialMarkdownStyles = await trialBubbles
+            .locator(".x-markdown")
+            .evaluateAll((elements) =>
+                elements.map((element) => {
+                    const styles = getComputedStyle(element);
+                    return {
+                        fontFamily: styles.fontFamily,
+                        fontSize: styles.fontSize,
+                        lineHeight: styles.lineHeight,
+                    };
+                }),
+            );
+        expect(trialMarkdownStyles[0]).toEqual(trialMarkdownStyles[1]);
+        const trialActions = trialBubbles
+            .last()
+            .locator(".chat-message-actions");
+        await expect(trialActions.locator(".ant-actions-icon")).toHaveCount(1);
+        await expect(page.getByLabel("复制第 2 条消息")).toBeVisible();
+        await expect(
+            trialActions.locator(".ant-actions-feedback-item-like"),
+        ).toBeVisible();
+        await expect(
+            trialActions.locator(".ant-actions-feedback-item-dislike"),
+        ).toBeVisible();
+        await expect(page.getByLabel(/删除第 \d+ 条消息/)).toHaveCount(0);
         expect(
             await page
                 .locator(".chat-panel-trial")
@@ -2026,6 +2306,9 @@ test("shows authentication errors and enters the workspace after login", async (
                 ),
             )
             .toBe(true);
+        await expect(page.locator(".chat-bubble-list .ant-bubble")).toHaveCount(
+            2,
+        );
         expect(chatRequestUrls).toEqual([
             "/agent/0198a96d-19e4-7000-8000-000000000301/v1/chat/completions",
             `/agent/${sharedAgent.id}/v1/chat/completions`,
@@ -2114,10 +2397,17 @@ test("shows authentication errors and enters the workspace after login", async (
         await firstVersionRow
             .getByRole("button", { name: "查看" })
             .dispatchEvent("click");
+        const versionAgentDetails = page.getByRole("dialog", {
+            name: "Agent 详情",
+        });
+        await expect(versionAgentDetails).toBeVisible();
         await expect(
-            page.getByText("v1 版本详情", { exact: true }),
+            versionAgentDetails.getByText("历史版本", { exact: true }),
         ).toBeVisible();
-        await page
+        await expect(
+            versionAgentDetails.getByText("版本：v1", { exact: true }),
+        ).toBeVisible();
+        await versionAgentDetails
             .getByRole("button", { name: "回滚到本版" })
             .dispatchEvent("click");
         const rollbackDialog = page.getByRole("dialog", {
@@ -2196,10 +2486,12 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.locator(".chat-panel-trial .ant-welcome-title"),
         ).toHaveCSS("height", "32px");
-        await expect(page.locator(".chat-panel-trial .composer")).toHaveCSS(
-            "padding",
-            "10px 16px 16px",
-        );
+        await expect(
+            page.locator(".chat-panel-trial .chat-composer-trial"),
+        ).toHaveCSS("padding", "10px 16px 16px");
+        await expect(
+            page.locator(".chat-panel-trial .chat-quick-prompts-trial button"),
+        ).toHaveCount(3);
         await expect(editorSections).toHaveCSS("width", "52px");
         await expect(
             editorSections
@@ -2403,18 +2695,73 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                         {
                             id: `${conversationId}-user`,
                             message: {
-                                role: "user",
-                                contents: [{ text: userContent }],
+                                Role: "user",
+                                Contents: [
+                                    { $type: "text", Text: userContent },
+                                ],
                             },
                             sequenceNumber: 1,
                         },
                         {
-                            id: `${conversationId}-assistant`,
+                            id: `${conversationId}-function-calls`,
                             message: {
-                                role: "assistant",
-                                contents: [{ text: assistantContent }],
+                                Role: "assistant",
+                                Contents:
+                                    userContent === "验证 Skill 调用"
+                                        ? [
+                                              {
+                                                  $type: "functionCall",
+                                                  Name: "load_skill",
+                                                  Arguments: {
+                                                      skillName: "code-review",
+                                                  },
+                                                  CallId: "call-load-skill",
+                                              },
+                                              {
+                                                  $type: "functionCall",
+                                                  Name: "read_skill_resource",
+                                                  Arguments: {
+                                                      skillName: "code-review",
+                                                      resourceName:
+                                                          "references/rule.md",
+                                                  },
+                                                  CallId: "call-read-skill-resource",
+                                              },
+                                          ]
+                                        : [],
                             },
                             sequenceNumber: 2,
+                        },
+                        {
+                            id: `${conversationId}-assistant`,
+                            message: {
+                                Role: "assistant",
+                                Contents: [
+                                    { $type: "text", Text: assistantContent },
+                                ],
+                            },
+                            sequenceNumber: 3,
+                        },
+                        {
+                            id: `${conversationId}-empty-assistant`,
+                            message: {
+                                Role: "assistant",
+                                Contents: [],
+                            },
+                            sequenceNumber: 4,
+                        },
+                        {
+                            id: `${conversationId}-tool-result`,
+                            message: {
+                                Role: "tool",
+                                Contents: [
+                                    {
+                                        $type: "functionResult",
+                                        CallId: "call-load-skill",
+                                    },
+                                ],
+                            },
+                            sequenceNumber: 5,
                         },
                     ]);
                 };
@@ -2436,6 +2783,72 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                     writeDelta("重试成功");
                     persist("重试成功");
                     response.end("data: [DONE]\n\n");
+                    return;
+                }
+
+                if (userContent === "验证 Skill 调用") {
+                    response.setHeader("Content-Type", "text/event-stream");
+                    response.write(
+                        `data: ${JSON.stringify({
+                            choices: [
+                                {
+                                    delta: {
+                                        tool_calls: [
+                                            {
+                                                index: 0,
+                                                id: "call-load-skill",
+                                                type: "function",
+                                                function: {
+                                                    name: "load_skill",
+                                                    arguments:
+                                                        '{"skillName":"code-',
+                                                },
+                                            },
+                                            {
+                                                index: 1,
+                                                id: "call-read-skill-resource",
+                                                type: "function",
+                                                function: {
+                                                    name: "read_skill_resource",
+                                                    arguments:
+                                                        '{"skillName":"code-review","resourceName":"references/',
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            ],
+                        })}\n\n`,
+                    );
+                    response.write(
+                        `data: ${JSON.stringify({
+                            choices: [
+                                {
+                                    delta: {
+                                        tool_calls: [
+                                            {
+                                                index: 0,
+                                                function: {
+                                                    arguments: 'review"}',
+                                                },
+                                            },
+                                            {
+                                                index: 1,
+                                                function: {
+                                                    arguments: 'rule.md"}',
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            ],
+                        })}\n\n`,
+                    );
+                    setTimeout(() => {
+                        writeDelta("已按 Skill 完成评审");
+                        persist("已按 Skill 完成评审");
+                        response.end("data: [DONE]\n\n");
+                    }, 800);
                     return;
                 }
 
@@ -2514,6 +2927,62 @@ test("preserves, stops, and retries chat runs through Electron", async ({
         const sender = page.getByPlaceholder(
             "输入消息，Enter 发送，Shift + Enter 换行",
         );
+        await sender.fill("验证 Skill 调用");
+        await sender.press("Enter");
+        await expect(page.getByText("工具调用", { exact: true })).toBeVisible();
+        await page
+            .getByRole("button", { name: "返回 Agent 空间" })
+            .dispatchEvent("click");
+        await page
+            .locator(".agent-space-card")
+            .filter({ hasText: "研发助手" })
+            .dispatchEvent("click");
+        await expect(page.getByText("工具调用", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("2 项已完成", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("加载 Skill：code-review", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("读取资源：references/rule.md", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("已按 Skill 完成评审", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.locator(".chat-bubble-list .ant-bubble-avatar"),
+        ).toHaveCount(0);
+        await expect(page.locator(".chat-bubble-list .ant-bubble")).toHaveCount(
+            3,
+        );
+        await expect(page.getByText("等待确认")).toHaveCount(0);
+        await expect(page.getByText("脚本执行需要用户确认")).toHaveCount(0);
+
+        await page
+            .getByRole("button", { name: "新建会话" })
+            .dispatchEvent("click");
+        const persistedSkillConversation = page
+            .locator(".chat-history-list")
+            .getByText("Chat run E2E", { exact: true });
+        await expect(persistedSkillConversation).toBeVisible();
+        await persistedSkillConversation.dispatchEvent("click");
+        await expect(
+            page.getByText("加载 Skill：code-review", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("读取资源：references/rule.md", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.locator(".chat-bubble-list .ant-bubble-avatar"),
+        ).toHaveCount(0);
+        await expect(page.locator(".chat-bubble-list .ant-bubble")).toHaveCount(
+            3,
+        );
+
+        await page
+            .getByRole("button", { name: "新建会话" })
+            .dispatchEvent("click");
         await sender.fill("验证锁屏恢复");
         await sender.press("Enter");
         await expect(page.getByText("锁屏前", { exact: true })).toBeVisible();
@@ -2605,6 +3074,9 @@ test("preserves, stops, and retries chat runs through Electron", async ({
         ).toHaveCount(0);
         await expect(
             page.getByText("停止前已收到的部分文本", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("已停止生成", { exact: true }),
         ).toBeVisible();
         await expect.poll(() => stoppedConnectionClosed).toBe(true);
 

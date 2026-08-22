@@ -11,6 +11,7 @@ import {
 import {
     ArrowLeftOutlined,
     DeleteOutlined,
+    EyeOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     PaperClipOutlined,
@@ -42,6 +43,10 @@ import {
     type SeedStep,
 } from "../chat/agui/replay";
 import type { AGUIEvent } from "../chat/agui/types";
+import {
+    AgentDetailsDrawer,
+    type AgentDetailsVersion,
+} from "../components/AgentDetailsDrawer";
 
 // ─── UI-005 · Agent 对话页（ui-spec.md §5，REQ-010 / REQ-016 / 场景 S3） ──────────
 // 视觉形态照抄 Ant Design X "ultramodern" playground 的结构：左侧固定 Conversations
@@ -70,6 +75,29 @@ const QUICK_PROMPTS = [
     { key: "qp3", description: "帮我优化一段产品介绍文案" },
     { key: "qp4", description: "展示工具调用示例" },
 ];
+
+function chatAgentVersion(agentName: string): AgentDetailsVersion {
+    return {
+        version: "v3",
+        status: "已发布",
+        savedAt: "2026-07-11 16:48:05",
+        savedBy: "owner-alice",
+        summary: "优化研究报告结构并更新模型参数",
+        snapshot: {
+            name: agentName,
+            description: "检索、分析并生成带来源的结构化研究报告。",
+            instructions:
+                "你是一名严谨的深度研究助手。开始任务前，先澄清研究目标、受众、时间范围和交付格式。\n\n检索时优先使用权威机构、原始论文、官方公告和一手数据；对重要事实至少寻找两个相互独立的来源进行交叉验证。若不同来源存在冲突，明确列出差异，不得自行拼接为确定结论。\n\n输出时先给出结论摘要，再按主题整理关键证据、数据口径、潜在风险和待验证事项。所有可验证的事实都要标注来源；无法确认的信息必须明确写为“尚未验证”，不得编造链接、作者、日期或统计数字。\n\n当用户要求建议时，区分事实、推断与建议，并说明建议成立所依赖的前提。最终附上来源列表，保留原始标题、发布方、发布日期和可访问链接。",
+            model: "Azure OpenAI GPT-4o mini",
+            temperature: 0.3,
+            topP: 0.9,
+            maxTokens: 4096,
+            maxMessages: 40,
+            tools: ["web_search", "document_reader", "calculator"],
+            skills: ["research-report", "source-citation"],
+        },
+    };
+}
 
 function mockConversation(sessionId: string, agentName: string): ChatMessage[] {
     // 每个种子会话都描述成"用户说了什么 + 助手侧发生过哪些 AG-UI 事件"，同步重放
@@ -320,6 +348,7 @@ export default function AgentChatPage({
     const [historyCollapsed, setHistoryCollapsed] = useState(false);
     const [sessions, setSessions] = useState(MOCK_SESSIONS);
     const [activeSession, setActiveSession] = useState("s1");
+    const [detailsOpen, setDetailsOpen] = useState(false);
     const { attachmentsOpen, setAttachmentsOpen, files, setFiles } =
         useAttachments();
     const {
@@ -336,6 +365,7 @@ export default function AgentChatPage({
     } = useMockChat(mockConversation("s1", agentName));
 
     const roles = useChatBubbleRoles(retryLast);
+    const currentAgentVersion = chatAgentVersion(agentName);
 
     const handleSwitchSession = (key: string) => {
         setActiveSession(key);
@@ -433,7 +463,24 @@ export default function AgentChatPage({
                     {agentName}
                 </Typography.Text>
                 <Tag style={{ margin: 0 }}>模型：gpt-4o-mini</Tag>
+                <Tag style={{ margin: 0 }}>版本：v3</Tag>
+                <Tooltip title="查看 Agent 详情">
+                    <Button
+                        className="inkwell-agent-chat-details-button"
+                        type="text"
+                        aria-label="查看 Agent 详情"
+                        icon={<EyeOutlined />}
+                        onClick={() => setDetailsOpen(true)}
+                    />
+                </Tooltip>
             </div>
+
+            <AgentDetailsDrawer
+                open={detailsOpen}
+                version={currentAgentVersion}
+                hidePublishedStatus
+                onClose={() => setDetailsOpen(false)}
+            />
 
             <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
                 {/* 历史会话侧栏（ui-spec.md §5.1：与 §0.2 主导航 nav 同屏共存，可折叠，默认展开）。

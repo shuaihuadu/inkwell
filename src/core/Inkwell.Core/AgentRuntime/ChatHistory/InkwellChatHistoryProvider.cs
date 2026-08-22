@@ -60,7 +60,7 @@ internal sealed class InkwellChatHistoryProvider(
         Guid conversationId = GetStateGuid(context.Session, SessionIdStateKey);
         IReadOnlyList<ChatMessage> history = await this._messages.ListHistoryMessagesAsync(conversationId, maxMessagesToRetrieve, cancellationToken).ConfigureAwait(false);
 
-        return history;
+        return history.Select(RemoveSkillToolApprovals).Where(message => message is not null)!;
     }
 
     /// <inheritdoc />
@@ -172,6 +172,36 @@ internal sealed class InkwellChatHistoryProvider(
             .FirstOrDefault(message => message.Role == ChatRole.User && !string.IsNullOrEmpty(message.Text));
         return firstUserMessage?.Text is { } text ? text[..Math.Min(30, text.Length)] : null;
     }
+
+    private static ChatMessage? RemoveSkillToolApprovals(ChatMessage message)
+    {
+        List<AIContent> supportedContents = [.. message.Contents
+            .Where(static content => !IsSkillToolApproval(content))];
+
+        if (supportedContents.Count == message.Contents.Count)
+        {
+            return message;
+        }
+
+        if (supportedContents.Count == 0)
+        {
+            return null;
+        }
+
+        ChatMessage filtered = message.Clone();
+        filtered.Contents = supportedContents;
+        return filtered;
+    }
+
+    private static bool IsSkillToolApproval(AIContent content) => content is ToolApprovalRequestContent
+    {
+        ToolCall: FunctionCallContent
+        {
+            Name: AgentSkillsProvider.LoadSkillToolName
+                or AgentSkillsProvider.ReadSkillResourceToolName
+                or AgentSkillsProvider.RunSkillScriptToolName,
+        },
+    };
 
     private static Guid GetStateGuid(AgentSession? session, string key)
     {

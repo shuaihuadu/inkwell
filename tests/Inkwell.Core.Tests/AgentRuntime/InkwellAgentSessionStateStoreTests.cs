@@ -71,6 +71,49 @@ public sealed class InkwellAgentSessionStateStoreTests
         Assert.AreEqual("round-1", checkpoint);
     }
 
+    /// <summary>验证 jsonb 重排多态元数据后，清理 Skill 工具审批并保留其他审批。</summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task GetSessionAsync_WithReorderedPendingApprovalMetadata_RemovesSkillToolApprovalsAsync()
+    {
+        // Arrange
+        FakeSessionStateRepository sessionStates = new();
+        InkwellAgentSessionStateStore store = CreateStore(sessionStates);
+        TestAgent agent = new();
+        AgentSession original = await agent.CreateSessionAsync();
+        FunctionCallContent loadSkillCall = new("call-1", AgentSkillsProvider.LoadSkillToolName);
+        FunctionCallContent readSkillResourceCall = new("call-2", AgentSkillsProvider.ReadSkillResourceToolName);
+        FunctionCallContent runSkillScriptCall = new("call-3", AgentSkillsProvider.RunSkillScriptToolName);
+        FunctionCallContent supportedCall = new("call-4", "get_weather", new Dictionary<string, object?> { ["city"] = "Seattle" });
+        original.StateBag.SetValue(
+            "_pendingApprovalRequests",
+            new List<ToolApprovalRequestContent>
+            {
+                new("approval-1", loadSkillCall),
+                new("approval-2", readSkillResourceCall),
+                new("approval-3", runSkillScriptCall),
+                new("approval-4", supportedCall),
+            },
+            AgentSessionJsonOptions.Default);
+        await store.SaveSessionAsync(agent, conversationId, original);
+        AgentSessionState persistedState = sessionStates.States[conversationId];
+        using JsonDocument document = JsonDocument.Parse(persistedState.SessionState);
+        sessionStates.States[conversationId] = CreateState(MoveMetadataPropertiesToEnd(document.RootElement).GetRawText());
+
+        // Act
+        AgentSession restored = await store.GetSessionAsync(agent, conversationId);
+        bool found = restored.StateBag.TryGetValue(
+            "_pendingApprovalRequests",
+            out List<ToolApprovalRequestContent>? pendingApprovals);
+
+        // Assert
+        Assert.IsTrue(found);
+        Assert.IsNotNull(pendingApprovals);
+        Assert.HasCount(1, pendingApprovals);
+        Assert.AreEqual("approval-4", pendingApprovals[0].RequestId);
+        Assert.AreEqual("get_weather", Assert.IsInstanceOfType<FunctionCallContent>(pendingApprovals[0].ToolCall).Name);
+    }
+
     /// <summary>验证状态内容不可反序列化时丢弃并新建空 Session，不向调用方抛出。</summary>
     /// <returns>表示异步测试操作的任务。</returns>
     [TestMethod]
@@ -172,6 +215,53 @@ public sealed class InkwellAgentSessionStateStoreTests
         CreatedTime = DateTimeOffset.UnixEpoch,
         UpdatedTime = DateTimeOffset.UnixEpoch,
     };
+
+    private static JsonElement MoveMetadataPropertiesToEnd(JsonElement element)
+    {
+        using MemoryStream stream = new();
+        using (Utf8JsonWriter writer = new(stream))
+        {
+            WriteWithMetadataLast(writer, element);
+        }
+
+        return JsonSerializer.Deserialize<JsonElement>(stream.ToArray());
+    }
+
+    private static void WriteWithMetadataLast(Utf8JsonWriter writer, JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            writer.WriteStartObject();
+            foreach (JsonProperty property in element.EnumerateObject().Where(property => property.Name != "$type"))
+            {
+                writer.WritePropertyName(property.Name);
+                WriteWithMetadataLast(writer, property.Value);
+            }
+
+            foreach (JsonProperty property in element.EnumerateObject().Where(property => property.Name == "$type"))
+            {
+                writer.WritePropertyName(property.Name);
+                WriteWithMetadataLast(writer, property.Value);
+            }
+
+            writer.WriteEndObject();
+            return;
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            writer.WriteStartArray();
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                WriteWithMetadataLast(writer, item);
+            }
+
+            writer.WriteEndArray();
+            return;
+        }
+
+        element.WriteTo(writer);
+    }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

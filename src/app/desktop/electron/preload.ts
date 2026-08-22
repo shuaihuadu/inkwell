@@ -105,6 +105,8 @@ const api: InkwellDesktopApi = {
     chat: (request) => ipcRenderer.invoke("inkwell:chat", request),
     getChatRun: (requestId) =>
         ipcRenderer.invoke("inkwell:get-chat-run", requestId),
+    getActiveAgentChatRun: (agentId) =>
+        ipcRenderer.invoke("inkwell:get-active-agent-chat-run", agentId),
     stopChat: (requestId) => ipcRenderer.invoke("inkwell:stop-chat", requestId),
     onChatRunChanged: (listener) => {
         const handler = (

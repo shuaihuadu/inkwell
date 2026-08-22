@@ -170,12 +170,115 @@ test.describe("Agent Design Page", () => {
         await expect(
             page.getByText("Temperature", { exact: true }),
         ).toBeVisible();
-        await page.getByRole("button", { name: "开始对话" }).click();
-        await expect(page.getByRole("dialog")).toBeVisible();
+        await page.getByRole("button", { name: "试运行" }).click();
+        await expect(
+            page.getByRole("heading", { name: "从一个研究问题开始" }),
+        ).toBeVisible();
         await page.screenshot({
             path: screenshotPath("08-agent-conversation.png"),
             fullPage: true,
         });
+    });
+
+    test("reuses the read-only Agent details in chat and version history", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        const consoleErrors: string[] = [];
+        page.on("console", (message) => {
+            if (message.type() === "error") consoleErrors.push(message.text());
+        });
+        page.on("pageerror", (error) => consoleErrors.push(error.message));
+        await page
+            .context()
+            .grantPermissions(["clipboard-read", "clipboard-write"], {
+                origin: "http://localhost:4174",
+            });
+
+        await page.goto("/shell");
+        await page.getByText("客服助手", { exact: true }).first().click();
+        await page.getByRole("button", { name: "查看 Agent 详情" }).click();
+        const chatDetails = page.getByRole("dialog", { name: "Agent 详情" });
+        await expect(chatDetails).toBeVisible();
+        await expect(
+            chatDetails.getByText("版本：v3", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            chatDetails.getByText("会话版本", { exact: true }),
+        ).toHaveCount(0);
+        await expect(
+            chatDetails.getByText("模型与上下文", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            chatDetails.getByText("web_search", { exact: true }),
+        ).toBeVisible();
+        const instructions = chatDetails.locator(
+            ".inkwell-agent-details-instructions",
+        );
+        await expect(instructions).toHaveClass(/collapsed/);
+        const collapsedHeight = await instructions.evaluate(
+            (element) => element.getBoundingClientRect().height,
+        );
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath("17-agent-chat-readonly-details.png"),
+        });
+        await chatDetails.getByRole("button", { name: "展开全文" }).click();
+        await expect(instructions).toHaveClass(/expanded/);
+        await expect(
+            chatDetails.getByRole("button", { name: "收起" }),
+        ).toBeVisible();
+        await page.waitForTimeout(220);
+        const expandedHeight = await instructions.evaluate(
+            (element) => element.getBoundingClientRect().height,
+        );
+        expect(expandedHeight).toBeGreaterThan(collapsedHeight);
+        await chatDetails
+            .getByRole("button", { name: "复制 Instructions" })
+            .click();
+        await expect(
+            page.getByText("Instructions 已复制", { exact: true }),
+        ).toBeVisible();
+        const copiedInstructions = await page.evaluate(() =>
+            navigator.clipboard.readText(),
+        );
+        expect(copiedInstructions).toContain("你是一名严谨的深度研究助手");
+        expect(copiedInstructions).toContain("不得编造链接");
+        await page.mouse.move(600, 600);
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath(
+                "19-agent-chat-long-instructions-expanded.png",
+            ),
+        });
+        await expectNoHorizontalOverflow(page);
+
+        await chatDetails
+            .getByRole("button", { name: "关闭 Agent 详情" })
+            .click();
+        await page.getByRole("button", { name: "返回 Agent 空间" }).click();
+        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        await page.getByRole("button", { name: "版本" }).click();
+        const historicalRow = page.locator(".ant-table-row").filter({
+            hasText: "v2",
+        });
+        await historicalRow.getByRole("button", { name: "查看" }).click();
+        const versionDetails = page.getByRole("dialog", {
+            name: "Agent 详情",
+        });
+        await expect(versionDetails).toBeVisible();
+        await expect(
+            versionDetails.getByText("历史版本", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            versionDetails.getByText("合同风险清单", { exact: false }),
+        ).toBeVisible();
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath("18-agent-version-readonly-details.png"),
+        });
+        await expectNoHorizontalOverflow(page);
+        expect(consoleErrors).toEqual([]);
     });
 
     test("shows the same AG-UI run summary in chat and trial", async ({
@@ -212,7 +315,9 @@ test.describe("Agent Design Page", () => {
         await expect(
             page.getByText(/已完成关于.*整理一份竞品研究框架.*的研究/),
         ).toBeVisible({ timeout: 10_000 });
-        const trialRunSummary = page.getByText("工具调用", { exact: true });
+        const trialRunSummary = page
+            .locator("strong")
+            .filter({ hasText: /^工具调用$/ });
         await trialRunSummary.scrollIntoViewIfNeeded();
         await expect(trialRunSummary).toBeVisible();
         await page.screenshot({
@@ -330,31 +435,22 @@ test.describe("Agent Design Page", () => {
         await expect(page.getByText("删除这个 Agent？")).toBeVisible();
     });
 
-    test("shows chat history and compaction as separate concerns", async ({
+    test("shows the chat history limit in model settings", async ({
         page,
     }, testInfo) => {
         test.skip(testInfo.project.name !== "desktop-hd");
         await page.goto("/agent");
-        await page.getByRole("button", { name: "上下文策略" }).click();
+        await page.getByText("模型与参数", { exact: true }).click();
         await expect(
-            page.getByText("InkwellChatHistoryProvider", { exact: true }),
+            page.getByText("最大消息记录数", { exact: true }),
         ).toBeVisible();
         await expect(
-            page.getByRole("switch", { name: "启用压缩流水线" }),
-        ).toBeDisabled();
-        for (const strategy of [
-            "ToolResultCompactionStrategy",
-            "SummarizationCompactionStrategy",
-            "SlidingWindowCompactionStrategy",
-            "TruncationCompactionStrategy",
-        ]) {
-            await expect(
-                page.getByText(strategy, { exact: true }),
-            ).toBeVisible();
-        }
-        await expect(
-            page.getByText("聊天记录存储与模型输入压缩相互独立"),
+            page.getByText(
+                "超过该数量时，最早的历史消息会被裁剪，避免无限增长挤占模型上下文。",
+                { exact: true },
+            ),
         ).toBeVisible();
+        await expect(page.getByRole("spinbutton").last()).toHaveValue("40");
     });
 
     test("tablet layout has no horizontal overflow", async ({

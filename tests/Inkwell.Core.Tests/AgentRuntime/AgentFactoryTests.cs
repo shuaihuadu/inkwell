@@ -77,7 +77,18 @@ public sealed class AgentFactoryTests
         Assert.IsNotNull(chatClientAgent);
         List<AIContextProvider> contextProviders = chatClientAgent.AIContextProviders?.ToList() ?? [];
         Assert.HasCount(1, contextProviders);
-        Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
+        AgentSkillsProvider skillsProvider = Assert.IsInstanceOfType<AgentSkillsProvider>(contextProviders[0]);
+        AIContextProvider.InvokingContext invokingContext = new(chatClientAgent, session: null, new AIContext());
+        AIContext context = await skillsProvider.InvokingAsync(invokingContext, CancellationToken.None);
+        AITool? loadSkill = context.Tools?.Single(tool => tool.Name == AgentSkillsProvider.LoadSkillToolName);
+        AITool? readSkillResource = context.Tools?.Single(tool => tool.Name == AgentSkillsProvider.ReadSkillResourceToolName);
+        AITool? runSkillScript = context.Tools?.Single(tool => tool.Name == AgentSkillsProvider.RunSkillScriptToolName);
+        Assert.IsNotNull(loadSkill);
+        Assert.IsNotNull(readSkillResource);
+        Assert.IsNotNull(runSkillScript);
+        Assert.IsNotInstanceOfType<ApprovalRequiredAIFunction>(loadSkill);
+        Assert.IsNotInstanceOfType<ApprovalRequiredAIFunction>(readSkillResource);
+        Assert.IsNotInstanceOfType<ApprovalRequiredAIFunction>(runSkillScript);
     }
 
     /// <summary>

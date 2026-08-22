@@ -242,6 +242,8 @@ export interface ChatMessage {
     id?: string;
     role: "user" | "assistant";
     content: string;
+    skillActivities?: SkillRunActivity[];
+    runStatus?: ChatRunStatus;
 }
 
 export interface ChatRequest {
@@ -259,11 +261,36 @@ export interface ChatRunError {
     reason: string;
 }
 
+export type SkillRunActivityType =
+    | "skill-loaded"
+    | "skill-resource-read"
+    | "skill-script-run";
+
+export type SkillRunActivityStatus = "loading" | "success" | "error" | "abort";
+
+export interface SkillRunActivity {
+    callId: string;
+    type: SkillRunActivityType;
+    skillName: string;
+    targetName?: string;
+    argumentsJson: string;
+    status: SkillRunActivityStatus;
+    error?: string;
+}
+
 export interface ChatRunSnapshot {
     requestId: string;
     status: ChatRunStatus;
     content: string;
+    skillActivities: SkillRunActivity[];
     error?: ChatRunError;
+}
+
+export interface ActiveAgentChatRun {
+    agentId: string;
+    conversationId: string | null;
+    userMessage: ChatMessage;
+    snapshot: ChatRunSnapshot;
 }
 
 export interface AgentConversationListItem {
@@ -335,9 +362,7 @@ export interface InkwellDesktopApi {
         versionId: string,
         changeSummary: string | null,
     ) => Promise<AgentVersion>;
-    createAgentConversation: (
-        agentId: string,
-    ) => Promise<AgentConversation>;
+    createAgentConversation: (agentId: string) => Promise<AgentConversation>;
     listAgentConversations: (
         agentId: string,
     ) => Promise<AgentConversationListItem[]>;
@@ -360,6 +385,9 @@ export interface InkwellDesktopApi {
     ) => Promise<void>;
     chat: (request: ChatRequest) => Promise<void>;
     getChatRun: (requestId: string) => Promise<ChatRunSnapshot | null>;
+    getActiveAgentChatRun: (
+        agentId: string,
+    ) => Promise<ActiveAgentChatRun | null>;
     stopChat: (requestId: string) => Promise<boolean>;
     onChatRunChanged: (
         listener: (snapshot: ChatRunSnapshot) => void,
