@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
     Alert,
     Button,
     Card,
     Checkbox,
     Col,
+    Descriptions,
+    Drawer,
     Flex,
     Form,
     Input,
@@ -42,6 +44,8 @@ import {
     ToolOutlined,
     ReadOutlined,
     HistoryOutlined,
+    DiffOutlined,
+    RollbackOutlined,
     UserOutlined,
     RobotOutlined,
     MenuFoldOutlined,
@@ -65,7 +69,12 @@ import { useMockChat, formatNow, type ChatMessage } from "../chat/useMockChat";
 import { toBubbleItems, useChatBubbleRoles } from "../chat/chatBubbleRoles";
 import { useAttachments } from "../chat/useAttachments";
 import { ChatAttachmentsHeader } from "../chat/ChatAttachmentsHeader";
-import { isHarnessTrigger, isAgentLoopTrigger, runHarnessDemo, runAgentLoopDemo } from "../chat/harnessDemo";
+import {
+    isHarnessTrigger,
+    isAgentLoopTrigger,
+    runHarnessDemo,
+    runAgentLoopDemo,
+} from "../chat/harnessDemo";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,7 +181,11 @@ function SectionBasic({ readonly }: { readonly: boolean }) {
                                     }}
                                 >
                                     <Typography.Text
-                                        style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: 24,
+                                            fontWeight: 700,
+                                        }}
                                     >
                                         {avatarText}
                                     </Typography.Text>
@@ -193,7 +206,11 @@ function SectionBasic({ readonly }: { readonly: boolean }) {
                                             }}
                                         >
                                             <Typography.Text
-                                                style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}
+                                                style={{
+                                                    color: "#fff",
+                                                    fontSize: 24,
+                                                    fontWeight: 700,
+                                                }}
                                             >
                                                 {avatarText}
                                             </Typography.Text>
@@ -232,7 +249,9 @@ function SectionBasic({ readonly }: { readonly: boolean }) {
                         <Input
                             placeholder="Agent 名称（1–50 字符）"
                             disabled={readonly}
-                            onChange={(event) => setAgentName(event.target.value)}
+                            onChange={(event) =>
+                                setAgentName(event.target.value)
+                            }
                         />
                     </Form.Item>
                     <Form.Item
@@ -557,10 +576,7 @@ function SectionModel({
             >
                 超过该数量时，最早的历史消息会被裁剪，避免无限增长挤占模型上下文。
             </Typography.Text>
-            <Form.Item
-                label="最大消息记录数"
-                style={{ marginBottom: 0 }}
-            >
+            <Form.Item label="最大消息记录数" style={{ marginBottom: 0 }}>
                 <InputNumber
                     min={1}
                     max={500}
@@ -769,13 +785,42 @@ function SectionSkills({
 // 原型不单独跳转到 UI-008 独立页面（“版本”区段本身即等价于同一 Agent 上下文内的 UI-008，
 // 详见 ui-spec.md §4.4“‘版本’：跳 UI-008 版本视图（同一个 Agent 上下文）”），因此直接在本区段
 // 内列出全部版本，2026-07-15 移除原先的“查看版本历史”跳转按钮。
-const MOCK_VERSIONS = [
+interface VersionSnapshot {
+    name: string;
+    description: string;
+    instructions: string;
+    model: string;
+    temperature: number;
+    tools: string[];
+    skills: string[];
+}
+
+interface VersionItem {
+    version: string;
+    status: string;
+    savedAt: string;
+    savedBy: string;
+    summary: string;
+    snapshot: VersionSnapshot;
+}
+
+const MOCK_VERSIONS: VersionItem[] = [
     {
         version: "v3",
         status: "已发布",
         savedAt: "2026-07-11 16:48:05",
         savedBy: "owner-alice",
         summary: "优化研究报告结构并更新模型参数",
+        snapshot: {
+            name: "深度研究助手",
+            description: "检索、分析并生成带来源的结构化研究报告。",
+            instructions:
+                "先澄清研究目标，再检索可信来源。输出结论、关键证据、风险和来源列表。",
+            model: "Azure OpenAI GPT-4o",
+            temperature: 0.3,
+            tools: ["web_search", "document_reader", "calculator"],
+            skills: ["research-report", "source-citation"],
+        },
     },
     {
         version: "v2",
@@ -783,6 +828,15 @@ const MOCK_VERSIONS = [
         savedAt: "2026-07-08 10:22:41",
         savedBy: "owner-alice",
         summary: "新增“合同风险清单”工具调用",
+        snapshot: {
+            name: "深度研究助手",
+            description: "检索并生成结构化研究报告。",
+            instructions: "检索可信来源，输出研究结论、证据和来源列表。",
+            model: "Azure OpenAI GPT-4o",
+            temperature: 0.5,
+            tools: ["web_search", "document_reader", "contract-risk-checklist"],
+            skills: ["research-report", "source-citation"],
+        },
     },
     {
         version: "v1",
@@ -790,30 +844,152 @@ const MOCK_VERSIONS = [
         savedAt: "2026-07-01 09:03:17",
         savedBy: "owner-alice",
         summary: "初始配置",
+        snapshot: {
+            name: "研究助手",
+            description: "根据问题检索资料并生成报告。",
+            instructions: "检索相关资料并给出摘要。",
+            model: "Azure OpenAI GPT-4o mini",
+            temperature: 0.7,
+            tools: ["web_search"],
+            skills: ["research-report"],
+        },
     },
 ];
 
-function SectionVersion() {
+const VERSION_FIELDS: Array<{
+    section: string;
+    key: keyof VersionSnapshot;
+    label: string;
+}> = [
+    { section: "基础信息", key: "name", label: "名称" },
+    { section: "基础信息", key: "description", label: "描述" },
+    { section: "Instructions", key: "instructions", label: "Instructions" },
+    { section: "模型与参数", key: "model", label: "模型" },
+    { section: "模型与参数", key: "temperature", label: "Temperature" },
+    { section: "能力", key: "tools", label: "工具" },
+    { section: "能力", key: "skills", label: "Skills" },
+];
+
+function formatVersionValue(value: VersionSnapshot[keyof VersionSnapshot]) {
+    return Array.isArray(value) ? value.join("、") || "未配置" : String(value);
+}
+
+function SectionVersion({ readonly }: { readonly: boolean }) {
+    const { token } = antdTheme.useToken();
+    const [messageApi, messageContextHolder] = message.useMessage();
+    const [modalApi, modalContextHolder] = Modal.useModal();
+    const [versions, setVersions] = useState(MOCK_VERSIONS);
+    const [selectedVersion, setSelectedVersion] = useState<VersionItem>(
+        MOCK_VERSIONS[0],
+    );
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [baseVersion, setBaseVersion] = useState("v2");
+    const [targetVersion, setTargetVersion] = useState("v3");
+    const [rollingBack, setRollingBack] = useState(false);
+
+    const openComparison = (base: string, target: string) => {
+        setBaseVersion(base);
+        setTargetVersion(target);
+        setCompareOpen(true);
+    };
+
+    const rollbackVersion = (version: VersionItem) => {
+        const nextVersionNumber =
+            Math.max(...versions.map((item) => Number(item.version.slice(1)))) +
+            1;
+        modalApi.confirm({
+            title: `回滚到 ${version.version}？`,
+            content: `回滚后将复制 ${version.version} 的配置并生成新版本 v${nextVersionNumber}。历史版本不会被修改，引用 latest 的公开 API 仍指向 latest。`,
+            okText: "确认回滚",
+            cancelText: "取消",
+            onOk: async () => {
+                setRollingBack(true);
+                await new Promise((resolve) => setTimeout(resolve, 700));
+                const rolledBackVersion: VersionItem = {
+                    ...version,
+                    version: `v${nextVersionNumber}`,
+                    status: "已发布",
+                    savedAt: "2026-07-23 14:36:12",
+                    summary: `回滚自 ${version.version}：${version.summary}`,
+                };
+                setVersions((current) => [
+                    rolledBackVersion,
+                    ...current.map((item) => ({ ...item, status: "历史版本" })),
+                ]);
+                setSelectedVersion(rolledBackVersion);
+                setDetailOpen(false);
+                setRollingBack(false);
+                messageApi.success(
+                    `已回滚到 ${version.version}，新生成版本 v${nextVersionNumber}`,
+                );
+            },
+        });
+    };
+
+    const base =
+        versions.find((item) => item.version === baseVersion) ?? versions[1];
+    const target =
+        versions.find((item) => item.version === targetVersion) ?? versions[0];
+    const differences = VERSION_FIELDS.filter(
+        (field) =>
+            formatVersionValue(base.snapshot[field.key]) !==
+            formatVersionValue(target.snapshot[field.key]),
+    );
+
     return (
-        <div>
+        <div style={{ minWidth: 0 }}>
+            {messageContextHolder}
+            {modalContextHolder}
+            <Flex
+                justify="space-between"
+                align="flex-start"
+                gap={16}
+                style={{ marginBottom: 16 }}
+            >
+                <div>
+                    <Typography.Title level={5} style={{ margin: 0 }}>
+                        版本历史
+                    </Typography.Title>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        发布和回滚会生成不可变版本；保存草稿不会出现在这里。
+                    </Typography.Text>
+                </div>
+                <Button
+                    icon={<DiffOutlined />}
+                    disabled={versions.length < 2}
+                    onClick={() =>
+                        openComparison(versions[1].version, versions[0].version)
+                    }
+                >
+                    版本对比
+                </Button>
+            </Flex>
             <Table
                 size="small"
                 pagination={false}
+                scroll={{ x: 760 }}
                 rowKey="version"
-                dataSource={MOCK_VERSIONS}
+                dataSource={versions}
                 columns={[
                     {
                         title: "版本",
                         dataIndex: "version",
                         width: 72,
-                        render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+                        render: (version: string) => (
+                            <Typography.Text strong>{version}</Typography.Text>
+                        ),
                     },
                     {
                         title: "状态",
                         dataIndex: "status",
                         width: 96,
                         render: (status: string) => (
-                            <Tag color={status === "已发布" ? "success" : "default"}>
+                            <Tag
+                                color={
+                                    status === "已发布" ? "success" : "default"
+                                }
+                            >
                                 {status}
                             </Tag>
                         ),
@@ -821,8 +997,233 @@ function SectionVersion() {
                     { title: "保存时间", dataIndex: "savedAt", width: 168 },
                     { title: "保存人", dataIndex: "savedBy", width: 120 },
                     { title: "变更摘要", dataIndex: "summary" },
+                    {
+                        title: "操作",
+                        key: "action",
+                        width: 72,
+                        align: "center",
+                        render: (_, version: VersionItem) => (
+                            <Button
+                                type="link"
+                                size="small"
+                                onClick={() => {
+                                    setSelectedVersion(version);
+                                    setDetailOpen(true);
+                                }}
+                            >
+                                查看
+                            </Button>
+                        ),
+                    },
                 ]}
             />
+
+            <Drawer
+                open={detailOpen}
+                onClose={() => setDetailOpen(false)}
+                title={`${selectedVersion.version} 版本详情`}
+                size={560}
+                extra={
+                    <Space>
+                        {versions.findIndex(
+                            (item) => item.version === selectedVersion.version,
+                        ) <
+                            versions.length - 1 && (
+                            <Button
+                                size="small"
+                                icon={<DiffOutlined />}
+                                onClick={() => {
+                                    const index = versions.findIndex(
+                                        (item) =>
+                                            item.version ===
+                                            selectedVersion.version,
+                                    );
+                                    openComparison(
+                                        versions[index + 1].version,
+                                        selectedVersion.version,
+                                    );
+                                }}
+                            >
+                                与上一版比较
+                            </Button>
+                        )}
+                        {selectedVersion.version !== versions[0].version && (
+                            <Button
+                                size="small"
+                                icon={<DiffOutlined />}
+                                onClick={() =>
+                                    openComparison(
+                                        selectedVersion.version,
+                                        versions[0].version,
+                                    )
+                                }
+                            >
+                                与最新版比较
+                            </Button>
+                        )}
+                    </Space>
+                }
+            >
+                <Descriptions
+                    column={1}
+                    size="small"
+                    items={[
+                        {
+                            key: "status",
+                            label: "状态",
+                            children: selectedVersion.status,
+                        },
+                        {
+                            key: "savedAt",
+                            label: "保存时间",
+                            children: selectedVersion.savedAt,
+                        },
+                        {
+                            key: "savedBy",
+                            label: "发布人",
+                            children: selectedVersion.savedBy,
+                        },
+                        {
+                            key: "summary",
+                            label: "变更摘要",
+                            children: selectedVersion.summary,
+                        },
+                    ]}
+                />
+                <Typography.Title level={5} style={{ marginTop: 24 }}>
+                    配置快照
+                </Typography.Title>
+                {VERSION_FIELDS.map((field) => (
+                    <div
+                        key={field.key}
+                        style={{
+                            padding: "10px 0",
+                            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                        }}
+                    >
+                        <Typography.Text
+                            type="secondary"
+                            style={{ display: "block", fontSize: 12 }}
+                        >
+                            {field.label}
+                        </Typography.Text>
+                        <Typography.Text>
+                            {formatVersionValue(
+                                selectedVersion.snapshot[field.key],
+                            )}
+                        </Typography.Text>
+                    </div>
+                ))}
+                {!readonly &&
+                    selectedVersion.version !== versions[0].version && (
+                        <Button
+                            danger
+                            block
+                            icon={<RollbackOutlined />}
+                            loading={rollingBack}
+                            style={{ marginTop: 24 }}
+                            onClick={() => rollbackVersion(selectedVersion)}
+                        >
+                            回滚到本版
+                        </Button>
+                    )}
+            </Drawer>
+
+            <Modal
+                open={compareOpen}
+                onCancel={() => setCompareOpen(false)}
+                footer={null}
+                width={920}
+                centered
+                title="版本对比"
+            >
+                <Flex align="center" gap={12} style={{ marginBottom: 20 }}>
+                    <Select
+                        value={baseVersion}
+                        onChange={setBaseVersion}
+                        style={{ flex: 1 }}
+                        options={versions.map((item) => ({
+                            value: item.version,
+                            label: `${item.version} · ${item.summary}`,
+                            disabled: item.version === targetVersion,
+                        }))}
+                    />
+                    <Typography.Text type="secondary">对比</Typography.Text>
+                    <Select
+                        value={targetVersion}
+                        onChange={setTargetVersion}
+                        style={{ flex: 1 }}
+                        options={versions.map((item) => ({
+                            value: item.version,
+                            label: `${item.version} · ${item.summary}`,
+                            disabled: item.version === baseVersion,
+                        }))}
+                    />
+                </Flex>
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                            "140px minmax(0, 1fr) minmax(0, 1fr)",
+                        borderTop: `1px solid ${token.colorBorderSecondary}`,
+                    }}
+                >
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        字段
+                    </Typography.Text>
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        {base.version}
+                    </Typography.Text>
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        {target.version}
+                    </Typography.Text>
+                    {differences.map((field) => (
+                        <Fragment key={field.key}>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                <Typography.Text
+                                    type="secondary"
+                                    style={{ display: "block", fontSize: 11 }}
+                                >
+                                    {field.section}
+                                </Typography.Text>
+                                <Typography.Text strong>
+                                    {field.label}
+                                </Typography.Text>
+                            </div>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    whiteSpace: "pre-wrap",
+                                    background: token.colorErrorBg,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                {formatVersionValue(base.snapshot[field.key])}
+                            </div>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    whiteSpace: "pre-wrap",
+                                    background: token.colorSuccessBg,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                {formatVersionValue(target.snapshot[field.key])}
+                            </div>
+                        </Fragment>
+                    ))}
+                </div>
+                {differences.length === 0 && (
+                    <Typography.Text type="secondary">
+                        两个版本的配置完全相同。
+                    </Typography.Text>
+                )}
+            </Modal>
         </div>
     );
 }
@@ -850,7 +1251,7 @@ function SectionContent({
         case "skills":
             return <SectionSkills readonly={readonly} density={density} />;
         case "version":
-            return <SectionVersion />;
+            return <SectionVersion readonly={readonly} />;
         default:
             return null;
     }
@@ -930,10 +1331,20 @@ function CopilotPanel({
     onClose: () => void;
 }) {
     const { token } = antdTheme.useToken();
-    const { attachmentsOpen, setAttachmentsOpen, files, setFiles } = useAttachments();
+    const { attachmentsOpen, setAttachmentsOpen, files, setFiles } =
+        useAttachments();
     const [activeSession, setActiveSession] = useState("cur");
-    const { messages, setMessages, replying, setReplying, input, setInput, submit, retryLast, startNewSession } =
-        useMockChat([], COPILOT_MOCK_REPLY);
+    const {
+        messages,
+        setMessages,
+        replying,
+        setReplying,
+        input,
+        setInput,
+        submit,
+        retryLast,
+        startNewSession,
+    } = useMockChat([], COPILOT_MOCK_REPLY);
     const roles = useChatBubbleRoles(retryLast);
 
     const handleNewSession = () => {
@@ -984,7 +1395,14 @@ function CopilotPanel({
         >
             {/* 面板本身固定 400px 内容宽度，用外层 width 做收起/展开动画，避免收起过程中
              * 内部 Flex 布局跟着挤压变形。 */}
-            <div style={{ width: 400, display: "flex", flexDirection: "column", height: "100%" }}>
+            <div
+                style={{
+                    width: 400,
+                    display: "flex",
+                    flexDirection: "column",
+                    height: "100%",
+                }}
+            >
                 <div
                     style={{
                         height: 52,
@@ -1014,10 +1432,16 @@ function CopilotPanel({
                             智
                         </div>
                         <div>
-                            <Typography.Text strong style={{ display: "block" }}>
+                            <Typography.Text
+                                strong
+                                style={{ display: "block" }}
+                            >
                                 智能研究助手
                             </Typography.Text>
-                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            <Typography.Text
+                                type="secondary"
+                                style={{ fontSize: 11 }}
+                            >
                                 Azure OpenAI GPT-4o · v3
                             </Typography.Text>
                         </div>
@@ -1033,7 +1457,13 @@ function CopilotPanel({
                         <Popover
                             placement="bottomRight"
                             trigger="click"
-                            styles={{ content: { padding: 0, maxHeight: 320, overflow: "auto" } }}
+                            styles={{
+                                content: {
+                                    padding: 0,
+                                    maxHeight: 320,
+                                    overflow: "auto",
+                                },
+                            }}
                             content={
                                 <Conversations
                                     items={DRAWER_SESSIONS}
@@ -1101,7 +1531,9 @@ function CopilotPanel({
                                 vertical
                                 items={DRAWER_PROMPTS}
                                 onItemClick={(info) =>
-                                    handleUserSubmit(info.data.description as string)
+                                    handleUserSubmit(
+                                        info.data.description as string,
+                                    )
                                 }
                             />
                         </>
@@ -1126,14 +1558,18 @@ function CopilotPanel({
                         <Button
                             size="small"
                             icon={<FileSearchOutlined />}
-                            onClick={() => handleUserSubmit("整理一份竞品研究框架")}
+                            onClick={() =>
+                                handleUserSubmit("整理一份竞品研究框架")
+                            }
                         >
                             研究框架
                         </Button>
                         <Button
                             size="small"
                             icon={<AppstoreAddOutlined />}
-                            onClick={() => handleUserSubmit("为调研报告设计目录")}
+                            onClick={() =>
+                                handleUserSubmit("为调研报告设计目录")
+                            }
                         >
                             报告目录
                         </Button>
@@ -1161,9 +1597,14 @@ function CopilotPanel({
                                     <Button
                                         type="text"
                                         icon={<PaperClipOutlined />}
-                                        onClick={() => setAttachmentsOpen(!attachmentsOpen)}
+                                        onClick={() =>
+                                            setAttachmentsOpen(!attachmentsOpen)
+                                        }
                                     />
-                                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                                    <Typography.Text
+                                        type="secondary"
+                                        style={{ fontSize: 11 }}
+                                    >
                                         当前使用已保存版本 v3
                                     </Typography.Text>
                                 </Flex>
@@ -1229,484 +1670,512 @@ export default function AgentDesignPage({
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
-                overflow: "hidden",
-                background: token.colorBgLayout,
-            }}
-        >
-            {/* Prototype controls */}
-            <div
-                style={{
-                    minHeight: 44,
-                    padding: "6px 24px",
-                    background: token.colorFillQuaternary,
-                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    flexShrink: 0,
-                }}
-            >
-                <Typography.Text
-                    type="secondary"
-                    style={{ fontSize: 11, marginRight: 4 }}
-                >
-                    设计评审
-                </Typography.Text>
-                <Select
-                    aria-label="页面状态"
-                    value={state}
-                    onChange={setState}
-                    style={{ width: 146 }}
-                    size="small"
-                    options={STATE_OPTIONS}
-                />
-                <Segmented
-                    size="small"
-                    value={density}
-                    onChange={(v) => setDensity(v as Density)}
-                    options={[
-                        { value: "standard", label: "标准" },
-                        { value: "compact", label: "紧凑" },
-                    ]}
-                />
-                <Tag
-                    style={{
-                        marginLeft: "auto",
-                        marginRight: 0,
-                        fontSize: 11,
-                        color: token.colorPrimaryText,
-                        background: token.colorPrimaryBg,
-                        borderColor: "transparent",
-                    }}
-                >
-                    UI-004 · 6 个配置区段
-                </Tag>
-            </div>
-
-            {/* Agent header */}
-            <div
-                style={{
-                    padding: density === "compact" ? "8px 24px" : "12px 24px",
-                    background: token.colorBgContainer,
-                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    flexWrap: "wrap",
-                    flexShrink: 0,
-                    minHeight: density === "compact" ? 60 : 72,
-                }}
-            >
-                {onBack && (
-                    <Tooltip title="返回 Agent 空间">
-                        <Button
-                            type="text"
-                            aria-label="返回 Agent 空间"
-                            icon={<ArrowLeftOutlined />}
-                            onClick={onBack}
-                        />
-                    </Tooltip>
-                )}
-                <div
-                    style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        background: `linear-gradient(145deg, ${token.colorPrimary}B8, ${token.colorPrimary})`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        boxShadow: `0 8px 20px ${token.colorPrimary}28`,
-                    }}
-                >
-                    <Typography.Text
-                        style={{ color: "#fff", fontWeight: 700, fontSize: 17 }}
-                    >
-                        智
-                    </Typography.Text>
-                </div>
-                <div style={{ minWidth: 140 }}>
-                    <Typography.Text
-                        strong
-                        style={{
-                            display: "block",
-                            lineHeight: 1.35,
-                            fontSize: 16,
-                        }}
-                    >
-                        智能研究助手
-                    </Typography.Text>
-                    <Space size={8} style={{ marginTop: 4 }}>
-                        <Typography.Text
-                            type="secondary"
-                            style={{ fontSize: 11 }}
-                        >
-                            v3 · Owner: owner-alice
-                        </Typography.Text>
-                        <StateBadge state={state} />
-                    </Space>
-                </div>
-
-                <div
-                    style={{
-                        marginLeft: "auto",
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                    }}
-                >
-                    {isOwner && (
-                        <Popconfirm
-                            title="删除这个 Agent？"
-                            description="删除后无法恢复，已有对话记录不会保留。"
-                            okText="删除"
-                            cancelText="取消"
-                            okButtonProps={{ danger: true }}
-                        >
-                            <Tooltip title="删除 Agent">
-                                <Button
-                                    danger
-                                    type="text"
-                                    aria-label="删除 Agent"
-                                    icon={<DeleteOutlined />}
-                                />
-                            </Tooltip>
-                        </Popconfirm>
-                    )}
-                    <Button
-                        icon={<PlayCircleOutlined />}
-                        onClick={() => {
-                            setConversationOpen(true);
-                            setSiderCollapsed(true);
-                            onCopilotOpenChange?.(true);
-                        }}
-                    >
-                        试运行
-                    </Button>
-                    {isOwner && (
-                        <Button
-                            icon={<SaveOutlined />}
-                            loading={state === "submitting"}
-                            disabled={state === "submitting"}
-                            onClick={() => message.success("已存为草稿，未影响已发布的版本")}
-                        >
-                            保存
-                        </Button>
-                    )}
-                    {isOwner && (
-                        <Button
-                            type="primary"
-                            icon={<CloudUploadOutlined />}
-                            loading={state === "submitting"}
-                            disabled={state === "submitting"}
-                            onClick={() => setPublishModalOpen(true)}
-                        >
-                            {state === "submitting" ? "发布中…" : "发布"}
-                        </Button>
-                    )}
-                    {!isOwner && (
-                        <Button icon={<CopyOutlined />}>
-                            复制为我的 Agent
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {(state === "submit-failed" || state === "submit-success") && (
-                <Alert
-                    banner
-                    type={state === "submit-failed" ? "error" : "success"}
-                    showIcon
-                    className="inkwell-compact-alert"
-                    title={
-                        <span style={{ fontSize: 13 }}>
-                            {state === "submit-failed" ? (
-                                "发布失败：500。已保留你的草稿"
-                            ) : (
-                                <span>
-                                    已发布为 <strong>v3</strong>{" "}
-                                    <Button
-                                        type="link"
-                                        size="small"
-                                        style={{ padding: 0 }}
-                                    >
-                                        查看版本
-                                    </Button>
-                                </span>
-                            )}
-                        </span>
-                    }
-                    style={{ flexShrink: 0, padding: "6px 24px" }}
-                />
-            )}
-
-            {/* Configuration workspace */}
-            <div
-                style={{
-                    flex: 1,
-                    minHeight: 0,
                     overflow: "hidden",
+                    background: token.colorBgLayout,
                 }}
             >
+                {/* Prototype controls */}
                 <div
-                    data-testid="agent-configuration-workspace"
                     style={{
-                        width: "100%",
-                        height: "100%",
+                        minHeight: 44,
+                        padding: "6px 24px",
+                        background: token.colorFillQuaternary,
+                        borderBottom: `1px solid ${token.colorBorderSecondary}`,
                         display: "flex",
-                        overflow: "auto",
-                        background: token.colorBgContainer,
-                        border: `1px solid ${token.colorBorderSecondary}`,
+                        gap: 12,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        flexShrink: 0,
                     }}
                 >
-                    {/* Section Navigation */}
-                    <div
+                    <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, marginRight: 4 }}
+                    >
+                        设计评审
+                    </Typography.Text>
+                    <Select
+                        aria-label="页面状态"
+                        value={state}
+                        onChange={setState}
+                        style={{ width: 146 }}
+                        size="small"
+                        options={STATE_OPTIONS}
+                    />
+                    <Segmented
+                        size="small"
+                        value={density}
+                        onChange={(v) => setDensity(v as Density)}
+                        options={[
+                            { value: "standard", label: "标准" },
+                            { value: "compact", label: "紧凑" },
+                        ]}
+                    />
+                    <Tag
                         style={{
-                            width: siderWidth,
-                            flexShrink: 0,
-                            background: token.colorFillQuaternary,
-                            borderRight: `1px solid ${token.colorBorderSecondary}`,
-                            overflow: "hidden",
-                            transition: "width 0.2s",
-                            display: "flex",
-                            flexDirection: "column",
+                            marginLeft: "auto",
+                            marginRight: 0,
+                            fontSize: 11,
+                            color: token.colorPrimaryText,
+                            background: token.colorPrimaryBg,
+                            borderColor: "transparent",
                         }}
                     >
-                        <div
-                            style={{
-                                minHeight: 48,
-                                padding: "8px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "flex-end",
-                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                            }}
-                        >
+                        UI-004 · 6 个配置区段
+                    </Tag>
+                </div>
+
+                {/* Agent header */}
+                <div
+                    style={{
+                        padding:
+                            density === "compact" ? "8px 24px" : "12px 24px",
+                        background: token.colorBgContainer,
+                        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        flexWrap: "wrap",
+                        flexShrink: 0,
+                        minHeight: density === "compact" ? 60 : 72,
+                    }}
+                >
+                    {onBack && (
+                        <Tooltip title="返回 Agent 空间">
                             <Button
                                 type="text"
-                                size="small"
-                                icon={
-                                    siderCollapsed ? (
-                                        <MenuUnfoldOutlined />
-                                    ) : (
-                                        <MenuFoldOutlined />
-                                    )
-                                }
-                                onClick={() => setSiderCollapsed((v) => !v)}
+                                aria-label="返回 Agent 空间"
+                                icon={<ArrowLeftOutlined />}
+                                onClick={onBack}
                             />
-                        </div>
-
-                        {/* Section list */}
-                        <div
-                            style={{
-                                flex: 1,
-                                overflow: "auto",
-                                padding: "10px 8px",
-                            }}
-                        >
-                            {SECTIONS.map((s) => {
-                                const active = s.key === section;
-                                return (
-                                    <button
-                                        key={s.key}
-                                        type="button"
-                                        onClick={() => setSection(s.key)}
-                                        style={{
-                                            position: "relative",
-                                            zIndex: 1,
-                                            width: "100%",
-                                            border: 0,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: siderCollapsed ? 0 : 8,
-                                            padding: siderCollapsed
-                                                ? "8px 0"
-                                                : density === "compact"
-                                                  ? "7px 10px"
-                                                  : "9px 10px",
-                                            marginBottom: 3,
-                                            borderRadius: 6,
-                                            cursor: "pointer",
-                                            justifyContent: siderCollapsed
-                                                ? "center"
-                                                : "flex-start",
-                                            background: active
-                                                ? token.colorPrimaryBg
-                                                : "transparent",
-                                            color: active
-                                                ? token.colorPrimary
-                                                : token.colorText,
-                                            transition:
-                                                "background-color 0.15s, color 0.15s",
-                                            fontSize:
-                                                density === "compact" ? 12 : 13,
-                                            fontWeight: active ? 600 : 400,
-                                            fontFamily: "inherit",
-                                            textAlign: "left",
-                                        }}
-                                        aria-current={
-                                            active ? "page" : undefined
-                                        }
-                                    >
-                                        <Tooltip
-                                            title={
-                                                siderCollapsed ? s.label : ""
-                                            }
-                                            placement="right"
-                                        >
-                                            <span
-                                                style={{
-                                                    flexShrink: 0,
-                                                    fontSize:
-                                                        density === "compact"
-                                                            ? 14
-                                                            : 16,
-                                                }}
-                                            >
-                                                {s.icon}
-                                            </span>
-                                        </Tooltip>
-                                        {!siderCollapsed && (
-                                            <span
-                                                style={{
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                }}
-                                            >
-                                                {s.label}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Section Content */}
+                        </Tooltip>
+                    )}
                     <div
                         style={{
-                            flex: 1,
-                            minHeight: 0,
-                            minWidth: 280,
-                            background: token.colorBgContainer,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            background: `linear-gradient(145deg, ${token.colorPrimary}B8, ${token.colorPrimary})`,
                             display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            boxShadow: `0 8px 20px ${token.colorPrimary}28`,
                         }}
                     >
-                        <div
+                        <Typography.Text
                             style={{
-                                width: "100%",
-                                minHeight: 48,
-                                padding:
-                                    density === "compact"
-                                        ? "0 24px"
-                                        : "0 32px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                flexShrink: 0,
-                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                                color: "#fff",
+                                fontWeight: 700,
+                                fontSize: 17,
                             }}
                         >
-                            <Typography.Title
-                                level={density === "compact" ? 5 : 3}
-                                style={{ margin: 0 }}
+                            智
+                        </Typography.Text>
+                    </div>
+                    <div style={{ minWidth: 140 }}>
+                        <Typography.Text
+                            strong
+                            style={{
+                                display: "block",
+                                lineHeight: 1.35,
+                                fontSize: 16,
+                            }}
+                        >
+                            智能研究助手
+                        </Typography.Text>
+                        <Space size={8} style={{ marginTop: 4 }}>
+                            <Typography.Text
+                                type="secondary"
+                                style={{ fontSize: 11 }}
                             >
-                                {
-                                    SECTIONS.find((s) => s.key === section)
-                                        ?.label
-                                }
-                            </Typography.Title>
-                            {section === "instructions" && (
-                                <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
+                                v3 · Owner: owner-alice
+                            </Typography.Text>
+                            <StateBadge state={state} />
+                        </Space>
+                    </div>
+
+                    <div
+                        style={{
+                            marginLeft: "auto",
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                        }}
+                    >
+                        {isOwner && (
+                            <Popconfirm
+                                title="删除这个 Agent？"
+                                description="删除后无法恢复，已有对话记录不会保留。"
+                                okText="删除"
+                                cancelText="取消"
+                                okButtonProps={{ danger: true }}
+                            >
+                                <Tooltip title="删除 Agent">
                                     <Button
+                                        danger
                                         type="text"
-                                        size="small"
-                                        aria-label="Instructions 帮助"
-                                        icon={<QuestionCircleOutlined />}
-                                        style={{
-                                            color: token.colorTextSecondary,
-                                        }}
+                                        aria-label="删除 Agent"
+                                        icon={<DeleteOutlined />}
                                     />
                                 </Tooltip>
-                            )}
+                            </Popconfirm>
+                        )}
+                        <Button
+                            icon={<PlayCircleOutlined />}
+                            onClick={() => {
+                                setConversationOpen(true);
+                                setSiderCollapsed(true);
+                                onCopilotOpenChange?.(true);
+                            }}
+                        >
+                            试运行
+                        </Button>
+                        {isOwner && (
+                            <Button
+                                icon={<SaveOutlined />}
+                                loading={state === "submitting"}
+                                disabled={state === "submitting"}
+                                onClick={() =>
+                                    message.success(
+                                        "已存为草稿，未影响已发布的版本",
+                                    )
+                                }
+                            >
+                                保存
+                            </Button>
+                        )}
+                        {isOwner && (
+                            <Button
+                                type="primary"
+                                icon={<CloudUploadOutlined />}
+                                loading={state === "submitting"}
+                                disabled={state === "submitting"}
+                                onClick={() => setPublishModalOpen(true)}
+                            >
+                                {state === "submitting" ? "发布中…" : "发布"}
+                            </Button>
+                        )}
+                        {!isOwner && (
+                            <Button icon={<CopyOutlined />}>
+                                复制为我的 Agent
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                {(state === "submit-failed" || state === "submit-success") && (
+                    <Alert
+                        banner
+                        type={state === "submit-failed" ? "error" : "success"}
+                        showIcon
+                        className="inkwell-compact-alert"
+                        title={
+                            <span style={{ fontSize: 13 }}>
+                                {state === "submit-failed" ? (
+                                    "发布失败：500。已保留你的草稿"
+                                ) : (
+                                    <span>
+                                        已发布为 <strong>v3</strong>{" "}
+                                        <Button
+                                            type="link"
+                                            size="small"
+                                            style={{ padding: 0 }}
+                                        >
+                                            查看版本
+                                        </Button>
+                                    </span>
+                                )}
+                            </span>
+                        }
+                        style={{ flexShrink: 0, padding: "6px 24px" }}
+                    />
+                )}
+
+                {/* Configuration workspace */}
+                <div
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                    }}
+                >
+                    <div
+                        data-testid="agent-configuration-workspace"
+                        style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            overflow: "auto",
+                            background: token.colorBgContainer,
+                            border: `1px solid ${token.colorBorderSecondary}`,
+                        }}
+                    >
+                        {/* Section Navigation */}
+                        <div
+                            style={{
+                                width: siderWidth,
+                                flexShrink: 0,
+                                background: token.colorFillQuaternary,
+                                borderRight: `1px solid ${token.colorBorderSecondary}`,
+                                overflow: "hidden",
+                                transition: "width 0.2s",
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    minHeight: 48,
+                                    padding: "8px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "flex-end",
+                                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    icon={
+                                        siderCollapsed ? (
+                                            <MenuUnfoldOutlined />
+                                        ) : (
+                                            <MenuFoldOutlined />
+                                        )
+                                    }
+                                    onClick={() => setSiderCollapsed((v) => !v)}
+                                />
+                            </div>
+
+                            {/* Section list */}
+                            <div
+                                style={{
+                                    flex: 1,
+                                    overflow: "auto",
+                                    padding: "10px 8px",
+                                }}
+                            >
+                                {SECTIONS.map((s) => {
+                                    const active = s.key === section;
+                                    return (
+                                        <button
+                                            key={s.key}
+                                            type="button"
+                                            onClick={() => setSection(s.key)}
+                                            style={{
+                                                position: "relative",
+                                                zIndex: 1,
+                                                width: "100%",
+                                                border: 0,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: siderCollapsed ? 0 : 8,
+                                                padding: siderCollapsed
+                                                    ? "8px 0"
+                                                    : density === "compact"
+                                                      ? "7px 10px"
+                                                      : "9px 10px",
+                                                marginBottom: 3,
+                                                borderRadius: 6,
+                                                cursor: "pointer",
+                                                justifyContent: siderCollapsed
+                                                    ? "center"
+                                                    : "flex-start",
+                                                background: active
+                                                    ? token.colorPrimaryBg
+                                                    : "transparent",
+                                                color: active
+                                                    ? token.colorPrimary
+                                                    : token.colorText,
+                                                transition:
+                                                    "background-color 0.15s, color 0.15s",
+                                                fontSize:
+                                                    density === "compact"
+                                                        ? 12
+                                                        : 13,
+                                                fontWeight: active ? 600 : 400,
+                                                fontFamily: "inherit",
+                                                textAlign: "left",
+                                            }}
+                                            aria-current={
+                                                active ? "page" : undefined
+                                            }
+                                        >
+                                            <Tooltip
+                                                title={
+                                                    siderCollapsed
+                                                        ? s.label
+                                                        : ""
+                                                }
+                                                placement="right"
+                                            >
+                                                <span
+                                                    style={{
+                                                        flexShrink: 0,
+                                                        fontSize:
+                                                            density ===
+                                                            "compact"
+                                                                ? 14
+                                                                : 16,
+                                                    }}
+                                                >
+                                                    {s.icon}
+                                                </span>
+                                            </Tooltip>
+                                            {!siderCollapsed && (
+                                                <span
+                                                    style={{
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow:
+                                                            "ellipsis",
+                                                    }}
+                                                >
+                                                    {s.label}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
+                        {/* Section Content */}
                         <div
                             style={{
                                 flex: 1,
                                 minHeight: 0,
-                                overflow: "auto",
-                                padding:
-                                    density === "compact"
-                                        ? "18px 24px"
-                                        : "24px 32px",
+                                minWidth: 280,
+                                background: token.colorBgContainer,
+                                display: "flex",
+                                flexDirection: "column",
+                                overflow: "hidden",
                             }}
                         >
-                            <SectionContent
-                                section={section}
-                                readonly={isReadonly}
-                                density={density}
-                            />
+                            <div
+                                style={{
+                                    width: "100%",
+                                    minHeight: 48,
+                                    padding:
+                                        density === "compact"
+                                            ? "0 24px"
+                                            : "0 32px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    flexShrink: 0,
+                                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                <Typography.Title
+                                    level={density === "compact" ? 5 : 3}
+                                    style={{ margin: 0 }}
+                                >
+                                    {
+                                        SECTIONS.find((s) => s.key === section)
+                                            ?.label
+                                    }
+                                </Typography.Title>
+                                {section === "instructions" && (
+                                    <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
+                                        <Button
+                                            type="text"
+                                            size="small"
+                                            aria-label="Instructions 帮助"
+                                            icon={<QuestionCircleOutlined />}
+                                            style={{
+                                                color: token.colorTextSecondary,
+                                            }}
+                                        />
+                                    </Tooltip>
+                                )}
+                            </div>
+
+                            <div
+                                style={{
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflow: "auto",
+                                    padding:
+                                        density === "compact"
+                                            ? "18px 24px"
+                                            : "24px 32px",
+                                }}
+                            >
+                                <SectionContent
+                                    section={section}
+                                    readonly={isReadonly}
+                                    density={density}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* 存为草稿与发布是两个独立动作：存为草稿不产生新版本、不影响已发布版本或正在进行的对话；发布才会把当前编辑内容提交为新版本并立即生效（对应 requirements.md REQ-015 二态版本模型） */}
-            <Modal
-                open={publishModalOpen}
-                onCancel={() => {
-                    setPublishModalOpen(false);
-                    setShareAfterPublish(false);
-                }}
-                onOk={() => {
-                    setPublishModalOpen(false);
-                    messageApi.success(
-                        shareAfterPublish
-                            ? "已发布新版本并共享给团队"
-                            : "已发布新版本",
-                    );
-                    setShareAfterPublish(false);
-                }}
-                okText="发布"
-                cancelText="取消"
-                title="发布新版本"
-            >
-                <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-                    发布后将成为新的正式版本，正在使用该 Agent 的对话会从下一轮开始使用新版本。
-                </Typography.Paragraph>
-                <Form layout="vertical">
-                    <Form.Item label="变更说明（可选）" style={{ marginBottom: 0 }}>
-                        <Input
-                            value={changeSummary}
-                            onChange={(event) => setChangeSummary(event.target.value)}
-                            placeholder="说明本次修改的内容，会记录到版本历史里"
-                            maxLength={100}
-                        />
-                    </Form.Item>
-                    <Form.Item style={{ marginTop: 16, marginBottom: 0 }}>
-                        <Checkbox
-                            checked={shareAfterPublish}
-                            onChange={(event) =>
-                                setShareAfterPublish(event.target.checked)
-                            }
+                {/* 存为草稿与发布是两个独立动作：存为草稿不产生新版本、不影响已发布版本或正在进行的对话；发布才会把当前编辑内容提交为新版本并立即生效（对应 requirements.md REQ-015 二态版本模型） */}
+                <Modal
+                    open={publishModalOpen}
+                    onCancel={() => {
+                        setPublishModalOpen(false);
+                        setShareAfterPublish(false);
+                    }}
+                    onOk={() => {
+                        setPublishModalOpen(false);
+                        messageApi.success(
+                            shareAfterPublish
+                                ? "已发布新版本并共享给团队"
+                                : "已发布新版本",
+                        );
+                        setShareAfterPublish(false);
+                    }}
+                    okText="发布"
+                    cancelText="取消"
+                    title="发布新版本"
+                >
+                    <Typography.Paragraph
+                        type="secondary"
+                        style={{ marginBottom: 16 }}
+                    >
+                        发布后将成为新的正式版本，正在使用该 Agent
+                        的对话会从下一轮开始使用新版本。
+                    </Typography.Paragraph>
+                    <Form layout="vertical">
+                        <Form.Item
+                            label="变更说明（可选）"
+                            style={{ marginBottom: 0 }}
                         >
-                            发布后共享给团队
-                        </Checkbox>
-                        <Typography.Text
-                            type="secondary"
-                            style={{ display: "block", marginTop: 4, marginLeft: 24 }}
-                        >
-                            团队成员将可以查看并使用本次发布的新版本。
-                        </Typography.Text>
-                    </Form.Item>
-                </Form>
-            </Modal>
+                            <Input
+                                value={changeSummary}
+                                onChange={(event) =>
+                                    setChangeSummary(event.target.value)
+                                }
+                                placeholder="说明本次修改的内容，会记录到版本历史里"
+                                maxLength={100}
+                            />
+                        </Form.Item>
+                        <Form.Item style={{ marginTop: 16, marginBottom: 0 }}>
+                            <Checkbox
+                                checked={shareAfterPublish}
+                                onChange={(event) =>
+                                    setShareAfterPublish(event.target.checked)
+                                }
+                            >
+                                发布后共享给团队
+                            </Checkbox>
+                            <Typography.Text
+                                type="secondary"
+                                style={{
+                                    display: "block",
+                                    marginTop: 4,
+                                    marginLeft: 24,
+                                }}
+                            >
+                                团队成员将可以查看并使用本次发布的新版本。
+                            </Typography.Text>
+                        </Form.Item>
+                    </Form>
+                </Modal>
             </div>
 
             <CopilotPanel
