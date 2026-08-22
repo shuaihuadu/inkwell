@@ -239,6 +239,7 @@ export interface IssuedCredential {
 }
 
 export interface ChatMessage {
+    id?: string;
     role: "user" | "assistant";
     content: string;
 }
@@ -344,6 +345,15 @@ export interface InkwellDesktopApi {
         agentId: string,
         conversationId: string,
     ) => Promise<ChatMessage[]>;
+    deleteAgentConversationMessage: (
+        agentId: string,
+        conversationId: string,
+        messageId: string,
+    ) => Promise<void>;
+    clearAgentConversation: (
+        agentId: string,
+        conversationId: string,
+    ) => Promise<void>;
     deleteAgentConversation: (
         agentId: string,
         conversationId: string,

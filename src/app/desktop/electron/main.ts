@@ -74,9 +74,11 @@ interface InternalAuthSession extends AuthIdentity {
 
 interface PagedApiResponse<T> {
     items: T[];
+    totalCount: number;
 }
 
 interface AgentChatMessageApiResponse {
+    id: string;
     message: {
         role: string;
         text?: string | null;
@@ -269,6 +271,20 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     return response.status === 204
         ? (undefined as T)
         : (response.json() as Promise<T>);
+};
+
+const requestAllPages = async <T>(path: string): Promise<T[]> => {
+    const pageSize = 100;
+    const items: T[] = [];
+    for (let page = 1; ; page++) {
+        const result = await request<PagedApiResponse<T>>(
+            `${path}?page=${page}&pageSize=${pageSize}`,
+        );
+        items.push(...result.items);
+        if (result.items.length === 0 || items.length >= result.totalCount) {
+            return items;
+        }
+    }
 };
 
 const requireAuthenticated = (): void => {
@@ -708,12 +724,9 @@ const registerApiHandlers = (): void => {
         "inkwell:list-agent-conversations",
         async (_event, agentId: string): Promise<AgentConversationListItem[]> => {
             requireAuthenticated();
-            const result = await request<
-                PagedApiResponse<AgentConversationListItem>
-            >(
-                `/api/agents/${encodeURIComponent(agentId)}/conversations?page=1&pageSize=100`,
+            return requestAllPages<AgentConversationListItem>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations`,
             );
-            return result.items;
         },
     );
     ipcMain.handle(
@@ -724,12 +737,11 @@ const registerApiHandlers = (): void => {
             conversationId: string,
         ): Promise<ChatMessage[]> => {
             requireAuthenticated();
-            const result = await request<
-                PagedApiResponse<AgentChatMessageApiResponse>
-            >(
-                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/messages?page=1&pageSize=100`,
+            const items = await requestAllPages<AgentChatMessageApiResponse>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/messages`,
             );
-            return result.items.map(({ message }) => ({
+            return items.map(({ id, message }) => ({
+                id,
                 role: message.role === "assistant" ? "assistant" : "user",
                 content:
                     message.text ??
@@ -738,6 +750,35 @@ const registerApiHandlers = (): void => {
                         .join("") ??
                     "",
             }));
+        },
+    );
+    ipcMain.handle(
+        "inkwell:delete-agent-conversation-message",
+        (
+            _event,
+            agentId: string,
+            conversationId: string,
+            messageId: string,
+        ): Promise<void> => {
+            requireAuthenticated();
+            return request<void>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+                { method: "DELETE" },
+            );
+        },
+    );
+    ipcMain.handle(
+        "inkwell:clear-agent-conversation",
+        (
+            _event,
+            agentId: string,
+            conversationId: string,
+        ): Promise<void> => {
+            requireAuthenticated();
+            return request<void>(
+                `/api/agents/${encodeURIComponent(agentId)}/conversations/${encodeURIComponent(conversationId)}/clear`,
+                { method: "POST" },
+            );
         },
     );
     ipcMain.handle(

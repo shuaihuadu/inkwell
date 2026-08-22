@@ -236,6 +236,10 @@ test("shows authentication errors and enters the workspace after login", async (
     let agentRollbacks = 0;
     let agentAvatarUploads = 0;
     let agentShares = 0;
+    let conversationMessageDeletes = 0;
+    let conversationClears = 0;
+    let conversationPageTwoRequests = 0;
+    let messagePageTwoRequests = 0;
     const chatRequestUrls: string[] = [];
     const chatRunModes: (string | undefined)[] = [];
     const chatConversationIds: (string | undefined)[] = [];
@@ -339,8 +343,35 @@ test("shows authentication errors and enters the workspace after login", async (
                               },
                           ]
                         : [],
-                    totalCount: conversationCreated ? 1 : 0,
+                    totalCount: conversationCreated ? 2 : 0,
                     pagination: { page: 1, pageSize: 100 },
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations?page=2&pageSize=100` &&
+            request.method === "GET"
+        ) {
+            conversationPageTwoRequests += 1;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items: conversationCreated
+                        ? [
+                              {
+                                  id: "0198a96d-19e4-7000-8000-000000000404",
+                                  agentVersionId: historicalAgentVersionId,
+                                  title: "更早的历史会话",
+                                  lastActivityTime: "2026-07-19T07:00:00Z",
+                                  createdTime: "2026-07-19T07:00:00Z",
+                              },
+                          ]
+                        : [],
+                    totalCount: conversationCreated ? 2 : 0,
+                    pagination: { page: 2, pageSize: 100 },
                 }),
             );
             return;
@@ -375,12 +406,57 @@ test("shows authentication errors and enters the workspace after login", async (
             response.setHeader("Content-Type", "application/json");
             response.end(
                 JSON.stringify({
-                    items: persistedConversationMessages,
+                    items: persistedConversationMessages.slice(0, 1),
                     totalCount: persistedConversationMessages.length,
                     page: 1,
                     pageSize: 100,
                 }),
             );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations/${conversationId}/messages?page=2&pageSize=100` &&
+            request.method === "GET"
+        ) {
+            messagePageTwoRequests += 1;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify({
+                    items: persistedConversationMessages.slice(1),
+                    totalCount: persistedConversationMessages.length,
+                    page: 2,
+                    pageSize: 100,
+                }),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations/${conversationId}/messages/0198a96d-19e4-7000-8000-000000000403` &&
+            request.method === "DELETE"
+        ) {
+            conversationMessageDeletes += 1;
+            persistedConversationMessages = persistedConversationMessages.filter(
+                (item) =>
+                    item.id !== "0198a96d-19e4-7000-8000-000000000403",
+            );
+            response.statusCode = 204;
+            response.end();
+            return;
+        }
+
+        if (
+            request.url ===
+                `/api/agents/${publishedAgent.id}/conversations/${conversationId}/clear` &&
+            request.method === "POST"
+        ) {
+            conversationClears += 1;
+            persistedConversationMessages = [];
+            response.statusCode = 204;
+            response.end();
             return;
         }
 
@@ -996,6 +1072,12 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByText("会话版本 v2", { exact: true }),
         ).toBeVisible();
+        await expect.poll(() => conversationPageTwoRequests).toBeGreaterThan(0);
+        await expect(
+            page
+                .locator(".chat-history")
+                .getByText("更早的历史会话", { exact: true }),
+        ).toBeVisible();
         await expect(page.locator(".chat-history")).toHaveCSS("width", "240px");
         await expect(page.locator(".chat-history")).toHaveCSS(
             "background-color",
@@ -1019,10 +1101,38 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.locator(".chat-full-messages .x-markdown h1"),
         ).toHaveText("运行成功");
+        await expect.poll(() => messagePageTwoRequests).toBeGreaterThan(0);
         await expect(
             page
                 .locator(".chat-history")
                 .getByText("验证正式发布版", { exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "删除第 2 条消息" })
+            .dispatchEvent("click");
+        const deleteMessageDialog = page.getByRole("dialog", {
+            name: "删除这条消息？",
+        });
+        await deleteMessageDialog
+            .getByRole("button", { name: "确认删除" })
+            .dispatchEvent("click");
+        await expect.poll(() => conversationMessageDeletes).toBe(1);
+        await expect(
+            page.locator(".chat-full-messages .x-markdown h1"),
+        ).toHaveCount(0);
+        await page
+            .getByRole("button", { name: "清空当前会话" })
+            .dispatchEvent("click");
+        const clearConversationDialog = page.getByRole("dialog", {
+            name: "清空当前会话？",
+        });
+        await clearConversationDialog
+            .getByRole("button", { name: "确认清空" })
+            .dispatchEvent("click");
+        await expect.poll(() => conversationClears).toBe(1);
+        await expect(page.locator(".chat-full-messages")).toHaveCount(0);
+        await expect(
+            page.locator(".chat-history").getByText("新会话", { exact: true }),
         ).toBeVisible();
         await page
             .getByRole("button", { name: "收起会话" })

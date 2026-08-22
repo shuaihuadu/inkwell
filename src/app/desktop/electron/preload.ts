@@ -83,6 +83,19 @@ const api: InkwellDesktopApi = {
             agentId,
             conversationId,
         ),
+    deleteAgentConversationMessage: (agentId, conversationId, messageId) =>
+        ipcRenderer.invoke(
+            "inkwell:delete-agent-conversation-message",
+            agentId,
+            conversationId,
+            messageId,
+        ),
+    clearAgentConversation: (agentId, conversationId) =>
+        ipcRenderer.invoke(
+            "inkwell:clear-agent-conversation",
+            agentId,
+            conversationId,
+        ),
     deleteAgentConversation: (agentId, conversationId) =>
         ipcRenderer.invoke(
             "inkwell:delete-agent-conversation",

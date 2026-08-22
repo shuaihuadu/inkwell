@@ -1,6 +1,7 @@
 import {
     AppstoreAddOutlined,
     ArrowLeftOutlined,
+    ClearOutlined,
     CloseOutlined,
     CommentOutlined,
     DeleteOutlined,
@@ -27,6 +28,7 @@ import {
     Empty,
     Flex,
     message,
+    Modal,
     Space,
     Tag,
     Tooltip,
@@ -359,6 +361,86 @@ export function ChatPanel({
         if (next) await switchConversation(String(next.key));
     };
 
+    const reloadConversation = async (conversationKey: string): Promise<void> => {
+        if (!agent) return;
+        const [persistedMessages, persistedConversations] = await Promise.all([
+            desktopApi.getAgentConversationMessages(agent.id, conversationKey),
+            desktopApi.listAgentConversations(agent.id),
+        ]);
+        setMessages(persistedMessages);
+        setConversations(persistedConversations.map(toConversationItem));
+    };
+
+    const confirmDeleteConversation = (key: string): void => {
+        Modal.confirm({
+            title: "删除这个会话？",
+            content: "会话及其全部消息将被永久删除，操作不可恢复。",
+            okText: "确认删除",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: () => deleteConversation(key),
+        });
+    };
+
+    const confirmClearConversation = (): void => {
+        if (!agent || !activeConversationKey || activeRequestId) return;
+        const agentId = agent.id;
+        const conversationKey = activeConversationKey;
+        Modal.confirm({
+            title: "清空当前会话？",
+            content: "全部消息将被永久删除，但会话仍保留在历史列表中。",
+            okText: "确认清空",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: async () => {
+                try {
+                    await desktopApi.clearAgentConversation(
+                        agentId,
+                        conversationKey,
+                    );
+                    await reloadConversation(conversationKey);
+                } catch (reason) {
+                    void messageApi.error(
+                        reason instanceof Error
+                            ? reason.message
+                            : "清空会话失败。",
+                    );
+                    throw reason;
+                }
+            },
+        });
+    };
+
+    const confirmDeleteMessage = (messageId: string): void => {
+        if (!agent || !activeConversationKey || activeRequestId) return;
+        const agentId = agent.id;
+        const conversationKey = activeConversationKey;
+        Modal.confirm({
+            title: "删除这条消息？",
+            content: "消息将被永久删除，操作不可恢复。",
+            okText: "确认删除",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: async () => {
+                try {
+                    await desktopApi.deleteAgentConversationMessage(
+                        agentId,
+                        conversationKey,
+                        messageId,
+                    );
+                    await reloadConversation(conversationKey);
+                } catch (reason) {
+                    void messageApi.error(
+                        reason instanceof Error
+                            ? reason.message
+                            : "删除消息失败。",
+                    );
+                    throw reason;
+                }
+            },
+        });
+    };
+
     const renderMessages = () => (
         <Bubble.List
             className="chat-bubble-list"
@@ -406,6 +488,19 @@ export function ChatPanel({
                               </Space>
                           )
                         : undefined,
+                footer: item.id ? (
+                    <Tooltip title="删除消息">
+                        <Button
+                            type="text"
+                            size="small"
+                            danger
+                            aria-label={`删除第 ${index + 1} 条消息`}
+                            icon={<DeleteOutlined />}
+                            disabled={Boolean(activeRequestId)}
+                            onClick={() => confirmDeleteMessage(item.id!)}
+                        />
+                    </Tooltip>
+                ) : undefined,
             }))}
             role={{
                 user: {
@@ -459,6 +554,19 @@ export function ChatPanel({
                                 : `会话版本 v${activeConversationVersionNumber}`
                             : `新会话将使用 v${agent.latestPublishedVersionNumber}`}
                     </Tag>
+                    <Tooltip title="清空当前会话">
+                        <Button
+                            type="text"
+                            aria-label="清空当前会话"
+                            icon={<ClearOutlined />}
+                            disabled={
+                                !activeConversationKey ||
+                                messages.length === 0 ||
+                                Boolean(activeRequestId)
+                            }
+                            onClick={confirmClearConversation}
+                        />
+                    </Tooltip>
                 </header>
 
                 <div className="chat-page-body">
@@ -531,7 +639,7 @@ export function ChatPanel({
                                                 danger: true,
                                                 icon: <DeleteOutlined />,
                                                 onClick: () =>
-                                                    void deleteConversation(
+                                                    confirmDeleteConversation(
                                                         String(
                                                             conversation.key,
                                                         ),
