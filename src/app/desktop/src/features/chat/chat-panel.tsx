@@ -62,12 +62,16 @@ const ChatPrompts = [
     { key: "rewrite", description: "帮我优化一段产品介绍文案" },
 ];
 
-type LocalConversation = ConversationItemType & { key: string };
+type LocalConversation = ConversationItemType & {
+    key: string;
+    agentVersionId: string;
+};
 
 const toConversationItem = (
     conversation: AgentConversationListItem,
 ): LocalConversation => ({
     key: conversation.id,
+    agentVersionId: conversation.agentVersionId,
     label: conversation.title ?? "新会话",
     group: "历史会话",
 });
@@ -97,6 +101,19 @@ export function ChatPanel({
         queryFn: () => desktopApi.getAgent(agent!.id),
         enabled: variant === "full" && Boolean(agent),
     });
+    const agentVersionsQuery = useQuery({
+        queryKey: ["agent-versions", agent?.id],
+        queryFn: () => desktopApi.listAgentVersions(agent!.id),
+        enabled: variant === "full" && Boolean(agent),
+    });
+    const activeConversation = activeConversationKey
+        ? conversations.find((item) => item.key === activeConversationKey)
+        : undefined;
+    const activeConversationVersionNumber = activeConversation
+        ? agentVersionsQuery.data?.find(
+              (version) => version.id === activeConversation.agentVersionId,
+          )?.versionNumber
+        : undefined;
 
     useEffect(() => {
         if (variant !== "full" || !agent) return;
@@ -434,6 +451,13 @@ export function ChatPanel({
                         模型：
                         {agentDetailsQuery.data?.buildOptions.modelOptions
                             .modelId ?? "未配置"}
+                    </Tag>
+                    <Tag>
+                        {activeConversation
+                            ? activeConversationVersionNumber === undefined
+                                ? "会话版本加载中"
+                                : `会话版本 v${activeConversationVersionNumber}`
+                            : `新会话将使用 v${agent.latestPublishedVersionNumber}`}
                     </Tag>
                 </header>
 

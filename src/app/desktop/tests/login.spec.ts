@@ -240,7 +240,9 @@ test("shows authentication errors and enters the workspace after login", async (
     const chatRunModes: (string | undefined)[] = [];
     const chatConversationIds: (string | undefined)[] = [];
     const conversationId = "0198a96d-19e4-7000-8000-000000000401";
-    let conversationCreated = false;
+    const historicalAgentVersionId =
+        "0198a96d-19e4-7000-8000-000000000304";
+    let conversationCreated = true;
     let persistedConversationMessages: Array<Record<string, unknown>> = [];
     const capturedPayloads: {
         agentCreate?: Record<string, unknown>;
@@ -298,6 +300,23 @@ test("shows authentication errors and enters the workspace after login", async (
             return;
         }
 
+        if (request.url === `/api/agents/${publishedAgent.id}/versions`) {
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+                JSON.stringify([
+                    {
+                        id: publishedAgent.currentPublishedVersionId,
+                        versionNumber: 3,
+                    },
+                    {
+                        id: historicalAgentVersionId,
+                        versionNumber: 2,
+                    },
+                ]),
+            );
+            return;
+        }
+
         if (
             request.url ===
                 `/api/agents/${publishedAgent.id}/conversations?page=1&pageSize=100` &&
@@ -310,8 +329,7 @@ test("shows authentication errors and enters the workspace after login", async (
                         ? [
                               {
                                   id: conversationId,
-                                  agentVersionId:
-                                      publishedAgent.currentPublishedVersionId,
+                                  agentVersionId: historicalAgentVersionId,
                                   title:
                                       persistedConversationMessages.length > 0
                                           ? "验证正式发布版"
@@ -975,6 +993,9 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByText("模型：gpt-5.4", { exact: true }),
         ).toBeVisible();
+        await expect(
+            page.getByText("会话版本 v2", { exact: true }),
+        ).toBeVisible();
         await expect(page.locator(".chat-history")).toHaveCSS("width", "240px");
         await expect(page.locator(".chat-history")).toHaveCSS(
             "background-color",
@@ -1013,6 +1034,9 @@ test("shows authentication errors and enters the workspace after login", async (
         await page
             .getByRole("button", { name: "新建会话" })
             .dispatchEvent("click");
+        await expect(
+            page.getByText("新会话将使用 v3", { exact: true }),
+        ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "研发助手" }),
         ).toBeVisible();
