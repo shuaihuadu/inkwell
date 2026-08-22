@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -139,7 +139,6 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                     agent_version_id = table.Column<Guid>(type: "uuid", nullable: false),
                     owner_user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     title = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
-                    last_committed_run_id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     last_activity_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     created_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -199,6 +198,12 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_agent_chat_messages_conversation_id_run_id_run_message_index",
+                table: "agent_chat_messages",
+                columns: new[] { "conversation_id", "run_id", "run_message_index" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_agent_chat_messages_conversation_id_sequence_number",

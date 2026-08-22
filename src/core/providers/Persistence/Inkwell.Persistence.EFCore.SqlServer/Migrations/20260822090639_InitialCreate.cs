@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -139,7 +139,6 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                     AgentVersionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     OwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    LastCommittedRunId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                     LastActivityTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     CreatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
@@ -199,6 +198,13 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AgentChatMessages_ConversationId_RunId_RunMessageIndex",
+                table: "AgentChatMessages",
+                columns: new[] { "ConversationId", "RunId", "RunMessageIndex" },
+                unique: true,
+                filter: "[RunId] IS NOT NULL AND [RunMessageIndex] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AgentChatMessages_ConversationId_SequenceNumber",
