@@ -66,6 +66,13 @@ const api: InkwellDesktopApi = {
         ipcRenderer.invoke("inkwell:publish-agent", agentId, changeSummary),
     listAgentVersions: (agentId) =>
         ipcRenderer.invoke("inkwell:list-agent-versions", agentId),
+    rollbackAgentVersion: (agentId, versionId, changeSummary) =>
+        ipcRenderer.invoke(
+            "inkwell:rollback-agent-version",
+            agentId,
+            versionId,
+            changeSummary,
+        ),
     createAgentConversation: (agentId) =>
         ipcRenderer.invoke("inkwell:create-agent-conversation", agentId),
     listAgentConversations: (agentId) =>

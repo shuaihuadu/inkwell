@@ -4,6 +4,7 @@ import {
     CloudUploadOutlined,
     CopyOutlined,
     DeleteOutlined,
+    DiffOutlined,
     HistoryOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
@@ -11,6 +12,7 @@ import {
     QuestionCircleOutlined,
     ReadOutlined,
     RobotOutlined,
+    RollbackOutlined,
     SaveOutlined,
     SlidersOutlined,
     ToolOutlined,
@@ -23,7 +25,10 @@ import {
     Button,
     Card,
     Checkbox,
+    Descriptions,
+    Drawer,
     Empty,
+    Flex,
     Form,
     Input,
     InputNumber,
@@ -39,12 +44,14 @@ import {
     Typography,
     Upload,
     message,
+    theme,
 } from "antd";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
     AgentDefinition,
     AgentUpsertRequest,
+    AgentVersion,
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
 import { ChatPanel } from "../chat/chat-panel";
@@ -250,6 +257,40 @@ export function AgentEditor({
                 reason instanceof Error ? reason.message : "复制 Agent 失败。",
             ),
     });
+    const rollbackMutation = useMutation({
+        mutationFn: ({
+            versionId,
+            changeSummary: rollbackChangeSummary,
+        }: {
+            versionId: string;
+            changeSummary: string | null;
+        }) =>
+            desktopApi.rollbackAgentVersion(
+                currentAgent!.id,
+                versionId,
+                rollbackChangeSummary,
+            ),
+        onSuccess: async (version) => {
+            setSavedAgent((previous) =>
+                previous
+                    ? {
+                          ...previous,
+                          currentPublishedVersionId: version.id,
+                          latestPublishedVersionNumber: version.versionNumber,
+                      }
+                    : previous,
+            );
+            await queryClient.invalidateQueries({ queryKey: ["agents"] });
+            await queryClient.invalidateQueries({
+                queryKey: ["agent-versions", versionAgentId],
+            });
+            messageApi.success(`已回滚，生成新版本 v${version.versionNumber}`);
+        },
+        onError: (reason) =>
+            messageApi.error(
+                reason instanceof Error ? reason.message : "回滚失败。",
+            ),
+    });
     const deleteMutation = useMutation({
         mutationFn: (targetAgentId: string) =>
             desktopApi.deleteAgent(targetAgentId),
@@ -290,6 +331,7 @@ export function AgentEditor({
         publishMutation.isPending ||
         avatarMutation.isPending ||
         cloneMutation.isPending ||
+        rollbackMutation.isPending ||
         deleteMutation.isPending;
     const selectedSection = Sections.find((item) => item.key === section)!;
     const chatModels = (modelsQuery.data ?? []).filter(
@@ -563,6 +605,19 @@ export function AgentEditor({
                                             versionsLoading={
                                                 versionsQuery.isLoading
                                             }
+                                            onRollback={(
+                                                versionId,
+                                                rollbackChangeSummary,
+                                            ) =>
+                                                rollbackMutation.mutateAsync({
+                                                    versionId,
+                                                    changeSummary:
+                                                        rollbackChangeSummary,
+                                                })
+                                            }
+                                            rollbackPending={
+                                                rollbackMutation.isPending
+                                            }
                                         />
                                     </div>
                                 ))}
@@ -666,6 +721,8 @@ function AgentSection({
     skillsLoading,
     versions,
     versionsLoading,
+    onRollback,
+    rollbackPending,
 }: {
     section: AgentEditorSection;
     agent: AgentDefinition | null;
@@ -682,6 +739,11 @@ function AgentSection({
     skillsLoading: boolean;
     versions: Awaited<ReturnType<typeof desktopApi.listAgentVersions>>;
     versionsLoading: boolean;
+    onRollback: (
+        versionId: string,
+        changeSummary: string | null,
+    ) => Promise<AgentVersion>;
+    rollbackPending: boolean;
 }) {
     if (section === "basic") {
         return (
@@ -818,60 +880,462 @@ function AgentSection({
         );
     }
     if (versionsLoading) return <Skeleton active paragraph={{ rows: 4 }} />;
-    if (!agent?.latestPublishedVersionNumber || versions.length === 0)
-        return <Empty description="此 Agent 尚未发布" />;
     return (
-        <Table
-            size="small"
-            pagination={false}
-            rowKey="id"
-            dataSource={versions}
-            columns={[
-                {
-                    title: "版本",
-                    dataIndex: "versionNumber",
-                    width: 72,
-                    render: (versionNumber: number) => (
-                        <Typography.Text strong>
-                            v{versionNumber}
-                        </Typography.Text>
-                    ),
-                },
-                {
-                    title: "状态",
-                    dataIndex: "versionNumber",
-                    width: 96,
-                    render: (versionNumber: number) => (
-                        <Tag
-                            color={
-                                versionNumber ===
-                                agent.latestPublishedVersionNumber
-                                    ? "success"
-                                    : "default"
-                            }
-                        >
-                            {versionNumber ===
-                            agent.latestPublishedVersionNumber
-                                ? "已发布"
-                                : "历史版本"}
-                        </Tag>
-                    ),
-                },
-                {
-                    title: "保存时间",
-                    dataIndex: "createdTime",
-                    width: 168,
-                    render: (createdTime: string) =>
-                        new Date(createdTime).toLocaleString("zh-CN"),
-                },
-                { title: "保存人", dataIndex: "createdByUserId", width: 120 },
-                {
-                    title: "变更摘要",
-                    dataIndex: "changeSummary",
-                    render: (summary: string | null) => summary || "-",
-                },
-            ]}
+        <VersionHistorySection
+            agent={agent}
+            versions={versions}
+            tools={tools}
+            readonly={readonly}
+            onRollback={onRollback}
+            rollbackPending={rollbackPending}
         />
+    );
+}
+
+interface VersionSnapshotField {
+    section: string;
+    label: string;
+    value: string;
+}
+
+function versionSnapshotFields(
+    snapshot: AgentVersion["snapshot"],
+    tools: Awaited<ReturnType<typeof desktopApi.listTools>>,
+): VersionSnapshotField[] {
+    const toolName = (toolId: string): string =>
+        tools.find((tool) => tool.id === toolId)?.name ?? toolId.slice(0, 8);
+    const model = snapshot.buildOptions.modelOptions;
+    const toolSummary =
+        (snapshot.buildOptions.toolBindings ?? [])
+            .map((binding) => toolName(binding.toolId))
+            .join("、") || "无";
+    const skillSummary =
+        (snapshot.buildOptions.skills ?? [])
+            .map((skill) => skill.name)
+            .join("、") || "无";
+    return [
+        { section: "基础信息", label: "名称", value: snapshot.name },
+        {
+            section: "基础信息",
+            label: "描述",
+            value: snapshot.description ?? "-",
+        },
+        {
+            section: "Instructions",
+            label: "Instructions",
+            value: snapshot.instructions ?? "-",
+        },
+        { section: "模型与参数", label: "模型", value: model.modelId ?? "-" },
+        {
+            section: "模型与参数",
+            label: "Temperature",
+            value: String(model.temperature ?? "默认"),
+        },
+        {
+            section: "模型与参数",
+            label: "Top P",
+            value: String(model.topP ?? "默认"),
+        },
+        {
+            section: "模型与参数",
+            label: "Max Tokens",
+            value: String(model.maxTokens ?? "默认"),
+        },
+        { section: "能力", label: "工具", value: toolSummary },
+        { section: "能力", label: "Skills", value: skillSummary },
+    ];
+}
+
+function VersionHistorySection({
+    agent,
+    versions,
+    tools,
+    readonly,
+    onRollback,
+    rollbackPending,
+}: {
+    agent: AgentDefinition | null;
+    versions: Awaited<ReturnType<typeof desktopApi.listAgentVersions>>;
+    tools: Awaited<ReturnType<typeof desktopApi.listTools>>;
+    readonly: boolean;
+    onRollback: (
+        versionId: string,
+        changeSummary: string | null,
+    ) => Promise<AgentVersion>;
+    rollbackPending: boolean;
+}) {
+    const { token } = theme.useToken();
+    const [modal, modalContextHolder] = Modal.useModal();
+    const [detailTarget, setDetailTarget] = useState<AgentVersion | null>(null);
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
+    const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
+
+    if (versions.length === 0)
+        return <Empty description="此 Agent 尚未发布" />;
+
+    const latestVersionNumber =
+        agent?.latestPublishedVersionNumber ??
+        Math.max(...versions.map((version) => version.versionNumber));
+    const isPublished = (version: AgentVersion): boolean =>
+        version.versionNumber === latestVersionNumber;
+    const savedBy = (version: AgentVersion): string =>
+        version.ownerUserName ?? version.ownerUserId;
+
+    const openComparison = (baseId: string, targetId: string): void => {
+        setBaseVersionId(baseId);
+        setTargetVersionId(targetId);
+        setCompareOpen(true);
+    };
+
+    const confirmRollback = (version: AgentVersion): void => {
+        modal.confirm({
+            title: `回滚到 v${version.versionNumber}？`,
+            content:
+                "将基于该历史版本生成一个新的发布版本，不会覆盖版本历史。",
+            okText: "确认回滚",
+            cancelText: "取消",
+            okButtonProps: { danger: true },
+            onOk: async () => {
+                await onRollback(version.id, null);
+                setDetailTarget(null);
+            },
+        });
+    };
+
+    const base =
+        versions.find((version) => version.id === baseVersionId) ??
+        versions[Math.min(1, versions.length - 1)];
+    const target =
+        versions.find((version) => version.id === targetVersionId) ??
+        versions[0];
+    const baseFields = versionSnapshotFields(base.snapshot, tools);
+    const targetFields = versionSnapshotFields(target.snapshot, tools);
+    const differences = baseFields
+        .map((field, index) => ({
+            ...field,
+            targetValue: targetFields[index].value,
+        }))
+        .filter((field) => field.value !== field.targetValue);
+
+    const detailIndex = detailTarget
+        ? versions.findIndex((version) => version.id === detailTarget.id)
+        : -1;
+
+    return (
+        <div style={{ minWidth: 0 }}>
+            {modalContextHolder}
+            <Flex
+                justify="space-between"
+                align="flex-start"
+                gap={16}
+                style={{ marginBottom: 16 }}
+            >
+                <div>
+                    <Typography.Title level={5} style={{ margin: 0 }}>
+                        版本历史
+                    </Typography.Title>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        发布和回滚会生成不可变版本；保存草稿不会出现在这里。
+                    </Typography.Text>
+                </div>
+                <Button
+                    icon={<DiffOutlined />}
+                    disabled={versions.length < 2}
+                    onClick={() =>
+                        openComparison(versions[1].id, versions[0].id)
+                    }
+                >
+                    版本对比
+                </Button>
+            </Flex>
+            <Table
+                size="small"
+                pagination={false}
+                scroll={{ x: 760 }}
+                rowKey="id"
+                dataSource={versions}
+                columns={[
+                    {
+                        title: "版本",
+                        dataIndex: "versionNumber",
+                        width: 72,
+                        render: (versionNumber: number) => (
+                            <Typography.Text strong>
+                                v{versionNumber}
+                            </Typography.Text>
+                        ),
+                    },
+                    {
+                        title: "状态",
+                        key: "status",
+                        width: 96,
+                        render: (_value: unknown, version: AgentVersion) => (
+                            <Tag
+                                color={
+                                    isPublished(version) ? "success" : "default"
+                                }
+                            >
+                                {isPublished(version) ? "已发布" : "历史版本"}
+                            </Tag>
+                        ),
+                    },
+                    {
+                        title: "保存时间",
+                        dataIndex: "createdTime",
+                        width: 168,
+                        render: (createdTime: string) =>
+                            new Date(createdTime).toLocaleString("zh-CN"),
+                    },
+                    {
+                        title: "保存人",
+                        key: "savedBy",
+                        width: 120,
+                        render: (_value: unknown, version: AgentVersion) =>
+                            savedBy(version),
+                    },
+                    {
+                        title: "变更摘要",
+                        dataIndex: "changeSummary",
+                        render: (summary: string | null) => summary || "-",
+                    },
+                    {
+                        title: "操作",
+                        key: "actions",
+                        width: 72,
+                        align: "center",
+                        render: (_value: unknown, version: AgentVersion) => (
+                            <Button
+                                type="link"
+                                size="small"
+                                onClick={() => setDetailTarget(version)}
+                            >
+                                查看
+                            </Button>
+                        ),
+                    },
+                ]}
+            />
+
+            <Drawer
+                open={detailTarget !== null}
+                onClose={() => setDetailTarget(null)}
+                title={
+                    detailTarget
+                        ? `v${detailTarget.versionNumber} 版本详情`
+                        : undefined
+                }
+                width={560}
+                extra={
+                    detailTarget && (
+                        <Space>
+                            {detailIndex >= 0 &&
+                                detailIndex < versions.length - 1 && (
+                                    <Button
+                                        size="small"
+                                        icon={<DiffOutlined />}
+                                        onClick={() =>
+                                            openComparison(
+                                                versions[detailIndex + 1].id,
+                                                detailTarget.id,
+                                            )
+                                        }
+                                    >
+                                        与上一版比较
+                                    </Button>
+                                )}
+                            {!isPublished(detailTarget) && (
+                                <Button
+                                    size="small"
+                                    icon={<DiffOutlined />}
+                                    onClick={() =>
+                                        openComparison(
+                                            detailTarget.id,
+                                            versions[0].id,
+                                        )
+                                    }
+                                >
+                                    与最新版比较
+                                </Button>
+                            )}
+                        </Space>
+                    )
+                }
+            >
+                {detailTarget && (
+                    <>
+                        <Descriptions
+                            column={1}
+                            size="small"
+                            items={[
+                                {
+                                    key: "status",
+                                    label: "状态",
+                                    children: isPublished(detailTarget)
+                                        ? "已发布"
+                                        : "历史版本",
+                                },
+                                {
+                                    key: "createdTime",
+                                    label: "保存时间",
+                                    children: new Date(
+                                        detailTarget.createdTime,
+                                    ).toLocaleString("zh-CN"),
+                                },
+                                {
+                                    key: "savedBy",
+                                    label: "发布人",
+                                    children: savedBy(detailTarget),
+                                },
+                                {
+                                    key: "summary",
+                                    label: "变更摘要",
+                                    children: detailTarget.changeSummary || "-",
+                                },
+                            ]}
+                        />
+                        <Typography.Title
+                            level={5}
+                            style={{ marginTop: 24 }}
+                        >
+                            配置快照
+                        </Typography.Title>
+                        {versionSnapshotFields(detailTarget.snapshot, tools).map(
+                            (field) => (
+                                <div
+                                    key={field.label}
+                                    style={{
+                                        padding: "10px 0",
+                                        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                                    }}
+                                >
+                                    <Typography.Text
+                                        type="secondary"
+                                        style={{
+                                            display: "block",
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        {field.label}
+                                    </Typography.Text>
+                                    <Typography.Text>
+                                        {field.value}
+                                    </Typography.Text>
+                                </div>
+                            ),
+                        )}
+                        {!readonly && !isPublished(detailTarget) && (
+                            <Button
+                                danger
+                                block
+                                icon={<RollbackOutlined />}
+                                loading={rollbackPending}
+                                style={{ marginTop: 24 }}
+                                onClick={() => confirmRollback(detailTarget)}
+                            >
+                                回滚到本版
+                            </Button>
+                        )}
+                    </>
+                )}
+            </Drawer>
+
+            <Modal
+                open={compareOpen}
+                onCancel={() => setCompareOpen(false)}
+                footer={null}
+                width={920}
+                centered
+                title="版本对比"
+            >
+                <Flex align="center" gap={12} style={{ marginBottom: 20 }}>
+                    <Select
+                        value={base.id}
+                        onChange={setBaseVersionId}
+                        style={{ flex: 1 }}
+                        options={versions.map((version) => ({
+                            value: version.id,
+                            label: `v${version.versionNumber} · ${version.changeSummary || "无摘要"}`,
+                            disabled: version.id === target.id,
+                        }))}
+                    />
+                    <Typography.Text type="secondary">对比</Typography.Text>
+                    <Select
+                        value={target.id}
+                        onChange={setTargetVersionId}
+                        style={{ flex: 1 }}
+                        options={versions.map((version) => ({
+                            value: version.id,
+                            label: `v${version.versionNumber} · ${version.changeSummary || "无摘要"}`,
+                            disabled: version.id === base.id,
+                        }))}
+                    />
+                </Flex>
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                            "140px minmax(0, 1fr) minmax(0, 1fr)",
+                        borderTop: `1px solid ${token.colorBorderSecondary}`,
+                    }}
+                >
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        字段
+                    </Typography.Text>
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        v{base.versionNumber}
+                    </Typography.Text>
+                    <Typography.Text strong style={{ padding: 12 }}>
+                        v{target.versionNumber}
+                    </Typography.Text>
+                    {differences.map((field) => (
+                        <Fragment key={field.label}>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                <Typography.Text
+                                    type="secondary"
+                                    style={{ display: "block", fontSize: 11 }}
+                                >
+                                    {field.section}
+                                </Typography.Text>
+                                <Typography.Text strong>
+                                    {field.label}
+                                </Typography.Text>
+                            </div>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    whiteSpace: "pre-wrap",
+                                    background: token.colorErrorBg,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                {field.value}
+                            </div>
+                            <div
+                                style={{
+                                    padding: 12,
+                                    whiteSpace: "pre-wrap",
+                                    background: token.colorSuccessBg,
+                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                                }}
+                            >
+                                {field.targetValue}
+                            </div>
+                        </Fragment>
+                    ))}
+                </div>
+                {differences.length === 0 && (
+                    <Typography.Text type="secondary">
+                        两个版本的配置完全相同。
+                    </Typography.Text>
+                )}
+            </Modal>
+        </div>
     );
 }
 

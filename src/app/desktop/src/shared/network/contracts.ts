@@ -122,11 +122,21 @@ export interface AgentUpsertRequest {
     skillBindings: AgentSkillBinding[];
 }
 
+export interface AgentVersionSnapshot {
+    name: string;
+    avatarUri: string | null;
+    description: string | null;
+    instructions: string | null;
+    buildOptions: AgentBuildOptions;
+}
+
 export interface AgentVersion {
     id: string;
     agentId: string;
     versionNumber: number;
-    createdByUserId: string;
+    snapshot: AgentVersionSnapshot;
+    ownerUserId: string;
+    ownerUserName: string | null;
     changeSummary: string | null;
     createdTime: string;
     updatedTime: string;
@@ -319,6 +329,11 @@ export interface InkwellDesktopApi {
         changeSummary: string | null,
     ) => Promise<AgentVersion>;
     listAgentVersions: (agentId: string) => Promise<AgentVersion[]>;
+    rollbackAgentVersion: (
+        agentId: string,
+        versionId: string,
+        changeSummary: string | null,
+    ) => Promise<AgentVersion>;
     createAgentConversation: (
         agentId: string,
     ) => Promise<AgentConversation>;

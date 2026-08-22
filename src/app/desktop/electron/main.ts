@@ -677,6 +677,24 @@ const registerApiHandlers = (): void => {
         },
     );
     ipcMain.handle(
+        "inkwell:rollback-agent-version",
+        (
+            _event,
+            agentId: string,
+            versionId: string,
+            changeSummary: string | null,
+        ): Promise<AgentVersion> => {
+            requireAuthenticated();
+            return request<AgentVersion>(
+                `/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}/rollback`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ changeSummary }),
+                },
+            );
+        },
+    );
+    ipcMain.handle(
         "inkwell:create-agent-conversation",
         (_event, agentId: string): Promise<AgentConversation> => {
             requireAuthenticated();

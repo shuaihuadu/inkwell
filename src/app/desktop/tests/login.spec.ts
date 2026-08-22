@@ -233,6 +233,7 @@ test("shows authentication errors and enters the workspace after login", async (
     let agentCreates = 0;
     let agentUpdates = 0;
     let agentPublishes = 0;
+    let agentRollbacks = 0;
     let agentAvatarUploads = 0;
     let agentShares = 0;
     const chatRequestUrls: string[] = [];
@@ -245,6 +246,7 @@ test("shows authentication errors and enters the workspace after login", async (
         agentCreate?: Record<string, unknown>;
         agentUpdate?: Record<string, unknown>;
         agentPublish?: Record<string, unknown>;
+        agentRollback?: Record<string, unknown>;
     } = {};
     const uploadedAvatarUri =
         "inkwell://agent-avatars/0198a96d19e470008000000000000001/avatar.png";
@@ -472,15 +474,30 @@ test("shows authentication errors and enters the workspace after login", async (
                 capturedPayloads.agentPublish = JSON.parse(
                     Buffer.concat(chunks).toString(),
                 ) as Record<string, unknown>;
+                const versionNumber = agentPublishes;
+                const versionId =
+                    versionNumber === 1
+                        ? "0198a96d-19e4-7000-8000-000000000305"
+                        : "0198a96d-19e4-7000-8000-000000000308";
                 response.setHeader("Content-Type", "application/json");
                 response.end(
                     JSON.stringify({
-                        id: "0198a96d-19e4-7000-8000-000000000305",
+                        id: versionId,
                         agentId: editableAgent.id,
-                        versionNumber: 1,
-                        createdByUserId: editableAgent.ownerUserId,
+                        versionNumber,
+                        snapshot: {
+                            name: editableAgent.name,
+                            avatarUri: editableAgent.avatarUri,
+                            description: editableAgent.description,
+                            instructions: editableAgent.instructions,
+                            buildOptions: editableAgent.buildOptions,
+                        },
+                        ownerUserId: editableAgent.ownerUserId,
+                        ownerUserName: "admin",
                         changeSummary: "补充头像与发布说明",
                         createdTime: "2026-07-19T00:01:00Z",
+                        updatedTime: "2026-07-19T00:01:00Z",
+                        publishedTime: "2026-07-19T00:01:00Z",
                     }),
                 );
             });
@@ -497,22 +514,110 @@ test("shows authentication errors and enters the workspace after login", async (
             return;
         }
 
-        if (request.url === `/api/agents/${editableAgent.id}/versions`) {
-            response.setHeader("Content-Type", "application/json");
-            response.end(
-                JSON.stringify([
-                    {
-                        id: "0198a96d-19e4-7000-8000-000000000305",
+        if (
+            request.url ===
+                `/api/agents/${editableAgent.id}/versions/0198a96d-19e4-7000-8000-000000000305/rollback` &&
+            request.method === "POST"
+        ) {
+            agentRollbacks += 1;
+            const chunks: Buffer[] = [];
+            request.on("data", (chunk: Buffer) => chunks.push(chunk));
+            request.on("end", () => {
+                capturedPayloads.agentRollback = JSON.parse(
+                    Buffer.concat(chunks).toString(),
+                ) as Record<string, unknown>;
+                response.setHeader("Content-Type", "application/json");
+                response.end(
+                    JSON.stringify({
+                        id: "0198a96d-19e4-7000-8000-000000000309",
                         agentId: editableAgent.id,
-                        versionNumber: 1,
-                        createdByUserId: editableAgent.ownerUserId,
-                        changeSummary: "补充头像与发布说明",
-                        createdTime: "2026-07-19T00:01:00Z",
-                        updatedTime: "2026-07-19T00:01:00Z",
-                        publishedTime: "2026-07-19T00:01:00Z",
+                        versionNumber: 3,
+                        snapshot: {
+                            name: editableAgent.name,
+                            avatarUri: editableAgent.avatarUri,
+                            description: editableAgent.description,
+                            instructions: editableAgent.instructions,
+                            buildOptions: editableAgent.buildOptions,
+                        },
+                        ownerUserId: editableAgent.ownerUserId,
+                        ownerUserName: "admin",
+                        changeSummary: "Rollback from v1",
+                        createdTime: "2026-07-19T00:03:00Z",
+                        updatedTime: "2026-07-19T00:03:00Z",
+                        publishedTime: "2026-07-19T00:03:00Z",
+                    }),
+                );
+            });
+            return;
+        }
+
+        if (request.url === `/api/agents/${editableAgent.id}/versions`) {
+            const versions = [
+                ...(agentRollbacks > 0
+                    ? [
+                          {
+                              id: "0198a96d-19e4-7000-8000-000000000309",
+                              agentId: editableAgent.id,
+                              versionNumber: 3,
+                              snapshot: {
+                                  name: editableAgent.name,
+                                  avatarUri: editableAgent.avatarUri,
+                                  description: editableAgent.description,
+                                  instructions: editableAgent.instructions,
+                                  buildOptions: editableAgent.buildOptions,
+                              },
+                              ownerUserId: editableAgent.ownerUserId,
+                              ownerUserName: "admin",
+                              changeSummary: "Rollback from v1",
+                              createdTime: "2026-07-19T00:03:00Z",
+                              updatedTime: "2026-07-19T00:03:00Z",
+                              publishedTime: "2026-07-19T00:03:00Z",
+                          },
+                      ]
+                    : []),
+                ...(agentPublishes > 1
+                    ? [
+                          {
+                              id: "0198a96d-19e4-7000-8000-000000000308",
+                              agentId: editableAgent.id,
+                              versionNumber: 2,
+                              snapshot: {
+                                  name: editableAgent.name,
+                                  avatarUri: editableAgent.avatarUri,
+                                  description: "整理第二版发布内容。",
+                                  instructions: editableAgent.instructions,
+                                  buildOptions: editableAgent.buildOptions,
+                              },
+                              ownerUserId: editableAgent.ownerUserId,
+                              ownerUserName: "admin",
+                              changeSummary: "补充第二版发布说明",
+                              createdTime: "2026-07-19T00:02:00Z",
+                              updatedTime: "2026-07-19T00:02:00Z",
+                              publishedTime: "2026-07-19T00:02:00Z",
+                          },
+                      ]
+                    : []),
+                {
+                    id: "0198a96d-19e4-7000-8000-000000000305",
+                    agentId: editableAgent.id,
+                    versionNumber: 1,
+                    snapshot: {
+                        name: editableAgent.name,
+                        avatarUri: editableAgent.avatarUri,
+                        description: editableAgent.description,
+                        instructions: editableAgent.instructions,
+                        buildOptions: editableAgent.buildOptions,
                     },
-                ]),
-            );
+                    ownerUserId: editableAgent.ownerUserId,
+                    ownerUserName: "admin",
+                    changeSummary: "补充头像与发布说明",
+                    createdTime: "2026-07-19T00:01:00Z",
+                    updatedTime: "2026-07-19T00:01:00Z",
+                    publishedTime: "2026-07-19T00:01:00Z",
+                },
+            ];
+            response.setHeader("Content-Type", "application/json");
+            response.end(JSON.stringify(versions));
             return;
         }
 
@@ -1844,12 +1949,54 @@ test("shows authentication errors and enters the workspace after login", async (
         expect(capturedPayloads.agentPublish?.changeSummary).toBe(
             "补充头像与发布说明",
         );
+        await page
+            .getByRole("button", { name: "基础信息" })
+            .dispatchEvent("click");
+        await page.getByLabel("描述").fill("整理第二版发布内容。");
+        await publishButton.dispatchEvent("click");
+        await publishDialog
+            .getByPlaceholder("说明本次修改的内容，会记录到版本历史里")
+            .fill("补充第二版发布说明");
+        await page
+            .locator(".ant-modal-footer:visible .ant-btn-primary")
+            .dispatchEvent("click");
+        await expect(publishDialog).toBeHidden();
+        await expect(page.getByText("已发布为 v2")).toBeVisible();
+        expect(agentUpdates).toBe(2);
+        expect(agentPublishes).toBe(2);
+        expect(capturedPayloads.agentPublish?.changeSummary).toBe(
+            "补充第二版发布说明",
+        );
         await page.getByRole("button", { name: "版本" }).dispatchEvent("click");
         await expect(
             page.getByRole("columnheader", { name: "变更摘要" }),
         ).toBeVisible();
         await expect(
             page.getByText("补充头像与发布说明", { exact: true }),
+        ).toBeVisible();
+        const firstVersionRow = page
+            .locator(".ant-table-row")
+            .filter({ hasText: "补充头像与发布说明" });
+        await firstVersionRow
+            .getByRole("button", { name: "查看" })
+            .dispatchEvent("click");
+        await expect(
+            page.getByText("v1 版本详情", { exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "回滚到本版" })
+            .dispatchEvent("click");
+        const rollbackDialog = page.getByRole("dialog", {
+            name: "回滚到 v1？",
+        });
+        await rollbackDialog
+            .getByRole("button", { name: "确认回滚" })
+            .dispatchEvent("click");
+        await expect.poll(() => agentRollbacks).toBe(1);
+        expect(capturedPayloads.agentRollback?.changeSummary).toBeNull();
+        await expect(page.getByText("已回滚，生成新版本 v3")).toBeVisible();
+        await expect(
+            page.getByText("Rollback from v1", { exact: true }),
         ).toBeVisible();
         await page
             .getByRole("button", { name: "基础信息" })
