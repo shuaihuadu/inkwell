@@ -1,5 +1,8 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using Inkwell.AppHost;
+using Microsoft.Extensions.Configuration;
+
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 string aspireDashboardOtlpEndpoint = builder.Configuration["ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL"]
     ?? throw new InvalidOperationException("Missing ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL.");
@@ -20,6 +23,16 @@ string liteLLMImage = ContainerImageConfiguration.GetRequired("AppHost:LiteLLM:I
 string postgresTag = ContainerImageConfiguration.GetRequired("AppHost:Postgres:Tag");
 string pgAdminTag = ContainerImageConfiguration.GetRequired("AppHost:PgAdmin:Tag");
 string sqlServerTag = ContainerImageConfiguration.GetRequired("AppHost:SqlServer:Tag");
+LiteLLMBootstrapModelOptions[] configuredLiteLLMModels = builder.Configuration
+    .GetSection("LiteLLM:BootstrapModels")
+    .Get<LiteLLMBootstrapModelOptions[]>() ?? [];
+LiteLLMBootstrapModelOptions[] liteLLMBootstrapModels =
+    [.. configuredLiteLLMModels.Where(model => model.Enabled)];
+string liteLLMConfigurationPath = Path.Combine(
+    builder.AppHostDirectory,
+    "obj",
+    "litellm-config.generated.yaml");
+LiteLLMConfigurationWriter.Write(liteLLMConfigurationPath, liteLLMBootstrapModels);
 
 string visualDesignDirectory = Path.GetFullPath(
     Path.Combine(builder.AppHostDirectory, "../../../prototypes/inkwell-visual-design"));
@@ -60,7 +73,7 @@ IResourceBuilder<ContainerResource> liteLLM = builder
     .AddContainer("litellm", liteLLMImage)
     .WithHttpEndpoint(port: liteLLMPort, targetPort: 4000, name: "http")
     .WithBindMount(
-        Path.Combine(builder.AppHostDirectory, "litellm-config.yaml"),
+        liteLLMConfigurationPath,
         "/app/config.yaml",
         isReadOnly: true)
     .WithEnvironment("LITELLM_MASTER_KEY", liteLLMMasterKey)
@@ -68,6 +81,65 @@ IResourceBuilder<ContainerResource> liteLLM = builder
     .WithEnvironment("STORE_MODEL_IN_DB", "True")
     .WithArgs("--config", "/app/config.yaml")
     .WaitFor(liteLLMDatabase);
+Dictionary<string, IResourceBuilder<ParameterResource>> liteLLMApiKeyParameters = new(StringComparer.Ordinal);
+Dictionary<string, string> liteLLMEnvironmentBindings = new(StringComparer.Ordinal);
+foreach (LiteLLMBootstrapModelOptions model in liteLLMBootstrapModels)
+{
+    if (!liteLLMApiKeyParameters.TryGetValue(
+        model.ApiKeyParameter,
+        out IResourceBuilder<ParameterResource>? apiKeyParameter))
+    {
+        apiKeyParameter = builder.AddParameter(model.ApiKeyParameter, secret: true);
+        liteLLMApiKeyParameters.Add(model.ApiKeyParameter, apiKeyParameter);
+    }
+
+    if (liteLLMEnvironmentBindings.TryGetValue(
+        model.ApiKeyEnvironmentVariable,
+        out string? existingParameterName))
+    {
+        if (!string.Equals(existingParameterName, model.ApiKeyParameter, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"LiteLLM environment variable '{model.ApiKeyEnvironmentVariable}' maps to multiple parameters.");
+        }
+
+    }
+    else
+    {
+        liteLLMEnvironmentBindings[model.ApiKeyEnvironmentVariable] = model.ApiKeyParameter;
+        liteLLM.WithEnvironment(model.ApiKeyEnvironmentVariable, apiKeyParameter);
+    }
+
+    if (string.IsNullOrWhiteSpace(model.ApiBaseParameter)
+        || string.IsNullOrWhiteSpace(model.ApiBaseEnvironmentVariable))
+    {
+        continue;
+    }
+
+    if (!liteLLMApiKeyParameters.TryGetValue(
+        model.ApiBaseParameter,
+        out IResourceBuilder<ParameterResource>? apiBaseParameter))
+    {
+        apiBaseParameter = builder.AddParameter(model.ApiBaseParameter, secret: true);
+        liteLLMApiKeyParameters.Add(model.ApiBaseParameter, apiBaseParameter);
+    }
+
+    if (liteLLMEnvironmentBindings.TryGetValue(
+        model.ApiBaseEnvironmentVariable,
+        out existingParameterName))
+    {
+        if (!string.Equals(existingParameterName, model.ApiBaseParameter, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"LiteLLM environment variable '{model.ApiBaseEnvironmentVariable}' maps to multiple parameters.");
+        }
+    }
+    else
+    {
+        liteLLMEnvironmentBindings[model.ApiBaseEnvironmentVariable] = model.ApiBaseParameter;
+        liteLLM.WithEnvironment(model.ApiBaseEnvironmentVariable, apiBaseParameter);
+    }
+}
 
 IResourceBuilder<SqlServerServerResource> sqlServer = builder
     .AddSqlServer("sqlserver", port: sqlServerPort)
