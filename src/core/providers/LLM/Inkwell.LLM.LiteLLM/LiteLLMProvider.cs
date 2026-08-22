@@ -57,29 +57,38 @@ public sealed class LiteLLMProvider(HttpClient httpClient, IOptions<LiteLLMOptio
         CancellationToken cancellationToken = default)
     {
         LLMModel model = await this.GetModelAsync(modelId, cancellationToken).ConfigureAwait(false);
-        if (model.Category != LLMModelCategory.Chat)
+        if (model.Category is not (LLMModelCategory.Chat or LLMModelCategory.Embedding))
         {
             return new LLMModelTestResult
             {
                 ModelId = model.Id,
                 IsSuccess = false,
                 Latency = TimeSpan.Zero,
-                ErrorMessage = "Connectivity testing is currently supported only for chat models.",
+                ErrorMessage = "Connectivity testing is currently supported only for chat and embedding models.",
             };
         }
 
         Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {
-            using HttpResponseMessage response = await httpClient.PostAsJsonAsync(
-                "v1/chat/completions",
-                new
-                {
-                    model = model.Id,
-                    messages = new[] { new { role = "user", content = "Reply with OK." } },
-                    max_completion_tokens = 8,
-                },
-                cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = model.Category == LLMModelCategory.Chat
+                ? await httpClient.PostAsJsonAsync(
+                    "v1/chat/completions",
+                    new
+                    {
+                        model = model.Id,
+                        messages = new[] { new { role = "user", content = "Reply with OK." } },
+                        max_completion_tokens = 8,
+                    },
+                    cancellationToken).ConfigureAwait(false)
+                : await httpClient.PostAsJsonAsync(
+                    "v1/embeddings",
+                    new
+                    {
+                        model = model.Id,
+                        input = "connectivity test",
+                    },
+                    cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             return new LLMModelTestResult

@@ -167,10 +167,10 @@ public sealed class LiteLLMProviderTests
     }
 
     /// <summary>
-    /// 验证非 Chat 模型不会触发可能计费的生成请求。
+    /// 验证 Embedding 模型连通性测试发送一次最小嵌入请求。
     /// </summary>
     [TestMethod]
-    public async Task TestModelAsync_WithEmbeddingModel_DoesNotSendGenerationRequestAsync()
+    public async Task TestModelAsync_WithEmbeddingModel_ReturnsSuccessAsync()
     {
         // Arrange
         using StubHttpMessageHandler handler = new(
@@ -183,8 +183,13 @@ public sealed class LiteLLMProviderTests
         LLMModelTestResult result = await provider.TestModelAsync("embedding-model");
 
         // Assert
-        Assert.IsFalse(result.IsSuccess);
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("embedding-model", result.ModelId);
         Assert.AreEqual(0, handler.ChatRequestCount);
+        Assert.AreEqual(1, handler.EmbeddingRequestCount);
+        using JsonDocument request = JsonDocument.Parse(handler.EmbeddingRequestJson!);
+        Assert.AreEqual("embedding-model", request.RootElement.GetProperty("model").GetString());
+        Assert.AreEqual("connectivity test", request.RootElement.GetProperty("input").GetString());
     }
 
     /// <summary>
@@ -228,11 +233,15 @@ public sealed class LiteLLMProviderTests
     {
         public int ChatRequestCount { get; private set; }
 
+        public int EmbeddingRequestCount { get; private set; }
+
         public string? AuthorizationParameter { get; private set; }
 
         public string? AuthorizationScheme { get; private set; }
 
         public string? ChatRequestJson { get; private set; }
+
+        public string? EmbeddingRequestJson { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -244,6 +253,7 @@ public sealed class LiteLLMProviderTests
                 "/v1/models" => modelsResponseJson,
                 "/model_group/info" => groupsResponseJson,
                 "/v1/chat/completions" => await this.GetChatResponseAsync(request, cancellationToken),
+                "/v1/embeddings" => await this.GetEmbeddingResponseAsync(request, cancellationToken),
                 _ => throw new AssertFailedException($"Unexpected request URI: {request.RequestUri}"),
             };
             HttpResponseMessage response = new(HttpStatusCode.OK)
@@ -266,6 +276,18 @@ public sealed class LiteLLMProviderTests
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
             return """{"id":"chatcmpl-test","object":"chat.completion","created":1784300000,"model":"gpt-5.4","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""";
+        }
+
+        private async Task<string> GetEmbeddingResponseAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            this.EmbeddingRequestCount++;
+            this.EmbeddingRequestJson = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            return """{"object":"list","data":[{"object":"embedding","index":0,"embedding":[0.1,0.2]}],"model":"embedding-model","usage":{"prompt_tokens":2,"total_tokens":2}}""";
         }
     }
 }
