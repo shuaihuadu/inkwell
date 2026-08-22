@@ -37,7 +37,6 @@ public sealed class AgentConversationModelTests
         // Assert
         Assert.IsNotNull(actual);
         Assert.AreEqual(expected, actual);
-        Assert.IsNull(actual.LastCommittedRunId);
     }
 
     /// <summary>

@@ -89,7 +89,6 @@ public sealed class AgentConversationServiceTests
         AgentConversation conversation = CreateConversation(conversationId, agentId, ownerUserId, originalTime) with
         {
             Title = "Existing title",
-            LastCommittedRunId = "existing-run",
         };
         FakeConversationRepository conversations = new() { ExistingConversation = conversation };
         FakeMessageRepository messages = new();
@@ -126,7 +125,6 @@ public sealed class AgentConversationServiceTests
         Assert.IsEmpty(sessionStates.States);
         Assert.IsNotNull(conversations.UpdatedConversation);
         Assert.IsNull(conversations.UpdatedConversation.Title);
-        Assert.IsNull(conversations.UpdatedConversation.LastCommittedRunId);
         Assert.AreEqual(now, conversations.UpdatedConversation.LastActivityTime);
         Assert.AreEqual(now, conversations.UpdatedConversation.UpdatedTime);
         Assert.AreEqual(IsolationLevel.Serializable, persistence.LastIsolationLevel);

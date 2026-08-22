@@ -9,7 +9,6 @@ internal sealed class AgentConversationEntity : IHasTimestamps, IHasOwner
     public Guid AgentVersionId { get; set; }
     public Guid OwnerUserId { get; init; }
     public string? Title { get; set; }
-    public string? LastCommittedRunId { get; set; }
     public DateTimeOffset LastActivityTime { get; set; }
     public DateTimeOffset CreatedTime { get; init; }
     public DateTimeOffset UpdatedTime { get; init; }

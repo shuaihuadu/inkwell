@@ -155,7 +155,6 @@ internal sealed class InkwellChatHistoryProvider(
         AgentConversation updated = conversation with
         {
             Title = FindTitle(allMessages),
-            LastCommittedRunId = executionId,
             LastActivityTime = now,
             UpdatedTime = now,
         };

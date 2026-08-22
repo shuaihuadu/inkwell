@@ -22,9 +22,6 @@ public sealed record class AgentConversation : IHasOwner, IHasTimestamps
     /// <summary>获取会话标题。</summary>
     public string? Title { get; init; }
 
-    /// <summary>获取最后成功提交消息批次的服务端执行标识。</summary>
-    public string? LastCommittedRunId { get; init; }
-
     /// <summary>获取最后一次消息活动时间。</summary>
     public required DateTimeOffset LastActivityTime { get; init; }
 

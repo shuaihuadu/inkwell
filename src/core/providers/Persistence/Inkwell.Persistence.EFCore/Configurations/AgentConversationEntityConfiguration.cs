@@ -12,7 +12,6 @@ internal sealed class AgentConversationEntityConfiguration : IEntityTypeConfigur
         builder.HasIndex(conversation => new { conversation.AgentId, conversation.OwnerUserId, conversation.LastActivityTime });
         builder.HasIndex(conversation => conversation.AgentVersionId);
         builder.Property(conversation => conversation.Title).HasMaxLength(30);
-        builder.Property(conversation => conversation.LastCommittedRunId).HasMaxLength(64);
         builder.HasOne<AgentVersionEntity>()
             .WithMany()
             .HasForeignKey(conversation => new { conversation.AgentId, conversation.AgentVersionId })

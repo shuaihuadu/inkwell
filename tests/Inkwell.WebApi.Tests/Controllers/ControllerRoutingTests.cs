@@ -160,7 +160,6 @@ public sealed class ControllerRoutingTests
         [
             "SessionKey",
             "OwnerUserId",
-            "LastCommittedRunId",
             "SerializedState",
         ];
 

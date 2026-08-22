@@ -84,7 +84,6 @@ internal sealed class AgentConversationService(
                 AgentConversation updated = conversation with
                 {
                     Title = FindTitle(remainingMessages),
-                    LastCommittedRunId = null,
                     LastActivityTime = remainingMessages.Count == 0 ? now : remainingMessages.Max(message => message.UpdatedTime),
                     UpdatedTime = now,
                 };
@@ -106,7 +105,6 @@ internal sealed class AgentConversationService(
                 AgentConversation cleared = conversation with
                 {
                     Title = null,
-                    LastCommittedRunId = null,
                     LastActivityTime = now,
                     UpdatedTime = now,
                 };

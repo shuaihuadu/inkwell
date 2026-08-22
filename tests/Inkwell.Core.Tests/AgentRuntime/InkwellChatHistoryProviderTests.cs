@@ -87,7 +87,6 @@ public sealed class InkwellChatHistoryProviderTests
         Assert.HasCount(2, repository.AppendedMessages);
         Assert.AreSame(request, repository.AppendedMessages[0]);
         Assert.AreSame(response, repository.AppendedMessages[1]);
-        Assert.AreEqual(executionId, conversations.UpdatedConversation?.LastCommittedRunId);
         JsonElement serializedState = session.StateBag.Serialize();
         Assert.HasCount(1, serializedState.EnumerateObject().ToList());
         Assert.AreEqual(sessionId.ToString("D"), serializedState.GetProperty(InkwellChatHistoryProvider.SessionIdStateKey).GetString());
