@@ -178,6 +178,9 @@ test("renders the prototype-aligned login experience", async ({
 
     try {
         const page = await application.firstWindow();
+        expect(
+            await application.evaluate(({ app }) => app.getName()),
+        ).toBe("Inkwell");
         await expect(
             page.getByRole("heading", { name: "Inkwell", exact: true }),
         ).toBeVisible();

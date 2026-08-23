@@ -47,6 +47,8 @@ import type {
 declare const __INKWELL_BUILD_NUMBER__: string;
 declare const __INKWELL_COMMIT_SHA__: string;
 
+app.setName("Inkwell");
+
 protocol.registerSchemesAsPrivileged([
     {
         scheme: "inkwell",

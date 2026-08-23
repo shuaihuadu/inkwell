@@ -505,7 +505,8 @@ function AgentLibraryMock({
                             >
                                 {activeTab === "mine" && (
                                     <Space
-                                        size={0}
+                                        size={6}
+                                        className="inkwell-agent-card-actions"
                                         style={{
                                             position: "absolute",
                                             bottom: 6,
@@ -524,9 +525,7 @@ function AgentLibraryMock({
                                                     event.stopPropagation();
                                                     onEditAgent(agent.name);
                                                 }}
-                                            >
-                                                编辑
-                                            </Button>
+                                            />
                                         </Tooltip>
                                         {agent.published &&
                                             !sharedAgentNames.has(
@@ -548,9 +547,7 @@ function AgentLibraryMock({
                                                                 agent.version,
                                                             );
                                                         }}
-                                                    >
-                                                        共享
-                                                    </Button>
+                                                    />
                                                 </Tooltip>
                                             )}
                                         {sharedAgentNames.has(agent.name) && (
@@ -568,16 +565,15 @@ function AgentLibraryMock({
                                                             agent.name,
                                                         );
                                                     }}
-                                                >
-                                                    撤销共享
-                                                </Button>
+                                                />
                                             </Tooltip>
                                         )}
                                     </Space>
                                 )}
                                 {activeTab === "shared" && (
                                     <Space
-                                        size={0}
+                                        size={6}
+                                        className="inkwell-agent-card-actions"
                                         style={{
                                             position: "absolute",
                                             bottom: 6,
@@ -596,9 +592,7 @@ function AgentLibraryMock({
                                                     event.stopPropagation();
                                                     onViewAgent(agent.name);
                                                 }}
-                                            >
-                                                查看
-                                            </Button>
+                                            />
                                         </Tooltip>
                                         {isAdmin && (
                                             <Tooltip title="撤销共享">
@@ -622,9 +616,7 @@ function AgentLibraryMock({
                                                             cancelText: "取消",
                                                         });
                                                     }}
-                                                >
-                                                    撤销共享
-                                                </Button>
+                                                />
                                             </Tooltip>
                                         )}
                                     </Space>

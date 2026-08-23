@@ -281,12 +281,14 @@ test.describe("Agent Design Page", () => {
 
         const firstAgent = page.locator(".inkwell-agent-card").first();
         await firstAgent.hover();
-        await expect(
-            firstAgent.getByRole("button", { name: /^编辑 / }),
-        ).toBeVisible();
-        await expect(
-            firstAgent.getByRole("button", { name: /^编辑 / }),
-        ).toHaveCSS("border-style", "solid");
+        const firstAgentAction = firstAgent.getByRole("button", {
+            name: /^编辑 /,
+        });
+        await expect(firstAgentAction).toBeVisible();
+        await expect(firstAgentAction).toHaveCSS("border-style", "solid");
+        await expect(firstAgentAction).toHaveCSS("width", "28px");
+        await expect(firstAgentAction).toHaveText("");
+        await expect(firstAgentAction.locator(".anticon")).toHaveCount(1);
         const agentPagination = page.locator(".inkwell-agent-pagination");
         const agentPaginationY = await agentPagination.evaluate(
             (element) => element.getBoundingClientRect().y,
@@ -497,7 +499,13 @@ test.describe("Agent Design Page", () => {
             .getByRole("button", { name: "关闭 Agent 详情" })
             .click();
         await page.getByRole("button", { name: "返回 Agent 空间" }).click();
-        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        const versionAgentCard = page.locator(".inkwell-agent-card").filter({
+            hasText: "客服助手",
+        });
+        await versionAgentCard.hover();
+        await versionAgentCard
+            .getByRole("button", { name: /^编辑 / })
+            .click();
         await page.getByRole("button", { name: "版本" }).click();
         const historicalRow = page.locator(".ant-table-row").filter({
             hasText: "v2",
@@ -544,7 +552,13 @@ test.describe("Agent Design Page", () => {
         });
 
         await page.getByRole("button", { name: "返回 Agent 空间" }).click();
-        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        const trialAgentCard = page.locator(".inkwell-agent-card").filter({
+            hasText: "客服助手",
+        });
+        await trialAgentCard.hover();
+        await trialAgentCard
+            .getByRole("button", { name: /^编辑 / })
+            .click();
         await page.getByRole("button", { name: "试运行" }).click();
         await page.getByRole("button", { name: "研究框架" }).click();
         await expect(page.getByText("4 项已完成", { exact: true })).toBeVisible(
@@ -579,7 +593,13 @@ test.describe("Agent Design Page", () => {
         page.on("pageerror", (error) => consoleErrors.push(error.message));
 
         await page.goto("/shell");
-        await page.getByRole("button", { name: "编辑 客服助手" }).click();
+        const toolCallAgentCard = page
+            .locator(".inkwell-agent-card")
+            .filter({ hasText: "客服助手" });
+        await toolCallAgentCard.hover();
+        await toolCallAgentCard
+            .getByRole("button", { name: /^编辑 / })
+            .click();
         await page.getByRole("button", { name: "试运行" }).click();
         await page.getByRole("button", { name: "工具调用" }).click();
         await expect(page.getByText("调用中", { exact: true })).toBeVisible();

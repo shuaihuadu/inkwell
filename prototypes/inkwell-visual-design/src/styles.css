@@ -97,13 +97,21 @@ body,
  * 避免状态 Tag 与操作按钮争抢空间，同时保留已发布 Agent 快速进入配置或共享的入口
  * （requirements.md §13 第 30 条 / ui-spec.md §3.4 2026-07-15 修订）。 */
 .inkwell-agent-card-edit-btn {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
     opacity: 0;
-    margin-left: 6px;
-    transition: opacity 0.15s;
+    visibility: hidden;
+    transition:
+        opacity 0.15s,
+        visibility 0.15s;
 }
 
-.inkwell-agent-card:hover .inkwell-agent-card-edit-btn {
+.inkwell-agent-card:hover .inkwell-agent-card-edit-btn,
+.inkwell-agent-card:focus-within .inkwell-agent-card-edit-btn {
     opacity: 1;
+    visibility: visible;
 }
 
 /*
