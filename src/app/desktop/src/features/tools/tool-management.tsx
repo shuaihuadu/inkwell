@@ -1,6 +1,26 @@
-import { EyeOutlined } from "@ant-design/icons";
+import {
+    CalendarOutlined,
+    CloseOutlined,
+    CodeOutlined,
+    EyeOutlined,
+    FormOutlined,
+    ToolOutlined,
+} from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { Collapse, Drawer, Space, Table, Tag, Typography, theme } from "antd";
+import {
+    Avatar,
+    Button,
+    Collapse,
+    Descriptions,
+    Drawer,
+    Flex,
+    Space,
+    Table,
+    Tag,
+    Tooltip,
+    Typography,
+    theme,
+} from "antd";
 import { useState } from "react";
 import DataListPage, {
     DataListRowAction,
@@ -109,9 +129,10 @@ export function ToolManagement() {
             dataSource={tools}
             rowKey="id"
             tableScrollX={800}
-            totalLabel={(total) => `共 ${total} 个 Tool`}
             loading={toolsQuery.isLoading}
-            errorMessage={toolsQuery.isError ? "工具列表加载失败，请稍后重试" : undefined}
+            errorMessage={
+                toolsQuery.isError ? "工具列表加载失败，请稍后重试" : undefined
+            }
             onRetry={() => void toolsQuery.refetch()}
             emptyText="当前没有已注册的工具"
             filteredEmptyText="没有匹配的工具，请清除搜索条件"
@@ -162,89 +183,176 @@ export function ToolManagement() {
             ]}
         >
             <Drawer
-                width={520}
+                width={600}
                 title="Tool 详情"
+                closable={false}
                 open={selectedTool !== null}
                 onClose={() => setSelectedTool(null)}
+                extra={
+                    <Tooltip title="关闭">
+                        <Button
+                            type="text"
+                            aria-label="关闭 Tool 详情"
+                            icon={<CloseOutlined />}
+                            onClick={() => setSelectedTool(null)}
+                        />
+                    </Tooltip>
+                }
+                className="resource-details-drawer"
+                styles={{ body: { padding: 0 } }}
             >
                 {selectedTool && (
-                    <Space orientation="vertical" size={20} style={{ width: "100%" }}>
-                        <div>
-                            <Typography.Text type="secondary">名称</Typography.Text>
-                            <Typography.Title level={5} style={{ margin: "4px 0 0" }}>
-                                <Typography.Text code>{selectedTool.name}</Typography.Text>
-                            </Typography.Title>
-                        </div>
-                        <div>
-                            <Typography.Text type="secondary">描述</Typography.Text>
-                            <Typography.Paragraph style={{ marginTop: 4 }}>
-                                {selectedTool.description}
-                            </Typography.Paragraph>
-                        </div>
-                        <div>
-                            <Typography.Text type="secondary">参数</Typography.Text>
-                            <Table<ToolParameter>
-                                size="small"
-                                pagination={false}
-                                rowKey="name"
-                                dataSource={selectedParameters}
-                                locale={{ emptyText: "此工具没有参数" }}
-                                style={{ marginTop: 8 }}
-                                columns={[
-                                    {
-                                        title: "名称",
-                                        dataIndex: "name",
-                                        render: (value: string) => (
-                                            <Typography.Text code>{value}</Typography.Text>
-                                        ),
-                                    },
-                                    { title: "类型", dataIndex: "type", width: 92 },
-                                    {
-                                        title: "必填",
-                                        dataIndex: "required",
-                                        width: 72,
-                                        render: (value: boolean) =>
-                                            value ? (
-                                                <Tag color="success">是</Tag>
-                                            ) : (
-                                                <Tag>否</Tag>
-                                            ),
-                                    },
-                                    {
-                                        title: "可选值",
-                                        dataIndex: "allowedValues",
-                                        render: (values: string[]) =>
-                                            values.length > 0 ? values.join(", ") : "-",
-                                    },
-                                ]}
+                    <div>
+                        <div
+                            className="agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ToolOutlined />}
+                                style={{ background: token.colorPrimary }}
                             />
+                            <div className="agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title
+                                        level={4}
+                                        style={{ margin: 0 }}
+                                    >
+                                        <Typography.Text code>
+                                            {selectedTool.name}
+                                        </Typography.Text>
+                                    </Typography.Title>
+                                    <Tag>
+                                        {selectedParameters.length} 个参数
+                                    </Tag>
+                                </Flex>
+                                <Typography.Paragraph
+                                    type="secondary"
+                                    style={{ margin: "6px 0 0" }}
+                                >
+                                    {selectedTool.description}
+                                </Typography.Paragraph>
+                                <Typography.Text type="secondary">
+                                    <CalendarOutlined />{" "}
+                                    {formatTime(selectedTool.updatedTime)}
+                                </Typography.Text>
+                            </div>
                         </div>
-                        <Collapse
-                            ghost
-                            items={[
-                                {
-                                    key: "schema",
-                                    label: "原始 JSON Schema",
-                                    children: (
-                                        <pre
-                                            className="tool-schema"
-                                            style={{
-                                                borderRadius: token.borderRadius,
-                                                color: token.colorText,
-                                                background: token.colorFillQuaternary,
-                                                border: `1px solid ${token.colorBorderSecondary}`,
-                                            }}
-                                        >
-                                            {selectedTool.parametersJsonSchema}
-                                        </pre>
-                                    ),
-                                },
-                            ]}
-                        />
-                        <Typography.Text type="secondary">
-                            最近更新：{formatTime(selectedTool.updatedTime)}
-                        </Typography.Text>
-                    </Space>
+
+                        <div className="agent-details-content">
+                            <section className="agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
+                                    <FormOutlined />
+                                    <Typography.Text strong>
+                                        参数
+                                    </Typography.Text>
+                                </Space>
+                                <Table<ToolParameter>
+                                    size="small"
+                                    pagination={false}
+                                    rowKey="name"
+                                    dataSource={selectedParameters}
+                                    locale={{ emptyText: "此工具没有参数" }}
+                                    columns={[
+                                        {
+                                            title: "名称",
+                                            dataIndex: "name",
+                                            render: (value: string) => (
+                                                <Typography.Text code>
+                                                    {value}
+                                                </Typography.Text>
+                                            ),
+                                        },
+                                        {
+                                            title: "类型",
+                                            dataIndex: "type",
+                                            width: 92,
+                                        },
+                                        {
+                                            title: "必填",
+                                            dataIndex: "required",
+                                            width: 72,
+                                            render: (value: boolean) =>
+                                                value ? (
+                                                    <Tag color="processing">
+                                                        是
+                                                    </Tag>
+                                                ) : (
+                                                    <Tag>否</Tag>
+                                                ),
+                                        },
+                                        {
+                                            title: "可选值",
+                                            dataIndex: "allowedValues",
+                                            render: (values: string[]) =>
+                                                values.length > 0
+                                                    ? values.join("、")
+                                                    : "—",
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
+                                    <CodeOutlined />
+                                    <Typography.Text strong>
+                                        原始 JSON Schema
+                                    </Typography.Text>
+                                </Space>
+                                <Collapse
+                                    size="small"
+                                    items={[
+                                        {
+                                            key: "schema",
+                                            label: "查看原始 Schema",
+                                            children: (
+                                                <pre className="resource-schema">
+                                                    {
+                                                        selectedTool.parametersJsonSchema
+                                                    }
+                                                </pre>
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
+                                    <CalendarOutlined />
+                                    <Typography.Text strong>
+                                        时间信息
+                                    </Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        {
+                                            key: "updated",
+                                            label: "更新时间",
+                                            children: formatTime(
+                                                selectedTool.updatedTime,
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            </section>
+                        </div>
+                    </div>
                 )}
             </Drawer>
         </DataListPage>

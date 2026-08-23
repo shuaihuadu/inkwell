@@ -27,6 +27,7 @@
     "@ant-design/icons": "6.3.2",
     "@ant-design/x": "2.8.0",
     "@ant-design/x-markdown": "2.8.0",
+    "@monaco-editor/react": "4.7.0",
     "@tanstack/react-query": "5.101.2",
     "antd": "6.5.1",
     "jszip": "3.10.1",

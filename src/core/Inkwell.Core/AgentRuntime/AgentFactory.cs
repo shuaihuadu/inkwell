@@ -12,6 +12,7 @@ namespace Inkwell;
 internal sealed class AgentFactory(
     ILLMProvider llmProvider,
     IChatLLMProvider chatLLMProvider,
+    IAgentToolCatalogService toolCatalogService,
     IPersistenceProvider persistence,
     TimeProvider timeProvider) : IAgentFactory
 {
@@ -91,6 +92,7 @@ internal sealed class AgentFactory(
         }
 
         AgentModelOptions modelOptions = buildOptions.ModelOptions;
+        List<AITool> tools = await this.CreateToolsAsync(buildOptions.ToolBindings, cancellationToken).ConfigureAwait(false);
         ChatClientAgentOptions options = new()
         {
             Id = id,
@@ -103,6 +105,7 @@ internal sealed class AgentFactory(
                 Temperature = (float?)modelOptions.Temperature,
                 TopP = (float?)modelOptions.TopP,
                 MaxOutputTokens = modelOptions.MaxTokens,
+                Tools = tools,
             },
             ChatHistoryProvider = this.CreateChatHistoryProvider(buildOptions.ChatHistoryOptions, usePersistentChatHistory),
             AIContextProviders = CreateContextProviders(buildOptions.Skills),
@@ -113,6 +116,31 @@ internal sealed class AgentFactory(
         {
             EnableSensitiveData = false,
         };
+    }
+
+    private async Task<List<AITool>> CreateToolsAsync(
+        ImmutableArray<AgentToolBinding> toolBindings,
+        CancellationToken cancellationToken)
+    {
+        List<AITool> tools = [];
+        foreach (AgentToolBinding binding in toolBindings)
+        {
+            AgentToolDefinition definition = await toolCatalogService.GetToolAsync(binding.ToolId, cancellationToken).ConfigureAwait(false);
+            switch (definition.Name)
+            {
+                case "get_current_datetime":
+                    AgentCurrentDateTimeTool currentDateTimeTool = new(timeProvider);
+                    tools.Add(AIFunctionFactory.Create(
+                        currentDateTimeTool.GetCurrentDateTime,
+                        definition.Name,
+                        definition.Description));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Tool '{definition.Name}' is not available in the Agent runtime.");
+            }
+        }
+
+        return tools;
     }
 
     private ChatHistoryProvider CreateChatHistoryProvider(AgentChatHistoryOptions? options, bool usePersistentChatHistory) =>

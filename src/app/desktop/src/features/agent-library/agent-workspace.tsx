@@ -54,8 +54,7 @@ export function AgentWorkspace({
     const { token } = antdTheme.useToken();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<AgentTab>("mine");
-    const [statusFilter, setStatusFilter] =
-        useState<AgentStatusFilter>("all");
+    const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>("all");
     const [searchText, setSearchText] = useState("");
     const deferredSearch = useDeferredValue(
         searchText.trim().toLocaleLowerCase(),
@@ -82,8 +81,7 @@ export function AgentWorkspace({
         }) => {
             if (action === "share") await desktopApi.shareAgent(agentId);
             if (action === "unshare") await desktopApi.unshareAgent(agentId);
-            if (action === "revoke")
-                await desktopApi.revokeAgentShare(agentId);
+            if (action === "revoke") await desktopApi.revokeAgentShare(agentId);
         },
         onSuccess: async (_result, variables) => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
@@ -266,12 +264,14 @@ export function AgentWorkspace({
                             >
                                 <AgentCard
                                     agent={agent}
-                                    avatarColor={[
-                                        token.colorPrimary,
-                                        token.colorInfo,
-                                        token.colorSuccess,
-                                        token.colorWarning,
-                                    ][index % 4]}
+                                    avatarColor={
+                                        [
+                                            token.colorPrimary,
+                                            token.colorInfo,
+                                            token.colorSuccess,
+                                            token.colorWarning,
+                                        ][index % 4]
+                                    }
                                     activeTab={activeTab}
                                     currentUserId={identity?.userId}
                                     isAdmin={identity?.isAdmin === true}
@@ -289,21 +289,19 @@ export function AgentWorkspace({
                 )}
             </section>
 
-            {filteredAgents.length > 0 && (
-                <footer className="agent-space-pagination">
-                    <Typography.Text type="secondary">
-                        共 {filteredAgents.length} 个 Agent
-                    </Typography.Text>
-                    <Pagination
-                        size="small"
-                        current={currentPage}
-                        pageSize={AgentsPerPage}
-                        total={filteredAgents.length}
-                        showSizeChanger={false}
-                        onChange={setPage}
-                    />
-                </footer>
-            )}
+            <footer className="agent-space-pagination">
+                <Typography.Text type="secondary">
+                    共 {filteredAgents.length} 项
+                </Typography.Text>
+                <Pagination
+                    size="small"
+                    current={currentPage}
+                    pageSize={AgentsPerPage}
+                    total={filteredAgents.length}
+                    showSizeChanger={false}
+                    onChange={setPage}
+                />
+            </footer>
         </main>
     );
 }
@@ -351,7 +349,7 @@ function AgentCard({
             styles={{ body: { padding: 12 } }}
         >
             {(showOwnerActions || activeTab === "shared") && (
-                <Space size={0} className="agent-card-actions">
+                <Space size={6} className="agent-card-actions">
                     {showOwnerActions && (
                         <Tooltip title="编辑配置">
                             <Button
@@ -369,20 +367,20 @@ function AgentCard({
                     {showOwnerActions &&
                         isPublished(agent) &&
                         !agent.isShared && (
-                        <Tooltip title="共享已发布版本">
-                            <Button
-                                type="text"
-                                size="small"
-                                aria-label={`共享 ${agent.name}`}
-                                icon={<ShareAltOutlined />}
-                                loading={isPending}
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    onAction("share");
-                                }}
-                            />
-                        </Tooltip>
-                    )}
+                            <Tooltip title="共享已发布版本">
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    aria-label={`共享 ${agent.name}`}
+                                    icon={<ShareAltOutlined />}
+                                    loading={isPending}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onAction("share");
+                                    }}
+                                />
+                            </Tooltip>
+                        )}
                     {showOwnerActions && agent.isShared && (
                         <Tooltip title="撤销共享">
                             <Button
@@ -480,11 +478,7 @@ function AgentGridSkeleton() {
     return (
         <Row gutter={[12, 12]}>
             {Array.from({ length: 8 }, (_, index) => (
-                <Col
-                    className="agent-space-column"
-                    key={index}
-                    flex="0 0 20%"
-                >
+                <Col className="agent-space-column" key={index} flex="0 0 20%">
                     <Card
                         className="agent-space-card"
                         styles={{ body: { padding: 14 } }}
@@ -532,7 +526,7 @@ function getEmptyDescription(
 ): string {
     if (hasSearch || statusFilter !== "all") return "没有符合条件的 Agent";
     return activeTab === "mine"
-        ? '还没有自己的 Agent，点击“新建 Agent”开始'
+        ? "还没有自己的 Agent，点击“新建 Agent”开始"
         : "团队成员还没有共享 Agent";
 }
 

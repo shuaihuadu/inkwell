@@ -46,6 +46,8 @@ import {
 } from "antd";
 import { Fragment, useEffect, useState } from "react";
 import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
+import { MarkdownContent } from "../../shared/components/markdown-content";
+import { MarkdownEditor } from "../../shared/components/markdown-editor";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
     AgentDefinition,
@@ -54,6 +56,7 @@ import type {
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
 import { ChatPanel } from "../chat/chat-panel";
+import { useResolvedAppearance } from "../shell/appearance-store";
 
 type AgentEditorSection =
     | "basic"
@@ -834,7 +837,7 @@ function AgentSection({
         );
     }
     if (section === "instructions") {
-        return <InstructionsSection />;
+        return <InstructionsSection readonly={readonly} />;
     }
     if (section === "model") {
         return <ModelSection chatModels={chatModels} loading={modelsLoading} />;
@@ -963,6 +966,7 @@ function VersionHistorySection({
     ) => Promise<AgentVersion>;
     rollbackPending: boolean;
 }) {
+    const appearance = useResolvedAppearance();
     const { token } = theme.useToken();
     const [modal, modalContextHolder] = Modal.useModal();
     const [detailTarget, setDetailTarget] = useState<AgentVersion | null>(null);
@@ -1115,6 +1119,7 @@ function VersionHistorySection({
             />
 
             <AgentDetailsDrawer
+                appearance={appearance}
                 open={detailTarget !== null}
                 onClose={() => setDetailTarget(null)}
                 version={detailTarget}
@@ -1273,7 +1278,8 @@ function VersionHistorySection({
     );
 }
 
-function InstructionsSection() {
+function InstructionsSection({ readonly }: { readonly: boolean }) {
+    const appearance = useResolvedAppearance();
     const form = Form.useFormInstance<AgentFormValues>();
     const instructions = Form.useWatch("instructions", form) ?? "";
     return (
@@ -1286,16 +1292,36 @@ function InstructionsSection() {
                     message="Instructions 较长，可能挤占模型上下文"
                 />
             )}
-            <Form.Item name="instructions">
-                <Input.TextArea
-                    aria-label="Instructions"
-                    rows={20}
-                    showCount={{
-                        formatter: ({ count }) => `${count} / 32000`,
-                    }}
-                    placeholder="输入给 Agent 的系统指令…"
-                />
-            </Form.Item>
+            {readonly ? (
+                <div className="agent-instructions-markdown">
+                    {instructions ? (
+                        <MarkdownContent
+                            appearance={appearance}
+                            content={instructions}
+                        />
+                    ) : (
+                        <Typography.Text type="secondary">
+                            暂无 Instructions
+                        </Typography.Text>
+                    )}
+                </div>
+            ) : (
+                <Form.Item
+                    name="instructions"
+                    className="agent-instructions-editor"
+                >
+                    <MarkdownEditor
+                        aria-label="Instructions"
+                        appearance={appearance}
+                    />
+                </Form.Item>
+            )}
+            <Typography.Text
+                type="secondary"
+                className="agent-instructions-editor-count"
+            >
+                {instructions.length} / 32000
+            </Typography.Text>
         </>
     );
 }
@@ -1324,36 +1350,64 @@ function BindingSelector({
         <Form.Item name={name} noStyle>
             <Checkbox.Group className="agent-binding-selector">
                 {items.map((item) => (
-                    <Card key={item.id} size="small">
-                        <Checkbox value={item.id}>
-                            <Typography.Text strong>
-                                {item.name}
-                            </Typography.Text>
-                            <Typography.Text type="secondary">
-                                {item.description}
-                            </Typography.Text>
-                            {name === "toolIds" &&
-                                selectedIds.includes(item.id) &&
-                                item.parameters &&
-                                item.parameters.length > 0 && (
-                                    <div className="agent-tool-parameters">
-                                        {item.parameters.map((parameter) => (
-                                            <Form.Item
-                                                key={parameter}
-                                                name={[
-                                                    "toolParameters",
-                                                    item.id,
-                                                    parameter,
-                                                ]}
-                                                label={parameter}
-                                            >
-                                                <Input size="small" />
-                                            </Form.Item>
-                                        ))}
-                                    </div>
+                    <div
+                        key={item.id}
+                        className={`agent-binding-item${
+                            selectedIds.includes(item.id) ? " selected" : ""
+                        }`}
+                    >
+                        <div className="agent-binding-item-main">
+                            <Checkbox value={item.id} aria-label={item.name} />
+                            <div className="agent-binding-item-icon">
+                                {name === "toolIds" ? (
+                                    <ToolOutlined />
+                                ) : (
+                                    <ReadOutlined />
                                 )}
-                        </Checkbox>
-                    </Card>
+                            </div>
+                            <div className="agent-binding-item-copy">
+                                <Typography.Text strong>{item.name}</Typography.Text>
+                                <Typography.Text type="secondary">
+                                    {item.description}
+                                </Typography.Text>
+                                {name === "skillIds" && (
+                                    <Flex gap={6} wrap className="agent-skill-stages">
+                                        <Tag>Discovery</Tag>
+                                        <Tag
+                                            color={
+                                                selectedIds.includes(item.id)
+                                                    ? "processing"
+                                                    : undefined
+                                            }
+                                        >
+                                            Activation
+                                        </Tag>
+                                        <Tag>Execution</Tag>
+                                    </Flex>
+                                )}
+                                {name === "toolIds" &&
+                                    selectedIds.includes(item.id) &&
+                                    item.parameters &&
+                                    item.parameters.length > 0 && (
+                                        <Flex gap={12} wrap className="agent-binding-config">
+                                            {item.parameters.map((parameter) => (
+                                                <Form.Item
+                                                    key={parameter}
+                                                    name={[
+                                                        "toolParameters",
+                                                        item.id,
+                                                        parameter,
+                                                    ]}
+                                                    label={parameter}
+                                                >
+                                                    <Input size="small" />
+                                                </Form.Item>
+                                            ))}
+                                        </Flex>
+                                    )}
+                            </div>
+                        </div>
+                    </div>
                 ))}
             </Checkbox.Group>
         </Form.Item>

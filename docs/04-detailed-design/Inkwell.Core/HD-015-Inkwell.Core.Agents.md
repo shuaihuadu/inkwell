@@ -25,6 +25,10 @@ upstream:
 <!-- markdownlint-disable MD060 -->
 <!-- 中文 + 英文混排长表格在 markdownlint 列宽计算下字面对齐 ≠ 视觉对齐（详 /memories/markdown-lint.md，与 HD-004 / HD-005 / HD-006 / HD-014 同处理方式），表格仍按 docs-style §3 视觉对齐维护，机械 MD060 不予执行。 -->
 
+> **2026-08-23 Tool 参数分层 errata**：Tool 目录的 `ParametersJsonSchema` 只控制 Agent 挂载时的静态配置表单，MAF 运行时函数参数由 `AIFunctionFactory` 根据强类型方法独立生成。`get_current_datetime` 没有静态绑定配置，Agent Snapshot 仅保存 `ToolId` 与 `ParametersJson = null`；`timeZoneId` 只在模型调用 Tool 时传入，缺省使用 UTC。本条取代下一条 errata 中“绑定 `timeZoneId` 作为静态配置并覆盖模型调用参数”的描述。
+>
+> **2026-08-23 Tool Binding 运行时接入 errata**：本条取代下方“Tool Binding 暂不转换为 `AIFunction`，等待 Agent Factory review”的未决状态。`AgentBuildOptionsResolver` 在 Agent 创建/更新时验证每个 `ToolId` 存在、静态参数满足目录 Schema 的顶层 `required` 字段，并拒绝重复绑定；解析后的 `AgentToolBinding` 原样保存到管理态与不可变 `AgentSnapshot`。构建 Draft、Published 或 Conversation Agent 时，`AgentFactory` 按 Snapshot 绑定加载 `AgentToolDefinition`，在 `Inkwell.Core.AgentRuntime` 边界把受支持的内置实现通过 `AIFunctionFactory.Create` 转为 MAF `AIFunction` 并传入 `ChatOptions.Tools`。没有绑定时不暴露任何内置 Tool；目录存在但部署版本不支持的 Tool 名称显式构建失败。首个受支持名称为 `get_current_datetime`，其绑定 `timeZoneId` 作为 Agent 静态配置优先于模型调用参数。
+>
 > **2026-07-12 替代性 errata（管理面与运行面重新分界）**：本 HD 原 `IAgentInvocationService -> IAgentRuntime` 数据面链路已移除；下方相关章节保留为历史依据，不再代表现行契约。`IAgentService` 只承担可编辑 `AgentDefinition` 的 CRUD、共享与克隆。发布/保存形成不可变 `AgentVersion` + `AgentSnapshot`，运行面由 `IAgentFactory` 直接构建 MAF `AIAgent`。协议入口负责完成调用者鉴权、加载目标版本和运行时附加项后调用 Factory，不再把 Agent 配置翻译为 Inkwell 自建 `AgentRunRequest`。
 >
 > **职责约束**：`AgentDefinition` 是管理态；`AgentVersion` 是版本身份与生命周期；`AgentSnapshot` 是该版本的完整运行配置。历史版本不得反向读取当前 `AgentDefinition` 的可变字段。工具绑定以 `AgentBuildOptions.ToolBindings` 原样保存在 Snapshot；Skill 由 `IAgentBuildOptionsResolver` 解析为 Definition，并在 AgentRuntime 边界转换为 `AgentSkillsProvider`。`JsonDelegateAIFunction` 与自建工具运行时转换链已删除，Tool Binding 暂不转换为 `AIFunction`，最终接入方式等待 Agent Factory review 定稿。读取 Agent 时仍必须校验 `requestingUserId == OwnerUserId || IsShared`。

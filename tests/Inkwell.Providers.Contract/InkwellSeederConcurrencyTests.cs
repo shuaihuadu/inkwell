@@ -1,6 +1,7 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
 using System.Security.Cryptography;
+using System.Text.Json;
 using Inkwell.Persistence.EFCore;
 using Inkwell.Persistence.EFCore.Entities;
 using Inkwell.Persistence.EFCore.Postgres.DependencyInjection;
@@ -12,7 +13,7 @@ namespace Inkwell.Providers.Contract;
 /// <summary>
 /// 验证 ADR-024 §幂等性保证要求的加固：两个 <see cref="InkwellSeeder"/> 实例并发跑同一段 Seed
 /// （模拟 <c>Inkwell.Migrator</c> Job 极端情况下短暂并发）时，不应有任一方抛异常失败，且最终
-/// 数据库里只有一条 <c>admin</c> 用户记录。
+/// 数据库里只有一条 <c>admin</c> 用户记录和一条内置工具记录。
 /// </summary>
 [TestClass]
 public sealed class InkwellSeederConcurrencyTests
@@ -38,7 +39,7 @@ public sealed class InkwellSeederConcurrencyTests
     }
 
     [TestMethod]
-    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_AdminAsync()
+    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_Admin_And_ToolAsync()
     {
         // Arrange
         ServiceProvider providerA = BuildServiceProvider();
@@ -64,6 +65,7 @@ public sealed class InkwellSeederConcurrencyTests
         InkwellDbContext db = verifyScope.ServiceProvider.GetRequiredService<InkwellDbContext>();
 
         UserEntity admin = await db.Set<UserEntity>().SingleAsync(x => x.Username == "admin");
+        AgentToolEntity currentDateTimeTool = await db.Set<AgentToolEntity>().SingleAsync(x => x.Name == "get_current_datetime");
         string[] hashParts = admin.PasswordHash.Split('$');
         byte[] salt = Convert.FromBase64String(hashParts[2]);
         byte[] expectedHash = Convert.FromBase64String(hashParts[3]);
@@ -75,6 +77,34 @@ public sealed class InkwellSeederConcurrencyTests
         Assert.AreEqual("PBKDF2", hashParts[0]);
         Assert.IsTrue(CryptographicOperations.FixedTimeEquals(configuredPasswordHash, expectedHash));
         Assert.IsFalse(CryptographicOperations.FixedTimeEquals(defaultPasswordHash, expectedHash));
+        Assert.AreEqual(Guid.Parse("00000000-0000-0000-0000-000000000101"), currentDateTimeTool.Id);
+        Assert.IsEmpty(
+            JsonDocument.Parse(currentDateTimeTool.ParametersJsonSchema)
+                .RootElement
+                .GetProperty("properties")
+                .EnumerateObject()
+                .ToArray());
+
+        await db.Set<AgentToolEntity>()
+            .Where(tool => tool.Name == "get_current_datetime")
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                tool => tool.ParametersJsonSchema,
+                "{\"type\":\"object\",\"properties\":{\"timeZoneId\":{\"type\":\"string\"}}}"));
+
+        await using AsyncServiceScope refreshScope = providerA.CreateAsyncScope();
+        await refreshScope.ServiceProvider.GetRequiredService<InkwellSeeder>().SeedAsync();
+        InkwellDbContext refreshedDb = refreshScope.ServiceProvider.GetRequiredService<InkwellDbContext>();
+        string refreshedSchema = await refreshedDb.Set<AgentToolEntity>()
+            .Where(tool => tool.Name == "get_current_datetime")
+            .Select(tool => tool.ParametersJsonSchema)
+            .SingleAsync();
+
+        Assert.IsEmpty(
+            JsonDocument.Parse(refreshedSchema)
+                .RootElement
+                .GetProperty("properties")
+                .EnumerateObject()
+                .ToArray());
     }
 
     private static ServiceProvider BuildServiceProvider()

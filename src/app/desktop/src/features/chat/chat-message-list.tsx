@@ -2,8 +2,9 @@ import { SyncOutlined } from "@ant-design/icons";
 import { Actions, Bubble, type BubbleItemType } from "@ant-design/x";
 import { Button, Flex, Typography } from "antd";
 import { useState } from "react";
+import { MarkdownContent } from "../../shared/components/markdown-content";
 import type { ChatMessage, ChatRunError } from "../../shared/network/contracts";
-import { ChatMarkdown } from "./chat-markdown";
+import { useResolvedAppearance } from "../shell/appearance-store";
 import { SkillActivityChain } from "./skill-activity-chain";
 
 type FeedbackValue = "default" | "like" | "dislike";
@@ -23,6 +24,7 @@ export function ChatMessageList({
     onRegenerate,
     onRetry,
 }: ChatMessageListProps) {
+    const appearance = useResolvedAppearance();
     const [feedbackByMessage, setFeedbackByMessage] = useState<
         Record<string, FeedbackValue>
     >({});
@@ -40,7 +42,10 @@ export function ChatMessageList({
                     role: "user",
                     content: item.content,
                     contentRender: (content) => (
-                        <ChatMarkdown content={String(content)} />
+                        <MarkdownContent
+                            appearance={appearance}
+                            content={String(content)}
+                        />
                     ),
                 },
             ];
@@ -74,7 +79,8 @@ export function ChatMessageList({
                 contentRender: (content) => (
                     <div className="chat-message-content">
                         {String(content) && (
-                            <ChatMarkdown
+                            <MarkdownContent
+                                appearance={appearance}
                                 content={String(content)}
                                 streaming={isLatestRunning}
                             />

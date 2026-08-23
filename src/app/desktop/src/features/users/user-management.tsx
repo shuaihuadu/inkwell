@@ -54,9 +54,7 @@ const formatDateTime = (value: string | null): string =>
           }).format(new Date(value))
         : "从未登录";
 
-const getStatus = (
-    account: UserListItem,
-): Exclude<AccountStatus, "all"> =>
+const getStatus = (account: UserListItem): Exclude<AccountStatus, "all"> =>
     account.isDisabled ? "disabled" : account.isLocked ? "locked" : "active";
 
 export function UserManagement() {
@@ -79,8 +77,9 @@ export function UserManagement() {
         queryFn: desktopApi.listAccounts,
     });
     const managedUser =
-        accountsQuery.data?.find((account) => account.userId === managedUserId) ??
-        null;
+        accountsQuery.data?.find(
+            (account) => account.userId === managedUserId,
+        ) ?? null;
 
     const refreshAccounts = async (): Promise<void> => {
         await queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -298,7 +297,6 @@ export function UserManagement() {
             dataSource={accounts}
             rowKey="userId"
             tableScrollX={800}
-            totalLabel={(total) => `共 ${total} 个用户`}
             loading={accountsQuery.isLoading}
             errorMessage={
                 accountsQuery.isError ? "用户列表加载失败，请重试" : undefined
@@ -429,7 +427,10 @@ export function UserManagement() {
                                     message: "用户名不能超过 100 个字符",
                                 },
                                 {
-                                    validator: (_, value: string | undefined) =>
+                                    validator: (
+                                        _,
+                                        value: string | undefined,
+                                    ) =>
                                         value &&
                                         accountsQuery.data?.some(
                                             (account) =>

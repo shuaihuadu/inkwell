@@ -39,6 +39,7 @@ import type {
     ChatRunSnapshot,
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
+import { useResolvedAppearance } from "../shell/appearance-store";
 import { ChatComposer } from "./chat-composer";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatQuickPrompts } from "./chat-quick-prompts";
@@ -116,6 +117,7 @@ export function ChatPanel({
     runMode = "published",
     onClose,
 }: ChatPanelProps) {
+    const appearance = useResolvedAppearance();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [draft, setDraft] = useState("");
     const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
@@ -588,6 +590,7 @@ export function ChatPanel({
                 </header>
 
                 <AgentDetailsDrawer
+                    appearance={appearance}
                     open={detailsOpen}
                     version={detailVersion}
                     tools={toolsQuery.data ?? []}

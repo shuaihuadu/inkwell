@@ -26,9 +26,11 @@ import {
     theme,
 } from "antd";
 import { useState, type ReactNode } from "react";
+import { MarkdownContent } from "./markdown-content";
 import type { AgentToolDefinition, AgentVersion } from "../network/contracts";
 
 interface AgentDetailsDrawerProps {
+    appearance: "light" | "dark";
     open: boolean;
     version: AgentVersion | null;
     tools: AgentToolDefinition[];
@@ -68,6 +70,7 @@ function SectionTitle({
 }
 
 export function AgentDetailsDrawer({
+    appearance,
     open,
     version,
     tools,
@@ -257,9 +260,10 @@ export function AgentDetailsDrawer({
                                         border: `1px solid ${token.colorBorderSecondary}`,
                                     }}
                                 >
-                                    <Typography.Paragraph style={{ margin: 0 }}>
-                                        {instructions}
-                                    </Typography.Paragraph>
+                                    <MarkdownContent
+                                        appearance={appearance}
+                                        content={instructions}
+                                    />
                                 </div>
                                 {hasLongInstructions && (
                                     <Button

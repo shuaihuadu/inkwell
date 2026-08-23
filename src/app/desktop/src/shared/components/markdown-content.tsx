@@ -3,19 +3,19 @@ import "@ant-design/x-markdown/themes/dark.css";
 import "@ant-design/x-markdown/themes/light.css";
 import { theme } from "antd";
 import { memo, type CSSProperties } from "react";
-import { useResolvedAppearance } from "../shell/appearance-store";
 
-interface ChatMarkdownProps {
+interface MarkdownContentProps {
+    appearance: "light" | "dark";
     content: string;
     streaming?: boolean;
 }
 
-export const ChatMarkdown = memo(function ChatMarkdown({
+export const MarkdownContent = memo(function MarkdownContent({
+    appearance,
     content,
     streaming = false,
-}: ChatMarkdownProps) {
+}: MarkdownContentProps) {
     const { token } = theme.useToken();
-    const appearance = useResolvedAppearance();
     const compactStyles = {
         "--primary-color": token.colorPrimary,
         "--primary-color-hover": token.colorPrimaryHover,

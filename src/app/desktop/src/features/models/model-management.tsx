@@ -1,18 +1,27 @@
 import {
     ApiOutlined,
+    AppstoreOutlined,
+    CloseOutlined,
     ClockCircleOutlined,
+    DatabaseOutlined,
+    EyeOutlined,
     ExperimentOutlined,
     ExportOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+    Avatar,
     Button,
+    Descriptions,
     Drawer,
+    Flex,
     Select,
     Space,
     Tag,
+    Tooltip,
     Typography,
     message,
+    theme,
 } from "antd";
 import { useState } from "react";
 import DataListPage, {
@@ -70,6 +79,7 @@ const formatLatency = (value: string): string => {
 };
 
 export function ModelManagement() {
+    const { token } = theme.useToken();
     const isAdmin = useAuthStore((state) => state.identity?.isAdmin === true);
     const [category, setCategory] = useState<ModelCategoryFilter>("All");
     const [searchText, setSearchText] = useState("");
@@ -173,7 +183,6 @@ export function ModelManagement() {
             dataSource={models}
             rowKey="id"
             tableScrollX={1120}
-            totalLabel={(total) => `实时发现 ${total} 个模型`}
             loading={modelsQuery.isLoading}
             errorMessage={
                 modelsQuery.isError ? "无法读取 LiteLLM 模型，请重试" : undefined
@@ -188,14 +197,8 @@ export function ModelManagement() {
                     dataIndex: "id",
                     width: 210,
                     fixed: "left",
-                    render: (value: string, model) => (
-                        <Button
-                            type="link"
-                            className="model-id-link"
-                            onClick={() => setSelectedModel(model)}
-                        >
-                            {value}
-                        </Button>
+                    render: (value: string) => (
+                        <Typography.Text>{value}</Typography.Text>
                     ),
                 },
                 {
@@ -254,14 +257,20 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "连通性",
-                    key: "test",
-                    width: 144,
+                    title: "操作",
+                    key: "actions",
+                    width: 220,
                     fixed: "right",
                     align: "center",
                     className: "inkwell-action-column",
                     render: (_, model) => (
                         <DataListRowActions>
+                            <DataListRowAction
+                                label={`查看 ${model.id}`}
+                                text="查看"
+                                icon={<EyeOutlined />}
+                                onClick={() => setSelectedModel(model)}
+                            />
                             <DataListRowAction
                                 label={`测试 ${model.id}`}
                                 text="测试"
@@ -282,77 +291,139 @@ export function ModelManagement() {
         >
             {messageContext}
             <Drawer
-                width={500}
+                width={600}
                 title="模型详情"
+                closable={false}
                 open={selectedModel !== null}
                 onClose={() => setSelectedModel(null)}
+                extra={
+                    <Tooltip title="关闭">
+                        <Button
+                            type="text"
+                            aria-label="关闭模型详情"
+                            icon={<CloseOutlined />}
+                            onClick={() => setSelectedModel(null)}
+                        />
+                    </Tooltip>
+                }
+                className="resource-details-drawer"
+                styles={{ body: { padding: 0 } }}
             >
                 {selectedModel && (
-                    <Space
-                        direction="vertical"
-                        size={20}
-                        style={{ width: "100%" }}
-                    >
-                        <Space>
-                            <ApiOutlined />
-                            <Typography.Title level={5} style={{ margin: 0 }}>
-                                {selectedModel.id}
-                            </Typography.Title>
-                        </Space>
-                        <Space wrap>
-                            <Tag color="blue">
-                                {categoryLabels[selectedModel.category]}
-                            </Tag>
-                            <Tag>{selectedModel.providerMode ?? "模式未知"}</Tag>
-                            <Tag>{selectedModel.ownedBy ?? "提供方未知"}</Tag>
-                        </Space>
-                        <div>
-                            <Typography.Text type="secondary">
-                                上下文限制
-                            </Typography.Text>
-                            <Typography.Paragraph style={{ marginTop: 4 }}>
-                                最大输入 {formatTokens(selectedModel.maxInputTokens)} 个令牌，最大输出{" "}
-                                {formatTokens(selectedModel.maxOutputTokens)} 个令牌
-                            </Typography.Paragraph>
-                        </div>
-                        <div>
-                            <Typography.Text type="secondary">
-                                能力
-                            </Typography.Text>
-                            <div className="model-capability-grid">
-                                <span>
-                                    视觉{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.supportsVision}
-                                    />
-                                </span>
-                                <span>
-                                    工具调用{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.supportsTools}
-                                    />
-                                </span>
-                                <span>
-                                    结构化输出{" "}
-                                    <CapabilityTag
-                                        value={
-                                            selectedModel.supportsStructuredOutput
-                                        }
-                                    />
-                                </span>
-                                <span>
-                                    推理{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.supportsReasoning}
-                                    />
-                                </span>
+                    <div>
+                        <div
+                            className="agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ApiOutlined />}
+                                style={{ background: token.colorPrimary }}
+                            />
+                            <div className="agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title level={4} style={{ margin: 0 }}>
+                                        {selectedModel.id}
+                                    </Typography.Title>
+                                    <Tag color="processing">
+                                        {categoryLabels[selectedModel.category]}
+                                    </Tag>
+                                </Flex>
+                                <Flex gap={8} wrap style={{ marginTop: 8 }}>
+                                    <Tag>{selectedModel.providerMode ?? "模式未知"}</Tag>
+                                    <Tag>{selectedModel.ownedBy ?? "提供方未知"}</Tag>
+                                </Flex>
                             </div>
                         </div>
-                        <Typography.Text type="secondary">
-                            <ClockCircleOutlined /> 数据来自 LiteLLM 实时发现，不在
-                            Inkwell 中保存副本。
-                        </Typography.Text>
-                    </Space>
+
+                        <div className="agent-details-content">
+                            <section className="agent-details-section">
+                                <Space size={8} className="agent-details-section-title">
+                                    <ApiOutlined />
+                                    <Typography.Text strong>模型信息</Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        { key: "id", label: "模型 ID", children: selectedModel.id },
+                                        { key: "category", label: "Category", children: selectedModel.category },
+                                        {
+                                            key: "providerMode",
+                                            label: "Provider Mode",
+                                            children: selectedModel.providerMode ?? "未知",
+                                        },
+                                        {
+                                            key: "ownedBy",
+                                            label: "OwnedBy",
+                                            children: selectedModel.ownedBy ?? "未知",
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space size={8} className="agent-details-section-title">
+                                    <DatabaseOutlined />
+                                    <Typography.Text strong>Token 上限</Typography.Text>
+                                </Space>
+                                <div className="model-metric-grid">
+                                    <div className="model-metric-item">
+                                        <Typography.Text type="secondary">最大输入</Typography.Text>
+                                        <Typography.Title level={4} style={{ margin: 0 }}>
+                                            {formatTokens(selectedModel.maxInputTokens)}
+                                        </Typography.Title>
+                                        <Typography.Text type="secondary">tokens</Typography.Text>
+                                    </div>
+                                    <div className="model-metric-item">
+                                        <Typography.Text type="secondary">最大输出</Typography.Text>
+                                        <Typography.Title level={4} style={{ margin: 0 }}>
+                                            {formatTokens(selectedModel.maxOutputTokens)}
+                                        </Typography.Title>
+                                        <Typography.Text type="secondary">tokens</Typography.Text>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space size={8} className="agent-details-section-title">
+                                    <AppstoreOutlined />
+                                    <Typography.Text strong>能力</Typography.Text>
+                                </Space>
+                                <div className="model-capability-grid">
+                                    <div className="model-capability-item">
+                                        <Typography.Text>视觉</Typography.Text>
+                                        <CapabilityTag value={selectedModel.supportsVision} />
+                                    </div>
+                                    <div className="model-capability-item">
+                                        <Typography.Text>工具调用</Typography.Text>
+                                        <CapabilityTag value={selectedModel.supportsTools} />
+                                    </div>
+                                    <div className="model-capability-item">
+                                        <Typography.Text>结构化输出</Typography.Text>
+                                        <CapabilityTag value={selectedModel.supportsStructuredOutput} />
+                                    </div>
+                                    <div className="model-capability-item">
+                                        <Typography.Text>推理</Typography.Text>
+                                        <CapabilityTag value={selectedModel.supportsReasoning} />
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space size={8} className="agent-details-section-title">
+                                    <ClockCircleOutlined />
+                                    <Typography.Text strong>数据来源</Typography.Text>
+                                </Space>
+                                <Typography.Text type="secondary">
+                                    数据来自 LiteLLM 实时发现，不在 Inkwell 中保存副本。
+                                </Typography.Text>
+                            </section>
+                        </div>
+                    </div>
                 )}
             </Drawer>
         </DataListPage>

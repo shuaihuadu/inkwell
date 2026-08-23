@@ -1,24 +1,36 @@
 import {
+    CalendarOutlined,
+    CloseOutlined,
     DeleteOutlined,
+    DownOutlined,
     EditOutlined,
     EyeOutlined,
+    FileTextOutlined,
+    FolderOpenOutlined,
     InboxOutlined,
     PlusOutlined,
+    ReadOutlined,
+    UpOutlined,
+    UserOutlined,
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    Alert,
+    Avatar,
     Button,
     Descriptions,
     Drawer,
+    Flex,
     Form,
     Input,
     Modal,
     Select,
     Space,
+    Tag,
+    Tooltip,
     Typography,
     Upload,
     message,
+    theme,
     type UploadFile,
 } from "antd";
 import JSZip from "jszip";
@@ -27,12 +39,15 @@ import DataListPage, {
     DataListRowAction,
     DataListRowActions,
 } from "../../shared/components/data-list-page";
+import { MarkdownContent } from "../../shared/components/markdown-content";
+import { MarkdownEditor } from "../../shared/components/markdown-editor";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
     AgentSkillDefinition,
     AgentSkillUpdateRequest,
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
+import { useResolvedAppearance } from "../shell/appearance-store";
 
 interface SkillFormValues {
     name: string;
@@ -131,6 +146,8 @@ const formatTime = (value: string): string =>
     }).format(new Date(value));
 
 export function SkillManagement() {
+    const { token } = theme.useToken();
+    const appearance = useResolvedAppearance();
     const identity = useAuthStore((state) => state.identity);
     const queryClient = useQueryClient();
     const [form] = Form.useForm<SkillFormValues>();
@@ -141,6 +158,7 @@ export function SkillManagement() {
     const [selectedSkill, setSelectedSkill] =
         useState<AgentSkillDefinition | null>(null);
     const [editing, setEditing] = useState(false);
+    const [skillContentExpanded, setSkillContentExpanded] = useState(false);
     const [saving, setSaving] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -171,8 +189,13 @@ export function SkillManagement() {
                 : skill.ownerUserId !== identity?.userId);
         return matchesText && matchesOwner;
     });
+    const hasLongSkillContent =
+        selectedSkill !== null &&
+        (selectedSkill.content.length > 180 ||
+            selectedSkill.content.split("\n").length > 8);
 
     const openSkill = (skill: AgentSkillDefinition, edit = false): void => {
+        setSkillContentExpanded(false);
         setSelectedSkill(skill);
         setEditing(edit);
         form.setFieldsValue(skill);
@@ -308,7 +331,6 @@ export function SkillManagement() {
             dataSource={skills}
             rowKey="id"
             tableScrollX={940}
-            totalLabel={(total) => `共 ${total} 个 Skill`}
             loading={skillsQuery.isLoading}
             errorMessage={
                 skillsQuery.isError ? "Skills 加载失败，请稍后重试" : undefined
@@ -347,7 +369,7 @@ export function SkillManagement() {
                 {
                     title: "操作",
                     key: "actions",
-                    width: 164,
+                    width: 244,
                     fixed: "right",
                     align: "center",
                     className: "inkwell-action-column",
@@ -360,12 +382,21 @@ export function SkillManagement() {
                                 onClick={() => openSkill(skill)}
                             />
                             {canManage(skill) && (
-                                <DataListRowAction
-                                    label={`编辑 ${skill.name}`}
-                                    text="编辑"
-                                    icon={<EditOutlined />}
-                                    onClick={() => openSkill(skill, true)}
-                                />
+                                <>
+                                    <DataListRowAction
+                                        label={`编辑 ${skill.name}`}
+                                        text="编辑"
+                                        icon={<EditOutlined />}
+                                        onClick={() => openSkill(skill, true)}
+                                    />
+                                    <DataListRowAction
+                                        label={`删除 ${skill.name}`}
+                                        text="删除"
+                                        icon={<DeleteOutlined />}
+                                        danger
+                                        onClick={() => deleteSkill(skill)}
+                                    />
+                                </>
                             )}
                         </DataListRowActions>
                     ),
@@ -377,30 +408,25 @@ export function SkillManagement() {
             <Drawer
                 width={600}
                 title={editing ? "编辑 Skill" : "Skill 详情"}
+                closable={false}
                 open={selectedSkill !== null}
                 onClose={() => {
                     setSelectedSkill(null);
                     setEditing(false);
                 }}
                 extra={
-                    selectedSkill && canManage(selectedSkill) ? (
-                        <Space>
-                            {!editing && (
-                                <Button
-                                    icon={<EditOutlined />}
-                                    onClick={() => setEditing(true)}
-                                >
-                                    编辑
-                                </Button>
-                            )}
+                    selectedSkill ? (
+                        <Tooltip title="关闭">
                             <Button
-                                danger
                                 type="text"
-                                aria-label="删除 Skill"
-                                icon={<DeleteOutlined />}
-                                onClick={() => deleteSkill(selectedSkill)}
+                                aria-label="关闭 Skill 详情"
+                                icon={<CloseOutlined />}
+                                onClick={() => {
+                                    setSelectedSkill(null);
+                                    setEditing(false);
+                                }}
                             />
-                        </Space>
+                        </Tooltip>
                     ) : null
                 }
                 footer={
@@ -428,9 +454,11 @@ export function SkillManagement() {
                         </div>
                     ) : null
                 }
+                className="skill-details-drawer"
+                styles={{ body: { padding: editing ? 24 : 0 } }}
             >
-                {selectedSkill && (
-                    <Form form={form} layout="vertical" disabled={!editing}>
+                {selectedSkill && editing && (
+                    <Form form={form} layout="vertical">
                         <Form.Item
                             label="机器名称"
                             name="name"
@@ -467,21 +495,14 @@ export function SkillManagement() {
                         <Form.Item
                             label="SKILL.md 内容"
                             name="content"
+                            className="skill-markdown-editor"
                             rules={[{ required: true, message: "请输入内容" }]}
                         >
-                            <Input.TextArea
-                                rows={14}
-                                className="inkwell-skill-editor"
+                            <MarkdownEditor
+                                aria-label="SKILL.md 内容"
+                                appearance={appearance}
                             />
                         </Form.Item>
-                        {selectedSkill.scriptFileUris.length > 0 && (
-                            <Alert
-                                type="warning"
-                                showIcon
-                                message="脚本已保存，当前版本不会执行"
-                                style={{ marginBottom: 16 }}
-                            />
-                        )}
                         <Space size={24} wrap>
                             <Typography.Text type="secondary">
                                 所有者：{ownerLabel(selectedSkill)}
@@ -500,6 +521,191 @@ export function SkillManagement() {
                             </Typography.Text>
                         </Space>
                     </Form>
+                )}
+                {selectedSkill && !editing && (
+                    <div className="skill-details">
+                        <div
+                            className="agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ReadOutlined />}
+                                style={{ background: token.colorPrimary }}
+                            />
+                            <div className="agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title
+                                        level={4}
+                                        style={{ margin: 0 }}
+                                    >
+                                        {selectedSkill.name}
+                                    </Typography.Title>
+                                    <Tag color="processing">Skill</Tag>
+                                    {selectedSkill.ownerUserId ===
+                                        identity?.userId && <Tag>我上传的</Tag>}
+                                </Flex>
+                                <Typography.Paragraph
+                                    type="secondary"
+                                    style={{ margin: "6px 0 0" }}
+                                >
+                                    {selectedSkill.description}
+                                </Typography.Paragraph>
+                                <Flex gap={16} wrap style={{ marginTop: 8 }}>
+                                    <Typography.Text type="secondary">
+                                        <UserOutlined />{" "}
+                                        {ownerLabel(selectedSkill)}
+                                    </Typography.Text>
+                                    <Typography.Text type="secondary">
+                                        <CalendarOutlined />{" "}
+                                        {formatTime(selectedSkill.updatedTime)}
+                                    </Typography.Text>
+                                </Flex>
+                            </div>
+                        </div>
+
+                        <div className="agent-details-content">
+                            <section className="agent-details-section">
+                                <Flex
+                                    align="center"
+                                    justify="space-between"
+                                    gap={12}
+                                    className="agent-details-section-title"
+                                >
+                                    <Space size={8}>
+                                        <FileTextOutlined />
+                                        <Typography.Text strong>
+                                            SKILL.md
+                                        </Typography.Text>
+                                    </Space>
+                                    <Typography.Text type="secondary">
+                                        {selectedSkill.content.length} 字符
+                                    </Typography.Text>
+                                </Flex>
+                                <div
+                                    className={`skill-details-markdown ${
+                                        skillContentExpanded
+                                            ? "expanded"
+                                            : "collapsed"
+                                    }`}
+                                    style={{
+                                        background: token.colorFillQuaternary,
+                                        border: `1px solid ${token.colorBorderSecondary}`,
+                                    }}
+                                >
+                                    <MarkdownContent
+                                        appearance={appearance}
+                                        content={selectedSkill.content}
+                                    />
+                                </div>
+                                {hasLongSkillContent && (
+                                    <Button
+                                        type="link"
+                                        size="small"
+                                        className="agent-details-instructions-toggle"
+                                        icon={
+                                            skillContentExpanded ? (
+                                                <UpOutlined />
+                                            ) : (
+                                                <DownOutlined />
+                                            )
+                                        }
+                                        onClick={() =>
+                                            setSkillContentExpanded(
+                                                (current) => !current,
+                                            )
+                                        }
+                                    >
+                                        {skillContentExpanded
+                                            ? "收起"
+                                            : "展开全文"}
+                                    </Button>
+                                )}
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
+                                    <FolderOpenOutlined />
+                                    <Typography.Text strong>
+                                        资源
+                                    </Typography.Text>
+                                </Space>
+                                <div className="skill-resource-grid">
+                                    <div className="skill-resource-item">
+                                        <FileTextOutlined />
+                                        <Typography.Text strong>
+                                            {
+                                                selectedSkill.referenceFileUris
+                                                    .length
+                                            }
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            References
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="skill-resource-item">
+                                        <FolderOpenOutlined />
+                                        <Typography.Text strong>
+                                            {selectedSkill.assetFileUris.length}
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            Assets
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="skill-resource-item">
+                                        <FileTextOutlined />
+                                        <Typography.Text strong>
+                                            {
+                                                selectedSkill.scriptFileUris
+                                                    .length
+                                            }
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            Scripts
+                                        </Typography.Text>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
+                                    <CalendarOutlined />
+                                    <Typography.Text strong>
+                                        时间信息
+                                    </Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        {
+                                            key: "created",
+                                            label: "创建时间",
+                                            children: formatTime(
+                                                selectedSkill.createdTime,
+                                            ),
+                                        },
+                                        {
+                                            key: "updated",
+                                            label: "更新时间",
+                                            children: formatTime(
+                                                selectedSkill.updatedTime,
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            </section>
+                        </div>
+                    </div>
                 )}
             </Drawer>
             <Modal

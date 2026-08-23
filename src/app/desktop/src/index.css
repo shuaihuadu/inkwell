@@ -570,11 +570,14 @@ textarea {
     background: var(--shell-bg);
 }
 .inkwell-data-list-page {
+    display: flex;
     width: 100%;
     min-width: 0;
+    min-height: 0;
     height: 100%;
+    flex-direction: column;
     padding: 24px 28px;
-    overflow: auto;
+    overflow: hidden;
     background: var(--shell-bg);
 }
 .inkwell-data-list-header,
@@ -608,10 +611,23 @@ textarea {
     width: 280px;
 }
 .inkwell-data-list-table {
+    min-height: 120px;
     max-width: 100%;
+    flex: 1;
     overflow: hidden;
 }
+.inkwell-data-list-table .ant-table-wrapper,
+.inkwell-data-list-table .ant-spin-nested-loading,
+.inkwell-data-list-table .ant-spin-container,
+.inkwell-data-list-table .ant-table,
+.inkwell-data-list-table .ant-table-container {
+    height: 100%;
+}
+.inkwell-data-list-table .ant-table-body {
+    min-height: var(--inkwell-table-body-height, 120px);
+}
 .inkwell-data-list-table .ant-skeleton {
+    height: 100%;
     padding: 16px;
 }
 .inkwell-data-list-table .inkwell-action-column {
@@ -620,6 +636,7 @@ textarea {
 .inkwell-data-list-pagination {
     display: flex;
     min-height: 48px;
+    flex: 0 0 48px;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
@@ -630,25 +647,90 @@ textarea {
     align-items: center;
     gap: 6px;
 }
-.model-id-link.ant-btn {
-    height: auto;
-    padding: 0;
-}
-.model-capability-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 10px;
-}
-.tool-schema {
+.resource-schema {
     max-height: 320px;
     margin: 0;
     padding: 14px;
     overflow: auto;
+    border-radius: 6px;
+    color: var(--ant-color-text);
+    background: var(--ant-color-fill-quaternary);
+    font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
     line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    white-space: pre;
+}
+.model-metric-grid,
+.model-capability-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.model-metric-item {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+    background: var(--ant-color-fill-quaternary);
+}
+.model-capability-item {
+    display: flex;
+    min-width: 0;
+    min-height: 52px;
+    padding: 10px 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+    background: var(--ant-color-fill-quaternary);
+}
+.model-capability-item .ant-tag {
+    margin-inline-end: 0;
+}
+.skill-details-markdown {
+    position: relative;
+    padding: 14px 16px;
+    overflow: hidden;
+    border-radius: 6px;
+    line-height: 1.7;
+    transition: max-height 180ms ease;
+}
+.skill-details-markdown.collapsed {
+    max-height: 148px;
+}
+.skill-details-markdown.expanded {
+    max-height: min(52vh, 520px);
+    overflow: auto;
+}
+.skill-details-markdown .x-markdown > :first-child {
+    margin-top: 0;
+}
+.skill-details-markdown .x-markdown > :last-child {
+    margin-bottom: 0;
+}
+.skill-resource-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+.skill-resource-item {
+    display: grid;
+    min-width: 0;
+    padding: 14px 12px;
+    justify-items: center;
+    gap: 5px;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+    background: var(--ant-color-fill-quaternary);
+}
+.skill-resource-item > .anticon {
+    color: var(--primary);
+}
+.skill-resource-item > strong {
+    font-size: 18px;
+    line-height: 1.2;
 }
 @media (max-width: 760px) {
     .inkwell-data-list-header {
@@ -774,11 +856,14 @@ textarea {
     gap: 12px;
 }
 .agent-space-page {
+    display: flex;
     width: 100%;
     min-width: 0;
+    min-height: 0;
     height: 100%;
+    flex-direction: column;
     padding: 20px;
-    overflow: auto;
+    overflow: hidden;
     background: var(--shell-bg);
 }
 .agent-space-header,
@@ -811,17 +896,18 @@ textarea {
 }
 .agent-space-canvas {
     position: relative;
-    min-height: 548px;
-}
-.agent-space-canvas.shared {
-    min-height: 594px;
+    min-height: 120px;
+    flex: 1;
+    padding-right: 4px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 .agent-space-column {
     max-width: 20%;
 }
 .agent-space-card.ant-card {
     position: relative;
-    height: 128px;
+    height: 148px;
     overflow: hidden;
     border-radius: 10px;
 }
@@ -835,14 +921,25 @@ textarea {
     z-index: 1;
     right: 6px;
     bottom: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 140ms ease,
+        visibility 140ms ease;
+}
+.agent-space-card:hover .agent-card-actions.ant-space,
+.agent-space-card:focus-within .agent-card-actions.ant-space {
+    opacity: 1;
+    visibility: visible;
 }
 .agent-card-actions .ant-btn {
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-.agent-space-card:hover .agent-card-actions .ant-btn,
-.agent-card-actions .ant-btn:focus-visible {
-    opacity: 1;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--shell-border);
+    background: var(--shell-panel);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
 }
 .agent-card-heading {
     display: flex;
@@ -913,6 +1010,7 @@ textarea {
 }
 .agent-space-pagination {
     min-height: 48px;
+    flex: 0 0 48px;
     padding-top: 16px;
 }
 .agent-chat-workspace {
@@ -992,7 +1090,6 @@ textarea {
     overflow: hidden;
     border-radius: 6px;
     line-height: 1.7;
-    white-space: pre-wrap;
     transition: max-height 180ms ease;
 }
 .agent-details-instructions.collapsed {
@@ -1001,6 +1098,12 @@ textarea {
 .agent-details-instructions.expanded {
     max-height: min(52vh, 520px);
     overflow: auto;
+}
+.agent-details-instructions .x-markdown > :first-child {
+    margin-top: 0;
+}
+.agent-details-instructions .x-markdown > :last-child {
+    margin-bottom: 0;
 }
 .agent-details-instructions-count {
     font-size: 12px;
@@ -1479,39 +1582,68 @@ textarea {
     width: 100%;
 }
 .agent-binding-selector.ant-checkbox-group {
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+}
+.agent-binding-item {
+    padding: 14px;
+    border-bottom: 1px solid var(--shell-border);
+    background: var(--shell-panel);
+    transition: background-color 160ms ease;
+}
+.agent-binding-item:last-child {
+    border-bottom: 0;
+}
+.agent-binding-item:hover {
+    background: var(--shell-fill-quaternary);
+}
+.agent-binding-item.selected {
+    background: var(--primary-soft);
+}
+.agent-binding-item-main {
     display: flex;
-    width: 100%;
-    flex-direction: column;
-    gap: 8px;
+    align-items: flex-start;
+    gap: 12px;
 }
-.agent-binding-selector .ant-card {
-    width: 100%;
-    border-radius: 8px;
+.agent-binding-item-main > .ant-checkbox-wrapper {
+    margin-top: 8px;
 }
-.agent-binding-selector .ant-card-body {
-    padding: 8px 12px;
-}
-.agent-binding-selector .ant-checkbox-wrapper {
+.agent-binding-item-icon {
     display: grid;
-    width: 100%;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    column-gap: 12px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--primary);
+    background: var(--primary-soft);
 }
-.agent-binding-selector .ant-checkbox-wrapper > span:last-child {
+.agent-binding-item-copy {
     display: flex;
     min-width: 0;
+    flex: 1;
     flex-direction: column;
     gap: 2px;
 }
-.agent-binding-selector .ant-checkbox-wrapper .ant-typography-secondary {
+.agent-binding-item-copy > .ant-typography-secondary {
     font-size: 12px;
 }
-.agent-binding-selector
-    .ant-checkbox-wrapper
-    > span:last-child
-    > .ant-typography:first-child {
-    font-size: 13px;
+.agent-binding-config {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    border-top: 1px solid var(--shell-border);
+    background: var(--shell-panel);
+}
+.agent-binding-config .ant-form-item {
+    min-width: 180px;
+    flex: 1;
+    margin-bottom: 0;
+}
+.agent-skill-stages {
+    margin-top: 8px;
 }
 .agent-skills-description.ant-typography {
     margin-bottom: 12px;
@@ -1522,6 +1654,42 @@ textarea {
 }
 .agent-instructions-warning .ant-alert-message {
     font-size: 12px;
+}
+.agent-instructions-editor {
+    margin-bottom: 0;
+}
+.agent-instructions-editor .ant-form-item-control-input-content {
+    height: 480px;
+    overflow: hidden;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+}
+.skill-markdown-editor .ant-form-item-control-input-content {
+    height: 480px;
+    overflow: hidden;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+}
+.agent-instructions-markdown {
+    min-height: 160px;
+    max-height: min(58vh, 560px);
+    padding: 16px 18px;
+    overflow: auto;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+    background: var(--ant-color-fill-quaternary);
+    line-height: 1.7;
+}
+.agent-instructions-markdown .x-markdown > :first-child {
+    margin-top: 0;
+}
+.agent-instructions-markdown .x-markdown > :last-child {
+    margin-bottom: 0;
+}
+.agent-instructions-editor-count.ant-typography {
+    display: block;
+    margin-top: 6px;
+    text-align: right;
 }
 .agent-tool-parameters {
     display: flex;

@@ -92,6 +92,82 @@ public sealed class AgentFactoryTests
     }
 
     /// <summary>
+    /// 验证已绑定的内置工具在运行时转换为 MAF AIFunction。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildAsync_WithCurrentDateTimeTool_AddsAIFunctionAsync()
+    {
+        // Arrange
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        AgentToolDefinition tool = CreateToolDefinition("get_current_datetime");
+        CapturingChatLLMProvider chatProvider = new();
+        AgentFactory factory = CreateFactory(model, chatProvider, tool);
+        AgentBuildOptions buildOptions = new()
+        {
+            ModelOptions = new AgentModelOptions { ModelId = model.Id },
+            ToolBindings = [new AgentToolBinding(tool.Id, null)],
+        };
+
+        // Act
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id, buildOptions));
+        await agent.RunAsync([new ChatMessage(ChatRole.User, "What time is it?")]);
+
+        // Assert
+        AIFunction function = Assert.IsInstanceOfType<AIFunction>(chatProvider.LastOptions?.Tools?.Single());
+        Assert.AreEqual(tool.Name, function.Name);
+        Assert.AreEqual(tool.Description, function.Description);
+        object? result = await function.InvokeAsync(new AIFunctionArguments
+        {
+            ["timeZoneId"] = "Asia/Shanghai",
+        });
+        JsonElement resultElement = Assert.IsInstanceOfType<JsonElement>(result);
+        Assert.AreEqual("Asia/Shanghai", resultElement.GetProperty("timeZoneId").GetString());
+    }
+
+    /// <summary>
+    /// 验证未绑定工具的 Agent 不获得内置工具。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildAsync_WithoutToolBindings_DoesNotAddToolsAsync()
+    {
+        // Arrange
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        CapturingChatLLMProvider chatProvider = new();
+        AgentFactory factory = CreateFactory(model, chatProvider);
+
+        // Act
+        AIAgent agent = await factory.BuildAsync(CreateVersion(model.Id));
+        await agent.RunAsync([new ChatMessage(ChatRole.User, "Hello")]);
+
+        // Assert
+        Assert.IsEmpty(chatProvider.LastOptions?.Tools ?? []);
+    }
+
+    /// <summary>
+    /// 验证目录中存在但运行时未实现的工具会使 Agent 构建失败。
+    /// </summary>
+    [TestMethod]
+    public async Task BuildAsync_WithUnavailableTool_ThrowsInvalidOperationExceptionAsync()
+    {
+        // Arrange
+        LLMModel model = CreateModel("gpt-5.4", LLMModelCategory.Chat);
+        AgentToolDefinition tool = CreateToolDefinition("unavailable_tool");
+        AgentFactory factory = CreateFactory(model, new RespondingChatLLMProvider(), tool);
+        AgentBuildOptions buildOptions = new()
+        {
+            ModelOptions = new AgentModelOptions { ModelId = model.Id },
+            ToolBindings = [new AgentToolBinding(tool.Id, null)],
+        };
+
+        // Act
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => factory.BuildAsync(CreateVersion(model.Id, buildOptions)).AsTask());
+
+        // Assert
+        StringAssert.Contains(exception.Message, "is not available in the Agent runtime");
+    }
+
+    /// <summary>
     /// 验证默认内存历史能够恢复被 jsonb 重排过多态元数据的 Session 状态。
     /// </summary>
     /// <returns>表示异步测试操作的任务。</returns>
@@ -195,8 +271,26 @@ public sealed class AgentFactoryTests
         ProviderMode = category == LLMModelCategory.Chat ? "chat" : "embedding",
     };
 
-    private static AgentFactory CreateFactory(LLMModel model, IChatLLMProvider chatProvider) =>
-        new(new StubLLMProvider(model), chatProvider, new StubPersistenceProvider(), TimeProvider.System);
+    private static AgentFactory CreateFactory(
+        LLMModel model,
+        IChatLLMProvider chatProvider,
+        AgentToolDefinition? tool = null) =>
+        new(
+            new StubLLMProvider(model),
+            chatProvider,
+            new StubAgentToolCatalogService(tool),
+            new StubPersistenceProvider(),
+            TimeProvider.System);
+
+    private static AgentToolDefinition CreateToolDefinition(string name) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        Name = name,
+        Description = "Gets the current date and time.",
+        ParametersJsonSchema = "{\"type\":\"object\",\"required\":[]}",
+        CreatedTime = DateTimeOffset.UtcNow,
+        UpdatedTime = DateTimeOffset.UtcNow,
+    };
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
@@ -330,6 +424,46 @@ public sealed class AgentFactoryTests
         public IChatClient CreateChatClient(string modelId) => new RespondingChatClient(modelId);
     }
 
+    private sealed class CapturingChatLLMProvider : IChatLLMProvider
+    {
+        private readonly CapturingChatClient _client = new();
+
+        public ChatOptions? LastOptions => this._client.LastOptions;
+
+        public IChatClient CreateChatClient(string modelId) => this._client;
+    }
+
+    private sealed class CapturingChatClient : IChatClient
+    {
+        public ChatOptions? LastOptions { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            this.LastOptions = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            this.LastOptions = options;
+            await Task.Yield();
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "done");
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
+    }
+
     private sealed class RespondingChatClient(string modelId) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(
@@ -362,6 +496,18 @@ public sealed class AgentFactoryTests
         public void Dispose()
         {
         }
+    }
+
+    private sealed class StubAgentToolCatalogService(AgentToolDefinition? tool) : IAgentToolCatalogService
+    {
+        public Task<IReadOnlyList<AgentToolDefinition>> ListAvailableToolsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AgentToolDefinition>>(tool is null ? [] : [tool]);
+
+        public Task<AgentToolDefinition> GetToolAsync(Guid toolId, CancellationToken ct = default) =>
+            Task.FromResult(tool is not null && toolId == tool.Id ? tool : throw new KeyNotFoundException());
+
+        public Task ValidateToolBindingAsync(Guid toolId, string? parametersJson, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class StubPersistenceProvider : IPersistenceProvider

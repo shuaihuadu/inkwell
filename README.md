@@ -1,91 +1,98 @@
 # Inkwell
 
+English | [简体中文](README.zh-CN.md)
+
 > [!WARNING]
-> Inkwell 当前处于活跃开发阶段，尚未发布稳定版本。功能、配置、数据库结构和公开接口都可能发生 Breaking Change，请勿将 `main` 分支视为稳定兼容基线。
+> Inkwell is under active development and has not reached a stable release. Features, configuration, database schemas, and public APIs may introduce breaking changes. Do not treat the `main` branch as a stable compatibility baseline.
 
-Inkwell 是一个基于 [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) 打造的智能体工作空间：团队可以把它部署给内部成员协作使用，个人及 OPC（One Person Company，单人公司）也可以独立部署给自己使用。
+Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://github.com/microsoft/agent-framework). Teams can deploy it for internal collaboration, while individuals and OPCs (One Person Companies) can self-host it for personal use.
 
-Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://github.com/microsoft/agent-framework): teams can deploy it for internal collaborative use, and individuals or OPCs (One Person Companies) can self-host it for personal use.
+## Features
 
-## 核心能力
+- **Agent authoring**: Configure identity, instructions, model parameters, tools, and skills, with draft saving and trial runs.
+- **Versioning and collaboration**: Publish versions, compare history, roll back to an earlier version, share agents with a team, or clone them as independent agents.
+- **Persistent conversations**: Create, switch, clear, and delete conversation histories while keeping each conversation bound to its agent version.
+- **Resilient chat runs**: Stop active runs, recover from errors, resume after screen lock, and inspect tool and skill activity alongside responses.
+- **Model access**: Discover and manage LiteLLM models, select chat and embedding models, and test connectivity.
+- **Resource management**: Manage agent skills, inspect the read-only tool catalog, and administer user accounts.
+- **Local development**: Start the complete environment with .NET Aspire, database migrations, and built-in observability.
 
-- **Agent 创作**：配置基础信息、Instructions、模型参数、Tools 与 Skills，支持草稿保存和试运行
-- **发布与协作**：发布 Agent 版本、查看版本历史、共享给团队或复制为独立 Agent
-- **Agent 对话**：使用已发布版本持续对话，也可在编辑器中试运行草稿
-- **模型接入**：统一管理并选用不同模型
-- **Skills 与工具**：管理 Agent Skills，查看可用工具目录
-- **账号管理**：管理员维护用户账号，用户可修改自己的密码
-- **本地运行**：使用 Aspire 启动完整开发环境，并通过内置指南快速上手
+## Technology
 
-## 技术栈
+- **Desktop**: Electron · React · TypeScript
+- **Backend**: .NET · ASP.NET Core · Microsoft Agent Framework
+- **Data and infrastructure**: EF Core · PostgreSQL / SQL Server · Qdrant · Redis · MinIO / Azure Blob
+- **Development and deployment**: .NET Aspire · Docker · Kubernetes · Helm
+- **Observability**: OpenTelemetry · Grafana · Prometheus · Tempo · Loki
+- **Testing**: MSTest · Vitest · Playwright · Testcontainers
 
-- **客户端**：Electron · React · TypeScript
-- **后端**：.NET · ASP.NET Core · Microsoft Agent Framework
-- **数据与基础设施**：EF Core · PostgreSQL / SQL Server · Qdrant · Redis · MinIO / Azure Blob
-- **开发与部署**：Aspire · Docker · Kubernetes · Helm
-- **可观测性**：OpenTelemetry · Grafana · Prometheus · Tempo · Loki
-- **测试**：MSTest · Vitest · Playwright · Testcontainers
+## Local Development
 
-## 本地启动
-
-本机需安装 [.NET 10 SDK](global.json)、Node.js（含 npm）和 Docker Desktop。克隆仓库后，先按 lockfile 安装 Desktop 与视觉原型依赖，再使用 AppHost User Secrets 配置 LiteLLM Portal 的本地管理员密钥（必须以 `sk-` 开头），最后启动 Aspire AppHost：
+Install the [.NET 10 SDK](global.json), Node.js with npm, and Docker Desktop. Then clone the repository, install the Desktop and visual prototype dependencies from their lockfiles, and start the Aspire AppHost:
 
 ```bash
 git clone https://github.com/shuaihuadu/inkwell.git
 cd inkwell
 npm --prefix src/app/desktop ci
 npm --prefix prototypes/inkwell-visual-design ci
-dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
 dotnet run --project src/core/Inkwell.AppHost
 ```
 
-启动后访问 LiteLLM Portal（<http://localhost:6804/ui>），使用用户名 `admin` 和上面配置的管理员密钥登录，然后在 Portal 中添加模型和供应商凭据。Portal 模型保存在独立的 LiteLLM PostgreSQL 数据库中，Inkwell 会自动发现并允许其用于基础对话；未配置能力覆盖的模型默认不声明视觉、工具调用或结构化输出能力。
+Aspire starts the databases, migrations, LiteLLM, observability services, WebApi, Desktop, and visual prototype. The default local LiteLLM master key is `sk-local`. To override it without modifying tracked configuration, use AppHost User Secrets before starting Aspire:
 
-启动后可通过 Aspire Dashboard 查看和管理各项本地服务。Inkwell 默认管理员账号和密码均为 `admin`，首次登录后必须修改密码。
+```bash
+dotnet user-secrets --project src/core/Inkwell.AppHost set "Parameters:litellm-master-key" "<local-litellm-key>"
+```
 
-常用本地地址：
+Open the LiteLLM Portal at <http://localhost:6804/ui> and sign in with username `admin` and the LiteLLM master key. You can add models and provider credentials in the Portal. Inkwell discovers those models automatically. The AppHost can also generate LiteLLM bootstrap configuration from `LiteLLM:BootstrapModels` in `src/core/Inkwell.AppHost/appsettings.json`; the sample models are disabled by default.
 
-- Aspire Dashboard：<https://localhost:15888>
-- 视觉原型设计：<http://localhost:6800>
-- WebApi：<http://localhost:6801>
-- LiteLLM Portal：<http://localhost:6804/ui>
-- Grafana：<http://localhost:6805>
-- Prometheus：<http://localhost:6806>
-- Tempo：<http://localhost:6807>
-- Loki：<http://localhost:6808>
+The default Inkwell administrator credentials are `admin` / `admin`. You must change the password after the first sign-in.
 
-端口配置位于 `src/core/Inkwell.AppHost/appsettings.json`。
+Common local endpoints:
 
-## Desktop 发布
+- Aspire Dashboard: <https://localhost:15888>
+- Visual prototype: <http://localhost:6800>
+- WebApi: <http://localhost:6801>
+- LiteLLM Portal: <http://localhost:6804/ui>
+- Grafana: <http://localhost:6805>
+- Prometheus: <http://localhost:6806>
+- Tempo: <http://localhost:6807>
+- Loki: <http://localhost:6808>
 
-Desktop 当前版本为 `0.0.1-alpha`。`alpha` 表示功能、配置、数据库结构和公开接口尚未稳定，后续版本可能包含 Breaking Change。
+Port configuration is available in `src/core/Inkwell.AppHost/appsettings.json`.
 
-推送与 `src/app/desktop/package.json` 版本一致的 Git Tag（例如 `v0.0.1-alpha`）后，GitHub Actions 会创建 prerelease 并生成以下安装包：
+## Desktop Releases
 
-- Windows x64：NSIS `.exe`、MSI `.msi`
-- macOS Universal：`.dmg`、`.zip`
-- Linux x64：`.AppImage`、`.deb`
+The current Desktop version is `0.0.1-alpha`. The `alpha` label means features, configuration, database schemas, and public APIs are not stable and may introduce breaking changes.
 
-安装包 About 窗口中的版本来自 `package.json`，构建号来自 GitHub Actions run number 与 run attempt，提交号来自发布工作流对应的 Git commit。安装包内部使用对应的纯数字平台构建版本 `0.0.<run_number>.<run_attempt>`，满足 macOS `CFBundleVersion` 与 Windows `FileVersion` 的格式要求。当前安装包未接入 Windows 代码签名和 macOS notarization，仅用于 alpha 阶段测试；Desktop 仍需连接可用的 Inkwell WebApi。
+Pushing a Git tag that matches the version in `src/app/desktop/package.json`, such as `v0.0.1-alpha`, triggers GitHub Actions to create a prerelease with these packages:
+
+- Windows x64: NSIS `.exe` and MSI `.msi`
+- macOS Universal: `.dmg` and `.zip`
+- Linux x64: `.AppImage` and `.deb`
+
+The version shown in the About window comes from `package.json`. The build number comes from the GitHub Actions run number and attempt, and the commit identifier comes from the release workflow commit. The packages use a numeric platform build version in the form `0.0.<run_number>.<run_attempt>` to satisfy macOS `CFBundleVersion` and Windows `FileVersion` requirements.
+
+Windows code signing and macOS notarization are not configured yet, so the packages are intended for alpha testing only. The Desktop application also requires access to a running Inkwell WebApi.
 
 ## Roadmap
 
-- ✅ Agent 创建、完整配置、草稿保存与试运行
-- ✅ Agent 发布、版本历史、团队共享与复制
-- ✅ LiteLLM 模型发现、模型管理与基础对话
-- ✅ Agent Skills 管理与只读工具目录
-- ✅ 用户账号管理与密码修改
-- ✅ Aspire 本地编排与 PostgreSQL / SQL Server 双数据库迁移
-- 🚧 Agent 版本回滚的桌面操作与更完整的协作治理
-- 🚧 知识库、长期记忆、多模态、调试与评测
-- 🚧 对外协议兼容与生产部署
+- ✅ Agent authoring, draft saving, and trial runs
+- ✅ Publishing, version comparison and rollback, team sharing, and cloning
+- ✅ Persistent conversation history, run recovery, and tool activity presentation
+- ✅ LiteLLM model discovery, model management, and connectivity tests
+- ✅ Agent skill management, read-only tool catalog, and user administration
+- ✅ Aspire orchestration, PostgreSQL / SQL Server migrations, and agent telemetry
+- 🚧 More comprehensive collaboration governance
+- 🚧 Knowledge bases, long-term memory, multimodal input, debugging, and evaluation
+- 🚧 External protocol compatibility and production deployment
 
-## 关注公众号
+## Follow the WeChat Official Account
 
-如果你也关注 AI Agent 的工程化落地、Microsoft Agent Framework 与 .NET AI 开发，欢迎扫码关注「全栈哥」。项目进展、架构思考和实践记录会持续分享。
+Interested in the engineering behind AI agents, Microsoft Agent Framework, and .NET AI development? Scan the QR code to follow “全栈哥” for project updates, architecture notes, and practical write-ups.
 
-![全栈哥公众号二维码](src/app/desktop/public/quanzhange.jpg)
+![全栈哥 WeChat official account QR code](src/app/desktop/public/quanzhange.jpg)
 
-## 许可证
+## License
 
 [MIT License](LICENSE)

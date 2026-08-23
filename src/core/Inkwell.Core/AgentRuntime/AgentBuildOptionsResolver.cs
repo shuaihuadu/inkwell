@@ -5,7 +5,9 @@ using System.Collections.Immutable;
 namespace Inkwell;
 
 /// <inheritdoc />
-internal sealed class AgentBuildOptionsResolver(IPersistenceProvider persistence) : IAgentBuildOptionsResolver
+internal sealed class AgentBuildOptionsResolver(
+    IPersistenceProvider persistence,
+    IAgentToolCatalogService toolCatalogService) : IAgentBuildOptionsResolver
 {
     private readonly IAgentSkillRepository _skills = persistence.GetRepository<IAgentSkillRepository>();
 
@@ -21,11 +23,23 @@ internal sealed class AgentBuildOptionsResolver(IPersistenceProvider persistence
             skills.Add(definition);
         }
 
+        IReadOnlyList<AgentToolBinding> toolBindings = request.ToolBindings ?? [];
+        HashSet<Guid> toolIds = [];
+        foreach (AgentToolBinding binding in toolBindings)
+        {
+            if (!toolIds.Add(binding.ToolId))
+            {
+                throw new ArgumentException($"Tool '{binding.ToolId}' cannot be bound more than once.", nameof(request));
+            }
+
+            await toolCatalogService.ValidateToolBindingAsync(binding.ToolId, binding.ParametersJson, cancellationToken).ConfigureAwait(false);
+        }
+
         return new AgentBuildOptions
         {
             ModelOptions = request.ModelOptions,
             ChatHistoryOptions = request.ChatHistoryOptions,
-            ToolBindings = [.. request.ToolBindings ?? []],
+            ToolBindings = [.. toolBindings],
             Skills = skills.ToImmutable(),
         };
     }

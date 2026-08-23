@@ -14,7 +14,13 @@ import {
     type TableColumnsType,
     type TableProps,
 } from "antd";
-import { useState, type ReactNode } from "react";
+import {
+    useEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode,
+} from "react";
 
 const pageSize = 20;
 
@@ -77,7 +83,6 @@ interface DataListPageProps<ItemType extends object> {
     columns: TableColumnsType<ItemType>;
     rowKey: TableProps<ItemType>["rowKey"];
     tableScrollX: number;
-    totalLabel: (total: number) => ReactNode;
     loading?: boolean;
     errorMessage?: string;
     onRetry?: () => void;
@@ -104,7 +109,6 @@ export default function DataListPage<ItemType extends object>({
     columns,
     rowKey,
     tableScrollX,
-    totalLabel,
     loading,
     errorMessage,
     onRetry,
@@ -113,6 +117,8 @@ export default function DataListPage<ItemType extends object>({
     isFiltered,
     children,
 }: DataListPageProps<ItemType>) {
+    const tableViewportRef = useRef<HTMLDivElement>(null);
+    const [tableBodyHeight, setTableBodyHeight] = useState(385);
     const [pagination, setPagination] = useState({
         resetKey: paginationResetKey,
         page: 1,
@@ -125,6 +131,25 @@ export default function DataListPage<ItemType extends object>({
         (currentPage - 1) * pageSize,
         currentPage * pageSize,
     );
+
+    useEffect(() => {
+        const viewport = tableViewportRef.current;
+        if (!viewport) return;
+
+        const updateTableBodyHeight = (): void => {
+            const headerHeight =
+                viewport
+                    .querySelector(".ant-table-thead")
+                    ?.getBoundingClientRect().height ?? 55;
+            setTableBodyHeight(
+                Math.max(120, Math.floor(viewport.clientHeight - headerHeight)),
+            );
+        };
+        const observer = new ResizeObserver(updateTableBodyHeight);
+        observer.observe(viewport);
+        updateTableBodyHeight();
+        return () => observer.disconnect();
+    }, [loading]);
 
     return (
         <main className="inkwell-data-list-page">
@@ -170,14 +195,20 @@ export default function DataListPage<ItemType extends object>({
                         placeholder={searchPlaceholder}
                         value={searchValue}
                         maxLength={searchMaxLength}
-                        onChange={(event) =>
-                            onSearchChange(event.target.value)
-                        }
+                        onChange={(event) => onSearchChange(event.target.value)}
                     />
                 </Space>
             </div>
 
-            <div className="inkwell-data-list-table">
+            <div
+                ref={tableViewportRef}
+                className="inkwell-data-list-table"
+                style={
+                    {
+                        "--inkwell-table-body-height": `${tableBodyHeight}px`,
+                    } as CSSProperties
+                }
+            >
                 {loading ? (
                     <Skeleton
                         active
@@ -188,7 +219,7 @@ export default function DataListPage<ItemType extends object>({
                     <Table<ItemType>
                         rowKey={rowKey}
                         dataSource={visibleItems}
-                        scroll={{ x: tableScrollX }}
+                        scroll={{ x: tableScrollX, y: tableBodyHeight }}
                         pagination={false}
                         columns={columns}
                         locale={{
@@ -210,7 +241,7 @@ export default function DataListPage<ItemType extends object>({
             {!loading && (
                 <div className="inkwell-data-list-pagination">
                     <Typography.Text type="secondary">
-                        {totalLabel(dataSource.length)}
+                        共 {dataSource.length} 项
                     </Typography.Text>
                     <Pagination
                         size="small"

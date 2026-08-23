@@ -27,7 +27,10 @@ public sealed class AgentBuildOptionsResolverTests
             SkillBindings = [new AgentSkillBinding(skill.Id)],
             ChatHistoryOptions = historyOptions,
         };
-        AgentBuildOptionsResolver resolver = new(new StubPersistenceProvider(new StubAgentSkillRepository(skill)));
+        AgentToolDefinition tool = CreateToolDefinition(toolBinding.ToolId);
+        AgentBuildOptionsResolver resolver = new(
+            new StubPersistenceProvider(new StubAgentSkillRepository(skill)),
+            new StubAgentToolCatalogService(tool));
 
         // Act
         AgentBuildOptions result = await resolver.ResolveAsync(request);
@@ -40,6 +43,43 @@ public sealed class AgentBuildOptionsResolverTests
         Assert.HasCount(1, result.Skills);
         Assert.AreSame(skill, result.Skills[0]);
     }
+
+    /// <summary>
+    /// 验证同一个工具不能重复绑定。
+    /// </summary>
+    [TestMethod]
+    public async Task ResolveAsync_WithDuplicateToolBindings_ThrowsArgumentExceptionAsync()
+    {
+        // Arrange
+        Guid toolId = Guid.CreateVersion7();
+        AgentToolDefinition tool = CreateToolDefinition(toolId);
+        AgentBuildOptionsResolver resolver = new(
+            new StubPersistenceProvider(new StubAgentSkillRepository(CreateSkillDefinition())),
+            new StubAgentToolCatalogService(tool));
+        AgentUpsertRequest request = new()
+        {
+            Name = "Research assistant",
+            ModelOptions = new AgentModelOptions { ModelId = "test-model" },
+            ToolBindings = [new AgentToolBinding(toolId, null), new AgentToolBinding(toolId, null)],
+        };
+
+        // Act
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => resolver.ResolveAsync(request));
+
+        // Assert
+        StringAssert.Contains(exception.Message, "cannot be bound more than once");
+    }
+
+    private static AgentToolDefinition CreateToolDefinition(Guid id) => new()
+    {
+        Id = id,
+        Name = "get_current_datetime",
+        Description = "Gets the current date and time.",
+        ParametersJsonSchema = "{\"type\":\"object\",\"required\":[]}",
+        CreatedTime = DateTimeOffset.UtcNow,
+        UpdatedTime = DateTimeOffset.UtcNow,
+    };
 
     private static AgentSkillDefinition CreateSkillDefinition() => new()
     {
@@ -68,6 +108,20 @@ public sealed class AgentBuildOptionsResolverTests
 
         public Task<PagedResult<AgentSkillDefinition>> ListSkills(Pagination pagination, SortOrder sort, CancellationToken ct = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class StubAgentToolCatalogService(AgentToolDefinition tool) : IAgentToolCatalogService
+    {
+        public Task<IReadOnlyList<AgentToolDefinition>> ListAvailableToolsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AgentToolDefinition>>([tool]);
+
+        public Task<AgentToolDefinition> GetToolAsync(Guid toolId, CancellationToken ct = default) =>
+            Task.FromResult(toolId == tool.Id ? tool : throw new KeyNotFoundException());
+
+        public async Task ValidateToolBindingAsync(Guid toolId, string? parametersJson, CancellationToken ct = default)
+        {
+            await this.GetToolAsync(toolId, ct);
+        }
     }
 
     private sealed class StubPersistenceProvider(IAgentSkillRepository skills) : IPersistenceProvider

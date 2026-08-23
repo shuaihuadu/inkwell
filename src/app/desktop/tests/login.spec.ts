@@ -30,7 +30,21 @@ const skillsResponse = JSON.stringify([
         ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
         name: "合同审查规范",
         description: "按团队法务标准识别合同风险并输出分级建议。",
-        content: "# 合同审查规范\n\n先识别合同类型，再输出风险。",
+        content: [
+            "# 合同审查规范",
+            "",
+            "先识别合同类型，再按高、中、低三级输出风险。每项风险必须引用原文。",
+            "",
+            "## 审查步骤",
+            "",
+            "1. 确认合同主体、标的、金额、履行期限与争议解决条款。",
+            "2. 识别权利义务不对等、责任上限缺失和单方变更等风险。",
+            "3. 对每项风险引用原文，并给出可直接替换的修改建议。",
+            "",
+            "## 输出要求",
+            "",
+            "不得脱离合同原文推断未约定的事实；信息不足时应明确标记待确认事项。",
+        ].join("\n"),
         referenceFileUris: ["inkwell://skills/references/rule.md"],
         assetFileUris: ["inkwell://skills/assets/template.docx"],
         scriptFileUris: ["inkwell://skills/scripts/check.ps1"],
@@ -246,15 +260,20 @@ test("shows authentication errors and enters the workspace after login", async (
     const conversationId = "0198a96d-19e4-7000-8000-000000000401";
     const historicalAgentVersionId = "0198a96d-19e4-7000-8000-000000000304";
     const historicalAgentInstructions = [
+        "# 研发协作规则",
+        "",
         "你是研发助手 v2，负责基于当前会话上下文整理可靠的研发结论。",
-        "调用工具前先说明目的，调用后明确区分工具结果与推断。",
-        "输出必须包含结论、依据、风险和后续行动。",
-        "遇到缺失信息时直接列出待确认项，不得虚构实现细节。",
-        "引用代码时给出准确路径，并优先提供可执行的验证步骤。",
-        "对于破坏性操作，必须先说明影响范围并等待确认。",
-        "保持表达简洁，避免重复用户已经明确提供的背景。",
-        "长任务按阶段报告进展，但不要用无信息量的状态更新刷屏。",
-        "最终回答应清楚说明已完成内容、验证结果和剩余风险。",
+        "",
+        "## 输出要求",
+        "",
+        "- 调用工具前先说明目的，调用后明确区分工具结果与推断。",
+        "- 输出必须包含结论、依据、风险和后续行动。",
+        "- 遇到缺失信息时直接列出待确认项，不得虚构实现细节。",
+        "- 引用代码时给出准确路径，并优先提供可执行的验证步骤。",
+        "- 对于破坏性操作，必须先说明影响范围并等待确认。",
+        "- 保持表达简洁，避免重复用户已经明确提供的背景。",
+        "- 长任务按阶段报告进展，但不要用无信息量的状态更新刷屏。",
+        "- 最终回答应清楚说明已完成内容、验证结果和剩余风险。",
     ].join("\n");
     let conversationCreated = true;
     let persistedConversationMessages: Array<Record<string, unknown>> = [];
@@ -1149,6 +1168,14 @@ test("shows authentication errors and enters the workspace after login", async (
             }),
         ).toBeVisible();
         await expect(
+            chatAgentDetails.getByRole("heading", {
+                name: "研发协作规则",
+            }),
+        ).toBeVisible();
+        await expect(
+            chatAgentDetails.locator(".agent-details-instructions .x-markdown"),
+        ).toBeVisible();
+        await expect(
             chatAgentDetails.getByText("最新发布的研发助手配置。", {
                 exact: true,
             }),
@@ -1373,7 +1400,11 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByText("合同审查助手", { exact: true }),
         ).toBeVisible();
-        await page
+        const sharedAgentCard = page
+            .locator(".agent-space-card")
+            .filter({ hasText: "合同审查助手" });
+        await sharedAgentCard.hover();
+        await sharedAgentCard
             .getByRole("button", { name: "查看 合同审查助手 详情" })
             .dispatchEvent("click");
         await expect(
@@ -1421,7 +1452,11 @@ test("shows authentication errors and enters the workspace after login", async (
             .getByRole("button", { name: "返回 Agent 空间" })
             .dispatchEvent("click");
         await page.getByRole("tab", { name: "团队共享" }).click();
-        await page
+        const sharedAgentCardAfterReturn = page
+            .locator(".agent-space-card")
+            .filter({ hasText: "合同审查助手" });
+        await sharedAgentCardAfterReturn.hover();
+        await sharedAgentCardAfterReturn
             .getByRole("button", { name: "撤销 合同审查助手 共享" })
             .dispatchEvent("click");
         await page
@@ -1532,7 +1567,7 @@ test("shows authentication errors and enters the workspace after login", async (
             "工具",
             "结构化",
             "推理",
-            "连通性",
+            "操作",
         ]) {
             await expect(
                 modelTable.getByRole("columnheader", { name: column }),
@@ -1554,20 +1589,33 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(listCapabilityTag).toHaveCSS("border-radius", "6px");
         await expect(listCapabilityTag).toHaveCSS("font-size", "12px");
         await expect(listCapabilityTag).toHaveCSS("line-height", "20px");
-        await page
-            .getByRole("button", { name: "gpt-5.4", exact: true })
+        const firstModelRow = modelTable.locator(".ant-table-row").first();
+        await expect(
+            firstModelRow.getByRole("button", { name: "查看 gpt-5.4" }),
+        ).toHaveCSS("border-style", "solid");
+        await expect(
+            firstModelRow.getByRole("button", { name: "测试 gpt-5.4" }),
+        ).toHaveCSS("border-style", "solid");
+        await firstModelRow
+            .getByRole("button", { name: "查看 gpt-5.4" })
             .dispatchEvent("click");
         const modelDetails = page.getByRole("dialog", { name: "模型详情" });
         await expect(modelDetails).toBeVisible();
         await expect(
-            modelDetails.getByText(
-                /最大输入 1,050,000 个令牌，最大输出 128,000 个令牌/,
-            ),
+            modelDetails.getByText("Token 上限", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            modelDetails.getByText("1,050,000", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            modelDetails.getByText("128,000", { exact: true }),
         ).toBeVisible();
         await expect(
             modelDetails.locator(".ant-tag-success").first(),
         ).toHaveCSS("background-color", "rgb(32, 43, 36)");
-        await modelDetails.locator(".ant-drawer-close").dispatchEvent("click");
+        await modelDetails
+            .getByRole("button", { name: "关闭模型详情" })
+            .dispatchEvent("click");
         await expect(modelDetails).toBeHidden();
         await page
             .getByRole("button", { name: "测试 gpt-5.4" })
@@ -1643,7 +1691,53 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             toolTable.getByText("2 项", { exact: true }),
         ).toBeVisible();
+        const toolPage = page.locator(".inkwell-data-list-page").filter({
+            has: page.getByRole("heading", { name: "工具", exact: true }),
+        });
+        const toolPagination = toolPage.locator(
+            ".inkwell-data-list-pagination",
+        );
+        const toolPaginationY = await toolPagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        const toolTableBody = toolPage.locator(".ant-table-body");
+        const toolTableBodyHeight = await toolTableBody.evaluate(
+            (element) => element.getBoundingClientRect().height,
+        );
+        await page.getByPlaceholder("搜索名称或描述").fill("不存在的工具");
+        await expect(toolTable.locator(".ant-empty")).toBeVisible();
+        expect(
+            await toolPagination.evaluate(
+                (element) => element.getBoundingClientRect().y,
+            ),
+        ).toBeCloseTo(toolPaginationY, 1);
+        await page.getByPlaceholder("搜索名称或描述").clear();
+        await expect(
+            toolTable.getByText("current_date_time", { exact: true }),
+        ).toBeVisible();
+        await page.setViewportSize({ width: 1080, height: 900 });
+        await expect
+            .poll(() =>
+                toolPagination.evaluate(
+                    (element) => element.getBoundingClientRect().y,
+                ),
+            )
+            .toBeCloseTo(toolPaginationY + 180, 0);
+        await expect
+            .poll(() =>
+                toolTableBody.evaluate(
+                    (element) => element.getBoundingClientRect().height,
+                ),
+            )
+            .toBeCloseTo(toolTableBodyHeight + 180, 0);
         await page.setViewportSize({ width: 1080, height: 720 });
+        await expect
+            .poll(() =>
+                toolPagination.evaluate(
+                    (element) => element.getBoundingClientRect().y,
+                ),
+            )
+            .toBeCloseTo(toolPaginationY, 0);
         await page.screenshot({
             path: testInfo.outputPath("tool-management-dark-1080x720.png"),
             fullPage: true,
@@ -1657,13 +1751,15 @@ test("shows authentication errors and enters the workspace after login", async (
             toolDetails.getByRole("cell", { name: "timeZone" }),
         ).toBeVisible();
         await expect(
-            toolDetails.getByText("UTC, Asia/Shanghai", { exact: true }),
+            toolDetails.getByText("UTC、Asia/Shanghai", { exact: true }),
         ).toBeVisible();
         await toolDetails
-            .getByText("原始 JSON Schema", { exact: true })
+            .getByText("查看原始 Schema", { exact: true })
             .dispatchEvent("click");
         await expect(toolDetails.getByText(/"timeZone"/)).toBeVisible();
-        await toolDetails.locator(".ant-drawer-close").dispatchEvent("click");
+        await toolDetails
+            .getByRole("button", { name: "关闭 Tool 详情" })
+            .dispatchEvent("click");
         await expect(toolDetails).toBeHidden();
 
         await page
@@ -1717,8 +1813,40 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(skillDetails).toBeVisible();
         await expect(
             skillDetails.getByText("脚本已保存，当前版本不会执行"),
+        ).toHaveCount(0);
+        await expect(
+            skillDetails.getByText("SKILL.md", { exact: true }),
         ).toBeVisible();
-        await skillDetails.locator(".ant-drawer-close").dispatchEvent("click");
+        await expect(
+            skillDetails.getByText("References", { exact: true }),
+        ).toBeVisible();
+        await expect(skillDetails.locator("input, textarea")).toHaveCount(0);
+        await expect(
+            skillDetails.getByRole("button", { name: "编辑" }),
+        ).toHaveCount(0);
+        const skillMarkdown = skillDetails.locator(".skill-details-markdown");
+        await expect(skillMarkdown).toHaveClass(/collapsed/);
+        await skillDetails
+            .getByRole("button", { name: "展开全文" })
+            .dispatchEvent("click");
+        await expect(skillMarkdown).toHaveClass(/expanded/);
+        await skillDetails
+            .getByRole("button", { name: "关闭 Skill 详情" })
+            .dispatchEvent("click");
+        await page
+            .getByRole("button", { name: "编辑 合同审查规范" })
+            .dispatchEvent("click");
+        const skillEditorDialog = page.getByRole("dialog", {
+            name: "编辑 Skill",
+        });
+        const skillEditor = skillEditorDialog.locator(
+            ".skill-markdown-editor .monaco-editor",
+        );
+        await expect(skillEditor).toBeVisible();
+        await expect(skillEditor).toHaveCSS("height", "480px");
+        await skillEditorDialog
+            .getByRole("button", { name: "关闭 Skill 详情" })
+            .dispatchEvent("click");
         await page
             .getByRole("button", { name: "上传 Skill" })
             .dispatchEvent("click");
@@ -1808,7 +1936,47 @@ test("shows authentication errors and enters the workspace after login", async (
         });
         const firstAgentCard = page.locator(".agent-space-card").first();
         const firstAgentAvatar = firstAgentCard.locator(".agent-card-avatar");
+        const agentPagination = page
+            .locator(".agent-space-page")
+            .locator(".agent-space-pagination");
         await expect(firstAgentCard).toBeVisible();
+        const agentPaginationY = await agentPagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        await page.getByPlaceholder("搜索 Agent").fill("研发");
+        expect(
+            await agentPagination.evaluate(
+                (element) => element.getBoundingClientRect().y,
+            ),
+        ).toBeCloseTo(agentPaginationY, 1);
+        await page.getByPlaceholder("搜索 Agent").clear();
+        await page.setViewportSize({ width: 1080, height: 900 });
+        await expect
+            .poll(() =>
+                agentPagination.evaluate(
+                    (element) => element.getBoundingClientRect().y,
+                ),
+            )
+            .toBeCloseTo(agentPaginationY + 180, 0);
+        await page.setViewportSize({ width: 1080, height: 720 });
+        await expect
+            .poll(() =>
+                agentPagination.evaluate(
+                    (element) => element.getBoundingClientRect().y,
+                ),
+            )
+            .toBeCloseTo(agentPaginationY, 0);
+        const firstAgentActions = firstAgentCard.locator(".agent-card-actions");
+        const firstAgentAction = firstAgentActions.locator(".ant-btn").first();
+        await expect(firstAgentActions).toHaveCSS("opacity", "0");
+        await expect(firstAgentAction.locator(".anticon")).toHaveCount(1);
+        await expect(firstAgentAction).toHaveText("");
+        await firstAgentCard.hover();
+        await expect(firstAgentActions).toHaveCSS("opacity", "1");
+        await expect(firstAgentAction).toHaveAttribute(
+            "aria-label",
+            /^(编辑|查看|共享|撤销) /,
+        );
         const firstAgentCardMetrics = await firstAgentCard.evaluate(
             (element) => {
                 const box = element.getBoundingClientRect();
@@ -1821,10 +1989,10 @@ test("shows authentication errors and enters the workspace after login", async (
                 };
             },
         );
-        expect(firstAgentCardMetrics.width).toBeCloseTo(158.4, 1);
+        expect(firstAgentCardMetrics.width).toBeCloseTo(157.6, 1);
         expect(firstAgentCardMetrics).toMatchObject({
             x: 220,
-            height: 128,
+            height: 148,
             borderRadius: "10px",
         });
         expect(
@@ -2068,7 +2236,15 @@ test("shows authentication errors and enters the workspace after login", async (
         await page
             .getByRole("button", { name: "Instructions" })
             .dispatchEvent("click");
-        await page.getByLabel("Instructions").fill("输出简洁的发布说明。");
+        const instructionsEditor = page.locator(
+            ".agent-instructions-editor .monaco-editor",
+        );
+        await expect(instructionsEditor).toBeVisible();
+        await expect(instructionsEditor).toHaveCSS("height", "480px");
+        const instructionsInput = instructionsEditor.locator("textarea");
+        await instructionsInput.focus();
+        await page.keyboard.press("Meta+A");
+        await page.keyboard.insertText("输出简洁的发布说明。");
         await page
             .getByRole("button", { name: "模型与参数" })
             .dispatchEvent("click");
@@ -2160,17 +2336,11 @@ test("shows authentication errors and enters the workspace after login", async (
         await editorSections
             .getByRole("button", { name: "工具" })
             .dispatchEvent("click");
-        const firstBindingCard = page
-            .locator(".agent-binding-selector .ant-card")
-            .first();
-        await expect(firstBindingCard).toHaveCSS("border-radius", "8px");
-        await expect(firstBindingCard.locator(".ant-card-body")).toHaveCSS(
-            "padding",
-            "8px 12px",
-        );
+        const firstBindingItem = page.locator(".agent-binding-item").first();
+        await expect(firstBindingItem).toHaveCSS("padding", "14px");
         await expect(
-            firstBindingCard.locator(".ant-typography").first(),
-        ).toHaveCSS("font-size", "13px");
+            firstBindingItem.locator(".agent-binding-item-icon"),
+        ).toBeVisible();
         await editorSections
             .getByRole("button", { name: "Skills" })
             .dispatchEvent("click");
@@ -2182,6 +2352,9 @@ test("shows authentication errors and enters the workspace after login", async (
             "margin-bottom",
             "12px",
         );
+        await expect(
+            page.locator(".agent-skill-stages").first().getByText("Discovery"),
+        ).toBeVisible();
         await page
             .locator(".agent-editor-actions")
             .getByRole("button", { name: "试运行" })

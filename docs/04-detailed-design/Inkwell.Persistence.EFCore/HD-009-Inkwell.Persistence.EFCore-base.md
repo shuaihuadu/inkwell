@@ -37,6 +37,10 @@ downstream: []
 > **2026-07-26 Session checkpoint 恢复 errata（`SessionKey` 部分已被 2026-08-03 errata 取代）**：`AgentSessionStateEntity` 及其 Configuration、Mapping、Repository 与 DI 注册重新引入，Conversations 回到三套实体，取代上一条 errata。`AgentSessionStateEntityConfiguration` 以 `Id` 为主键（**不是** 旧设计的 `ConversationId` 同时作 PK/FK），对 `SessionKey` 建唯一索引并限长 32，通过 `HasPrincipalKey<AgentConversationEntity>(c => c.SessionKey)` 建立 1:0..1 外键并 `ON DELETE CASCADE`；`SessionState` 列在 PostgreSQL 用 `jsonb`、SQL Server 用 `json`。不恢复 Revision / RowVersion / CAS 配置。
 >
 > **2026-08-03 会话标识统一 errata**：`SessionKey` 整体移除，取代上一条 errata 中关于该列与外键主体键的部分。当前契约为：一、`AgentConversationEntityConfiguration` 不再配置 `SessionKey` 列、其唯一索引与备用键（SQL Server 侧 `AK_AgentConversations_SessionKey` 一并消失）；二、`AgentSessionStateEntityConfiguration` 仍以 `Id` 为主键，改为对 `ConversationId`（`Guid`）建唯一索引，并以常规主键关系建立 1:0..1 外键指向 `agent_conversations.Id` 并 `ON DELETE CASCADE`，**不再使用** `HasPrincipalKey`；三、`SessionState` 的原生 JSON 列类型要求与「不恢复 Revision / RowVersion / CAS」保持不变；四、双 Provider 的 `Migrations/` 已按新 Model 由 `dotnet ef migrations add` 重新生成。
+>
+> **2026-08-23 Agent Tool Seed errata**：`InkwellSeeder.SeedAsync` 当前包含 `DefaultAdmin` 与 `DefaultTools` 两个独立段。`SeedDefaultToolsAsync` 在共享 EFCore base 中写入 v1 唯一内置工具目录记录：固定持久化 ID `00000000-0000-0000-0000-000000000101`、唯一 `Name = "get_current_datetime"`、描述及含可选 `timeZoneId` 的 JSON Schema。幂等判断使用业务唯一键 `Name`，不使用固定 ID；并发 Migrator 均通过预检查时，由数据库唯一约束决定胜者，失败实例清空当前 `DbContext.ChangeTracker` 后继续，避免前一 Seed 段的冲突实体污染后一段。该共享实现同时供 SQL Server 与 PostgreSQL 使用；真实 PostgreSQL 并发契约测试断言最终只有一条默认管理员与一条该 Tool 记录。下方 §3.4 中“v1 唯一 Seed 段为默认管理员”的描述由本条取代。
+>
+> **2026-08-23 Agent Tool Seed 元数据同步 errata**：`get_current_datetime` 的绑定配置 Schema 已收敛为空对象，运行时 `timeZoneId` 由 MAF 强类型函数 Schema 描述，不进入目录绑定 Schema。`SeedDefaultToolsAsync` 不再对已存在的业务唯一键直接 no-op；当内置 Tool 的描述或绑定 Schema 与代码常量不一致时，通过 `ExecuteUpdateAsync` 同步目录元数据并更新 `UpdatedTime`。这保证已有开发/部署数据库重跑 Migrator 后移除旧的 `timeZoneId` 静态输入框，同时保持固定 ID、创建时间和 Agent Snapshot 引用不变。真实 PostgreSQL 契约测试覆盖首次并发 Seed 与旧 Schema 再同步两条路径。
 
 ## 1. 模块概述
 
