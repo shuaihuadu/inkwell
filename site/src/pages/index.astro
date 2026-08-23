@@ -1,0 +1,650 @@
+---
+import heroImage from '../assets/screenshots/agent-space.png';
+import chatImage from '../assets/screenshots/agent-chat.png';
+import modelImage from '../assets/screenshots/model-management.png';
+import toolImage from '../assets/screenshots/tool-management.png';
+
+const base = import.meta.env.BASE_URL;
+const basePath = base.endsWith('/') ? base : `${base}/`;
+const isEnglish = Astro.props.locale === 'en';
+const copy = isEnglish ? {
+	lang: 'en',
+	title: 'Inkwell · Agent Workspace',
+	description: 'Inkwell is an open-source agent workspace built on Microsoft Agent Framework.',
+	ogDescription: 'An open-source workspace for authoring, running, sharing, and governing LLM agents.',
+	brandHome: 'Inkwell home',
+	navLabel: 'Main navigation',
+	nav: ['Capabilities', 'Experience', 'Architecture', 'Roadmap'],
+	languageLabel: '中文',
+	languageAria: '切换到简体中文',
+	languageLang: 'zh-CN',
+	eyebrow: 'Open source · Active development',
+	heroTitle: ['From agent ideas', 'to real work'],
+	heroLead: 'Built on Microsoft Agent Framework, Inkwell brings LLM agent authoring, execution, sharing, and governance into one focused workspace.',
+	viewGitHub: 'View on GitHub',
+	localStart: 'Get started',
+	preview: 'Interactive preview',
+	technologyOverview: 'Project technology overview',
+	capabilitiesTitle: ['Build, run, govern', 'agent workflows'],
+	capabilitiesLead: 'From configuration and trial runs to publishing and conversations, every core workflow stays in one focused, consistent interface.',
+	capabilities: [
+		['01', 'Agent authoring', 'Configure instructions, model parameters, chat history, tools, and skills, then test unpublished drafts.'],
+		['02', 'Versions and sharing', 'Publish, inspect, and roll back versions; share agents with a team, revoke access, or clone a copy.'],
+		['03', 'Persistent conversations', 'Bind conversations to agent versions, page, clear, or delete messages, and stop or retry runs from the desktop app.'],
+		['04', 'Open protocols', 'Expose AG-UI SSE, OpenAI Chat Completions, Responses, and Conversations endpoints through MAF Hosting.'],
+		['05', 'Unified model catalog', 'Discover and filter LiteLLM models, inspect capabilities, and test Chat and Embedding connectivity.'],
+		['06', 'Accounts and security', 'Restore sign-in state, lock the client, change passwords, and let administrators disable or unlock accounts.'],
+	],
+	experienceTitle: 'One context from draft to chat',
+	experienceLead: 'Published agents use persistent conversations while drafts run directly in trial mode. The desktop app can stop active generation and retry failed requests, with history bound to its agent version.',
+	chatAlt: 'Inkwell persistent agent conversation',
+	chatCaption: 'Tool arguments, successful results, and failures stay in the message context',
+	modelAlt: 'Inkwell LiteLLM model management',
+	modelCaption: 'Live LiteLLM catalog, capabilities, and connectivity tests',
+	previewNote: 'Screenshots come from the interactive visual prototype and use simulated data. Capability descriptions reflect the current product source.',
+	resourcesTitle: ['Attach resources', 'when needed'],
+	resourcesLead: 'The tool catalog exposes JSON Schema and validates required bindings. Skills store Markdown and packaged files while loading static content at runtime. LiteLLM supplies the model catalog live.',
+	toolAlt: 'Inkwell tool catalog',
+	resourcePoints: [
+		['Tools', 'System registration, read-only discovery, schema inspection, and required-parameter validation.'],
+		['Skills', 'Upload, edit, packaged-file storage, and static content loading.'],
+		['Models', 'Live discovery, capability filters, token limits, and Chat / Embedding connectivity tests.'],
+	],
+	architectureTitle: ['App to server', 'clear boundaries'],
+	architectureLead: 'Ports & Adapters constrains business and infrastructure dependencies. Aspire orchestrates the current local environment; production Kubernetes and Helm remain on the roadmap.',
+	stack: [
+		['Experience', 'Electron · React · Ant Design X'],
+		['Application', '.NET · ASP.NET Core · Microsoft Agent Framework'],
+		['Capabilities', 'LiteLLM · Qdrant · Redis · Object Storage'],
+		['Data', 'PostgreSQL / SQL Server · EF Core'],
+		['Runtime', 'Aspire · OpenTelemetry · OTLP'],
+	],
+	runtimeFacts: [
+		['WebApi', 'Entry point for REST, AG-UI, and OpenAI-compatible protocols, with authentication, rate limiting, and health checks.'],
+		['Migrator', 'Runs EF Core migrations and seeding as a separate process, then exits before business services start.'],
+		['Worker', 'The background-process and telemetry foundation is in place; queue consumption, KB ingest, and the DurableTask runner are still being connected.'],
+		['Providers', 'Adapters exist for PostgreSQL / SQL Server, Redis, MinIO / Azure Blob, and Qdrant; local development defaults to lightweight providers.'],
+	],
+	roadmapTitle: ['What works now', 'What comes next'],
+	roadmapLead: 'Inkwell is still in alpha. Features, configuration, database schemas, and public APIs may introduce breaking changes.',
+	roadmap: [
+		['Complete', 'Agent authoring, version management, and team sharing', true],
+		['Complete', 'Persistent conversations, protocol endpoints, and desktop stop / retry', true],
+		['Complete', 'LiteLLM model discovery and local Aspire orchestration', true],
+		['Integrating', 'Worker queue consumption and background task execution', false],
+		['Planned', 'Knowledge bases, long-term memory, and multimodal input', false],
+		['Planned', 'Kubernetes / Helm production deployment and business observability', false],
+	],
+	closingKicker: 'OPEN SOURCE · SELF-HOSTED · BUILT WITH MAF',
+	closingTitle: ['Bring your agents', 'into Inkwell'],
+	closingAction: 'Explore on GitHub',
+	footer: 'Built on Microsoft Agent Framework',
+} : {
+	lang: 'zh-CN',
+	title: 'Inkwell · 智能体工作空间',
+	description: 'Inkwell 是基于 Microsoft Agent Framework 构建的开源智能体工作空间。',
+	ogDescription: '创作、运行、共享和治理 LLM Agent 的开源工作空间。',
+	brandHome: 'Inkwell 首页',
+	navLabel: '主导航',
+	nav: ['能力', '体验', '架构', 'Roadmap'],
+	languageLabel: 'EN',
+	languageAria: 'Switch to English',
+	languageLang: 'en',
+	eyebrow: '开源 · 活跃开发中',
+	heroTitle: ['让 Agent 从想法', '走进工作现场'],
+	heroLead: 'Inkwell 是基于 Microsoft Agent Framework 构建的智能体工作空间，集中承载 LLM Agent 的创作、运行、共享与治理。',
+	viewGitHub: '查看 GitHub',
+	localStart: '本地启动',
+	preview: '交互界面预览',
+	technologyOverview: '项目技术概览',
+	capabilitiesTitle: ['创作、运行与治理，', '覆盖 Agent 全流程'],
+	capabilitiesLead: '从配置、试运行到发布与会话，Agent 的核心工作流程都集中在一个专注、统一的界面中。',
+	capabilities: [
+		['01', 'Agent 创作', '配置 Instructions、模型参数、聊天历史、Tools 与 Skills，支持草稿试运行。'],
+		['02', '版本协作', '发布、查看与回滚 Agent 版本，在团队内共享、撤销共享或克隆副本。'],
+		['03', '持久化会话', '会话与 Agent 版本绑定，支持消息分页、清空和删除，以及桌面端停止生成与失败重试。'],
+		['04', '开放协议', '通过 MAF Hosting 挂载 AG-UI SSE、OpenAI Chat Completions、Responses 与 Conversations 端点。'],
+		['05', '统一模型', '通过 LiteLLM 实时发现并筛选模型，查看能力，对 Chat 与 Embedding 模型执行连通性测试。'],
+		['06', '账号与安全', '包含登录状态恢复、客户端锁定、密码修改，以及管理员账号启停与解锁。'],
+	],
+	experienceTitle: '从创作到对话，保持同一条上下文',
+	experienceLead: '已发布 Agent 进入持久化会话，草稿可直接试运行。桌面端可停止当前生成并重试失败请求，历史记录绑定对应版本。',
+	chatAlt: 'Inkwell Agent 持久化对话界面',
+	chatCaption: '工具参数、成功结果与失败状态都留在消息上下文中',
+	modelAlt: 'Inkwell LiteLLM 模型管理界面',
+	modelCaption: 'LiteLLM 实时模型目录、能力与连通性测试',
+	previewNote: '界面截图来自可交互视觉原型，展示数据为模拟内容；能力描述以当前产品源码为准。',
+	resourcesTitle: ['能力以资源组织，', '按需装配到 Agent'],
+	resourcesLead: '工具目录公开 JSON Schema 并校验绑定必填项；Skills 支持 Markdown 与随包文件入库，运行时加载静态内容；模型目录由 LiteLLM 实时提供。',
+	toolAlt: 'Inkwell 工具目录界面',
+	resourcePoints: [
+		['Tools', '系统注册、只读发现、Schema 展示与必填参数校验。'],
+		['Skills', '上传、编辑、随包文件入库与静态内容加载。'],
+		['Models', '实时发现、能力筛选、Token 上限与 Chat / Embedding 连通性测试。'],
+	],
+	architectureTitle: ['从桌面到服务端，', '边界保持清楚'],
+	architectureLead: 'Ports & Adapters 约束业务与基础设施依赖。当前本地环境由 Aspire 编排；生产 Kubernetes 与 Helm 仍在 Roadmap 中。',
+	stack: [
+		['体验层', 'Electron · React · Ant Design X'],
+		['应用层', '.NET · ASP.NET Core · Microsoft Agent Framework'],
+		['能力层', 'LiteLLM · Qdrant · Redis · Object Storage'],
+		['数据层', 'PostgreSQL / SQL Server · EF Core'],
+		['运行层', 'Aspire · OpenTelemetry · OTLP'],
+	],
+	runtimeFacts: [
+		['WebApi', 'REST、AG-UI 与 OpenAI 兼容协议入口；承载鉴权、限流和健康检查。'],
+		['Migrator', '独立执行 EF Core Migration 与 Seed，完成后退出，不把迁移混入业务进程。'],
+		['Worker', '后台进程与遥测骨架已经就位；队列消费、KB ingest 与 DurableTask runner 仍在接入。'],
+		['Providers', 'PostgreSQL / SQL Server、Redis、MinIO / Azure Blob、Qdrant 适配器已具备；本地默认采用轻量 Provider 组合。'],
+	],
+	roadmapTitle: ['现在能做什么，', '接下来走向哪里'],
+	roadmapLead: '项目仍处于 alpha 阶段。功能、配置、数据库结构与公开接口可能发生 Breaking Change。',
+	roadmap: [
+		['已完成', 'Agent 创作、版本管理与团队共享', true],
+		['已完成', '持久化会话、协议端点与桌面端停止 / 重试', true],
+		['已完成', 'LiteLLM 模型发现与 Aspire 本地编排', true],
+		['接入中', 'Worker 队列消费与后台任务执行', false],
+		['规划中', '知识库、长期记忆与多模态', false],
+		['规划中', 'Kubernetes / Helm 生产部署与业务可观测性', false],
+	],
+	closingKicker: 'OPEN SOURCE · SELF-HOSTED · BUILT WITH MAF',
+	closingTitle: ['把你的 Agent', '带进 Inkwell'],
+	closingAction: '在 GitHub 上查看',
+	footer: '基于 Microsoft Agent Framework 构建',
+};
+
+const languageHref = isEnglish ? basePath : `${basePath}en/`;
+const canonicalHref = new URL(isEnglish ? `${basePath}en/` : basePath, Astro.site);
+const chineseHref = new URL(basePath, Astro.site);
+const englishHref = new URL(`${basePath}en/`, Astro.site);
+const startHref = isEnglish
+	? 'https://github.com/shuaihuadu/inkwell#local-development'
+	: 'https://github.com/shuaihuadu/inkwell/blob/main/README.zh-CN.md#本地启动';
+const sectionIds = ['capabilities', 'experience', 'architecture', 'roadmap'];
+---
+
+<!doctype html>
+<html lang={copy.lang}>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="generator" content={Astro.generator} />
+		<meta name="description" content={copy.description} />
+		<meta name="theme-color" content="#f6f5f7" />
+		<meta property="og:title" content={copy.title} />
+		<meta property="og:description" content={copy.ogDescription} />
+		<meta property="og:type" content="website" />
+		<meta property="og:image" content={new URL(heroImage.src, Astro.site)} />
+		<link rel="canonical" href={canonicalHref} />
+		<link rel="alternate" hreflang="zh-CN" href={chineseHref} />
+		<link rel="alternate" hreflang="en" href={englishHref} />
+		<link rel="alternate" hreflang="x-default" href={chineseHref} />
+		<link rel="icon" type="image/svg+xml" href={`${basePath}favicon.svg`} />
+		<title>{copy.title}</title>
+	</head>
+	<body>
+		<header class="site-header">
+			<a class="brand" href="#top" aria-label={copy.brandHome}>
+				<svg viewBox="0 0 32 32" aria-hidden="true">
+					<circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" opacity=".3"></circle>
+					<circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".65"></circle>
+					<circle cx="16" cy="16" r="4" fill="currentColor"></circle>
+				</svg>
+				<span>Inkwell</span>
+			</a>
+			<nav aria-label={copy.navLabel}>
+				{copy.nav.map((label, index) => <a href={`#${sectionIds[index]}`}>{label}</a>)}
+			</nav>
+			<div class="header-actions">
+				<a class="language-switch" href={languageHref} hreflang={copy.languageLang} aria-label={copy.languageAria}>{copy.languageLabel}</a>
+				<a class="header-action" href="https://github.com/shuaihuadu/inkwell">GitHub <span aria-hidden="true">↗</span></a>
+			</div>
+		</header>
+
+		<main id="top">
+			<section class="hero" aria-labelledby="hero-title">
+				<div class="hero-copy">
+					<p class="eyebrow"><span></span> {copy.eyebrow}</p>
+					<h1 id="hero-title">{copy.heroTitle[0]}<br />{copy.heroTitle[1]}</h1>
+					<p class="hero-lead">{copy.heroLead}</p>
+					<div class="hero-actions">
+						<a class="button button-primary" href="https://github.com/shuaihuadu/inkwell">{copy.viewGitHub} <span aria-hidden="true">↗</span></a>
+						<a class="button button-secondary" href={startHref}>{copy.localStart} <span aria-hidden="true">→</span></a>
+					</div>
+				</div>
+				<figure class="hero-visual">
+					<div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Agent Space</span></div>
+					<img src={heroImage.src} alt="Inkwell Agent Space" width={1440} height={900} fetchpriority="high" />
+					<figcaption><span>{copy.preview}</span><span>Desktop / 2026</span></figcaption>
+				</figure>
+			</section>
+
+			<div class="signal-strip" aria-label={copy.technologyOverview}>
+				<span>Microsoft Agent Framework</span>
+				<span>Electron + React</span>
+				<span>.NET 10</span>
+				<span>Self-hosted</span>
+				<span>MIT License</span>
+			</div>
+
+			<section class="section capabilities" id="capabilities">
+				<div class="section-heading">
+					<p class="section-index">01 / CAPABILITIES</p>
+					<h2>{copy.capabilitiesTitle[0]}<br />{copy.capabilitiesTitle[1]}</h2>
+					<p>{copy.capabilitiesLead}</p>
+				</div>
+				<div class="capability-grid">
+					{copy.capabilities.map(([index, title, description]) => (
+						<article>
+							<span class="capability-index">{index}</span>
+							<h3>{title}</h3>
+							<p>{description}</p>
+						</article>
+					))}
+				</div>
+			</section>
+
+			<section class="experience" id="experience">
+				<div class="experience-intro">
+					<p class="section-index">02 / EXPERIENCE</p>
+					<h2>{copy.experienceTitle}</h2>
+					<p>{copy.experienceLead}</p>
+				</div>
+				<figure class="screen screen-main">
+					<img src={chatImage.src} alt={copy.chatAlt} width="2336" height="1260" loading="lazy" />
+					<figcaption><span>01</span> {copy.chatCaption}</figcaption>
+				</figure>
+				<figure class="screen screen-detail">
+					<img src={modelImage.src} alt={copy.modelAlt} width="2336" height="1260" loading="lazy" />
+					<figcaption><span>02</span> {copy.modelCaption}</figcaption>
+				</figure>
+				<p class="preview-note">{copy.previewNote}</p>
+			</section>
+
+			<section class="resources">
+				<div class="resources-copy">
+					<p class="section-index">03 / RESOURCE CENTER</p>
+					<h2>{copy.resourcesTitle[0]}<br />{copy.resourcesTitle[1]}</h2>
+					<p>{copy.resourcesLead}</p>
+				</div>
+				<figure class="resource-screen">
+					<img src={toolImage.src} alt={copy.toolAlt} width="2336" height="1260" loading="lazy" />
+					<figcaption><span>Tools</span><span>Schema-driven directory</span></figcaption>
+				</figure>
+				<div class="resource-points">
+					{copy.resourcePoints.map(([title, description]) => <div><strong>{title}</strong><p>{description}</p></div>)}
+				</div>
+			</section>
+
+			<section class="section architecture" id="architecture">
+				<div class="section-heading architecture-heading">
+					<p class="section-index">04 / ARCHITECTURE</p>
+					<h2>{copy.architectureTitle[0]}<br />{copy.architectureTitle[1]}</h2>
+					<p>{copy.architectureLead}</p>
+				</div>
+				<div class="stack-flow">
+					{copy.stack.map(([name, detail], index) => (
+						<div class="stack-item">
+							<span>{String(index + 1).padStart(2, '0')}</span>
+							<div>
+								<h3>{name}</h3>
+								<p>{detail}</p>
+							</div>
+							{index < copy.stack.length - 1 && <b aria-hidden="true">↓</b>}
+						</div>
+					))}
+				</div>
+				<div class="runtime-facts">
+					{copy.runtimeFacts.map(([name, description]) => (
+						<article><strong>{name}</strong><p>{description}</p></article>
+					))}
+				</div>
+			</section>
+
+			<section class="roadmap" id="roadmap">
+				<div class="roadmap-copy">
+					<p class="section-index">05 / ROADMAP</p>
+					<h2>{copy.roadmapTitle[0]}<br />{copy.roadmapTitle[1]}</h2>
+					<p>{copy.roadmapLead}</p>
+				</div>
+				<ol class="roadmap-list">
+					{copy.roadmap.map(([status, description, done]) => <li class:list={{ done }}><span>{status}</span><strong>{description}</strong></li>)}
+				</ol>
+			</section>
+
+			<section class="closing">
+				<p>{copy.closingKicker}</p>
+				<h2>{copy.closingTitle[0]}<br />{copy.closingTitle[1]}</h2>
+				<a class="button button-light" href="https://github.com/shuaihuadu/inkwell">{copy.closingAction} <span aria-hidden="true">↗</span></a>
+			</section>
+		</main>
+
+		<footer>
+			<a class="brand footer-brand" href="#top">
+				<svg viewBox="0 0 32 32" aria-hidden="true">
+					<circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" opacity=".3"></circle>
+					<circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".65"></circle>
+					<circle cx="16" cy="16" r="4" fill="currentColor"></circle>
+				</svg>
+				<span>Inkwell</span>
+			</a>
+			<p>{copy.footer}</p>
+			<div><a href="https://github.com/shuaihuadu/inkwell">GitHub</a><a href="https://github.com/shuaihuadu/inkwell/blob/main/LICENSE">MIT License</a></div>
+		</footer>
+	</body>
+</html>
+
+<style is:global>
+	:root {
+		--ink: #19171d;
+		--muted: #6e6973;
+		--paper: #f6f5f7;
+		--surface: #ffffff;
+		--line: #dcd8df;
+		--purple: #68469c;
+		--purple-deep: #4f327d;
+		--coral: #c65f49;
+		--teal: #147d78;
+	}
+
+	* { box-sizing: border-box; }
+	html { scroll-behavior: smooth; }
+	body {
+		margin: 0;
+		background: var(--paper);
+		color: var(--ink);
+		font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+		letter-spacing: 0;
+		-webkit-font-smoothing: antialiased;
+	}
+	a { color: inherit; text-decoration: none; }
+	img { display: block; max-width: 100%; }
+	p, h1, h2, h3 { margin-top: 0; }
+
+	.site-header {
+		height: 70px;
+		padding: 0 4vw;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		border-bottom: 1px solid rgba(25, 23, 29, .12);
+		background: rgba(246, 245, 247, .94);
+		position: sticky;
+		top: 0;
+		z-index: 20;
+		backdrop-filter: blur(16px);
+	}
+	.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; width: fit-content; }
+	.brand svg { width: 28px; height: 28px; color: var(--purple); }
+	.site-header nav { display: flex; gap: 34px; font-size: 14px; }
+	.site-header nav a, footer a { transition: color .2s ease; }
+	.site-header nav a:hover, footer a:hover { color: var(--purple); }
+	.header-actions { justify-self: end; display: flex; align-items: center; gap: 18px; }
+	.language-switch { min-width: 30px; color: var(--purple-deep); font-size: 12px; font-weight: 700; text-align: center; }
+	.language-switch:hover { color: var(--coral); }
+	.header-action { font-size: 14px; font-weight: 650; }
+	.header-action span { color: var(--purple); margin-left: 3px; }
+
+	.hero {
+		height: calc(100svh - 106px);
+		min-height: 620px;
+		max-height: 840px;
+		position: relative;
+		overflow: hidden;
+		border-bottom: 1px solid var(--line);
+		background:
+			linear-gradient(rgba(104, 70, 156, .045) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(104, 70, 156, .045) 1px, transparent 1px),
+			var(--paper);
+		background-size: 32px 32px;
+	}
+	.hero::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(90deg, var(--paper) 0%, rgba(246,245,247,.94) 37%, rgba(246,245,247,.18) 68%, rgba(246,245,247,0) 100%);
+		pointer-events: none;
+	}
+	.hero-copy {
+		position: relative;
+		z-index: 3;
+		width: min(620px, 46vw);
+		padding: 11vh 0 0 7vw;
+	}
+	.eyebrow, .section-index {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		color: var(--purple-deep);
+	}
+	.eyebrow { display: flex; align-items: center; gap: 9px; margin-bottom: 24px; }
+	.eyebrow span { width: 8px; height: 8px; background: var(--coral); border-radius: 50%; }
+	h1, h2 {
+		font-family: "Avenir Next", "Noto Sans SC", sans-serif;
+		font-size: 46px;
+		line-height: 1.2;
+		font-weight: 620;
+		letter-spacing: 0;
+	}
+	h1 {
+		margin-bottom: 28px;
+	}
+	.hero-lead { max-width: 590px; font-size: 18px; line-height: 1.8; color: #403b44; }
+	.hero-actions { display: flex; gap: 12px; margin-top: 32px; }
+	.button {
+		min-height: 46px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 18px;
+		padding: 0 20px;
+		border: 1px solid var(--ink);
+		font-size: 14px;
+		font-weight: 650;
+		transition: transform .2s ease, background-color .2s ease, color .2s ease;
+	}
+	.button:hover { transform: translateY(-2px); }
+	.button-primary { background: var(--ink); color: white; }
+	.button-primary:hover { background: var(--purple-deep); }
+	.button-secondary { background: var(--surface); }
+	.hero-visual {
+		position: absolute;
+		z-index: 1;
+		width: min(850px, 59vw);
+		margin: 0;
+		right: -4vw;
+		top: 9%;
+		background: var(--surface);
+		border: 1px solid #cfcad2;
+		box-shadow: 0 28px 70px rgba(31, 21, 43, .18);
+	}
+	.hero-visual img { width: 100%; height: auto; }
+	.window-bar {
+		height: 34px;
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		padding: 0 12px;
+		border-bottom: 1px solid var(--line);
+		color: var(--muted);
+		font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+		text-transform: uppercase;
+	}
+	.window-bar i { width: 7px; height: 7px; border-radius: 50%; background: #c9c4cc; }
+	.window-bar i:first-child { background: var(--coral); }
+	.window-bar span { margin-left: 6px; }
+	.hero-visual figcaption {
+		display: flex;
+		justify-content: space-between;
+		padding: 10px 12px;
+		border-top: 1px solid var(--line);
+		color: var(--muted);
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 10px;
+		text-transform: uppercase;
+	}
+
+	.signal-strip {
+		min-height: 72px;
+		display: flex;
+		justify-content: space-around;
+		align-items: center;
+		gap: 24px;
+		padding: 16px 4vw;
+		background: var(--ink);
+		color: white;
+		font-size: 12px;
+		text-transform: uppercase;
+		white-space: nowrap;
+		overflow: hidden;
+	}
+	.signal-strip span::before { content: "◆"; color: var(--coral); margin-right: 18px; font-size: 7px; }
+
+	.section { padding: 120px 7vw; }
+	.section-heading { display: grid; grid-template-columns: 1fr 2fr 1.2fr; gap: 5vw; align-items: start; margin-bottom: 76px; }
+	.section-heading h2, .experience h2, .roadmap h2 {
+		margin-bottom: 0;
+	}
+	.section-heading > p:last-child, .experience-intro > p:last-child, .roadmap-copy > p:last-child {
+		color: var(--muted);
+		font-size: 15px;
+		line-height: 1.8;
+	}
+	.capability-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+	.capability-grid article { min-height: 250px; padding: 28px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+	.capability-index { color: var(--coral); font: 11px ui-monospace, monospace; }
+	.capability-grid h3 { margin: 70px 0 12px; font-size: 20px; }
+	.capability-grid p { margin-bottom: 0; color: var(--muted); line-height: 1.75; font-size: 14px; }
+
+	.experience {
+		padding: 110px 7vw 130px;
+		display: grid;
+		grid-template-columns: 1fr 1.6fr;
+		gap: 6vw;
+		background: #202026;
+		color: white;
+		overflow: hidden;
+	}
+	.experience-intro { align-self: start; position: sticky; top: 110px; }
+	.experience .section-index { color: #c7a9ed; }
+	.experience-intro > p:last-child { color: #bdb8c3; max-width: 470px; margin-top: 28px; }
+	.screen { margin: 0; min-width: 0; }
+	.screen img { width: 100%; height: auto; border: 1px solid #4d4952; }
+	.screen figcaption { margin-top: 14px; color: #ccc6d1; font-size: 12px; display: flex; gap: 16px; }
+	.screen figcaption span { color: #c7a9ed; font-family: ui-monospace, monospace; }
+	.screen-detail { grid-column: 2; margin-top: 26px; width: 82%; justify-self: end; }
+	.preview-note { grid-column: 2; margin: 10px 0 0; color: #8f8994; font-size: 11px; line-height: 1.6; }
+
+	.resources { padding: 120px 7vw; display: grid; grid-template-columns: .75fr 1.6fr; gap: 7vw; background: #e9e6eb; }
+	.resources-copy h2 { margin: 34px 0 26px; }
+	.resources-copy > p:last-child { color: var(--muted); font-size: 15px; line-height: 1.8; }
+	.resource-screen { margin: 0; min-width: 0; }
+	.resource-screen img { width: 100%; height: auto; border: 1px solid #bcb7c0; box-shadow: 0 24px 60px rgba(31,21,43,.12); }
+	.resource-screen figcaption { display: flex; justify-content: space-between; margin-top: 12px; color: var(--muted); font: 10px ui-monospace, monospace; text-transform: uppercase; }
+	.resource-points { grid-column: 2; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #bcb7c0; }
+	.resource-points div { padding: 24px 24px 0 0; }
+	.resource-points strong { color: var(--purple-deep); font-size: 13px; }
+	.resource-points p { color: var(--muted); font-size: 13px; line-height: 1.65; }
+
+	.architecture { background-color: var(--surface); }
+	.architecture-heading { margin-bottom: 54px; }
+	.stack-flow { margin-left: 33%; border-top: 1px solid var(--ink); }
+	.stack-item { min-height: 104px; display: grid; grid-template-columns: 54px 1fr 30px; align-items: center; border-bottom: 1px solid var(--line); }
+	.stack-item > span { font: 11px ui-monospace, monospace; color: var(--teal); }
+	.stack-item h3 { font-size: 17px; margin: 0 0 7px; }
+	.stack-item p { color: var(--muted); margin: 0; font-size: 13px; }
+	.stack-item b { font-weight: 400; color: var(--purple); }
+	.runtime-facts { margin: 72px 0 0 33%; display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+	.runtime-facts article { min-height: 150px; padding: 24px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+	.runtime-facts strong { color: var(--teal); font: 12px ui-monospace, monospace; }
+	.runtime-facts p { margin: 28px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+
+	.roadmap { padding: 120px 7vw; display: grid; grid-template-columns: .85fr 1.5fr; gap: 10vw; background: #e7e3e9; }
+	.roadmap-copy > p:last-child { margin-top: 30px; max-width: 440px; }
+	.roadmap-list { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--ink); }
+	.roadmap-list li { min-height: 90px; display: grid; grid-template-columns: 110px 1fr; align-items: center; border-bottom: 1px solid #bcb7c0; }
+	.roadmap-list span { color: var(--coral); font-size: 12px; font-weight: 700; }
+	.roadmap-list .done span { color: var(--teal); }
+	.roadmap-list strong { font-size: 16px; font-weight: 560; }
+
+	.closing { min-height: 560px; padding: 95px 7vw; background: var(--purple-deep); color: white; position: relative; overflow: hidden; }
+	.closing::after { content: "Inkwell"; position: absolute; right: 3vw; bottom: 18px; color: rgba(255,255,255,.06); font-size: clamp(108px, 14vw, 196px); font-weight: 800; line-height: 1; white-space: nowrap; }
+	.closing p { color: #d2c1e6; font: 11px ui-monospace, monospace; }
+	.closing h2 { margin: 70px 0 44px; position: relative; z-index: 1; }
+	.button-light { border-color: white; color: white; position: relative; z-index: 1; }
+	.button-light:hover { background: white; color: var(--purple-deep); }
+
+	footer { min-height: 120px; padding: 34px 7vw; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; background: var(--ink); color: #d5d0d8; font-size: 12px; }
+	.footer-brand { color: white; }
+	footer p { margin: 0; }
+	footer div { justify-self: end; display: flex; gap: 24px; }
+
+	@media (max-width: 900px) {
+		.site-header { grid-template-columns: 1fr auto; }
+		.site-header nav { display: none; }
+		.hero-copy { width: 64vw; padding-top: 9vh; }
+		.hero-visual { width: 66vw; right: -24vw; top: 18%; }
+		.section-heading { grid-template-columns: 1fr 2fr; }
+		.section-heading > p:last-child { grid-column: 2; }
+		.capability-grid { grid-template-columns: repeat(2, 1fr); }
+		.experience { grid-template-columns: 1fr; }
+		.experience-intro { position: static; }
+		.screen-detail { grid-column: 1; width: 88%; }
+		.preview-note { grid-column: 1; }
+		.resources { grid-template-columns: 1fr; }
+		.resource-points { grid-column: 1; }
+		.stack-flow { margin-left: 0; }
+		.runtime-facts { margin-left: 0; }
+		.roadmap { grid-template-columns: 1fr; gap: 56px; }
+	}
+
+	@media (max-width: 600px) {
+		.site-header { height: 62px; padding: 0 20px; }
+		.brand { font-size: 14px; }
+		.brand svg { width: 25px; height: 25px; }
+		.header-actions { gap: 12px; }
+		.language-switch { min-width: 24px; font-size: 11px; }
+		.header-action { font-size: 12px; }
+		.hero { height: auto; min-height: 780px; max-height: none; padding-bottom: 28px; }
+		.hero::after { background: linear-gradient(180deg, var(--paper) 0%, rgba(246,245,247,.96) 48%, rgba(246,245,247,.12) 100%); }
+		.hero-copy { width: auto; padding: 56px 24px 0; }
+		.eyebrow { margin-bottom: 18px; }
+		h1, h2 { font-size: 34px; }
+		h1 { margin-bottom: 20px; }
+		.hero-lead { font-size: 15px; line-height: 1.7; max-width: 420px; }
+		.hero-actions { margin-top: 24px; flex-wrap: wrap; }
+		.button { min-height: 44px; padding: 0 16px; }
+		.hero-visual { position: relative; z-index: 2; top: auto; right: auto; width: calc(100% - 24px); margin: 50px 0 0 24px; box-shadow: 0 18px 44px rgba(31,21,43,.16); }
+		.hero-visual figcaption { display: none; }
+		.signal-strip { justify-content: flex-start; min-height: 62px; }
+		.section { padding: 82px 24px; }
+		.section-heading { display: block; margin-bottom: 46px; }
+		.section-heading h2, .experience h2, .roadmap h2 { margin: 30px 0 20px; }
+		.capability-grid { grid-template-columns: 1fr; }
+		.capability-grid article { min-height: 215px; }
+		.capability-grid h3 { margin-top: 52px; }
+		.experience { padding: 82px 24px 92px; gap: 44px; }
+		.screen, .screen-detail { width: 100%; margin-left: 0; }
+		.screen figcaption { max-width: none; line-height: 1.5; }
+		.resources { padding: 82px 24px; gap: 42px; }
+		.resource-points { grid-template-columns: 1fr; }
+		.resource-points div { border-bottom: 1px solid #c8c3cb; }
+		.stack-item { grid-template-columns: 42px 1fr 18px; min-height: 112px; }
+		.stack-item p { line-height: 1.5; }
+		.runtime-facts { grid-template-columns: 1fr; margin-top: 48px; }
+		.roadmap { padding: 82px 24px; }
+		.roadmap-list li { grid-template-columns: 82px 1fr; gap: 12px; min-height: 104px; }
+		.roadmap-list strong { font-size: 14px; line-height: 1.5; }
+		.closing { min-height: 500px; padding: 78px 24px; }
+		.closing h2 { margin-top: 64px; }
+		.closing::after { right: 12px; bottom: 12px; font-size: 66px; }
+		footer { padding: 34px 24px; grid-template-columns: 1fr auto; }
+		footer p { display: none; }
+		footer div { gap: 14px; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html { scroll-behavior: auto; }
+		*, *::before, *::after { transition-duration: .01ms !important; }
+	}
+</style>
