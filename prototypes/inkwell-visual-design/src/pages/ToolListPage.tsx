@@ -1,12 +1,29 @@
 import { useState } from "react";
 import {
+    Avatar,
+    Button,
+    Collapse,
+    Descriptions,
     Drawer,
+    Flex,
     Space,
+    Table,
+    Tag,
+    Tooltip,
     Typography,
     theme as antdTheme,
 } from "antd";
-import { EyeOutlined } from "@ant-design/icons";
-import ResourceListPage, { ResourceRowAction } from "../components/ResourceListPage";
+import {
+    CalendarOutlined,
+    CloseOutlined,
+    CodeOutlined,
+    EyeOutlined,
+    FormOutlined,
+    ToolOutlined,
+} from "@ant-design/icons";
+import ResourceListPage, {
+    ResourceRowAction,
+} from "../components/ResourceListPage";
 
 interface ToolItem {
     key: string;
@@ -15,6 +32,31 @@ interface ToolItem {
     parameterCount: number;
     updatedTime: string;
     schema: string;
+}
+
+interface ToolParameter {
+    name: string;
+    type: string;
+    required: boolean;
+    options: string[];
+}
+
+function getToolParameters(tool: ToolItem): ToolParameter[] {
+    const schema = JSON.parse(tool.schema) as {
+        required?: string[];
+        properties?: Record<
+            string,
+            { type?: string; enum?: Array<string | number | boolean> }
+        >;
+    };
+    const required = new Set(schema.required ?? []);
+
+    return Object.entries(schema.properties ?? {}).map(([name, property]) => ({
+        name,
+        type: property.type ?? "未知",
+        required: required.has(name),
+        options: property.enum?.map(String) ?? [],
+    }));
 }
 
 const INITIAL_TOOLS: ToolItem[] = [
@@ -42,20 +84,24 @@ const INITIAL_TOOLS: ToolItem[] = [
         updatedTime: "2026-07-10 11:06",
         schema: '{\n  "type": "object",\n  "required": ["city"],\n  "properties": {\n    "city": { "type": "string" },\n    "days": { "type": "integer" }\n  }\n}',
     },
-    ...Array.from({ length: 22 }, (_, index): ToolItem => ({
-        key: `tool-${index + 1}`,
-        name: ["document_reader", "ticket_lookup", "time_zone", "url_fetch"][
-            index % 4
-        ] + `_${index + 1}`,
-        description: [
-            "读取指定资源并返回结构化内容。",
-            "查询业务记录并返回当前状态。",
-            "执行受控的辅助能力调用。",
-        ][index % 3],
-        parameterCount: (index % 4) + 1,
-        updatedTime: `2026-06-${String(28 - (index % 20)).padStart(2, "0")} 14:20`,
-        schema: '{\n  "type": "object",\n  "properties": {\n    "input": { "type": "string" }\n  }\n}',
-    })),
+    ...Array.from(
+        { length: 22 },
+        (_, index): ToolItem => ({
+            key: `tool-${index + 1}`,
+            name:
+                ["document_reader", "ticket_lookup", "time_zone", "url_fetch"][
+                    index % 4
+                ] + `_${index + 1}`,
+            description: [
+                "读取指定资源并返回结构化内容。",
+                "查询业务记录并返回当前状态。",
+                "执行受控的辅助能力调用。",
+            ][index % 3],
+            parameterCount: (index % 4) + 1,
+            updatedTime: `2026-06-${String(28 - (index % 20)).padStart(2, "0")} 14:20`,
+            schema: '{\n  "type": "object",\n  "properties": {\n    "input": { "type": "string" }\n  }\n}',
+        }),
+    ),
 ];
 
 export default function ToolListPage() {
@@ -68,6 +114,9 @@ export default function ToolListPage() {
             .toLowerCase()
             .includes(searchText.trim().toLowerCase()),
     );
+    const selectedParameters = selectedTool
+        ? getToolParameters(selectedTool)
+        : [];
 
     return (
         <ResourceListPage<ToolItem>
@@ -81,13 +130,14 @@ export default function ToolListPage() {
             dataSource={filteredTools}
             rowKey="key"
             tableScrollX={800}
-            totalLabel={(total) => `共 ${total} 个 Tool`}
             columns={[
                 {
                     title: "名称",
                     dataIndex: "name",
                     width: 210,
-                    render: (value: string) => <Typography.Text code>{value}</Typography.Text>,
+                    render: (value: string) => (
+                        <Typography.Text code>{value}</Typography.Text>
+                    ),
                 },
                 {
                     title: "描述",
@@ -120,45 +170,175 @@ export default function ToolListPage() {
             ]}
         >
             <Drawer
-                width={520}
+                width={600}
                 title="Tool 详情"
+                closable={false}
                 open={selectedTool !== null}
                 onClose={() => setSelectedTool(null)}
+                extra={
+                    <Tooltip title="关闭">
+                        <Button
+                            type="text"
+                            aria-label="关闭 Tool 详情"
+                            icon={<CloseOutlined />}
+                            onClick={() => setSelectedTool(null)}
+                        />
+                    </Tooltip>
+                }
+                className="inkwell-resource-details-drawer"
+                styles={{ body: { padding: 0 } }}
             >
                 {selectedTool && (
-                    <Space direction="vertical" size={20} style={{ width: "100%" }}>
-                        <div>
-                            <Typography.Text type="secondary">名称</Typography.Text>
-                            <Typography.Title level={5} style={{ margin: "4px 0 0" }}>
-                                <Typography.Text code>{selectedTool.name}</Typography.Text>
-                            </Typography.Title>
+                    <div>
+                        <div
+                            className="inkwell-agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ToolOutlined />}
+                                style={{ background: token.colorPrimary }}
+                            />
+                            <div className="inkwell-agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title
+                                        level={4}
+                                        style={{ margin: 0 }}
+                                    >
+                                        <Typography.Text code>
+                                            {selectedTool.name}
+                                        </Typography.Text>
+                                    </Typography.Title>
+                                    <Tag>
+                                        {selectedTool.parameterCount} 个参数
+                                    </Tag>
+                                </Flex>
+                                <Typography.Paragraph
+                                    type="secondary"
+                                    style={{ margin: "6px 0 0" }}
+                                >
+                                    {selectedTool.description}
+                                </Typography.Paragraph>
+                                <Typography.Text type="secondary">
+                                    <CalendarOutlined />{" "}
+                                    {selectedTool.updatedTime}
+                                </Typography.Text>
+                            </div>
                         </div>
-                        <div>
-                            <Typography.Text type="secondary">描述</Typography.Text>
-                            <Typography.Paragraph style={{ marginTop: 4 }}>
-                                {selectedTool.description}
-                            </Typography.Paragraph>
+
+                        <div className="inkwell-agent-details-content">
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <FormOutlined />
+                                    <Typography.Text strong>
+                                        参数
+                                    </Typography.Text>
+                                </Space>
+                                <Table<ToolParameter>
+                                    size="small"
+                                    rowKey="name"
+                                    pagination={false}
+                                    dataSource={selectedParameters}
+                                    columns={[
+                                        {
+                                            title: "名称",
+                                            dataIndex: "name",
+                                            render: (value: string) => (
+                                                <Typography.Text code>
+                                                    {value}
+                                                </Typography.Text>
+                                            ),
+                                        },
+                                        {
+                                            title: "类型",
+                                            dataIndex: "type",
+                                            width: 96,
+                                        },
+                                        {
+                                            title: "必填",
+                                            dataIndex: "required",
+                                            width: 80,
+                                            render: (value: boolean) => (
+                                                <Tag
+                                                    color={
+                                                        value
+                                                            ? "processing"
+                                                            : "default"
+                                                    }
+                                                >
+                                                    {value ? "是" : "否"}
+                                                </Tag>
+                                            ),
+                                        },
+                                        {
+                                            title: "可选值",
+                                            dataIndex: "options",
+                                            width: 120,
+                                            render: (value: string[]) =>
+                                                value.length > 0
+                                                    ? value.join("、")
+                                                    : "—",
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <CodeOutlined />
+                                    <Typography.Text strong>
+                                        原始 JSON Schema
+                                    </Typography.Text>
+                                </Space>
+                                <Collapse
+                                    size="small"
+                                    items={[
+                                        {
+                                            key: "schema",
+                                            label: "查看原始 Schema",
+                                            children: (
+                                                <pre className="inkwell-resource-schema">
+                                                    {selectedTool.schema}
+                                                </pre>
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <CalendarOutlined />
+                                    <Typography.Text strong>
+                                        时间信息
+                                    </Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        {
+                                            key: "updated",
+                                            label: "更新时间",
+                                            children: selectedTool.updatedTime,
+                                        },
+                                    ]}
+                                />
+                            </section>
                         </div>
-                        <div>
-                            <Typography.Text type="secondary">参数 JSON Schema</Typography.Text>
-                            <pre
-                                style={{
-                                    marginTop: 8,
-                                    padding: 14,
-                                    overflow: "auto",
-                                    borderRadius: token.borderRadius,
-                                    color: token.colorText,
-                                    background: token.colorFillQuaternary,
-                                    border: `1px solid ${token.colorBorderSecondary}`,
-                                }}
-                            >
-                                {selectedTool.schema}
-                            </pre>
-                        </div>
-                        <Typography.Text type="secondary">
-                            最近更新：{selectedTool.updatedTime}
-                        </Typography.Text>
-                    </Space>
+                    </div>
                 )}
             </Drawer>
         </ResourceListPage>

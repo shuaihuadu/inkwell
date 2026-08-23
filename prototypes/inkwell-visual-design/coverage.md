@@ -1,5 +1,33 @@
 # 原型覆盖矩阵
 
+## UI-003 / UI-004 / UI-009 ~ UI-012 · 列表与 Agent 编辑统一（2026-08-23）
+
+<!-- markdownlint-disable MD060 -->
+
+| UI-NNN | ui-spec 节标题            | 原型文件 / 路由                                                     | 对应状态                                          | 截图                                                                                          |
+| ------ | ------------------------- | ------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| UI-003 | Agent 空间                | `src/pages/AppShellExplorer.tsx` · `/shell`                         | 有数据、固定卡片画布、统一操作与分页              | `screenshots/20-agent-space-unified-list.png`                                                 |
+| UI-004 | Agent 配置 · Instructions | `src/pages/AgentDesignPage.tsx` · Agent 编辑 → Instructions         | 编辑态、固定高度 Monaco Editor                    | `screenshots/21-agent-instructions-monaco.png`                                                |
+| UI-004 | Agent 配置 · 工具         | `src/pages/AgentDesignPage.tsx` · Agent 编辑 → 工具                 | 已挂载 / 未挂载、工具参数展开                     | `screenshots/22-agent-tool-bindings.png`                                                      |
+| UI-004 | Agent 配置 · Skills       | `src/pages/AgentDesignPage.tsx` · Agent 编辑 → Skills               | 已挂载 / 未挂载、加载阶段状态                     | `screenshots/23-agent-skill-bindings.png`                                                     |
+| UI-010 | 工具列表                  | `src/pages/ToolListPage.tsx` · `/shell` → 资源中心 → 工具           | 有数据、固定表格正文、统一总数与操作              | `screenshots/24-tool-list-unified.png`                                                        |
+| UI-010 | 工具列表 · Tool 详情       | `src/pages/ToolListPage.tsx` · 工具 → 查看                          | 只读身份信息、参数表、原始 JSON Schema 展开态     | `screenshots/30-tool-readonly-details.png`                                                    |
+| UI-011 | Skills 列表               | `src/pages/SkillListPage.tsx` · `/shell` → 资源中心 → Skills        | 有数据、Owner 操作、固定分页                      | `screenshots/25-skill-list-unified.png`                                                       |
+| UI-011 | Skills 列表 · Skill 详情  | `src/pages/SkillListPage.tsx` · Skills → 查看                       | 超长 Markdown 默认折叠 / 展开滚动、资源与时间信息 | `screenshots/28-skill-readonly-details.png`、`screenshots/29-skill-long-content-expanded.png` |
+| UI-012 | 模型列表                  | `src/pages/ModelListPage.tsx` · `/shell` → 资源中心 → 模型          | 有数据、三态能力、统一测试按钮                    | `screenshots/26-model-list-unified.png`                                                       |
+| UI-012 | 模型列表 · 模型详情       | `src/pages/ModelListPage.tsx` · 模型 → 操作 → 查看                  | 只读模型信息、Token 上限、三态能力与数据来源      | `screenshots/31-model-readonly-details.png`                                                   |
+| UI-009 | 用户管理                  | `src/pages/UserManagementPage.tsx` · `/shell` → 系统管理 → 用户管理 | Admin、有数据、统一管理按钮与固定分页             | `screenshots/27-user-list-unified.png`                                                        |
+
+<!-- markdownlint-enable MD060 -->
+
+UI-009 ~ UI-012 继续复用 `ResourceListPage.tsx`。表格正文固定为 440px 并在内部滚动，每页仍切片 20 条；筛选前后左下“共 N 项”和右下分页的纵向位置不变。UI-003 使用同高度卡片画布并在画布内滚动，保持相同底部基线。Playwright 同时测量 UI-003 与 UI-010 筛选前后的分页纵坐标，避免只通过截图判断。
+
+列表操作统一为 Ant Design `small` 默认边框按钮，使用“图标 + 文字”，并保留 Tooltip 和可访问名称。Instructions 使用 `@monaco-editor/react`，固定 480px 高度、内部滚动、自动布局、Markdown 编辑模式和亮暗主题联动，不提供浏览器原生拖拽缩放。
+
+Tool 与模型详情沿用 Agent / Skill 只读详情的身份头与分区结构。Tool 参数从 JSON Schema 结构化展示，原始 Schema 默认折叠并支持区内滚动；模型详情分别展示目录字段、输入 / 输出 Token 上限和视觉、工具调用、结构化输出、推理四项三态能力。连通性测试仍只保留在模型列表，不进入查看 Drawer。
+
+已知缺口：无 `<未实现>` 或 `<缺截图>` 项。
+
 ## UI-004 / UI-005 · AG-UI 运行过程统一（2026-08-22）
 
 | UI-NNN | ui-spec 节标题               | 原型文件 / 路由                                                            | 对应状态                                                  | 截图                                                                                                         |
@@ -73,7 +101,7 @@ Instructions 对超长内容默认展示约 5 行预览，并显示字符数；�
 
 已确认的设计决策：
 
-- 左侧 nav 是真正可展开折叠的两级树形结构，共三组（2026-07-15 两轮修订，requirements.md §13 第 29/31 条 / ui-spec.md OQ-011 修订）：`工作区`（Agent 空间）/ `资源中心`（工具管理、Skills 管理、模型管理——均为 v1 占位入口，点击只显示"即将上线"，UI-010/UI-011/UI-012）/ `系统管理`（Admin，仅 is_super 可见）。分组标题可点击折叠/展开（箭头旋转动画），Sider 收起为图标条时分组一律展开、只显示图标。占位入口带"待上线"小标签 + hover tooltip。`工作区`/`资源中心`/`Agent 空间` 原名分别为 `工作空间`/`能力管理`/`Agent 库`，2026-07-15 再次改名，同时在 `资源中心` 下新增第三个占位叶子 `模型管理`（UI-012）。
+- 左侧 nav 是真正可展开折叠的两级树形结构，共三组：`工作区`（Agent 空间）/ `资源中心`（工具、Skills、模型）/ `系统管理`（用户管理，仅 Admin 可见）。UI-010 ~ UI-012 已从早期占位入口升级为正式资源列表页；分组标题可点击折叠/展开，Sider 收起为图标条时分组一律展开、只显示图标。
 - 品牌主题色（曜石紫/朱砂橙/碧海青）三选一只是 Design Lab 评审工具的候选方案，H2 ADR 会锁定其中一套，**不是**面向最终用户的产品功能；但“浅色/暗色”外观切换是合理的最终产品功能，已加入模拟 Header。
 - i18n/多语言切换明确不做（ADR-014 + AGENTS.md §3.3 禁区已锁定 v1 仅 zh-CN，原型阶段不能绕过）。
 - “关于”入口：Header 品牌区一个实心圆点（无图标），`currentColor` 驱动的呼吸动画，随主题自动换色；点击弹出 Modal：版本/构建号/提交/作者/GitHub 链接同居一个信息列表，下方大尺寸二维码占据剩余整个区域。

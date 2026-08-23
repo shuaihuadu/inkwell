@@ -133,6 +133,246 @@ test.describe("Login Explorer", () => {
 });
 
 test.describe("Agent Design Page", () => {
+    test("shows polished read-only Tool and model details", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await page.getByText("工具", { exact: true }).first().click();
+
+        const firstToolRow = page.locator(".ant-table-row").first();
+        await firstToolRow.getByRole("button", { name: /^查看 / }).click();
+        const toolDetails = page.getByRole("dialog", { name: "Tool 详情" });
+        await expect(toolDetails).toBeVisible();
+        await expect(
+            toolDetails.getByRole("heading", { name: "web_search", level: 4 }),
+        ).toBeVisible();
+        await expect(
+            toolDetails.getByText("参数", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            toolDetails.getByText("query", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            toolDetails.getByText("原始 JSON Schema", { exact: true }),
+        ).toBeVisible();
+        await expect(toolDetails.locator("input, textarea")).toHaveCount(0);
+        await toolDetails.getByText("查看原始 Schema", { exact: true }).click();
+        await expect(
+            toolDetails.locator(".inkwell-resource-schema"),
+        ).toBeVisible();
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath("30-tool-readonly-details.png"),
+        });
+
+        await toolDetails
+            .getByRole("button", { name: "关闭 Tool 详情" })
+            .click();
+        await page.getByText("模型", { exact: true }).first().click();
+        const firstModelRow = page.locator(".ant-table-row").first();
+        const viewModelButton = firstModelRow.getByRole("button", {
+            name: "查看 gpt-4.1",
+        });
+        const testModelButton = firstModelRow.getByRole("button", {
+            name: "测试 gpt-4.1",
+        });
+        await expect(viewModelButton).toHaveCSS("border-style", "solid");
+        await expect(testModelButton).toHaveCSS("border-style", "solid");
+        await viewModelButton.click();
+        const modelDetails = page.getByRole("dialog", { name: "模型详情" });
+        await expect(modelDetails).toBeVisible();
+        await expect(
+            modelDetails.getByRole("heading", { name: "gpt-4.1", level: 4 }),
+        ).toBeVisible();
+        await expect(
+            modelDetails.getByText("Token 上限", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            modelDetails.getByText("工具调用", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            modelDetails.getByText("不支持", { exact: true }),
+        ).toBeVisible();
+        await expect(modelDetails.locator("input, textarea")).toHaveCount(0);
+        await expect(
+            modelDetails.getByRole("button", { name: /测试/ }),
+        ).toHaveCount(0);
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath("31-model-readonly-details.png"),
+        });
+    });
+
+    test("shows a dedicated Skill detail view before editing", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await page.getByText("Skills", { exact: true }).first().click();
+
+        const firstSkillRow = page.locator(".ant-table-row").first();
+        await firstSkillRow.getByRole("button", { name: /^查看 / }).click();
+        const skillDetails = page.getByRole("dialog", { name: "Skill 详情" });
+        await expect(skillDetails).toBeVisible();
+        await expect(
+            skillDetails.getByRole("heading", {
+                name: "合同审查规范",
+                level: 4,
+            }),
+        ).toBeVisible();
+        await expect(
+            skillDetails.getByText("SKILL.md", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            skillDetails.getByText("References", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            skillDetails.getByText("脚本已保存，当前版本不会执行"),
+        ).toHaveCount(0);
+        const skillMarkdown = skillDetails.locator(
+            ".inkwell-skill-details-markdown",
+        );
+        await expect(skillMarkdown).toHaveClass(/collapsed/);
+        const collapsedHeight = await skillMarkdown.evaluate(
+            (element) => element.getBoundingClientRect().height,
+        );
+        await expect(skillDetails.locator("input, textarea")).toHaveCount(0);
+        await expect(
+            skillDetails.getByRole("button", { name: "编辑" }),
+        ).toHaveCount(0);
+        await expect(
+            skillDetails.getByRole("button", { name: "删除 Skill" }),
+        ).toHaveCount(0);
+        await page.waitForTimeout(400);
+        await page.screenshot({
+            path: screenshotPath("28-skill-readonly-details.png"),
+        });
+
+        await skillDetails.getByRole("button", { name: "展开全文" }).click();
+        await expect(skillMarkdown).toHaveClass(/expanded/);
+        await expect(
+            skillDetails.getByRole("button", { name: "收起" }),
+        ).toBeVisible();
+        await page.waitForTimeout(220);
+        const expandedHeight = await skillMarkdown.evaluate(
+            (element) => element.getBoundingClientRect().height,
+        );
+        expect(expandedHeight).toBeGreaterThan(collapsedHeight);
+        await page.screenshot({
+            path: screenshotPath("29-skill-long-content-expanded.png"),
+        });
+
+        await skillDetails
+            .getByRole("button", { name: "关闭 Skill 详情" })
+            .click();
+        await firstSkillRow.getByRole("button", { name: /^编辑 / }).click();
+        const skillEditor = page.getByRole("dialog", { name: "编辑 Skill" });
+        await expect(skillEditor.locator("input")).toHaveCount(1);
+        await expect(skillEditor.locator("textarea")).toHaveCount(2);
+    });
+
+    test("unifies list baselines, actions, and Agent binding editors", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await waitForRender(page);
+
+        const firstAgent = page.locator(".inkwell-agent-card").first();
+        await firstAgent.hover();
+        await expect(
+            firstAgent.getByRole("button", { name: /^编辑 / }),
+        ).toBeVisible();
+        await expect(
+            firstAgent.getByRole("button", { name: /^编辑 / }),
+        ).toHaveCSS("border-style", "solid");
+        const agentPagination = page.locator(".inkwell-agent-pagination");
+        const agentPaginationY = await agentPagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        await page.getByPlaceholder("搜索 Agent").fill("市场洞察 1");
+        await expect(page.getByText("共 1 项", { exact: true })).toBeVisible();
+        const filteredAgentPaginationY = await agentPagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        expect(filteredAgentPaginationY).toBeCloseTo(agentPaginationY, 0);
+        await page.getByPlaceholder("搜索 Agent").clear();
+        await firstAgent.hover();
+        await page.screenshot({
+            path: screenshotPath("20-agent-space-unified-list.png"),
+            fullPage: true,
+        });
+
+        await firstAgent.getByRole("button", { name: /^编辑 / }).click();
+        await page.getByRole("button", { name: "Instructions" }).click();
+        const instructionsEditor = page.locator(
+            ".inkwell-instructions-editor .monaco-editor",
+        );
+        await expect(instructionsEditor).toBeVisible();
+        await expect(instructionsEditor).toHaveCSS("height", "480px");
+        await expect(
+            page.locator(".inkwell-instructions-editor textarea"),
+        ).toHaveCSS("resize", "none");
+        await page.screenshot({
+            path: screenshotPath("21-agent-instructions-monaco.png"),
+            fullPage: true,
+        });
+
+        await page.getByRole("button", { name: /工具$/ }).click();
+        await expect(page.locator(".inkwell-binding-item")).toHaveCount(3);
+        await page.screenshot({
+            path: screenshotPath("22-agent-tool-bindings.png"),
+            fullPage: true,
+        });
+
+        await page.getByRole("button", { name: /Skills$/ }).click();
+        await expect(page.locator(".inkwell-binding-item")).toHaveCount(2);
+        await page.screenshot({
+            path: screenshotPath("23-agent-skill-bindings.png"),
+            fullPage: true,
+        });
+
+        await page.goto("/shell");
+        await page.getByText("工具", { exact: true }).first().click();
+        const pagination = page.locator(".inkwell-resource-pagination");
+        const paginationY = await pagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        await page.getByPlaceholder("搜索名称或描述").fill("weather_forecast");
+        await expect(page.getByText("共 1 项", { exact: true })).toBeVisible();
+        const filteredPaginationY = await pagination.evaluate(
+            (element) => element.getBoundingClientRect().y,
+        );
+        expect(filteredPaginationY).toBeCloseTo(paginationY, 0);
+        await page.getByPlaceholder("搜索名称或描述").clear();
+        await page.screenshot({
+            path: screenshotPath("24-tool-list-unified.png"),
+            fullPage: true,
+        });
+
+        await page.getByText("Skills", { exact: true }).first().click();
+        await expect(page.getByText(/共 \d+ 项/)).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("25-skill-list-unified.png"),
+            fullPage: true,
+        });
+
+        await page.getByText("模型", { exact: true }).first().click();
+        await expect(page.getByText(/共 \d+ 项/)).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("26-model-list-unified.png"),
+            fullPage: true,
+        });
+
+        await page.getByText("用户管理", { exact: true }).first().click();
+        await expect(page.getByText(/共 \d+ 项/)).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("27-user-list-unified.png"),
+            fullPage: true,
+        });
+    });
+
     test("configuration workspace fills wide viewports", async ({
         page,
     }, testInfo) => {
@@ -192,7 +432,7 @@ test.describe("Agent Design Page", () => {
         await page
             .context()
             .grantPermissions(["clipboard-read", "clipboard-write"], {
-                origin: "http://localhost:4174",
+                origin: "http://localhost:4195",
             });
 
         await page.goto("/shell");

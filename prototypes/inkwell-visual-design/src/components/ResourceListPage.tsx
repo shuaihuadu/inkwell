@@ -72,7 +72,6 @@ interface ResourceListPageProps<ItemType extends object> {
     columns: TableColumnsType<ItemType>;
     rowKey: TableProps<ItemType>["rowKey"];
     tableScrollX: number;
-    totalLabel: (total: number) => ReactNode;
     children?: ReactNode;
 }
 
@@ -91,7 +90,6 @@ export default function ResourceListPage<ItemType extends object>({
     columns,
     rowKey,
     tableScrollX,
-    totalLabel,
     children,
 }: ResourceListPageProps<ItemType>) {
     const [page, setPage] = useState(1);
@@ -136,12 +134,13 @@ export default function ResourceListPage<ItemType extends object>({
 
             <div className="inkwell-resource-table">
                 <Table<ItemType>
+                    className="inkwell-resource-table-content"
                     rowKey={rowKey}
                     dataSource={dataSource.slice(
                         (currentPage - 1) * PAGE_SIZE,
                         currentPage * PAGE_SIZE,
                     )}
-                    scroll={{ x: tableScrollX }}
+                    scroll={{ x: tableScrollX, y: 440 }}
                     pagination={false}
                     columns={columns}
                 />
@@ -149,7 +148,7 @@ export default function ResourceListPage<ItemType extends object>({
 
             <div className="inkwell-resource-pagination">
                 <Typography.Text type="secondary">
-                    {totalLabel(dataSource.length)}
+                    共 {dataSource.length} 项
                 </Typography.Text>
                 <Pagination
                     size="small"

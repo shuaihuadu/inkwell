@@ -7,13 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 4174",
+    "preview": "vite preview --port 4195",
     "screenshot": "npx playwright test --reporter=list"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.2",
     "@ant-design/x": "2.8.0",
     "@ant-design/x-markdown": "2.8.0",
+    "@monaco-editor/react": "^4.7.0",
     "antd": "6.5.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",

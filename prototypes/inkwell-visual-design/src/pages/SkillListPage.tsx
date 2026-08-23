@@ -1,28 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+    Avatar,
     Button,
     Descriptions,
     Drawer,
     Form,
+    Flex,
     Input,
     Modal,
     Select,
     Space,
+    Tag,
+    Tooltip,
     Typography,
     Upload,
     message,
+    theme as antdTheme,
 } from "antd";
 import {
+    CalendarOutlined,
+    CloseOutlined,
+    CodeOutlined,
     DeleteOutlined,
     EditOutlined,
     EyeOutlined,
+    FileTextOutlined,
+    FolderOpenOutlined,
     InboxOutlined,
     PlusOutlined,
+    ReadOutlined,
+    DownOutlined,
+    UpOutlined,
+    UserOutlined,
 } from "@ant-design/icons";
 import ResourceListPage, {
     ResourceRowAction,
     ResourceRowActions,
 } from "../components/ResourceListPage";
+import { ChatMarkdown } from "../chat/ChatMarkdown";
 
 interface SkillItem {
     key: string;
@@ -33,6 +48,7 @@ interface SkillItem {
     references: number;
     assets: number;
     scripts: number;
+    createdTime: string;
     updatedTime: string;
 }
 
@@ -42,12 +58,28 @@ const INITIAL_SKILLS: SkillItem[] = [
         key: "contract-review",
         name: "合同审查规范",
         description: "按团队法务标准识别合同风险并输出分级建议。",
-        content:
-            "# 合同审查规范\n\n先识别合同类型，再按高、中、低三级输出风险。每项风险必须引用原文。",
+        content: `# 合同审查规范
+
+    先识别合同类型，再按高、中、低三级输出风险。每项风险必须引用原文。
+
+    ## 审查步骤
+
+    1. 确认合同主体、标的、金额、履行期限与争议解决条款。
+    2. 识别权利义务不对等、责任上限缺失和单方变更等风险。
+    3. 对每项风险引用原文，并给出可直接替换的修改建议。
+
+    ## 输出要求
+
+    - 高风险：可能导致重大损失、履约失败或合规责任。
+    - 中风险：条款不明确或责任分配明显不平衡。
+    - 低风险：措辞、格式或一般性完善建议。
+
+    不得脱离合同原文推断未约定的事实；信息不足时应明确标记待确认事项。`,
         owner: CURRENT_USER,
         references: 4,
         assets: 1,
         scripts: 2,
+        createdTime: "2026-06-03 09:12",
         updatedTime: "2026-07-17 17:20",
     },
     {
@@ -59,6 +91,7 @@ const INITIAL_SKILLS: SkillItem[] = [
         references: 2,
         assets: 0,
         scripts: 0,
+        createdTime: "2026-06-11 14:30",
         updatedTime: "2026-07-16 10:08",
     },
     {
@@ -70,6 +103,7 @@ const INITIAL_SKILLS: SkillItem[] = [
         references: 3,
         assets: 2,
         scripts: 1,
+        createdTime: "2026-06-18 11:05",
         updatedTime: "2026-07-11 08:35",
     },
     ...Array.from(
@@ -94,22 +128,33 @@ const INITIAL_SKILLS: SkillItem[] = [
             references: index % 5,
             assets: index % 3,
             scripts: index % 4 === 0 ? 1 : 0,
+            createdTime: `2026-05-${String(28 - (index % 20)).padStart(2, "0")} 09:40`,
             updatedTime: `2026-06-${String(28 - (index % 20)).padStart(2, "0")} 13:10`,
         }),
     ),
 ];
 
 export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
+    const { token } = antdTheme.useToken();
     const [skills, setSkills] = useState(INITIAL_SKILLS);
     const [searchText, setSearchText] = useState("");
     const [owner, setOwner] = useState("all");
     const [selectedSkill, setSelectedSkill] = useState<SkillItem | null>(null);
     const [editing, setEditing] = useState(false);
+    const [skillContentExpanded, setSkillContentExpanded] = useState(false);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadSelected, setUploadSelected] = useState(false);
     const [form] = Form.useForm();
     const [messageApi, contextHolder] = message.useMessage();
     const [modalApi, modalContextHolder] = Modal.useModal();
+    const hasLongSkillContent =
+        selectedSkill !== null &&
+        (selectedSkill.content.length > 180 ||
+            selectedSkill.content.split("\n").length > 8);
+
+    useEffect(() => {
+        setSkillContentExpanded(false);
+    }, [selectedSkill?.key]);
 
     const canManage = (skill: SkillItem) =>
         isAdmin || skill.owner === CURRENT_USER;
@@ -194,7 +239,6 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
             dataSource={filteredSkills}
             rowKey="key"
             tableScrollX={940}
-            totalLabel={(total) => `共 ${total} 个 Skill`}
             columns={[
                 {
                     title: "名称",
@@ -215,7 +259,7 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
                 {
                     title: "操作",
                     key: "actions",
-                    width: 164,
+                    width: 244,
                     fixed: "right",
                     align: "center",
                     className: "inkwell-action-column",
@@ -228,12 +272,21 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
                                 onClick={() => openDetail(skill)}
                             />
                             {canManage(skill) && (
-                                <ResourceRowAction
-                                    label={`编辑 ${skill.name}`}
-                                    text="编辑"
-                                    icon={<EditOutlined />}
-                                    onClick={() => openDetail(skill, true)}
-                                />
+                                <>
+                                    <ResourceRowAction
+                                        label={`编辑 ${skill.name}`}
+                                        text="编辑"
+                                        icon={<EditOutlined />}
+                                        onClick={() => openDetail(skill, true)}
+                                    />
+                                    <ResourceRowAction
+                                        label={`删除 ${skill.name}`}
+                                        text="删除"
+                                        icon={<DeleteOutlined />}
+                                        danger
+                                        onClick={() => deleteSkill(skill)}
+                                    />
+                                </>
                             )}
                         </ResourceRowActions>
                     ),
@@ -245,29 +298,26 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
             <Drawer
                 width={600}
                 title={editing ? "编辑 Skill" : "Skill 详情"}
+                closable={false}
                 open={selectedSkill !== null}
                 onClose={() => {
                     setSelectedSkill(null);
                     setEditing(false);
                 }}
                 extra={
-                    selectedSkill && canManage(selectedSkill) ? (
-                        <Space>
-                            {!editing && (
+                    selectedSkill ? (
+                        <Space size={8}>
+                            <Tooltip title="关闭">
                                 <Button
-                                    icon={<EditOutlined />}
-                                    onClick={() => setEditing(true)}
-                                >
-                                    编辑
-                                </Button>
-                            )}
-                            <Button
-                                danger
-                                type="text"
-                                aria-label="删除 Skill"
-                                icon={<DeleteOutlined />}
-                                onClick={() => deleteSkill(selectedSkill)}
-                            />
+                                    type="text"
+                                    aria-label="关闭 Skill 详情"
+                                    icon={<CloseOutlined />}
+                                    onClick={() => {
+                                        setSelectedSkill(null);
+                                        setEditing(false);
+                                    }}
+                                />
+                            </Tooltip>
                         </Space>
                     ) : null
                 }
@@ -290,8 +340,10 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
                         </div>
                     ) : null
                 }
+                className="inkwell-skill-details-drawer"
+                styles={{ body: { padding: editing ? 24 : 0 } }}
             >
-                {selectedSkill && (
+                {selectedSkill && editing && (
                     <Form form={form} layout="vertical" disabled={!editing}>
                         <Form.Item
                             label="名称"
@@ -336,6 +388,180 @@ export default function SkillListPage({ isAdmin }: { isAdmin: boolean }) {
                             </Typography.Text>
                         </Space>
                     </Form>
+                )}
+                {selectedSkill && !editing && (
+                    <div className="inkwell-skill-details">
+                        <div
+                            className="inkwell-agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ReadOutlined />}
+                                style={{ background: token.colorPrimary }}
+                            />
+                            <div className="inkwell-agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title
+                                        level={4}
+                                        style={{ margin: 0 }}
+                                    >
+                                        {selectedSkill.name}
+                                    </Typography.Title>
+                                    <Tag color="processing">Skill</Tag>
+                                    {selectedSkill.owner === CURRENT_USER && (
+                                        <Tag>我上传的</Tag>
+                                    )}
+                                </Flex>
+                                <Typography.Paragraph
+                                    type="secondary"
+                                    style={{ margin: "6px 0 0" }}
+                                >
+                                    {selectedSkill.description}
+                                </Typography.Paragraph>
+                                <Flex gap={16} wrap style={{ marginTop: 8 }}>
+                                    <Typography.Text type="secondary">
+                                        <UserOutlined /> {selectedSkill.owner}
+                                    </Typography.Text>
+                                    <Typography.Text type="secondary">
+                                        <CalendarOutlined />{" "}
+                                        {selectedSkill.updatedTime}
+                                    </Typography.Text>
+                                </Flex>
+                            </div>
+                        </div>
+
+                        <div className="inkwell-agent-details-content">
+                            <section className="inkwell-agent-details-section">
+                                <Flex
+                                    align="center"
+                                    justify="space-between"
+                                    gap={12}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <Space size={8}>
+                                        <FileTextOutlined />
+                                        <Typography.Text strong>
+                                            SKILL.md
+                                        </Typography.Text>
+                                    </Space>
+                                    <Typography.Text type="secondary">
+                                        {selectedSkill.content.length} 字符
+                                    </Typography.Text>
+                                </Flex>
+                                <div
+                                    className={`inkwell-skill-details-markdown ${
+                                        skillContentExpanded
+                                            ? "expanded"
+                                            : "collapsed"
+                                    }`}
+                                    style={{
+                                        background: token.colorFillQuaternary,
+                                        border: `1px solid ${token.colorBorderSecondary}`,
+                                    }}
+                                >
+                                    <ChatMarkdown
+                                        content={selectedSkill.content}
+                                    />
+                                </div>
+                            </section>
+                                    {hasLongSkillContent && (
+                                        <Button
+                                            type="link"
+                                            size="small"
+                                            className="inkwell-agent-details-instructions-toggle"
+                                            icon={
+                                                skillContentExpanded ? (
+                                                    <UpOutlined />
+                                                ) : (
+                                                    <DownOutlined />
+                                                )
+                                            }
+                                            onClick={() =>
+                                                setSkillContentExpanded(
+                                                    (current) => !current,
+                                                )
+                                            }
+                                        >
+                                            {skillContentExpanded
+                                                ? "收起"
+                                                : "展开全文"}
+                                        </Button>
+                                    )}
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <FolderOpenOutlined />
+                                    <Typography.Text strong>
+                                        资源
+                                    </Typography.Text>
+                                </Space>
+                                <div className="inkwell-skill-resource-grid">
+                                    <div className="inkwell-skill-resource-item">
+                                        <FileTextOutlined />
+                                        <Typography.Text strong>
+                                            {selectedSkill.references}
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            References
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="inkwell-skill-resource-item">
+                                        <FolderOpenOutlined />
+                                        <Typography.Text strong>
+                                            {selectedSkill.assets}
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            Assets
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="inkwell-skill-resource-item">
+                                        <CodeOutlined />
+                                        <Typography.Text strong>
+                                            {selectedSkill.scripts}
+                                        </Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            Scripts
+                                        </Typography.Text>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <CalendarOutlined />
+                                    <Typography.Text strong>
+                                        时间信息
+                                    </Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        {
+                                            key: "created",
+                                            label: "创建时间",
+                                            children: selectedSkill.createdTime,
+                                        },
+                                        {
+                                            key: "updated",
+                                            label: "更新时间",
+                                            children: selectedSkill.updatedTime,
+                                        },
+                                    ]}
+                                />
+                            </section>
+                        </div>
+                    </div>
                 )}
             </Drawer>
 

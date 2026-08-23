@@ -8,7 +8,7 @@ export default defineConfig({
     workers: 1,
     reporter: "list",
     use: {
-        baseURL: "http://localhost:4174",
+        baseURL: "http://localhost:4195",
         trace: "off",
         screenshot: "only-on-failure",
     },
@@ -43,9 +43,9 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: "npm run preview",
-        url: "http://localhost:4174",
-        reuseExistingServer: true,
+        command: "npm exec vite preview -- --port 4195",
+        url: "http://localhost:4195",
+        reuseExistingServer: false,
         timeout: 30_000,
     },
 });

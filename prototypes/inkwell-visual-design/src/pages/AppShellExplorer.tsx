@@ -362,7 +362,8 @@ function AgentLibraryMock({
     const unshareAgent = (name: string) => {
         modalApi.confirm({
             title: `撤销「${name}」的共享`,
-            content: "撤销后，团队成员将无法继续访问该 Agent；你的 Agent 和已有配置不会被删除。",
+            content:
+                "撤销后，团队成员将无法继续访问该 Agent；你的 Agent 和已有配置不会被删除。",
             okText: "确认撤销",
             okButtonProps: { danger: true },
             cancelText: "取消",
@@ -474,7 +475,9 @@ function AgentLibraryMock({
              * 让下方总数和分页控件的位置保持稳定；标题单行、描述两行省略。 */}
             <div
                 style={{
-                    minHeight: activeTab === "shared" ? 594 : 548,
+                    height: 440,
+                    overflowY: "auto",
+                    paddingRight: 4,
                     position: "relative",
                 }}
             >
@@ -489,7 +492,7 @@ function AgentLibraryMock({
                                 hoverable
                                 className="inkwell-agent-card"
                                 onClick={() => onSelectAgent(agent)}
-                                style={{ height: 128, position: "relative" }}
+                                style={{ height: 148, position: "relative" }}
                                 styles={{
                                     body: {
                                         padding: 12,
@@ -513,7 +516,7 @@ function AgentLibraryMock({
                                         <Tooltip title="编辑配置（跳 UI-004）">
                                             <Button
                                                 className="inkwell-agent-card-edit-btn"
-                                                type="text"
+                                                type="default"
                                                 size="small"
                                                 aria-label={`编辑 ${agent.name}`}
                                                 icon={<EditOutlined />}
@@ -521,7 +524,9 @@ function AgentLibraryMock({
                                                     event.stopPropagation();
                                                     onEditAgent(agent.name);
                                                 }}
-                                            />
+                                            >
+                                                编辑
+                                            </Button>
                                         </Tooltip>
                                         {agent.published &&
                                             !sharedAgentNames.has(
@@ -530,7 +535,7 @@ function AgentLibraryMock({
                                                 <Tooltip title="共享已发布版本">
                                                     <Button
                                                         className="inkwell-agent-card-edit-btn"
-                                                        type="text"
+                                                        type="default"
                                                         size="small"
                                                         aria-label={`共享 ${agent.name}`}
                                                         icon={
@@ -543,7 +548,9 @@ function AgentLibraryMock({
                                                                 agent.version,
                                                             );
                                                         }}
-                                                    />
+                                                    >
+                                                        共享
+                                                    </Button>
                                                 </Tooltip>
                                             )}
                                         {sharedAgentNames.has(agent.name) && (
@@ -551,15 +558,19 @@ function AgentLibraryMock({
                                                 <Button
                                                     className="inkwell-agent-card-edit-btn"
                                                     danger
-                                                    type="text"
+                                                    type="default"
                                                     size="small"
                                                     aria-label={`撤销 ${agent.name} 共享`}
                                                     icon={<UndoOutlined />}
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        unshareAgent(agent.name);
+                                                        unshareAgent(
+                                                            agent.name,
+                                                        );
                                                     }}
-                                                />
+                                                >
+                                                    撤销共享
+                                                </Button>
                                             </Tooltip>
                                         )}
                                     </Space>
@@ -577,7 +588,7 @@ function AgentLibraryMock({
                                         <Tooltip title="查看详情">
                                             <Button
                                                 className="inkwell-agent-card-edit-btn"
-                                                type="text"
+                                                type="default"
                                                 size="small"
                                                 aria-label={`查看 ${agent.name} 详情`}
                                                 icon={<EyeOutlined />}
@@ -585,14 +596,16 @@ function AgentLibraryMock({
                                                     event.stopPropagation();
                                                     onViewAgent(agent.name);
                                                 }}
-                                            />
+                                            >
+                                                查看
+                                            </Button>
                                         </Tooltip>
                                         {isAdmin && (
                                             <Tooltip title="撤销共享">
                                                 <Button
                                                     className="inkwell-agent-card-edit-btn"
                                                     danger
-                                                    type="text"
+                                                    type="default"
                                                     size="small"
                                                     aria-label={`撤销 ${agent.name} 共享`}
                                                     icon={<UndoOutlined />}
@@ -609,7 +622,9 @@ function AgentLibraryMock({
                                                             cancelText: "取消",
                                                         });
                                                     }}
-                                                />
+                                                >
+                                                    撤销共享
+                                                </Button>
                                             </Tooltip>
                                         )}
                                     </Space>
@@ -699,17 +714,7 @@ function AgentLibraryMock({
                                     style={{
                                         fontSize: 12,
                                         marginTop: 6,
-                                        marginBottom: 0,
-                                        paddingRight:
-                                            activeTab === "mine"
-                                                ? agent.published
-                                                    ? 52
-                                                    : 26
-                                                : activeTab === "shared"
-                                                  ? isAdmin
-                                                      ? 52
-                                                      : 26
-                                                  : 0,
+                                        marginBottom: 30,
                                     }}
                                     ellipsis={{ rows: 2 }}
                                 >
@@ -737,6 +742,7 @@ function AgentLibraryMock({
             </div>
             {filteredAgents.length > 0 && (
                 <div
+                    className="inkwell-agent-pagination"
                     style={{
                         display: "flex",
                         alignItems: "center",
@@ -746,7 +752,7 @@ function AgentLibraryMock({
                     }}
                 >
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        共 {filteredAgents.length} 个 Agent
+                        共 {filteredAgents.length} 项
                     </Typography.Text>
                     <Pagination
                         size="small"
@@ -1297,11 +1303,15 @@ export default function AppShellExplorer() {
                             flex: 1,
                             minHeight: 0,
                             overflow:
-                                showAgentDetail || showAgentChat || activeNav === "guide"
+                                showAgentDetail ||
+                                showAgentChat ||
+                                activeNav === "guide"
                                     ? "hidden"
                                     : "auto",
                             padding:
-                                showAgentDetail || showAgentChat || activeNav === "guide"
+                                showAgentDetail ||
+                                showAgentChat ||
+                                activeNav === "guide"
                                     ? 0
                                     : 20,
                         }}
@@ -1370,9 +1380,7 @@ export default function AppShellExplorer() {
                                 onStartQuickGuide={() =>
                                     setQuickStartOpen(true)
                                 }
-                                onGoToAgentSpace={() =>
-                                    setActiveNav("library")
-                                }
+                                onGoToAgentSpace={() => setActiveNav("library")}
                             />
                         )}
                     </div>
@@ -1398,7 +1406,11 @@ export default function AppShellExplorer() {
                     showInfo={false}
                     style={{ marginBottom: 18 }}
                 />
-                <Space orientation="vertical" size={4} style={{ width: "100%" }}>
+                <Space
+                    orientation="vertical"
+                    size={4}
+                    style={{ width: "100%" }}
+                >
                     {[
                         ["创建一个 Agent", "填写名称和用途"],
                         ["完成核心配置", "补充 Instructions 并选择模型"],
@@ -1422,14 +1434,17 @@ export default function AppShellExplorer() {
                                 onChange={(event) => {
                                     setCompletedGuideSteps((current) => {
                                         const next = new Set(current);
-                                        if (event.target.checked) next.add(index);
+                                        if (event.target.checked)
+                                            next.add(index);
                                         else next.delete(index);
                                         return next;
                                     });
                                 }}
                             />
                             <span>
-                                <Typography.Text strong>{title}</Typography.Text>
+                                <Typography.Text strong>
+                                    {title}
+                                </Typography.Text>
                                 <Typography.Text
                                     type="secondary"
                                     style={{ display: "block", fontSize: 12 }}

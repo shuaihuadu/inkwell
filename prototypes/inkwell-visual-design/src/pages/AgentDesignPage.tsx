@@ -68,6 +68,7 @@ import {
     Welcome,
     type ConversationItemType,
 } from "@ant-design/x";
+import Editor from "@monaco-editor/react";
 import { useMockChat, formatNow, type ChatMessage } from "../chat/useMockChat";
 import { toBubbleItems, useChatBubbleRoles } from "../chat/chatBubbleRoles";
 import { useAttachments } from "../chat/useAttachments";
@@ -80,6 +81,7 @@ import {
     runAgentLoopDemo,
     runToolCallDemo,
 } from "../chat/harnessDemo";
+import { useDesign } from "../context/DesignContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,6 +165,16 @@ const MOCK_SKILLS = [
         description: "数据分析与图表生成",
     },
 ];
+
+const DEFAULT_INSTRUCTIONS = `你是一名专业的研究助手，擅长以下工作：
+1. 文献检索与摘要提炼
+2. 数据分析与可视化建议
+3. 报告框架设计与撰写
+
+工作原则：
+- 回答要有依据，引用来源
+- 专业术语使用准确
+- 遇到不确定的内容，明确说明而非猜测`;
 
 // ─── Section Components ───────────────────────────────────────────────────────
 
@@ -292,7 +304,8 @@ function SectionBasic({ readonly }: { readonly: boolean }) {
 }
 
 function SectionInstructions({ readonly }: { readonly: boolean }) {
-    const [charCount, setCharCount] = useState(420);
+    const { isDark } = useDesign();
+    const [charCount, setCharCount] = useState(DEFAULT_INSTRUCTIONS.length);
     const WARN_THRESHOLD = 32000;
     return (
         <Form layout="vertical">
@@ -310,26 +323,35 @@ function SectionInstructions({ readonly }: { readonly: boolean }) {
                         style={{ marginBottom: 8 }}
                     />
                 )}
-                <Input.TextArea
-                    aria-label="Instructions"
-                    rows={20}
-                    disabled={readonly}
-                    defaultValue={`你是一名专业的研究助手，擅长以下工作：
-1. 文献检索与摘要提炼
-2. 数据分析与可视化建议
-3. 报告框架设计与撰写
-
-工作原则：
-- 回答要有依据，引用来源
-- 专业术语使用准确
-- 遇到不确定的内容，明确说明而非猜测`}
-                    onChange={(e) => setCharCount(e.target.value.length)}
-                    showCount={{
-                        formatter: ({ count }) =>
-                            `${count} / ${WARN_THRESHOLD}`,
-                    }}
-                    placeholder="输入给 Agent 的系统指令…"
-                />
+                <div className="inkwell-instructions-editor">
+                    <Editor
+                        height="480px"
+                        defaultLanguage="markdown"
+                        defaultValue={DEFAULT_INSTRUCTIONS}
+                        theme={isDark ? "vs-dark" : "light"}
+                        onChange={(value) => setCharCount(value?.length ?? 0)}
+                        options={{
+                            accessibilitySupport: "on",
+                            automaticLayout: true,
+                            folding: false,
+                            fontSize: 13,
+                            lineHeight: 21,
+                            minimap: { enabled: false },
+                            overviewRulerLanes: 0,
+                            padding: { top: 12, bottom: 12 },
+                            readOnly: readonly,
+                            renderLineHighlight: "line",
+                            scrollBeyondLastLine: false,
+                            wordWrap: "on",
+                        }}
+                    />
+                </div>
+                <Typography.Text
+                    type="secondary"
+                    className="inkwell-instructions-editor-count"
+                >
+                    {charCount} / {WARN_THRESHOLD}
+                </Typography.Text>
             </Form.Item>
         </Form>
     );
@@ -604,34 +626,19 @@ function SectionTools({
 }) {
     const [checked, setChecked] = useState<string[]>(["t1"]);
     return (
-        <div>
-            <Space
-                direction="vertical"
-                style={{ width: "100%" }}
-                size={density === "compact" ? 8 : 12}
-            >
+        <div className="inkwell-binding-list">
+            <div className="inkwell-binding-list-body">
                 {MOCK_TOOLS.map((t) => (
-                    <Card
+                    <div
                         key={t.id}
-                        size="small"
-                        style={{ borderRadius: 8 }}
-                        styles={{
-                            body: {
-                                padding:
-                                    density === "compact"
-                                        ? "8px 12px"
-                                        : "12px 16px",
-                            },
+                        className={`inkwell-binding-item${checked.includes(t.id) ? " selected" : ""}`}
+                        style={{
+                            paddingBlock: density === "compact" ? 10 : 14,
                         }}
                     >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 12,
-                            }}
-                        >
+                        <div className="inkwell-binding-item-main">
                             <Checkbox
+                                aria-label={t.name}
                                 checked={checked.includes(t.id)}
                                 disabled={readonly}
                                 onChange={(e) => {
@@ -642,10 +649,13 @@ function SectionTools({
                                     );
                                 }}
                             />
-                            <div style={{ flex: 1 }}>
+                            <div className="inkwell-binding-item-icon">
+                                <ToolOutlined />
+                            </div>
+                            <div className="inkwell-binding-item-copy">
                                 <Typography.Text
                                     strong
-                                    style={{ fontSize: 13 }}
+                                    style={{ fontSize: 14 }}
                                 >
                                     {t.name}
                                 </Typography.Text>
@@ -657,28 +667,21 @@ function SectionTools({
                                 </Typography.Text>
                                 {checked.includes(t.id) && t.params && (
                                     <Form
-                                        layout="inline"
-                                        size="small"
-                                        style={{ marginTop: 8 }}
+                                        layout="vertical"
+                                        className="inkwell-binding-config"
                                     >
-                                        {t.params.map((p) => (
-                                            <Form.Item
-                                                key={p}
-                                                label={p}
-                                                style={{ marginBottom: 0 }}
-                                            >
-                                                <Input
-                                                    size="small"
-                                                    style={{ width: 120 }}
-                                                    disabled={readonly}
-                                                />
-                                            </Form.Item>
-                                        ))}
+                                        <Flex gap={12} wrap>
+                                            {t.params.map((p) => (
+                                                <Form.Item key={p} label={p}>
+                                                    <Input disabled={readonly} />
+                                                </Form.Item>
+                                            ))}
+                                        </Flex>
                                     </Form>
                                 )}
                             </div>
                         </div>
-                    </Card>
+                    </div>
                 ))}
                 {MOCK_TOOLS.length === 0 && (
                     <div style={{ textAlign: "center", padding: 32 }}>
@@ -687,7 +690,7 @@ function SectionTools({
                         </Typography.Text>
                     </div>
                 )}
-            </Space>
+            </div>
         </div>
     );
 }
@@ -711,33 +714,19 @@ function SectionSkills({
                 从统一 Skill 管理中选择需要挂载到当前 Agent 的 Skill。
             </Typography.Text>
 
-            <Space
-                direction="vertical"
-                style={{ width: "100%" }}
-                size={density === "compact" ? 8 : 12}
-            >
+            <div className="inkwell-binding-list">
+                <div className="inkwell-binding-list-body">
                 {MOCK_SKILLS.map((s) => (
-                    <Card
+                    <div
                         key={s.id}
-                        size="small"
-                        style={{ borderRadius: 8 }}
-                        styles={{
-                            body: {
-                                padding:
-                                    density === "compact"
-                                        ? "8px 12px"
-                                        : "12px 16px",
-                            },
+                        className={`inkwell-binding-item${checked.includes(s.id) ? " selected" : ""}`}
+                        style={{
+                            paddingBlock: density === "compact" ? 10 : 14,
                         }}
                     >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 12,
-                            }}
-                        >
+                        <div className="inkwell-binding-item-main">
                             <Checkbox
+                                aria-label={s.name}
                                 checked={checked.includes(s.id)}
                                 disabled={readonly}
                                 onChange={(e) => {
@@ -748,7 +737,10 @@ function SectionSkills({
                                     );
                                 }}
                             />
-                            <div>
+                            <div className="inkwell-binding-item-icon">
+                                <ReadOutlined />
+                            </div>
+                            <div className="inkwell-binding-item-copy">
                                 <Space>
                                     <Typography.Text
                                         strong
@@ -763,9 +755,22 @@ function SectionSkills({
                                 >
                                     {s.description}
                                 </Typography.Text>
+                                <Flex gap={6} wrap style={{ marginTop: 8 }}>
+                                    <Tag>Discovery</Tag>
+                                    <Tag
+                                        color={
+                                            checked.includes(s.id)
+                                                ? "processing"
+                                                : undefined
+                                        }
+                                    >
+                                        Activation
+                                    </Tag>
+                                    <Tag>Execution</Tag>
+                                </Flex>
                             </div>
                         </div>
-                    </Card>
+                    </div>
                 ))}
 
                 {MOCK_SKILLS.length === 0 && (
@@ -781,7 +786,8 @@ function SectionSkills({
                         </Typography.Text>
                     </div>
                 )}
-            </Space>
+                </div>
+            </div>
         </div>
     );
 }

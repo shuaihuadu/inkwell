@@ -28,7 +28,7 @@ npx playwright install chromium
 npm run screenshot
 ```
 
-Vite 开发服务器默认使用终端输出的本地地址。`npm run preview` 固定使用 `http://localhost:4174`，供 Playwright 使用。
+Vite 开发服务器默认使用终端输出的本地地址。`npm run preview` 固定使用 `http://localhost:4195`，供 Playwright 使用。
 
 ## 评审入口
 

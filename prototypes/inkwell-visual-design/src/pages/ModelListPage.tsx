@@ -1,8 +1,25 @@
 import { useState } from "react";
-import { Button, Drawer, Select, Space, Tag, Typography, message } from "antd";
+import {
+    Avatar,
+    Button,
+    Descriptions,
+    Drawer,
+    Flex,
+    Select,
+    Space,
+    Tag,
+    Tooltip,
+    Typography,
+    message,
+    theme as antdTheme,
+} from "antd";
 import {
     ApiOutlined,
+    AppstoreOutlined,
+    CloseOutlined,
     ClockCircleOutlined,
+    DatabaseOutlined,
+    EyeOutlined,
     ExperimentOutlined,
     ExportOutlined,
 } from "@ant-design/icons";
@@ -146,6 +163,7 @@ function CapabilityTag({ value }: { value: Capability }) {
 }
 
 export default function ModelListPage() {
+    const { token } = antdTheme.useToken();
     const [searchText, setSearchText] = useState("");
     const [category, setCategory] = useState("all");
     const [selectedModel, setSelectedModel] = useState<ModelItem | null>(null);
@@ -178,10 +196,16 @@ export default function ModelListPage() {
         }, 700);
     };
 
-    const testLabel = (model: ModelItem) => {
+    const modelActions = (model: ModelItem) => {
         const state = testStates[model.key] ?? "idle";
         return (
             <ResourceRowActions>
+                <ResourceRowAction
+                    label={`查看 ${model.id}`}
+                    text="查看"
+                    icon={<EyeOutlined />}
+                    onClick={() => setSelectedModel(model)}
+                />
                 <ResourceRowAction
                     label={`测试 ${model.id}`}
                     text="测试"
@@ -247,21 +271,14 @@ export default function ModelListPage() {
             dataSource={filteredModels}
             rowKey="key"
             tableScrollX={1120}
-            totalLabel={(total) => `实时发现 ${total} 个模型`}
             columns={[
                 {
                     title: "模型标识",
                     dataIndex: "id",
                     width: 210,
                     fixed: "left",
-                    render: (value: string, model) => (
-                        <Button
-                            type="link"
-                            style={{ padding: 0 }}
-                            onClick={() => setSelectedModel(model)}
-                        >
-                            {value}
-                        </Button>
+                    render: (value: string) => (
+                        <Typography.Text>{value}</Typography.Text>
                     ),
                 },
                 {
@@ -314,101 +331,185 @@ export default function ModelListPage() {
                     render: (value) => <CapabilityTag value={value} />,
                 },
                 {
-                    title: "连通性",
-                    key: "test",
-                    width: 144,
+                    title: "操作",
+                    key: "actions",
+                    width: 220,
                     fixed: "right",
                     align: "center",
                     className: "inkwell-action-column",
-                    render: (_, model) => testLabel(model),
+                    render: (_, model) => modelActions(model),
                 },
             ]}
         >
             {contextHolder}
             <Drawer
-                width={500}
+                width={600}
                 title="模型详情"
+                closable={false}
                 open={selectedModel !== null}
                 onClose={() => setSelectedModel(null)}
+                extra={
+                    <Tooltip title="关闭">
+                        <Button
+                            type="text"
+                            aria-label="关闭模型详情"
+                            icon={<CloseOutlined />}
+                            onClick={() => setSelectedModel(null)}
+                        />
+                    </Tooltip>
+                }
+                className="inkwell-resource-details-drawer"
+                styles={{ body: { padding: 0 } }}
             >
                 {selectedModel && (
-                    <Space
-                        direction="vertical"
-                        size={20}
-                        style={{ width: "100%" }}
-                    >
-                        <Space>
-                            <ApiOutlined />
-                            <Typography.Title level={5} style={{ margin: 0 }}>
-                                {selectedModel.id}
-                            </Typography.Title>
-                        </Space>
-                        <Space wrap>
-                            <Tag color="blue">
-                                {CATEGORY_LABELS[selectedModel.category]}
-                            </Tag>
-                            <Tag>
-                                {selectedModel.providerMode ?? "模式未知"}
-                            </Tag>
-                            <Tag>{selectedModel.ownedBy ?? "提供方未知"}</Tag>
-                        </Space>
-                        <div>
-                            <Typography.Text type="secondary">
-                                上下文限制
-                            </Typography.Text>
-                            <Typography.Paragraph style={{ marginTop: 4 }}>
-                                最大输入{" "}
-                                {selectedModel.maxInputTokens?.toLocaleString() ??
-                                    "未知"}{" "}
-                                个令牌，最大输出{" "}
-                                {selectedModel.maxOutputTokens?.toLocaleString() ??
-                                    "未知"}{" "}
-                                个令牌
-                            </Typography.Paragraph>
-                        </div>
-                        <div>
-                            <Typography.Text type="secondary">
-                                能力
-                            </Typography.Text>
-                            <div
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr 1fr",
-                                    gap: 12,
-                                    marginTop: 10,
-                                }}
-                            >
-                                <span>
-                                    视觉{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.vision}
-                                    />
-                                </span>
-                                <span>
-                                    工具调用{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.tools}
-                                    />
-                                </span>
-                                <span>
-                                    结构化输出{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.structuredOutput}
-                                    />
-                                </span>
-                                <span>
-                                    推理{" "}
-                                    <CapabilityTag
-                                        value={selectedModel.reasoning}
-                                    />
-                                </span>
+                    <div>
+                        <div
+                            className="inkwell-agent-details-identity"
+                            style={{
+                                background: token.colorFillQuaternary,
+                                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                            }}
+                        >
+                            <Avatar
+                                size={52}
+                                icon={<ApiOutlined />}
+                                style={{ background: token.colorPrimary }}
+                            />
+                            <div className="inkwell-agent-details-identity-copy">
+                                <Flex align="center" gap={8} wrap>
+                                    <Typography.Title level={4} style={{ margin: 0 }}>
+                                        {selectedModel.id}
+                                    </Typography.Title>
+                                    <Tag color="processing">
+                                        {CATEGORY_LABELS[selectedModel.category]}
+                                    </Tag>
+                                </Flex>
+                                <Flex gap={8} wrap style={{ marginTop: 8 }}>
+                                    <Tag>
+                                        {selectedModel.providerMode ?? "模式未知"}
+                                    </Tag>
+                                    <Tag>{selectedModel.ownedBy ?? "提供方未知"}</Tag>
+                                </Flex>
                             </div>
                         </div>
-                        <Typography.Text type="secondary">
-                            <ClockCircleOutlined /> 数据来自 LiteLLM
-                            实时发现，不在 Inkwell 中保存副本。
-                        </Typography.Text>
-                    </Space>
+
+                        <div className="inkwell-agent-details-content">
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <ApiOutlined />
+                                    <Typography.Text strong>模型信息</Typography.Text>
+                                </Space>
+                                <Descriptions
+                                    size="small"
+                                    column={1}
+                                    items={[
+                                        {
+                                            key: "id",
+                                            label: "模型 ID",
+                                            children: selectedModel.id,
+                                        },
+                                        {
+                                            key: "category",
+                                            label: "Category",
+                                            children: selectedModel.category,
+                                        },
+                                        {
+                                            key: "providerMode",
+                                            label: "Provider Mode",
+                                            children:
+                                                selectedModel.providerMode ?? "未知",
+                                        },
+                                        {
+                                            key: "ownedBy",
+                                            label: "OwnedBy",
+                                            children: selectedModel.ownedBy ?? "未知",
+                                        },
+                                    ]}
+                                />
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <DatabaseOutlined />
+                                    <Typography.Text strong>Token 上限</Typography.Text>
+                                </Space>
+                                <div className="inkwell-model-metric-grid">
+                                    <div className="inkwell-model-metric-item">
+                                        <Typography.Text type="secondary">
+                                            最大输入
+                                        </Typography.Text>
+                                        <Typography.Title level={4} style={{ margin: 0 }}>
+                                            {selectedModel.maxInputTokens?.toLocaleString() ??
+                                                "未知"}
+                                        </Typography.Title>
+                                        <Typography.Text type="secondary">
+                                            tokens
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="inkwell-model-metric-item">
+                                        <Typography.Text type="secondary">
+                                            最大输出
+                                        </Typography.Text>
+                                        <Typography.Title level={4} style={{ margin: 0 }}>
+                                            {selectedModel.maxOutputTokens?.toLocaleString() ??
+                                                "未知"}
+                                        </Typography.Title>
+                                        <Typography.Text type="secondary">
+                                            tokens
+                                        </Typography.Text>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <AppstoreOutlined />
+                                    <Typography.Text strong>能力</Typography.Text>
+                                </Space>
+                                <div className="inkwell-model-capability-grid">
+                                    {[
+                                        ["视觉", selectedModel.vision],
+                                        ["工具调用", selectedModel.tools],
+                                        [
+                                            "结构化输出",
+                                            selectedModel.structuredOutput,
+                                        ],
+                                        ["推理", selectedModel.reasoning],
+                                    ].map(([label, value]) => (
+                                        <div
+                                            key={String(label)}
+                                            className="inkwell-model-capability-item"
+                                        >
+                                            <Typography.Text>{label}</Typography.Text>
+                                            <CapabilityTag value={value as Capability} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            <section className="inkwell-agent-details-section">
+                                <Space
+                                    size={8}
+                                    className="inkwell-agent-details-section-title"
+                                >
+                                    <ClockCircleOutlined />
+                                    <Typography.Text strong>数据来源</Typography.Text>
+                                </Space>
+                                <Typography.Text type="secondary">
+                                    数据来自 LiteLLM 实时发现，不在 Inkwell 中保存副本。
+                                </Typography.Text>
+                            </section>
+                        </div>
+                    </div>
                 )}
             </Drawer>
         </ResourceListPage>

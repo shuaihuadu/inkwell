@@ -196,7 +196,6 @@ export default function UserManagementPage() {
             dataSource={filteredUsers}
             rowKey="key"
             tableScrollX={800}
-            totalLabel={(total) => `共 ${total} 个用户`}
             columns={[
                 { title: "用户名", dataIndex: "username", width: 200 },
                 {
