@@ -133,11 +133,16 @@ textarea {
     z-index: 1;
     margin: 0;
     color: #fff;
-    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    font-family: Arial, sans-serif;
     font-size: 62px;
     font-weight: 600;
     line-height: 1;
     letter-spacing: 0;
+}
+.login-heading h4.ant-typography,
+.app-identity strong,
+.about-heading h5.ant-typography {
+    font-family: Arial, sans-serif;
 }
 .login-brand-rings {
     position: absolute;

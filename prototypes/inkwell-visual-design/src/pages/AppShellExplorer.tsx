@@ -1031,6 +1031,7 @@ export default function AppShellExplorer() {
                     <img src={logo} width={26} height={26} alt="Inkwell" />
                     <Typography.Text
                         strong
+                        className="inkwell-brand-name"
                         style={{ fontSize: 15, color: token.colorPrimary }}
                     >
                         Inkwell
@@ -1514,6 +1515,7 @@ export default function AppShellExplorer() {
                     <img src={logo} width={48} height={48} alt="Inkwell" />
                     <Typography.Title
                         level={5}
+                        className="inkwell-brand-name"
                         style={{ margin: "12px 0 2px" }}
                     >
                         Inkwell

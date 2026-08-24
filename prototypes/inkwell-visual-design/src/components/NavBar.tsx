@@ -48,6 +48,7 @@ export default function NavBar() {
                 <img src={logo} alt="Inkwell" width={28} height={28} />
                 <Typography.Text
                     strong
+                    className="inkwell-brand-name"
                     style={{
                         fontSize: 15,
                         color: token.colorPrimary,

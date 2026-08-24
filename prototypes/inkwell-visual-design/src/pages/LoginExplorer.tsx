@@ -74,7 +74,11 @@ function LoginForm({
                     height={64}
                     style={{ display: "block", margin: "0 auto 14px" }}
                 />
-                <Typography.Title level={4} style={{ margin: "0 0 2px" }}>
+                <Typography.Title
+                    level={4}
+                    className="inkwell-brand-name"
+                    style={{ margin: "0 0 2px" }}
+                >
                     Inkwell Agent 平台
                 </Typography.Title>
             </div>
