@@ -1,32 +1,18 @@
 import {
-    AppstoreAddOutlined,
-    FileSearchOutlined,
+    BulbOutlined,
+    QuestionCircleOutlined,
+    RobotOutlined,
 } from "@ant-design/icons";
 import { Prompts } from "@ant-design/x";
 import { Button, Space, theme } from "antd";
 import { useTranslation } from "react-i18next";
+import { ChatQuickPromptKeys } from "./chat-quick-prompt-items";
 
-const FullChatPrompts = [
-    { key: "research" },
-    { key: "outline" },
-    { key: "rewrite" },
-    { key: "tools" },
-];
-
-const TrialChatPrompts = [
-    {
-        key: "research",
-        icon: <FileSearchOutlined />,
-    },
-    {
-        key: "outline",
-        icon: <AppstoreAddOutlined />,
-    },
-    {
-        key: "tools",
-        icon: <AppstoreAddOutlined />,
-    },
-];
+const PromptIcons = {
+    capabilities: <RobotOutlined />,
+    tasks: <BulbOutlined />,
+    questionTips: <QuestionCircleOutlined />,
+};
 
 interface ChatQuickPromptsProps {
     variant: "full" | "trial";
@@ -46,15 +32,18 @@ export function ChatQuickPrompts({
 
     if (variant === "trial") {
         return (
-            <Space className="chat-quick-prompts chat-quick-prompts-trial" size={8}>
-                {TrialChatPrompts.map((prompt) => (
+            <Space
+                className="chat-quick-prompts chat-quick-prompts-trial"
+                size={8}
+            >
+                {ChatQuickPromptKeys.map((key) => (
                     <Button
-                        key={prompt.key}
+                        key={key}
                         size="small"
-                        icon={prompt.icon}
-                        onClick={() => onSelect(promptDescription(prompt.key))}
+                        icon={PromptIcons[key]}
+                        onClick={() => onSelect(promptDescription(key))}
                     >
-                        {t(`chat.prompts.${prompt.key}.label`)}
+                        {t(`chat.prompts.${key}.label`)}
                     </Button>
                 ))}
             </Space>
@@ -64,9 +53,9 @@ export function ChatQuickPrompts({
     return (
         <Prompts
             className="chat-quick-prompts chat-quick-prompts-full"
-            items={FullChatPrompts.map((prompt) => ({
-                ...prompt,
-                description: promptDescription(prompt.key),
+            items={ChatQuickPromptKeys.map((key) => ({
+                key,
+                description: promptDescription(key),
             }))}
             wrap
             onItemClick={(info) => onSelect(String(info.data.description))}

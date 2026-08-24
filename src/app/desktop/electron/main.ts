@@ -62,6 +62,7 @@ const apiBaseUrl = (
 const authSessionFileName = "auth-session.bin";
 const idleLockMilliseconds = 60 * 60 * 1000;
 const completedChatRunLimit = 20;
+const chatRunBroadcastIntervalMilliseconds = 32;
 const applicationIconPath = join(__dirname, "../renderer/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
@@ -77,6 +78,7 @@ const chatRuns = new Map<
     }
 >();
 const completedChatRunIds: string[] = [];
+const pendingChatRunBroadcastTimers = new Map<string, NodeJS.Timeout>();
 
 interface InternalAuthSession extends AuthIdentity {
     sessionToken: string;
@@ -306,11 +308,37 @@ const normalizePersistedChatMessages = (
     return messages;
 };
 
-const broadcastChatRun = (snapshot: ChatRunSnapshot): void => {
+const sendChatRunSnapshot = (snapshot: ChatRunSnapshot): void => {
     const value = copyChatRunSnapshot(snapshot);
     for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send("inkwell:chat-run-changed", value);
     }
+};
+
+const broadcastChatRun = (
+    snapshot: ChatRunSnapshot,
+    immediate = false,
+): void => {
+    const pendingTimer = pendingChatRunBroadcastTimers.get(snapshot.requestId);
+    if (immediate || snapshot.status !== "running") {
+        if (pendingTimer) {
+            clearTimeout(pendingTimer);
+            pendingChatRunBroadcastTimers.delete(snapshot.requestId);
+        }
+        sendChatRunSnapshot(snapshot);
+        return;
+    }
+
+    if (pendingTimer) return;
+
+    pendingChatRunBroadcastTimers.set(
+        snapshot.requestId,
+        setTimeout(() => {
+            pendingChatRunBroadcastTimers.delete(snapshot.requestId);
+            const latestSnapshot = chatRuns.get(snapshot.requestId)?.snapshot;
+            if (latestSnapshot) sendChatRunSnapshot(latestSnapshot);
+        }, chatRunBroadcastIntervalMilliseconds),
+    );
 };
 
 const finishChatRun = (
@@ -336,7 +364,7 @@ const finishChatRun = (
         })),
         ...(error ? { error } : {}),
     };
-    broadcastChatRun(run.snapshot);
+    broadcastChatRun(run.snapshot, true);
     completedChatRunIds.push(requestId);
     while (completedChatRunIds.length > completedChatRunLimit) {
         const expiredRequestId = completedChatRunIds.shift();
@@ -1035,7 +1063,7 @@ const registerApiHandlers = (): void => {
                 },
             };
             chatRuns.set(input.requestId, run);
-            broadcastChatRun(run.snapshot);
+            broadcastChatRun(run.snapshot, true);
             const versionQuery =
                 input.runMode === "draft" ? "?version=draft" : "";
             try {
@@ -1163,7 +1191,7 @@ const registerApiHandlers = (): void => {
                                         ...newActivities,
                                     ],
                                 };
-                                broadcastChatRun(run.snapshot);
+                                broadcastChatRun(run.snapshot, true);
                             }
                         } catch {
                             throw new ChatRunFailure({

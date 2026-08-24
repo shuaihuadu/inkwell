@@ -1,7 +1,12 @@
 import { SyncOutlined } from "@ant-design/icons";
 import { Actions, Bubble, type BubbleItemType } from "@ant-design/x";
 import { Button, Flex, Typography } from "antd";
-import { useState } from "react";
+import {
+    useState,
+    type ComponentRef,
+    type Ref,
+    type UIEventHandler,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { MarkdownContent } from "../../shared/components/markdown-content";
 import type { ChatMessage, ChatRunError } from "../../shared/network/contracts";
@@ -10,12 +15,16 @@ import { SkillActivityChain } from "./skill-activity-chain";
 
 type FeedbackValue = "default" | "like" | "dislike";
 
+export type ChatMessageListRef = ComponentRef<typeof Bubble.List>;
+
 interface ChatMessageListProps {
     messages: ChatMessage[];
     activeRequestId: string | null;
     error: ChatRunError | null;
     onRegenerate: (messageIndex: number) => void;
     onRetry: () => void;
+    listRef?: Ref<ChatMessageListRef>;
+    onScroll?: UIEventHandler<HTMLDivElement>;
 }
 
 export function ChatMessageList({
@@ -24,6 +33,8 @@ export function ChatMessageList({
     error,
     onRegenerate,
     onRetry,
+    listRef,
+    onScroll,
 }: ChatMessageListProps) {
     const { t } = useTranslation();
     const appearance = useResolvedAppearance();
@@ -31,7 +42,7 @@ export function ChatMessageList({
         Record<string, FeedbackValue>
     >({});
     const items: BubbleItemType[] = messages.flatMap((item, index) => {
-        const messageKey = item.id ?? `${item.role}-${index}`;
+        const messageKey = `${item.role}-${index}`;
         const isLatestRunning =
             Boolean(activeRequestId) && index === messages.length - 1;
         const hasContent = item.content.trim().length > 0;
@@ -172,8 +183,10 @@ export function ChatMessageList({
 
     return (
         <Bubble.List
+            ref={listRef}
             className="chat-bubble-list"
             items={items}
+            onScroll={onScroll}
             role={{
                 user: {
                     placement: "end",

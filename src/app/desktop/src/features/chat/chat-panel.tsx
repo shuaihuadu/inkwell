@@ -1,4 +1,5 @@
 import {
+    ArrowDownOutlined,
     ArrowLeftOutlined,
     ClearOutlined,
     CloseOutlined,
@@ -27,7 +28,7 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type UIEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
@@ -43,7 +44,8 @@ import type {
 import { useAuthStore } from "../auth/auth-store";
 import { useResolvedAppearance } from "../shell/appearance-store";
 import { ChatComposer } from "./chat-composer";
-import { ChatMessageList } from "./chat-message-list";
+import { ChatMessageList, type ChatMessageListRef } from "./chat-message-list";
+import { ChatQuickPromptKeys } from "./chat-quick-prompt-items";
 import { ChatQuickPrompts } from "./chat-quick-prompts";
 
 interface ChatPanelProps {
@@ -52,12 +54,6 @@ interface ChatPanelProps {
     runMode?: "published" | "draft";
     onClose?: () => void;
 }
-
-const TrialPrompts = [
-    "chat.prompts.research.description",
-    "chat.prompts.analyze",
-    "chat.prompts.outline.description",
-];
 
 type LocalConversation = ConversationItemType & {
     key: string;
@@ -130,6 +126,8 @@ export function ChatPanel({
         (ChatRunError & { input: string }) | null
     >(null);
     const [historyCollapsed, setHistoryCollapsed] = useState(false);
+    const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+    const messageListRef = useRef<ChatMessageListRef>(null);
     const [conversations, setConversations] = useState<LocalConversation[]>([]);
     const [activeConversationKey, setActiveConversationKey] = useState<
         string | null
@@ -430,6 +428,7 @@ export function ChatPanel({
 
     const startNewConversation = (): void => {
         if (activeRequestId) return;
+        setShowScrollToLatest(false);
         setActiveConversationKey(null);
         setMessages([]);
         setDraft("");
@@ -441,6 +440,7 @@ export function ChatPanel({
         if (activeRequestId) return;
         const conversation = conversations.find((item) => item.key === key);
         if (!conversation || !agent) return;
+        setShowScrollToLatest(false);
         setActiveConversationKey(key);
         setDraft("");
         setChatError(null);
@@ -485,6 +485,7 @@ export function ChatPanel({
         conversationKey: string,
     ): Promise<void> => {
         if (!agent) return;
+        setShowScrollToLatest(false);
         const [persistedMessages, persistedConversations] = await Promise.all([
             desktopApi.getAgentConversationMessages(agent.id, conversationKey),
             desktopApi.listAgentConversations(agent.id),
@@ -534,6 +535,21 @@ export function ChatPanel({
                     throw reason;
                 }
             },
+        });
+    };
+
+    const handleMessageScroll = (event: UIEvent<HTMLDivElement>): void => {
+        const scrollBox = event.currentTarget;
+        const hasOverflow = scrollBox.scrollHeight > scrollBox.clientHeight + 1;
+        setShowScrollToLatest(
+            hasOverflow && Math.abs(scrollBox.scrollTop) > 24,
+        );
+    };
+
+    const scrollToLatestMessage = (): void => {
+        messageListRef.current?.scrollTo({
+            top: "bottom",
+            behavior: "smooth",
         });
     };
 
@@ -724,12 +740,31 @@ export function ChatPanel({
                             <>
                                 <div className="chat-full-messages">
                                     <ChatMessageList
+                                        listRef={messageListRef}
                                         messages={messages}
                                         activeRequestId={activeRequestId}
                                         error={chatError}
                                         onRegenerate={regenerate}
                                         onRetry={retry}
+                                        onScroll={handleMessageScroll}
                                     />
+                                    {showScrollToLatest && (
+                                        <Tooltip
+                                            title={t(
+                                                "chat.panel.scrollToLatest",
+                                            )}
+                                        >
+                                            <Button
+                                                className="chat-scroll-to-latest"
+                                                shape="circle"
+                                                aria-label={t(
+                                                    "chat.panel.scrollToLatest",
+                                                )}
+                                                icon={<ArrowDownOutlined />}
+                                                onClick={scrollToLatestMessage}
+                                            />
+                                        </Tooltip>
+                                    )}
                                 </div>
                                 <ChatComposer
                                     variant="full"
@@ -830,9 +865,11 @@ export function ChatPanel({
                             />
                             <Prompts
                                 vertical
-                                items={TrialPrompts.map((prompt, index) => ({
-                                    key: `trial-${index}`,
-                                    description: t(prompt),
+                                items={ChatQuickPromptKeys.map((key) => ({
+                                    key,
+                                    description: t(
+                                        `chat.prompts.${key}.description`,
+                                    ),
                                 }))}
                                 onItemClick={(info) =>
                                     void send(String(info.data.description))

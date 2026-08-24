@@ -8,6 +8,7 @@ internal sealed class AgentService(
     IAgentBuildOptionsResolver buildOptionsResolver) : IAgentService
 {
     private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
+    private readonly IAgentVersionRepository _versions = persistence.GetRepository<IAgentVersionRepository>();
 
     public async Task<AgentDefinition> CreateAgentAsync(AgentUpsertRequest request, Guid ownerUserId, CancellationToken ct = default)
     {
@@ -75,21 +76,21 @@ internal sealed class AgentService(
             throw new UnauthorizedAccessException($"User '{requestingUserId}' cannot access agent '{agent.Id}'.");
         }
 
-        return agent;
+        return await this.WithUnpublishedChangesAsync(agent, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<AgentListItem>> ListMyAgentsAsync(Guid ownerUserId, CancellationToken ct = default)
     {
         IReadOnlyList<AgentDefinition> mine = await this._agents.FindAgentsByOwner(ownerUserId, ct).ConfigureAwait(false);
 
-        return ToAgentListItems(mine);
+        return await this.ToAgentListItemsAsync(mine, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<AgentListItem>> ListSharedAgentsAsync(Guid excludingOwnerUserId, CancellationToken ct = default)
     {
         IReadOnlyList<AgentDefinition> shared = await this._agents.FindSharedAgents(excludingOwnerUserId, ct).ConfigureAwait(false);
 
-        return ToAgentListItems(shared);
+        return await this.ToAgentListItemsAsync(shared, ct).ConfigureAwait(false);
     }
 
     public Task ShareAgentAsync(Guid agentId, Guid actorUserId, CancellationToken ct = default) =>
@@ -161,8 +162,30 @@ internal sealed class AgentService(
         }
     }
 
-    private static IReadOnlyList<AgentListItem> ToAgentListItems(IReadOnlyList<AgentDefinition> agents) =>
-        [.. agents.Select(agent => new AgentListItem(
+    private async Task<AgentDefinition> WithUnpublishedChangesAsync(AgentDefinition agent, CancellationToken cancellationToken)
+    {
+        if (agent.CurrentPublishedVersionId is not Guid publishedVersionId)
+        {
+            return agent;
+        }
+
+        AgentVersion publishedVersion = await this._versions.GetVersionAsync(publishedVersionId, cancellationToken).ConfigureAwait(false);
+
+        return agent with { HasUnpublishedChanges = !AgentSnapshotComparer.Matches(agent, publishedVersion.Snapshot) };
+    }
+
+    private async Task<IReadOnlyList<AgentListItem>> ToAgentListItemsAsync(
+        IReadOnlyList<AgentDefinition> agents,
+        CancellationToken cancellationToken)
+    {
+        Guid[] versionIds = [.. agents
+            .Where(agent => agent.CurrentPublishedVersionId.HasValue)
+            .Select(agent => agent.CurrentPublishedVersionId!.Value)];
+        IReadOnlyDictionary<Guid, AgentVersion> versions = await this._versions
+            .FindVersionsByIdsAsync(versionIds, cancellationToken)
+            .ConfigureAwait(false);
+
+        return [.. agents.Select(agent => new AgentListItem(
             agent.Id,
             agent.Name,
             agent.AvatarUri,
@@ -170,5 +193,14 @@ internal sealed class AgentService(
             agent.OwnerUserId,
             agent.IsShared,
             agent.LatestPublishedVersionNumber,
+            HasUnpublishedChanges(agent, versions),
             agent.UpdatedTime))];
+    }
+
+    private static bool HasUnpublishedChanges(
+        AgentDefinition agent,
+        IReadOnlyDictionary<Guid, AgentVersion> versions) =>
+        agent.CurrentPublishedVersionId is Guid versionId &&
+        versions.TryGetValue(versionId, out AgentVersion? version) &&
+        !AgentSnapshotComparer.Matches(agent, version.Snapshot);
 }

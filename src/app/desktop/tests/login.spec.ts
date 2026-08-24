@@ -7,18 +7,13 @@ const applicationEntry = "out/main/index.js";
 const toolsResponse = JSON.stringify([
     {
         id: "0198a96d-19e4-7000-8000-000000000101",
-        name: "current_date_time",
-        description: "返回指定时区的当前日期和时间。",
+        name: "get_current_datetime",
+        description: "获取当前日期时间，可选指定 IANA 或 Windows 时区标识符。",
         parametersJsonSchema: JSON.stringify({
             type: "object",
-            required: ["timeZone"],
-            properties: {
-                timeZone: {
-                    type: "string",
-                    enum: ["UTC", "Asia/Shanghai"],
-                },
-                format: { type: "string" },
-            },
+            required: [],
+            properties: {},
+            additionalProperties: false,
         }),
         createdTime: "2026-07-17T08:00:00Z",
         updatedTime: "2026-07-18T08:42:00Z",
@@ -73,6 +68,7 @@ const myAgentsResponse = JSON.stringify([
         ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
         isShared: true,
         latestPublishedVersionNumber: 3,
+        hasUnpublishedChanges: true,
         updatedTime: "2026-07-18T12:00:00Z",
     },
     {
@@ -83,6 +79,7 @@ const myAgentsResponse = JSON.stringify([
         ownerUserId: "0198a96d-19e4-7000-8000-000000000001",
         isShared: false,
         latestPublishedVersionNumber: 0,
+        hasUnpublishedChanges: false,
         updatedTime: "2026-07-18T13:00:00Z",
     },
 ]);
@@ -95,6 +92,7 @@ const sharedAgentsResponse = JSON.stringify([
         ownerUserId: "0198a96d-19e4-7000-8000-000000000002",
         isShared: true,
         latestPublishedVersionNumber: 2,
+        hasUnpublishedChanges: false,
         updatedTime: "2026-07-17T10:00:00Z",
     },
 ]);
@@ -957,9 +955,24 @@ test("shows authentication errors and enters the workspace after login", async (
                 }
 
                 response.setHeader("Content-Type", "text/event-stream");
-                response.end(
-                    `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`,
-                );
+                const characters = Array.from(content);
+                let characterIndex = 0;
+                const writeNextDelta = (): void => {
+                    if (characterIndex >= characters.length) {
+                        response.end("data: [DONE]\n\n");
+                        return;
+                    }
+
+                    const delta = characters
+                        .slice(characterIndex, characterIndex + 2)
+                        .join("");
+                    characterIndex += 2;
+                    response.write(
+                        `data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`,
+                    );
+                    setTimeout(writeNextDelta, 1);
+                };
+                writeNextDelta();
             });
             return;
         }
@@ -1030,6 +1043,9 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(page.getByText("草稿 1", { exact: true })).toBeVisible();
         await expect(page.getByText("研发助手", { exact: true })).toBeVisible();
         await expect(page.getByText("产品草稿", { exact: true })).toBeVisible();
+        await expect(
+            page.getByText("有未发布的修改", { exact: true }),
+        ).toBeVisible();
 
         await page.getByRole("button", { name: "帮助" }).dispatchEvent("click");
         const helpMenu = page.getByRole("menu");
@@ -1223,7 +1239,9 @@ test("shows authentication errors and enters the workspace after login", async (
             page.getByRole("heading", { name: "研发助手" }),
         ).toBeVisible();
         await expect(
-            page.getByText("整理一份竞品研究框架", { exact: true }),
+            page.getByText("请介绍你能提供哪些帮助，并给出几个具体示例", {
+                exact: true,
+            }),
         ).toBeVisible();
         await page.screenshot({
             path: testInfo.outputPath("agent-chat-published-dark-1080x720.png"),
@@ -1232,11 +1250,93 @@ test("shows authentication errors and enters the workspace after login", async (
         const publishedSender = page.getByPlaceholder(
             "输入消息，Enter 发送，Shift + Enter 换行",
         );
+        await page.evaluate(() => {
+            const metrics = {
+                runningContentUpdates: 0,
+                completed: false,
+                visualContentLengths: [] as number[],
+            };
+            Object.assign(window, { __inkwellStreamMetrics: metrics });
+            const observer = new MutationObserver(() => {
+                const markdown = Array.from(
+                    document.querySelectorAll(
+                        ".chat-full-messages .markdown-content-frame",
+                    ),
+                ).at(-1);
+                const contentLength = Number(
+                    markdown?.getAttribute("data-stream-content-length") ?? 0,
+                );
+                if (
+                    contentLength > 0 &&
+                    metrics.visualContentLengths.at(-1) !== contentLength
+                ) {
+                    metrics.visualContentLengths.push(contentLength);
+                }
+            });
+            observer.observe(document.body, {
+                attributes: true,
+                attributeFilter: ["data-stream-content-length"],
+                childList: true,
+                subtree: true,
+            });
+            const desktop = (
+                globalThis as unknown as { inkwell: InkwellDesktopApi }
+            ).inkwell;
+            desktop.onChatRunChanged((snapshot) => {
+                if (snapshot.status === "running" && snapshot.content) {
+                    metrics.runningContentUpdates += 1;
+                }
+                if (snapshot.status === "completed") {
+                    metrics.completed = true;
+                }
+            });
+        });
         await publishedSender.fill("验证正式发布版");
         await publishedSender.press("Enter");
         await expect(
             page.locator(".chat-full-messages .x-markdown h1"),
         ).toHaveText("运行成功");
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () =>
+                        (
+                            window as typeof window & {
+                                __inkwellStreamMetrics: {
+                                    completed: boolean;
+                                };
+                            }
+                        ).__inkwellStreamMetrics.completed,
+                ),
+            )
+            .toBe(true);
+        await expect(
+            page.locator(".chat-full-messages .x-markdown").last(),
+        ).toContainText("第 80 段用于验证长回复滚动行为的内容。");
+        const streamMetrics = await page.evaluate(
+            () =>
+                (
+                    window as typeof window & {
+                        __inkwellStreamMetrics: {
+                            runningContentUpdates: number;
+                            visualContentLengths: number[];
+                        };
+                    }
+                ).__inkwellStreamMetrics,
+        );
+        expect(streamMetrics.runningContentUpdates).toBeGreaterThan(2);
+        expect(streamMetrics.runningContentUpdates).toBeLessThan(200);
+        expect(streamMetrics.visualContentLengths.length).toBeGreaterThan(
+            streamMetrics.runningContentUpdates,
+        );
+        const visualIncrements = streamMetrics.visualContentLengths
+            .slice(1)
+            .map(
+                (length, index) =>
+                    length - streamMetrics.visualContentLengths[index],
+            )
+            .filter((increment) => increment > 0);
+        expect(Math.max(...visualIncrements)).toBeLessThanOrEqual(48);
         await expect.poll(() => messagePageTwoRequests).toBeGreaterThan(0);
         await expect(
             page
@@ -1246,7 +1346,12 @@ test("shows authentication errors and enters the workspace after login", async (
         const chatQuickPrompts = page.locator(
             ".chat-quick-prompts-full .ant-prompts-item",
         );
-        await expect(chatQuickPrompts).toHaveCount(4);
+        await expect(chatQuickPrompts).toHaveCount(3);
+        await expect(chatQuickPrompts).toHaveText([
+            "请介绍你能提供哪些帮助，并给出几个具体示例",
+            "根据你的能力，推荐三个适合立即开始的任务",
+            "告诉我怎样提问能让你给出更好的回答",
+        ]);
         await expect(chatQuickPrompts.first()).toHaveCSS(
             "font-family",
             '"PingFang SC", "Microsoft YaHei", sans-serif',
@@ -1333,6 +1438,39 @@ test("shows authentication errors and enters the workspace after login", async (
                 }),
             );
         expect(publishedMarkdownStyles[0]).toEqual(publishedMarkdownStyles[1]);
+        const publishedScrollBox = page.locator(
+            ".chat-full-messages .ant-bubble-list-scroll-box",
+        );
+        const scrollToLatestButton = page.getByRole("button", {
+            name: "滚动到最新消息",
+        });
+        await expect(scrollToLatestButton).toBeHidden();
+        await expect
+            .poll(() =>
+                publishedScrollBox.evaluate(
+                    (element) => element.scrollHeight > element.clientHeight,
+                ),
+            )
+            .toBe(true);
+        await publishedScrollBox.evaluate((element) => {
+            element.scrollTop = -element.scrollHeight;
+        });
+        await expect(scrollToLatestButton).toBeVisible();
+        await page.screenshot({
+            path: testInfo.outputPath(
+                "agent-chat-scroll-to-latest-dark-1080x720.png",
+            ),
+            fullPage: true,
+        });
+        await scrollToLatestButton.dispatchEvent("click");
+        await expect(scrollToLatestButton).toBeHidden();
+        await expect
+            .poll(() =>
+                publishedScrollBox.evaluate(
+                    (element) => Math.abs(element.scrollTop) <= 1,
+                ),
+            )
+            .toBe(true);
         const publishedActions = publishedBubbles
             .last()
             .locator(".chat-message-actions");
@@ -1741,10 +1879,10 @@ test("shows authentication errors and enters the workspace after login", async (
             ).toBeVisible();
         }
         await expect(
-            toolTable.getByText("current_date_time", { exact: true }),
+            toolTable.getByText("get_current_datetime", { exact: true }),
         ).toBeVisible();
         await expect(
-            toolTable.getByText("2 项", { exact: true }),
+            toolTable.getByText("0 项", { exact: true }),
         ).toBeVisible();
         const toolPage = page.locator(".inkwell-data-list-page").filter({
             has: page.getByRole("heading", { name: "工具", exact: true }),
@@ -1768,7 +1906,7 @@ test("shows authentication errors and enters the workspace after login", async (
         ).toBeCloseTo(toolPaginationY, 1);
         await page.getByPlaceholder("搜索名称或描述").clear();
         await expect(
-            toolTable.getByText("current_date_time", { exact: true }),
+            toolTable.getByText("get_current_datetime", { exact: true }),
         ).toBeVisible();
         await page.setViewportSize({ width: 1080, height: 900 });
         await expect
@@ -1798,20 +1936,17 @@ test("shows authentication errors and enters the workspace after login", async (
             fullPage: true,
         });
         await page
-            .getByRole("button", { name: "查看 current_date_time" })
+            .getByRole("button", { name: "查看 get_current_datetime" })
             .dispatchEvent("click");
         const toolDetails = page.getByRole("dialog", { name: "Tool 详情" });
         await expect(toolDetails).toBeVisible();
-        await expect(
-            toolDetails.getByRole("cell", { name: "timeZone" }),
-        ).toBeVisible();
-        await expect(
-            toolDetails.getByText("UTC、Asia/Shanghai", { exact: true }),
-        ).toBeVisible();
+        await expect(toolDetails.getByText("此工具没有参数")).toBeVisible();
         await toolDetails
             .getByText("查看原始 Schema", { exact: true })
             .dispatchEvent("click");
-        await expect(toolDetails.getByText(/"timeZone"/)).toBeVisible();
+        await expect(
+            toolDetails.getByText(/"additionalProperties":false/),
+        ).toBeVisible();
         await toolDetails
             .getByRole("button", { name: "关闭 Tool 详情" })
             .dispatchEvent("click");
@@ -2393,9 +2528,47 @@ test("shows authentication errors and enters the workspace after login", async (
             .dispatchEvent("click");
         const firstBindingItem = page.locator(".agent-binding-item").first();
         await expect(firstBindingItem).toHaveCSS("padding", "14px");
+        const bindingSelectorWidth = await page
+            .locator("#toolIds")
+            .evaluate((element) => element.getBoundingClientRect().width);
+        const bindingItemWidth = await firstBindingItem.evaluate(
+            (element) => element.getBoundingClientRect().width,
+        );
+        expect(bindingSelectorWidth - bindingItemWidth).toBeCloseTo(2, 0);
         await expect(
             firstBindingItem.locator(".agent-binding-item-icon"),
         ).toBeVisible();
+        const toolBindingCheckbox = firstBindingItem.getByRole("checkbox");
+        await toolBindingCheckbox.dispatchEvent("click");
+        await expect(toolBindingCheckbox).toBeChecked();
+        await expect(firstBindingItem).toHaveClass(/selected/);
+        await expect(toolBindingCheckbox.locator("xpath=..")).toHaveClass(
+            /ant-checkbox-checked/,
+        );
+        expect(
+            await page
+                .locator("html")
+                .evaluate((element) =>
+                    getComputedStyle(element)
+                        .getPropertyValue("--primary-soft")
+                        .trim()
+                        .toLowerCase(),
+                ),
+        ).toBe("#533730");
+        await expect(firstBindingItem).toHaveCSS(
+            "background-color",
+            "rgb(83, 55, 48)",
+        );
+        await expect(
+            firstBindingItem.locator(".agent-binding-config"),
+        ).toHaveCount(0);
+        await page.evaluate(() => window.getSelection()?.removeAllRanges());
+        await page.screenshot({
+            path: testInfo.outputPath("agent-tools-editor-dark-1080x720.png"),
+            fullPage: true,
+        });
+        await toolBindingCheckbox.dispatchEvent("click");
+        await expect(toolBindingCheckbox).not.toBeChecked();
         await editorSections
             .getByRole("button", { name: "Skills" })
             .dispatchEvent("click");
@@ -2407,9 +2580,24 @@ test("shows authentication errors and enters the workspace after login", async (
             "margin-bottom",
             "12px",
         );
+        await expect(page.locator(".agent-skill-stages")).toHaveCount(0);
+        const skillBindingCheckbox = page.getByRole("checkbox", {
+            name: "合同审查规范",
+        });
+        await skillBindingCheckbox.dispatchEvent("click");
+        await expect(skillBindingCheckbox).toBeChecked();
         await expect(
-            page.locator(".agent-skill-stages").first().getByText("发现"),
-        ).toBeVisible();
+            skillBindingCheckbox.locator(
+                "xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' agent-binding-item ')]",
+            ),
+        ).toHaveClass(/selected/);
+        await page.evaluate(() => window.getSelection()?.removeAllRanges());
+        await page.screenshot({
+            path: testInfo.outputPath("agent-skills-editor-dark-1080x720.png"),
+            fullPage: true,
+        });
+        await skillBindingCheckbox.dispatchEvent("click");
+        await expect(skillBindingCheckbox).not.toBeChecked();
         await page
             .locator(".agent-editor-actions")
             .getByRole("button", { name: "试运行" })
@@ -2429,9 +2617,50 @@ test("shows authentication errors and enters the workspace after login", async (
         const trialPanelHeightBeforeSend = await page
             .locator(".agent-editor-trial")
             .evaluate((element) => element.clientHeight);
+        await page.evaluate(() => {
+            const metrics = { runningContentUpdates: 0, completed: false };
+            Object.assign(window, { __inkwellTrialStreamMetrics: metrics });
+            const desktop = (
+                globalThis as unknown as { inkwell: InkwellDesktopApi }
+            ).inkwell;
+            desktop.onChatRunChanged((snapshot) => {
+                if (snapshot.status === "running" && snapshot.content) {
+                    metrics.runningContentUpdates += 1;
+                }
+                if (snapshot.status === "completed") {
+                    metrics.completed = true;
+                }
+            });
+        });
         await draftTrialSender.fill("验证未发布草稿");
         await draftTrialSender.press("Enter");
         await expect(page.getByText("运行成功")).toBeVisible();
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () =>
+                        (
+                            window as typeof window & {
+                                __inkwellTrialStreamMetrics: {
+                                    completed: boolean;
+                                };
+                            }
+                        ).__inkwellTrialStreamMetrics.completed,
+                ),
+            )
+            .toBe(true);
+        const trialRunningContentUpdates = await page.evaluate(
+            () =>
+                (
+                    window as typeof window & {
+                        __inkwellTrialStreamMetrics: {
+                            runningContentUpdates: number;
+                        };
+                    }
+                ).__inkwellTrialStreamMetrics.runningContentUpdates,
+        );
+        expect(trialRunningContentUpdates).toBeGreaterThan(2);
+        expect(trialRunningContentUpdates).toBeLessThan(200);
         await expect(page.locator(".chat-bubble-list")).toBeVisible();
         await expect(page.locator(".chat-bubble-list .ant-bubble")).toHaveCount(
             2,
@@ -2534,6 +2763,11 @@ test("shows authentication errors and enters the workspace after login", async (
                 ),
             )
             .toBe(true);
+        await expect(
+            page
+                .locator(".chat-panel-trial")
+                .getByRole("button", { name: "滚动到最新消息" }),
+        ).toHaveCount(0);
         await expect(page.locator(".chat-bubble-list .ant-bubble")).toHaveCount(
             2,
         );
@@ -2653,6 +2887,18 @@ test("shows authentication errors and enters the workspace after login", async (
         await page
             .getByRole("button", { name: "基础信息" })
             .dispatchEvent("click");
+        await expect(page.getByLabel("描述")).toHaveValue(
+            editableAgent.description,
+        );
+        await page
+            .getByRole("button", { name: "Instructions" })
+            .dispatchEvent("click");
+        await expect(
+            page.locator(".agent-instructions-editor .view-lines"),
+        ).toContainText(editableAgent.instructions);
+        await page
+            .getByRole("button", { name: "基础信息" })
+            .dispatchEvent("click");
         await page
             .locator(".agent-editor-actions")
             .getByRole("button", { name: "试运行" })
@@ -2691,6 +2937,21 @@ test("shows authentication errors and enters the workspace after login", async (
         ).toBeVisible();
         await expect(
             page.locator(".chat-panel-trial .ant-prompts"),
+        ).toBeVisible();
+        await expect(
+            page.getByText("请介绍你能提供哪些帮助，并给出几个具体示例", {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("根据你的能力，推荐三个适合立即开始的任务", {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("告诉我怎样提问能让你给出更好的回答", {
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(
             page.locator(".chat-panel-trial .ant-sender"),

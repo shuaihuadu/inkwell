@@ -63,6 +63,7 @@ export interface AgentListItem {
     ownerUserId: string;
     isShared: boolean;
     latestPublishedVersionNumber: number;
+    hasUnpublishedChanges: boolean;
     updatedTime: string;
 }
 
@@ -76,6 +77,7 @@ export interface AgentDefinition {
     buildOptions: AgentBuildOptions;
     currentPublishedVersionId: string | null;
     latestPublishedVersionNumber: number;
+    hasUnpublishedChanges: boolean;
     isShared: boolean;
     sharedRevokedByAdminTime: string | null;
     createdTime: string;

@@ -494,6 +494,11 @@ function AgentCard({
                                 {t("agents.space.status.draft")}
                             </Tag>
                         )}
+                        {agent.hasUnpublishedChanges && (
+                            <Tag color="warning">
+                                {t("agents.space.status.unpublishedChanges")}
+                            </Tag>
+                        )}
                         {activeTab === "mine" && agent.isShared && (
                             <Tag color="processing">
                                 {t("agents.space.status.shared")}
