@@ -9,7 +9,7 @@ authors:
 		role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-08-24
 upstream:
 	- REQ-003
 	- REQ-004
@@ -47,9 +47,9 @@ downstream:
 
 ## 3. 当前基线
 
-- **已有**：创建 Agent Modal、模型列表、Agent CRUD 和版本 REST 端点。
-- **缺失**：独立配置页、多区段数据加载、草稿/发布状态和绝大多数配置 API。
-- **偏差**：当前创建流程立即发布。
+- **已有**：独立配置页、模型/工具/Skill 配置、Agent CRUD、草稿保存、发布、版本列表、完整快照 diff 和回滚。
+- **状态语义**：新建 Agent 保持纯草稿；发布生成不可变 Snapshot；当前草稿与发布 Snapshot 的结构化差异由服务端派生，不新增数据库状态列。
+- **验证**：Core 比较及 Service 状态、WebApi 发布/回滚映射、PostgreSQL JSONB Snapshot 往返和 Electron 回滚流程均有自动化测试。
 
 ## 4. 范围
 
@@ -87,3 +87,8 @@ downstream:
 - 发布生成新版本并清除“有未发布的修改”。
 - 非 Owner 只读且看不到写操作。
 - 所有选项来自后端，不硬编码模型、工具或 Skill。
+
+## 10. 决策更新
+
+- 2026-08-24：H5-004-D 与 H5-006 已按真实代码收尾。`HasUnpublishedChanges` 是服务端查询时比较当前定义和发布 Snapshot 得到的派生字段；发布和回滚成功后桌面端同步清除该状态。
+- 2026-08-24：版本 diff 覆盖头像、模型与 Chat History、Tool 参数、完整 Skill 内容及资源引用；回滚后配置表单从新版本 Snapshot 恢复，不仅更新版本号。
