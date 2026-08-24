@@ -157,7 +157,13 @@ body,
 }
 
 .inkwell-resource-page {
+    display: flex;
+    width: 100%;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .inkwell-resource-header,
@@ -187,12 +193,23 @@ body,
 }
 
 .inkwell-resource-table {
+    min-height: 120px;
     max-width: 100%;
+    flex: 1;
     overflow: hidden;
 }
 
-.inkwell-resource-table-content .ant-table-body {
-    min-height: 440px;
+.inkwell-resource-table .ant-table-wrapper,
+.inkwell-resource-table .ant-spin-nested-loading,
+.inkwell-resource-table .ant-spin-container,
+.inkwell-resource-table .ant-table,
+.inkwell-resource-table .ant-table-container {
+    height: 100%;
+}
+
+.inkwell-resource-table .ant-table-body {
+    min-height: var(--inkwell-table-body-height, 120px);
+    overflow-y: auto !important;
 }
 
 .inkwell-row-action.ant-btn {
@@ -211,6 +228,7 @@ body,
 
 .inkwell-resource-pagination {
     min-height: 48px;
+    flex: 0 0 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
