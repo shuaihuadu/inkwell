@@ -9,6 +9,8 @@
     --shell-text-tertiary: rgb(0 0 0 / 45%);
     --primary: #68469c;
     --primary-soft: #f1edf7;
+    --primary-icon: #54327f;
+    --primary-icon-bg: #e5dced;
     --message-bg: #f0f3f2;
     --shell-shadow: rgb(27 56 49 / 8%);
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -1177,6 +1179,7 @@ textarea {
     background: var(--shell-panel);
 }
 .chat-full-messages {
+    position: relative;
     min-height: 0;
     flex: 1;
     overflow: hidden;
@@ -1185,7 +1188,17 @@ textarea {
     height: 100%;
 }
 .chat-full-messages .ant-bubble-list-scroll-box {
-    padding: 20px 24px 0;
+    padding: 20px 24px 48px;
+}
+.chat-scroll-to-latest.ant-btn {
+    position: absolute;
+    right: 24px;
+    bottom: 12px;
+    z-index: 2;
+    color: var(--shell-text-secondary);
+    background: var(--shell-bg);
+    border-color: var(--shell-border);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 16%);
 }
 .chat-full-empty {
     display: flex;
@@ -1264,6 +1277,9 @@ textarea {
 .chat-message-content > :first-child,
 .chat-message-content .x-markdown > :first-child {
     margin-top: 0;
+}
+.markdown-content-frame {
+    display: contents;
 }
 .chat-message-content > :last-child,
 .chat-message-content .x-markdown > :last-child {
@@ -1588,12 +1604,21 @@ textarea {
     width: 100%;
 }
 .agent-binding-selector.ant-checkbox-group {
+    display: block;
     width: 100%;
     overflow: hidden;
     border: 1px solid var(--shell-border);
     border-radius: 6px;
 }
+.agent-binding-selector-empty {
+    width: 100%;
+    padding: 32px;
+    border: 1px solid var(--shell-border);
+    border-radius: 6px;
+    text-align: center;
+}
 .agent-binding-item {
+    width: 100%;
     padding: 14px;
     border-bottom: 1px solid var(--shell-border);
     background: var(--shell-panel);
@@ -1623,8 +1648,8 @@ textarea {
     flex: 0 0 32px;
     place-items: center;
     border-radius: 6px;
-    color: var(--primary);
-    background: var(--primary-soft);
+    color: var(--primary-icon);
+    background: var(--primary-icon-bg);
 }
 .agent-binding-item-copy {
     display: flex;
@@ -1632,6 +1657,9 @@ textarea {
     flex: 1;
     flex-direction: column;
     gap: 2px;
+}
+.agent-binding-item-copy > .ant-typography-strong {
+    font-size: 14px;
 }
 .agent-binding-item-copy > .ant-typography-secondary {
     font-size: 12px;
@@ -1647,9 +1675,6 @@ textarea {
     min-width: 180px;
     flex: 1;
     margin-bottom: 0;
-}
-.agent-skill-stages {
-    margin-top: 8px;
 }
 .agent-skills-description.ant-typography {
     margin-bottom: 12px;

@@ -200,6 +200,7 @@ export const resources = {
                         draft: "草稿",
                         shared: "已共享",
                         unpublished: "未发布",
+                        unpublishedChanges: "有未发布的修改",
                     },
                     noDescription: "暂无描述",
                     empty: {
@@ -303,9 +304,6 @@ export const resources = {
                         skillsDescription:
                             "从统一 Skill 管理中选择需要挂载到当前 Agent 的 Skill。",
                         noSkills: "统一 Skill 管理中暂无可用 Skill",
-                        discovery: "发现",
-                        activation: "激活",
-                        execution: "执行",
                     },
                     version: {
                         none: "此 Agent 尚未发布",
@@ -339,10 +337,12 @@ export const resources = {
                         snapshot: {
                             basic: "基础信息",
                             name: "名称",
+                            avatar: "头像",
                             description: "描述",
                             instructions: "Instructions",
                             model: "模型与参数",
                             modelId: "模型",
+                            chatHistory: "对话历史配置",
                             capabilities: "能力",
                             tools: "工具",
                             skills: "Skills",
@@ -413,23 +413,19 @@ export const resources = {
                     addAttachment: "添加附件",
                 },
                 prompts: {
-                    research: {
-                        label: "研究框架",
-                        description: "整理一份竞品研究框架",
+                    capabilities: {
+                        label: "了解能力",
+                        description:
+                            "请介绍你能提供哪些帮助，并给出几个具体示例",
                     },
-                    outline: {
-                        label: "报告目录",
-                        description: "为调研报告设计目录",
+                    tasks: {
+                        label: "推荐任务",
+                        description: "根据你的能力，推荐三个适合立即开始的任务",
                     },
-                    rewrite: {
-                        label: "优化文案",
-                        description: "帮我优化一段产品介绍文案",
+                    questionTips: {
+                        label: "提问建议",
+                        description: "告诉我怎样提问能让你给出更好的回答",
                     },
-                    tools: {
-                        label: "工具调用",
-                        description: "展示工具调用示例",
-                    },
-                    analyze: "分析这份资料的关键结论",
                 },
                 messages: {
                     stopped: "已停止生成",
@@ -489,6 +485,7 @@ export const resources = {
                     version: "版本：v{{version}}",
                     viewDetails: "查看 Agent 详情",
                     clearConversation: "清空当前会话",
+                    scrollToLatest: "滚动到最新消息",
                     conversations: "会话",
                     expandConversations: "展开会话",
                     collapseConversations: "收起会话",
@@ -599,7 +596,6 @@ export const resources = {
                     capabilities: "能力",
                     toolCalls: "工具调用",
                     structuredOutput: "结构化输出",
-                    dataSource: "数据来源",
                     dataSourceDescription:
                         "数据来自 LiteLLM 实时发现，不在 Inkwell 中保存副本。",
                 },
@@ -1181,6 +1177,7 @@ export const resources = {
                         draft: "Draft",
                         shared: "Shared",
                         unpublished: "Unpublished",
+                        unpublishedChanges: "Unpublished changes",
                     },
                     noDescription: "No description",
                     empty: {
@@ -1292,9 +1289,6 @@ export const resources = {
                         skillsDescription:
                             "Select Skills from Skill management to attach to this Agent.",
                         noSkills: "No Skills are available in Skill management",
-                        discovery: "Discovery",
-                        activation: "Activation",
-                        execution: "Execution",
                     },
                     version: {
                         none: "This Agent has not been published",
@@ -1329,10 +1323,12 @@ export const resources = {
                         snapshot: {
                             basic: "Basic details",
                             name: "Name",
+                            avatar: "Avatar",
                             description: "Description",
                             instructions: "Instructions",
                             model: "Model and parameters",
                             modelId: "Model",
+                            chatHistory: "Chat history settings",
                             capabilities: "Capabilities",
                             tools: "Tools",
                             skills: "Skills",
@@ -1407,23 +1403,21 @@ export const resources = {
                     addAttachment: "Add attachment",
                 },
                 prompts: {
-                    research: {
-                        label: "Research framework",
-                        description: "Create a competitive research framework",
+                    capabilities: {
+                        label: "Explore capabilities",
+                        description:
+                            "Describe how you can help and give me a few specific examples",
                     },
-                    outline: {
-                        label: "Report outline",
-                        description: "Design an outline for a research report",
+                    tasks: {
+                        label: "Suggest tasks",
+                        description:
+                            "Based on your capabilities, suggest three tasks we can start now",
                     },
-                    rewrite: {
-                        label: "Improve copy",
-                        description: "Improve a product introduction for me",
+                    questionTips: {
+                        label: "Asking tips",
+                        description:
+                            "Tell me how to ask questions so you can give better answers",
                     },
-                    tools: {
-                        label: "Tool call",
-                        description: "Show an example Tool call",
-                    },
-                    analyze: "Analyze the key findings in this material",
                 },
                 messages: {
                     stopped: "Generation stopped",
@@ -1486,6 +1480,7 @@ export const resources = {
                     version: "Version v{{version}}",
                     viewDetails: "View Agent details",
                     clearConversation: "Clear current conversation",
+                    scrollToLatest: "Scroll to latest message",
                     conversations: "Conversations",
                     expandConversations: "Expand conversations",
                     collapseConversations: "Collapse conversations",
@@ -1600,7 +1595,6 @@ export const resources = {
                     capabilities: "Capabilities",
                     toolCalls: "Tool calls",
                     structuredOutput: "Structured output",
-                    dataSource: "Data source",
                     dataSourceDescription:
                         "Data is discovered from LiteLLM in real time and is not stored in Inkwell.",
                 },
