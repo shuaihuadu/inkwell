@@ -630,6 +630,7 @@ textarea {
 }
 .inkwell-data-list-table .ant-table-body {
     min-height: var(--inkwell-table-body-height, 120px);
+    overflow-y: auto !important;
 }
 .inkwell-data-list-table .ant-skeleton {
     height: 100%;

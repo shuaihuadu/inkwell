@@ -1334,6 +1334,7 @@ export default function AppShellExplorer() {
                     <div
                         style={{
                             flex: 1,
+                            minWidth: 0,
                             minHeight: 0,
                             overflow:
                                 showAgentDetail ||
