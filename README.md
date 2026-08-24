@@ -28,6 +28,8 @@ Inkwell is an agent workspace built on the [Microsoft Agent Framework](https://g
 
 ## Local Development
 
+Before contributing code, read the [development and branch workflow](CONTRIBUTING.md) for the `feature/* -> dev -> main` pull request, validation, release, and hotfix process.
+
 Install the [.NET 10 SDK](global.json), Node.js with npm, and Docker Desktop. Then clone the repository, install the Desktop and visual prototype dependencies from their lockfiles, and start the Aspire AppHost:
 
 ```bash
