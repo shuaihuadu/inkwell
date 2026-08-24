@@ -178,8 +178,9 @@
 
 ## 5. 给 AI 工具的通用指令
 
+- **Git 工作流**：所有代码、文档和配置变更均以 [`CONTRIBUTING.md`](CONTRIBUTING.md) 为唯一流程事实源。常规变更从最新 `dev` 创建短生命周期分支并 PR 到 `dev`；仅 `dev` 发布 PR 或 `hotfix/*` 可 PR 到 `main`；禁止直接在 `main` / `dev` 上开发、提交、push 或 force push
 - **修改前先读**：上方 §3 模块边界 / 禁区、相关详细设计章节（`docs/04-detailed-design/`）、相关 ADR（`docs/03-architecture/adr/`）
-- **提交信息**：建议保留六字段格式（Design / Tests / Verify / Docs / Risk / Task），便于追溯改动对应的需求 / 设计 / 任务编号；不再强制通过 instructions 文件自动校验
+- **提交信息**：所有提交使用 Conventional Commits 标题。存在正式任务简报/设计测试追溯，或涉及产品代码、测试、架构/详细设计、数据库结构时，正文必须包含 Design / Tests / Verify / Docs / Risk / Task 六字段；无正式追溯要求且不触及上述范围的轻量 `docs` / `chore` 可省略。混合改动从严处理，具体判定以 [`CONTRIBUTING.md` §4](CONTRIBUTING.md#4-提交变更) 为准
 - **签字位**：`status: draft → reviewed`、`reviewers: []`、本文件 §1 / §3 一律由人工填，AI 不替签
 - **风格与禁区违反**：阻塞返回，不要尝试绕路，直接向 Owner 反馈冲突点
 - **追溯链**：变更尽量能映射到 `REQ-NNN`（需求）+ `HD-NNN` / `API-NNN` / `DB-NNN`（设计），缺失时提醒 Owner 但不强制阻塞轻量迭代
