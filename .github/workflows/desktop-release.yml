@@ -7,7 +7,7 @@ on:
       - "src/app/desktop/**"
       - ".github/workflows/desktop-release.yml"
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - "src/app/desktop/**"
       - ".github/workflows/desktop-release.yml"
