@@ -43,7 +43,7 @@ downstream:
 | 锁屏 + 在途任务                  | 主进程长 SSE + 5 min idle                                                                                     | [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)                                                                                                                                                                     | medium |
 | 客户端↔后端协议                  | REST + AG-UI（无 cursor）                                                                                     | [ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md)                                                                                                                                                                          | high   |
 | 可观测性                         | OTel + Grafana 自托管                                                                                         | [ADR-013](./adr/ADR-013-observability-otel-self-hosted-grafana.md)                                                                                                                                                                    | high   |
-| 国际化                           | v1 仅 zh-CN                                                                                                   | [ADR-014](./adr/ADR-014-i18n-out-of-scope-v1.md)                                                                                                                                                                                      | high   |
+| 国际化                           | 桌面端 UI 支持 zh-CN / en-US；i18next + react-i18next                                                         | [ADR-027](./adr/ADR-027-desktop-ui-bilingual-localization.md)                                                                                                                                                                         | high   |
 | 文件存储                         | IFileStorageProvider 抽象（LocalFileSystem / AzureBlob / MinIO）                                              | [ADR-015](./adr/ADR-015-object-storage-provider-switchable.md)                                                                                                                                                                        | medium |
 | 缓存层                           | ICacheProvider 抽象（Redis）                                                                                  | [ADR-016](./adr/ADR-016-cache-provider-redis.md)                                                                                                                                                                                      | medium |
 | 凭据存储                         | K8s Secret + .env（v1，不走 Key Vault）                                                                       | [OQ-A006 closed §B](./open-questions-arch.md) + [RISK-013](./risk-analysis.md)                                                                                                                                                        | medium |
@@ -165,9 +165,9 @@ downstream:
 
 ## 14. 国际化（ADR-014）
 
-- **选择**：v1 仅 zh-CN；不引入 i18n 框架；UI 文案直接中文字面量。
+- **选择**：桌面端自有 UI 支持 `zh-CN` / `en-US` 手动切换及跟随系统，使用 i18next + react-i18next 集中维护消息资源；系统语言不受支持时回退 `zh-CN`。后端错误正文、模型输出、用户数据与 ASR 暂不国际化。
 - **为什么**：与 [OQ-015 closed §A](../01-requirements/open-questions.md) 一致；客户群在中文环境；范围控制理念一致。
-- **替代方案**：双语 / 仅 zh-CN 但抽 i18n key / 不声明语言。
+- **替代方案**：仅 `zh-CN` / 仅按系统语言自动选择且不允许覆盖 / 同步服务端用户语言偏好。
 - **放弃理由**：详见 [ADR-014 §备选项](./adr/ADR-014-i18n-out-of-scope-v1.md)。
 - **团队维护影响**：H5 工期不背负 i18n 抽 key 与翻译成本；v2 引入时遍历抽 key（[RISK-010](./risk-analysis.md)）。
 - **成本/性能/安全/交付**：成本低；性能 N/A；安全 N/A；交付高。

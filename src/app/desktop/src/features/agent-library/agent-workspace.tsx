@@ -28,8 +28,10 @@ import {
     theme as antdTheme,
 } from "antd";
 import type { ModalFuncProps } from "antd";
+import type { TFunction } from "i18next";
 import { useDeferredValue, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type { AgentListItem } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
@@ -50,6 +52,7 @@ export function AgentWorkspace({
     onCreateAgent,
     onEditAgent,
 }: AgentWorkspaceProps) {
+    const { t } = useTranslation();
     const identity = useAuthStore((state) => state.identity);
     const { token } = antdTheme.useToken();
     const queryClient = useQueryClient();
@@ -85,16 +88,18 @@ export function AgentWorkspace({
         },
         onSuccess: async (_result, variables) => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
-            const successMessages: Record<AgentAction, string> = {
-                share: "Agent 已共享给团队",
-                unshare: "已撤销团队共享",
-                revoke: "已由管理员撤销共享",
+            const successMessageKeys: Record<AgentAction, string> = {
+                share: "agents.space.actionSuccess.share",
+                unshare: "agents.space.actionSuccess.unshare",
+                revoke: "agents.space.actionSuccess.revoke",
             };
-            messageApi.success(successMessages[variables.action]);
+            messageApi.success(t(successMessageKeys[variables.action]));
         },
         onError: (reason) => {
             messageApi.error(
-                reason instanceof Error ? reason.message : "Agent 操作失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.space.actionFailed"),
             );
         },
     });
@@ -149,7 +154,7 @@ export function AgentWorkspace({
             onCreateAgent();
             return;
         }
-        messageApi.info("Agent 配置页将在下一项工作中接入。");
+        messageApi.info(t("agents.space.configComingSoon"));
     };
     const openAgent = (agent: AgentListItem): void => {
         if (isPublished(agent)) setChatAgent(agent);
@@ -157,7 +162,7 @@ export function AgentWorkspace({
     };
     const requestAction = (action: AgentAction, agent: AgentListItem): void => {
         modalApi.confirm({
-            ...getActionDialog(action, agent.name),
+            ...getActionDialog(action, agent.name, t),
             onOk: async () =>
                 actionMutation.mutateAsync({ action, agentId: agent.id }),
         });
@@ -177,13 +182,15 @@ export function AgentWorkspace({
             {modalContextHolder}
             {messageContextHolder}
             <header className="agent-space-header">
-                <Typography.Title level={4}>Agent 空间</Typography.Title>
+                <Typography.Title level={4}>
+                    {t("agents.space.title")}
+                </Typography.Title>
                 <Button
                     type="primary"
                     icon={<PlusOutlined />}
                     onClick={() => openEditor()}
                 >
-                    新建 Agent
+                    {t("agents.space.create")}
                 </Button>
             </header>
 
@@ -192,14 +199,14 @@ export function AgentWorkspace({
                     activeKey={activeTab}
                     onChange={changeTab}
                     items={[
-                        { key: "mine", label: "我的" },
-                        { key: "shared", label: "团队共享" },
+                        { key: "mine", label: t("agents.space.mine") },
+                        { key: "shared", label: t("agents.space.shared") },
                     ]}
                 />
                 <Space wrap>
-                    <Tooltip title="刷新">
+                    <Tooltip title={t("common.refresh")}>
                         <Button
-                            aria-label="刷新 Agent"
+                            aria-label={t("agents.space.refreshLabel")}
                             icon={<ReloadOutlined />}
                             loading={currentQuery.isFetching}
                             onClick={refresh}
@@ -209,7 +216,7 @@ export function AgentWorkspace({
                         allowClear
                         maxLength={50}
                         prefix={<SearchOutlined />}
-                        placeholder="搜索 Agent"
+                        placeholder={t("agents.space.searchPlaceholder")}
                         value={searchText}
                         onChange={(event) => {
                             setSearchText(event.target.value);
@@ -228,12 +235,24 @@ export function AgentWorkspace({
                         setPage(1);
                     }}
                     options={[
-                        { value: "all", label: `全部 ${scopedAgents.length}` },
+                        {
+                            value: "all",
+                            label: t("agents.space.filters.all", {
+                                count: scopedAgents.length,
+                            }),
+                        },
                         {
                             value: "published",
-                            label: `已发布 ${publishedCount}`,
+                            label: t("agents.space.filters.published", {
+                                count: publishedCount,
+                            }),
                         },
-                        { value: "draft", label: `草稿 ${draftCount}` },
+                        {
+                            value: "draft",
+                            label: t("agents.space.filters.draft", {
+                                count: draftCount,
+                            }),
+                        },
                     ]}
                 />
             )}
@@ -243,8 +262,12 @@ export function AgentWorkspace({
                     <AgentGridSkeleton />
                 ) : currentQuery.isError ? (
                     <AgentGridEmpty
-                        description="加载失败，请检查网络后重试"
-                        action={<Button onClick={refresh}>重试</Button>}
+                        description={t("agents.space.loadError")}
+                        action={
+                            <Button onClick={refresh}>
+                                {t("common.retry")}
+                            </Button>
+                        }
                     />
                 ) : pageAgents.length === 0 ? (
                     <AgentGridEmpty
@@ -252,6 +275,7 @@ export function AgentWorkspace({
                             activeTab,
                             Boolean(deferredSearch),
                             statusFilter,
+                            t,
                         )}
                     />
                 ) : (
@@ -291,7 +315,9 @@ export function AgentWorkspace({
 
             <footer className="agent-space-pagination">
                 <Typography.Text type="secondary">
-                    共 {filteredAgents.length} 项
+                    {t("common.itemCount", {
+                        count: filteredAgents.length,
+                    })}
                 </Typography.Text>
                 <Pagination
                     size="small"
@@ -329,6 +355,7 @@ function AgentCard({
     onView: () => void;
     onAction: (action: AgentAction) => void;
 }) {
+    const { t } = useTranslation();
     const isOwner = agent.ownerUserId === currentUserId;
     const showOwnerActions = activeTab === "mine" && isOwner;
     const actionCount = showOwnerActions
@@ -351,11 +378,14 @@ function AgentCard({
             {(showOwnerActions || activeTab === "shared") && (
                 <Space size={6} className="agent-card-actions">
                     {showOwnerActions && (
-                        <Tooltip title="编辑配置">
+                        <Tooltip title={t("agents.space.actions.edit")}>
                             <Button
                                 type="text"
                                 size="small"
-                                aria-label={`编辑 ${agent.name}`}
+                                aria-label={t(
+                                    "agents.space.actions.editLabel",
+                                    { name: agent.name },
+                                )}
                                 icon={<EditOutlined />}
                                 onClick={(event) => {
                                     event.stopPropagation();
@@ -367,11 +397,14 @@ function AgentCard({
                     {showOwnerActions &&
                         isPublished(agent) &&
                         !agent.isShared && (
-                            <Tooltip title="共享已发布版本">
+                            <Tooltip title={t("agents.space.actions.share")}>
                                 <Button
                                     type="text"
                                     size="small"
-                                    aria-label={`共享 ${agent.name}`}
+                                    aria-label={t(
+                                        "agents.space.actions.shareLabel",
+                                        { name: agent.name },
+                                    )}
                                     icon={<ShareAltOutlined />}
                                     loading={isPending}
                                     onClick={(event) => {
@@ -382,12 +415,15 @@ function AgentCard({
                             </Tooltip>
                         )}
                     {showOwnerActions && agent.isShared && (
-                        <Tooltip title="撤销共享">
+                        <Tooltip title={t("agents.space.actions.revoke")}>
                             <Button
                                 danger
                                 type="text"
                                 size="small"
-                                aria-label={`撤销 ${agent.name} 共享`}
+                                aria-label={t(
+                                    "agents.space.actions.revokeLabel",
+                                    { name: agent.name },
+                                )}
                                 icon={<UndoOutlined />}
                                 loading={isPending}
                                 onClick={(event) => {
@@ -398,11 +434,14 @@ function AgentCard({
                         </Tooltip>
                     )}
                     {activeTab === "shared" && (
-                        <Tooltip title="查看详情">
+                        <Tooltip title={t("agents.space.actions.view")}>
                             <Button
                                 type="text"
                                 size="small"
-                                aria-label={`查看 ${agent.name} 详情`}
+                                aria-label={t(
+                                    "agents.space.actions.viewLabel",
+                                    { name: agent.name },
+                                )}
                                 icon={<EyeOutlined />}
                                 onClick={(event) => {
                                     event.stopPropagation();
@@ -412,12 +451,15 @@ function AgentCard({
                         </Tooltip>
                     )}
                     {activeTab === "shared" && isAdmin && (
-                        <Tooltip title="撤销共享">
+                        <Tooltip title={t("agents.space.actions.revoke")}>
                             <Button
                                 danger
                                 type="text"
                                 size="small"
-                                aria-label={`撤销 ${agent.name} 共享`}
+                                aria-label={t(
+                                    "agents.space.actions.revokeLabel",
+                                    { name: agent.name },
+                                )}
                                 icon={<UndoOutlined />}
                                 loading={isPending}
                                 onClick={(event) => {
@@ -447,9 +489,15 @@ function AgentCard({
                         <Typography.Text strong ellipsis>
                             {agent.name}
                         </Typography.Text>
-                        {!isPublished(agent) && <Tag color="warning">草稿</Tag>}
+                        {!isPublished(agent) && (
+                            <Tag color="warning">
+                                {t("agents.space.status.draft")}
+                            </Tag>
+                        )}
                         {activeTab === "mine" && agent.isShared && (
-                            <Tag color="processing">已共享</Tag>
+                            <Tag color="processing">
+                                {t("agents.space.status.shared")}
+                            </Tag>
                         )}
                     </Space>
                     <Typography.Text type="secondary" ellipsis>
@@ -458,8 +506,8 @@ function AgentCard({
                             : ""}
                         {isPublished(agent)
                             ? `v${agent.latestPublishedVersionNumber}`
-                            : "未发布"}
-                        {` · ${formatRelativeTime(agent.updatedTime)}`}
+                            : t("agents.space.status.unpublished")}
+                        {` · ${formatRelativeTime(agent.updatedTime, t)}`}
                     </Typography.Text>
                 </div>
             </div>
@@ -468,7 +516,7 @@ function AgentCard({
                 type="secondary"
                 ellipsis={{ rows: 2 }}
             >
-                {agent.descriptionExcerpt || "暂无描述"}
+                {agent.descriptionExcerpt || t("agents.space.noDescription")}
             </Typography.Paragraph>
         </Card>
     );
@@ -523,31 +571,34 @@ function getEmptyDescription(
     activeTab: AgentTab,
     hasSearch: boolean,
     statusFilter: AgentStatusFilter,
+    t: TFunction,
 ): string {
-    if (hasSearch || statusFilter !== "all") return "没有符合条件的 Agent";
+    if (hasSearch || statusFilter !== "all")
+        return t("agents.space.empty.filtered");
     return activeTab === "mine"
-        ? "还没有自己的 Agent，点击“新建 Agent”开始"
-        : "团队成员还没有共享 Agent";
+        ? t("agents.space.empty.mine")
+        : t("agents.space.empty.shared");
 }
 
 function getActionDialog(
     action: AgentAction,
     agentName: string,
+    t: TFunction,
 ): ModalFuncProps {
     if (action === "revoke") {
         return {
-            title: `撤销「${agentName}」的共享`,
-            content: "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
-            okText: "确认撤销",
+            title: t("agents.space.dialogs.revokeTitle", { name: agentName }),
+            content: t("agents.space.dialogs.revokeContent"),
+            okText: t("agents.space.dialogs.confirmRevoke"),
             okButtonProps: { danger: true },
-            cancelText: "取消",
+            cancelText: t("common.cancel"),
         };
     }
     return {
-        title: `共享「${agentName}」`,
-        content: "共享后，团队成员可以查看并使用该 Agent 的已发布版本。",
-        okText: "确认共享",
-        cancelText: "取消",
+        title: t("agents.space.dialogs.shareTitle", { name: agentName }),
+        content: t("agents.space.dialogs.shareContent"),
+        okText: t("agents.space.dialogs.confirmShare"),
+        cancelText: t("common.cancel"),
     };
 }
 
@@ -555,16 +606,22 @@ function shortId(value: string): string {
     return value.slice(0, 8);
 }
 
-function formatRelativeTime(value: string): string {
+function formatRelativeTime(value: string, t: TFunction): string {
     const time = Date.parse(value);
-    if (Number.isNaN(time)) return "刚刚更新";
+    if (Number.isNaN(time)) return t("agents.space.relativeTime.now");
     const elapsedMinutes = Math.max(
         0,
         Math.floor((Date.now() - time) / 60_000),
     );
-    if (elapsedMinutes < 1) return "刚刚更新";
-    if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
+    if (elapsedMinutes < 1) return t("agents.space.relativeTime.now");
+    if (elapsedMinutes < 60)
+        return t("agents.space.relativeTime.minutes", {
+            count: elapsedMinutes,
+        });
     const elapsedHours = Math.floor(elapsedMinutes / 60);
-    if (elapsedHours < 24) return `${elapsedHours} 小时前`;
-    return `${Math.floor(elapsedHours / 24)} 天前`;
+    if (elapsedHours < 24)
+        return t("agents.space.relativeTime.hours", { count: elapsedHours });
+    return t("agents.space.relativeTime.days", {
+        count: Math.floor(elapsedHours / 24),
+    });
 }

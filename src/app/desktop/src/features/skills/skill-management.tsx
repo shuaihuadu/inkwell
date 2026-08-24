@@ -34,7 +34,9 @@ import {
     type UploadFile,
 } from "antd";
 import JSZip from "jszip";
+import type { TFunction } from "i18next";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import DataListPage, {
     DataListRowAction,
     DataListRowActions,
@@ -64,14 +66,14 @@ interface SkillUploadPreview {
 }
 
 const skillNamePattern = /^[a-z0-9](?:[a-z0-9]*-[a-z0-9])*[a-z0-9]*$/;
-const skillNameMessage =
-    "机器名称只能包含小写字母、数字和单个连字符，且不能以连字符开头或结尾";
 
 const parseSkillMarkdown = (
     content: string,
+    t: TFunction,
 ): Pick<SkillUploadPreview, "name" | "description"> => {
     const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
-    if (!frontmatter) throw new Error("SKILL.md 缺少有效的 YAML frontmatter");
+    if (!frontmatter)
+        throw new Error(t("skills.validation.missingFrontmatter"));
     const readField = (field: string): string =>
         frontmatter[1]
             .split("\n")
@@ -82,17 +84,25 @@ const parseSkillMarkdown = (
             .trim() ?? "";
     const name = readField("name");
     const description = readField("description");
-    if (!name || !description) throw new Error("SKILL.md 必须包含名称和描述");
+    if (!name || !description)
+        throw new Error(t("skills.validation.missingFields"));
     if (name.length > 64 || !skillNamePattern.test(name)) {
-        throw new Error(`SKILL.md ${skillNameMessage}`);
+        throw new Error(
+            t("skills.validation.invalidName", {
+                message: t("skills.validation.namePattern"),
+            }),
+        );
     }
     return { name, description };
 };
 
-const createUploadPreview = async (file: File): Promise<SkillUploadPreview> => {
+const createUploadPreview = async (
+    file: File,
+    t: TFunction,
+): Promise<SkillUploadPreview> => {
     if (file.name.toLocaleLowerCase().endsWith(".md")) {
         return {
-            ...parseSkillMarkdown(await file.text()),
+            ...parseSkillMarkdown(await file.text(), t),
             references: 0,
             assets: 0,
             scripts: 0,
@@ -104,14 +114,14 @@ const createUploadPreview = async (file: File): Promise<SkillUploadPreview> => {
         /(^|\/)SKILL\.md$/i.test(entry.name),
     );
     if (markdownFiles.length !== 1)
-        throw new Error("压缩包必须包含且只包含一个 SKILL.md");
+        throw new Error(t("skills.validation.archiveSkillFile"));
     const markdown = markdownFiles[0];
     const root = markdown.name.slice(0, -"SKILL.md".length);
     const relativePaths = files
         .filter((entry) => entry !== markdown)
         .map((entry) => {
             if (!entry.name.startsWith(root))
-                throw new Error("所有文件必须位于 SKILL.md 所在文件夹内");
+                throw new Error(t("skills.validation.filesOutsideRoot"));
             return entry.name.slice(root.length);
         });
     const count = (folder: string): number =>
@@ -123,20 +133,18 @@ const createUploadPreview = async (file: File): Promise<SkillUploadPreview> => {
             (path) => !/^(references|assets|scripts)\//i.test(path),
         )
     ) {
-        throw new Error(
-            "包内文件只能放在 references、assets 或 scripts 文件夹",
-        );
+        throw new Error(t("skills.validation.unsupportedFolder"));
     }
     return {
-        ...parseSkillMarkdown(await markdown.async("text")),
+        ...parseSkillMarkdown(await markdown.async("text"), t),
         references: count("references"),
         assets: count("assets"),
         scripts: count("scripts"),
     };
 };
 
-const formatTime = (value: string): string =>
-    new Intl.DateTimeFormat("zh-CN", {
+const formatTime = (value: string, locale: string): string =>
+    new Intl.DateTimeFormat(locale, {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -146,6 +154,7 @@ const formatTime = (value: string): string =>
     }).format(new Date(value));
 
 export function SkillManagement() {
+    const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const appearance = useResolvedAppearance();
     const identity = useAuthStore((state) => state.identity);
@@ -175,8 +184,8 @@ export function SkillManagement() {
         identity?.isAdmin === true || skill.ownerUserId === identity?.userId;
     const ownerLabel = (skill: AgentSkillDefinition): string =>
         skill.ownerUserId === identity?.userId
-            ? (identity?.username ?? "我")
-            : "其他成员";
+            ? (identity?.username ?? t("skills.owner.me"))
+            : t("skills.owner.others");
     const skills = (skillsQuery.data ?? []).filter((skill) => {
         const matchesText =
             `${skill.name} ${skill.description} ${ownerLabel(skill)}`
@@ -220,9 +229,9 @@ export function SkillManagement() {
             );
             setSelectedSkill(updated);
             setEditing(false);
-            messageApi.success("Skill 已保存");
+            messageApi.success(t("skills.messages.saved"));
         } catch {
-            messageApi.error("Skill 保存失败，请稍后重试");
+            messageApi.error(t("skills.messages.saveFailed"));
         } finally {
             setSaving(false);
         }
@@ -230,12 +239,11 @@ export function SkillManagement() {
 
     const deleteSkill = (skill: AgentSkillDefinition): void => {
         modalApi.confirm({
-            title: `删除「${skill.name}」`,
-            content:
-                "删除后，新配置将无法再选择此 Skill；已保存草稿与已发布版本继续使用各自 Snapshot。确认删除？",
-            okText: "确认删除",
+            title: t("skills.deleteDialog.title", { name: skill.name }),
+            content: t("skills.deleteDialog.content"),
+            okText: t("skills.deleteDialog.confirm"),
             okButtonProps: { danger: true },
-            cancelText: "取消",
+            cancelText: t("common.cancel"),
             onOk: async () => {
                 try {
                     await desktopApi.deleteSkill(skill.id);
@@ -246,9 +254,9 @@ export function SkillManagement() {
                     );
                     setSelectedSkill(null);
                     setEditing(false);
-                    messageApi.success("Skill 已删除");
+                    messageApi.success(t("skills.messages.deleted"));
                 } catch {
-                    messageApi.error("Skill 删除失败，请稍后重试");
+                    messageApi.error(t("skills.messages.deleteFailed"));
                     throw new Error("Skill deletion failed");
                 }
             },
@@ -262,10 +270,12 @@ export function SkillManagement() {
         if (!file) return;
         setPreviewing(true);
         try {
-            setUploadPreview(await createUploadPreview(file));
+            setUploadPreview(await createUploadPreview(file, t));
         } catch (error) {
             messageApi.error(
-                error instanceof Error ? error.message : "Skill 文件无法解析",
+                error instanceof Error
+                    ? error.message
+                    : t("skills.messages.parseFailed"),
             );
         } finally {
             setPreviewing(false);
@@ -287,9 +297,9 @@ export function SkillManagement() {
             );
             setUploadOpen(false);
             setUploadFiles([]);
-            messageApi.success("Skill 已上传");
+            messageApi.success(t("skills.messages.uploaded"));
         } catch {
-            messageApi.error("Skill 上传失败，请检查文件结构");
+            messageApi.error(t("skills.messages.uploadFailed"));
         } finally {
             setUploading(false);
         }
@@ -297,15 +307,15 @@ export function SkillManagement() {
 
     return (
         <DataListPage<AgentSkillDefinition>
-            title="Skills"
-            description="查看和管理 Agent 的 Skill。Skill 通过任务说明和参考资料，教 Agent 如何完成特定工作。"
+            title={t("skills.title")}
+            description={t("skills.description")}
             primaryAction={
                 <Button
                     type="primary"
                     icon={<PlusOutlined />}
                     onClick={() => setUploadOpen(true)}
                 >
-                    上传 Skill
+                    {t("skills.upload")}
                 </Button>
             }
             filters={
@@ -314,17 +324,20 @@ export function SkillManagement() {
                     onChange={setOwnerFilter}
                     style={{ width: 132 }}
                     options={[
-                        { value: "all", label: "全部归属" },
-                        { value: "mine", label: "我上传的" },
-                        { value: "others", label: "其他成员" },
+                        { value: "all", label: t("skills.filters.all") },
+                        { value: "mine", label: t("skills.filters.mine") },
+                        {
+                            value: "others",
+                            label: t("skills.filters.others"),
+                        },
                     ]}
                 />
             }
-            refreshLabel="刷新 Skills"
+            refreshLabel={t("skills.refreshLabel")}
             onRefresh={() => void skillsQuery.refetch()}
             refreshing={skillsQuery.isFetching && !skillsQuery.isLoading}
             searchValue={searchText}
-            searchPlaceholder="搜索名称、描述或所有者"
+            searchPlaceholder={t("skills.searchPlaceholder")}
             searchMaxLength={128}
             onSearchChange={setSearchText}
             paginationResetKey={`${searchText}:${ownerFilter}`}
@@ -333,41 +346,49 @@ export function SkillManagement() {
             tableScrollX={940}
             loading={skillsQuery.isLoading}
             errorMessage={
-                skillsQuery.isError ? "Skills 加载失败，请稍后重试" : undefined
+                skillsQuery.isError ? t("skills.loadFailed") : undefined
             }
             onRetry={() => void skillsQuery.refetch()}
-            emptyText="还没有 Skill"
-            filteredEmptyText="在所选条件内没有结果，请清除筛选"
+            emptyText={t("skills.empty")}
+            filteredEmptyText={t("skills.filteredEmpty")}
             isFiltered={normalizedSearch.length > 0 || ownerFilter !== "all"}
             columns={[
                 {
-                    title: "名称",
+                    title: t("skills.columns.name"),
                     dataIndex: "name",
                     width: 180,
                     ellipsis: true,
                 },
-                { title: "描述", dataIndex: "description", ellipsis: true },
                 {
-                    title: "所有者",
+                    title: t("skills.columns.description"),
+                    dataIndex: "description",
+                    ellipsis: true,
+                },
+                {
+                    title: t("skills.columns.owner"),
                     key: "owner",
                     width: 110,
                     render: (_, skill) => ownerLabel(skill),
                 },
                 {
-                    title: "资料",
+                    title: t("skills.columns.resources"),
                     key: "files",
                     width: 190,
                     render: (_, skill) =>
-                        `${skill.referenceFileUris.length} 引用 · ${skill.assetFileUris.length} 素材 · ${skill.scriptFileUris.length} 脚本`,
+                        t("skills.resourceSummary", {
+                            references: skill.referenceFileUris.length,
+                            assets: skill.assetFileUris.length,
+                            scripts: skill.scriptFileUris.length,
+                        }),
                 },
                 {
-                    title: "更新时间",
+                    title: t("skills.columns.updatedTime"),
                     dataIndex: "updatedTime",
                     width: 162,
-                    render: formatTime,
+                    render: (value: string) => formatTime(value, i18n.language),
                 },
                 {
-                    title: "操作",
+                    title: t("skills.columns.actions"),
                     key: "actions",
                     width: 244,
                     fixed: "right",
@@ -376,22 +397,28 @@ export function SkillManagement() {
                     render: (_, skill) => (
                         <DataListRowActions>
                             <DataListRowAction
-                                label={`查看 ${skill.name}`}
-                                text="查看"
+                                label={t("skills.actions.viewLabel", {
+                                    name: skill.name,
+                                })}
+                                text={t("common.view")}
                                 icon={<EyeOutlined />}
                                 onClick={() => openSkill(skill)}
                             />
                             {canManage(skill) && (
                                 <>
                                     <DataListRowAction
-                                        label={`编辑 ${skill.name}`}
-                                        text="编辑"
+                                        label={t("skills.actions.editLabel", {
+                                            name: skill.name,
+                                        })}
+                                        text={t("common.edit")}
                                         icon={<EditOutlined />}
                                         onClick={() => openSkill(skill, true)}
                                     />
                                     <DataListRowAction
-                                        label={`删除 ${skill.name}`}
-                                        text="删除"
+                                        label={t("skills.actions.deleteLabel", {
+                                            name: skill.name,
+                                        })}
+                                        text={t("common.delete")}
                                         icon={<DeleteOutlined />}
                                         danger
                                         onClick={() => deleteSkill(skill)}
@@ -407,7 +434,11 @@ export function SkillManagement() {
             {modalContext}
             <Drawer
                 width={600}
-                title={editing ? "编辑 Skill" : "Skill 详情"}
+                title={
+                    editing
+                        ? t("skills.details.editTitle")
+                        : t("skills.details.title")
+                }
                 closable={false}
                 open={selectedSkill !== null}
                 onClose={() => {
@@ -416,10 +447,10 @@ export function SkillManagement() {
                 }}
                 extra={
                     selectedSkill ? (
-                        <Tooltip title="关闭">
+                        <Tooltip title={t("common.close")}>
                             <Button
                                 type="text"
-                                aria-label="关闭 Skill 详情"
+                                aria-label={t("skills.details.closeLabel")}
                                 icon={<CloseOutlined />}
                                 onClick={() => {
                                     setSelectedSkill(null);
@@ -441,14 +472,14 @@ export function SkillManagement() {
                                         setEditing(false);
                                     }}
                                 >
-                                    取消
+                                    {t("common.cancel")}
                                 </Button>
                                 <Button
                                     type="primary"
                                     loading={saving}
                                     onClick={() => void saveSkill()}
                                 >
-                                    保存
+                                    {t("common.save")}
                                 </Button>
                             </Space>
                         </div>
@@ -460,31 +491,47 @@ export function SkillManagement() {
                 {selectedSkill && editing && (
                     <Form form={form} layout="vertical">
                         <Form.Item
-                            label="机器名称"
+                            label={t("skills.details.machineName")}
                             name="name"
-                            extra="用于 Skill 发现和 load_skill 调用，格式为 kebab-case。"
+                            extra={t("skills.details.machineNameHelp")}
                             rules={[
-                                { required: true, message: "请输入机器名称" },
+                                {
+                                    required: true,
+                                    message: t(
+                                        "skills.details.machineNameRequired",
+                                    ),
+                                },
                                 {
                                     max: 64,
-                                    message: "机器名称不能超过 64 个字符",
+                                    message: t(
+                                        "skills.details.machineNameTooLong",
+                                    ),
                                 },
                                 {
                                     pattern: skillNamePattern,
-                                    message: skillNameMessage,
+                                    message: t("skills.validation.namePattern"),
                                 },
                             ]}
                         >
                             <Input
                                 maxLength={64}
                                 showCount
-                                placeholder="例如 code-review"
+                                placeholder={t(
+                                    "skills.details.machineNamePlaceholder",
+                                )}
                             />
                         </Form.Item>
                         <Form.Item
-                            label="描述"
+                            label={t("skills.columns.description")}
                             name="description"
-                            rules={[{ required: true, message: "请输入描述" }]}
+                            rules={[
+                                {
+                                    required: true,
+                                    message: t(
+                                        "skills.details.descriptionRequired",
+                                    ),
+                                },
+                            ]}
                         >
                             <Input.TextArea
                                 rows={3}
@@ -493,31 +540,44 @@ export function SkillManagement() {
                             />
                         </Form.Item>
                         <Form.Item
-                            label="SKILL.md 内容"
+                            label={t("skills.details.content")}
                             name="content"
                             className="skill-markdown-editor"
-                            rules={[{ required: true, message: "请输入内容" }]}
+                            rules={[
+                                {
+                                    required: true,
+                                    message: t(
+                                        "skills.details.contentRequired",
+                                    ),
+                                },
+                            ]}
                         >
                             <MarkdownEditor
-                                aria-label="SKILL.md 内容"
+                                aria-label={t("skills.details.content")}
                                 appearance={appearance}
                             />
                         </Form.Item>
                         <Space size={24} wrap>
                             <Typography.Text type="secondary">
-                                所有者：{ownerLabel(selectedSkill)}
+                                {t("skills.details.owner", {
+                                    owner: ownerLabel(selectedSkill),
+                                })}
                             </Typography.Text>
                             <Typography.Text type="secondary">
-                                引用：{selectedSkill.referenceFileUris.length}{" "}
-                                个（只读）
+                                {t("skills.details.referenceCount", {
+                                    count: selectedSkill.referenceFileUris
+                                        .length,
+                                })}
                             </Typography.Text>
                             <Typography.Text type="secondary">
-                                素材：{selectedSkill.assetFileUris.length}{" "}
-                                个（只读）
+                                {t("skills.details.assetCount", {
+                                    count: selectedSkill.assetFileUris.length,
+                                })}
                             </Typography.Text>
                             <Typography.Text type="secondary">
-                                脚本：{selectedSkill.scriptFileUris.length}{" "}
-                                个（只读）
+                                {t("skills.details.scriptCount", {
+                                    count: selectedSkill.scriptFileUris.length,
+                                })}
                             </Typography.Text>
                         </Space>
                     </Form>
@@ -546,7 +606,9 @@ export function SkillManagement() {
                                     </Typography.Title>
                                     <Tag color="processing">Skill</Tag>
                                     {selectedSkill.ownerUserId ===
-                                        identity?.userId && <Tag>我上传的</Tag>}
+                                        identity?.userId && (
+                                        <Tag>{t("skills.owner.mine")}</Tag>
+                                    )}
                                 </Flex>
                                 <Typography.Paragraph
                                     type="secondary"
@@ -561,7 +623,10 @@ export function SkillManagement() {
                                     </Typography.Text>
                                     <Typography.Text type="secondary">
                                         <CalendarOutlined />{" "}
-                                        {formatTime(selectedSkill.updatedTime)}
+                                        {formatTime(
+                                            selectedSkill.updatedTime,
+                                            i18n.language,
+                                        )}
                                     </Typography.Text>
                                 </Flex>
                             </div>
@@ -582,7 +647,9 @@ export function SkillManagement() {
                                         </Typography.Text>
                                     </Space>
                                     <Typography.Text type="secondary">
-                                        {selectedSkill.content.length} 字符
+                                        {t("skills.details.characterCount", {
+                                            count: selectedSkill.content.length,
+                                        })}
                                     </Typography.Text>
                                 </Flex>
                                 <div
@@ -620,8 +687,8 @@ export function SkillManagement() {
                                         }
                                     >
                                         {skillContentExpanded
-                                            ? "收起"
-                                            : "展开全文"}
+                                            ? t("skills.details.collapse")
+                                            : t("skills.details.expand")}
                                     </Button>
                                 )}
                             </section>
@@ -633,7 +700,7 @@ export function SkillManagement() {
                                 >
                                     <FolderOpenOutlined />
                                     <Typography.Text strong>
-                                        资源
+                                        {t("skills.details.resources")}
                                     </Typography.Text>
                                 </Space>
                                 <div className="skill-resource-grid">
@@ -646,7 +713,7 @@ export function SkillManagement() {
                                             }
                                         </Typography.Text>
                                         <Typography.Text type="secondary">
-                                            References
+                                            {t("skills.details.references")}
                                         </Typography.Text>
                                     </div>
                                     <div className="skill-resource-item">
@@ -655,7 +722,7 @@ export function SkillManagement() {
                                             {selectedSkill.assetFileUris.length}
                                         </Typography.Text>
                                         <Typography.Text type="secondary">
-                                            Assets
+                                            {t("skills.details.assets")}
                                         </Typography.Text>
                                     </div>
                                     <div className="skill-resource-item">
@@ -667,7 +734,7 @@ export function SkillManagement() {
                                             }
                                         </Typography.Text>
                                         <Typography.Text type="secondary">
-                                            Scripts
+                                            {t("skills.details.scripts")}
                                         </Typography.Text>
                                     </div>
                                 </div>
@@ -680,7 +747,7 @@ export function SkillManagement() {
                                 >
                                     <CalendarOutlined />
                                     <Typography.Text strong>
-                                        时间信息
+                                        {t("skills.details.timeInformation")}
                                     </Typography.Text>
                                 </Space>
                                 <Descriptions
@@ -689,16 +756,22 @@ export function SkillManagement() {
                                     items={[
                                         {
                                             key: "created",
-                                            label: "创建时间",
+                                            label: t(
+                                                "skills.details.createdTime",
+                                            ),
                                             children: formatTime(
                                                 selectedSkill.createdTime,
+                                                i18n.language,
                                             ),
                                         },
                                         {
                                             key: "updated",
-                                            label: "更新时间",
+                                            label: t(
+                                                "skills.details.updatedTime",
+                                            ),
                                             children: formatTime(
                                                 selectedSkill.updatedTime,
+                                                i18n.language,
                                             ),
                                         },
                                     ]}
@@ -709,11 +782,11 @@ export function SkillManagement() {
                 )}
             </Drawer>
             <Modal
-                title="上传 Skill"
+                title={t("skills.uploadDialog.title")}
                 open={uploadOpen}
                 width={600}
-                okText="开始上传"
-                cancelText="取消"
+                okText={t("skills.uploadDialog.start")}
+                cancelText={t("common.cancel")}
                 confirmLoading={uploading}
                 okButtonProps={{
                     disabled: uploadPreview === null || previewing,
@@ -738,35 +811,43 @@ export function SkillManagement() {
                         <InboxOutlined />
                     </p>
                     <p className="ant-upload-text">
-                        选择 Skill 文件夹压缩包或 SKILL.md
+                        {t("skills.uploadDialog.selectFile")}
                     </p>
                     <p className="ant-upload-hint">
-                        名称和描述读取自 SKILL.md 的 YAML
-                        frontmatter，上传后可在详情中编辑。支持
-                        references/、assets/ 和 scripts/。
+                        {t("skills.uploadDialog.hint")}
                     </p>
                 </Upload.Dragger>
                 {previewing && (
                     <Typography.Text type="secondary">
-                        正在解析 SKILL.md...
+                        {t("skills.uploadDialog.parsing")}
                     </Typography.Text>
                 )}
                 {uploadPreview && (
                     <div style={{ marginTop: 16 }}>
                         <Typography.Title level={5}>
-                            SKILL.md 解析预览
+                            {t("skills.uploadDialog.preview")}
                         </Typography.Title>
                         <Descriptions size="small" column={1} bordered>
-                            <Descriptions.Item label="机器名称">
+                            <Descriptions.Item
+                                label={t("skills.uploadDialog.machineName")}
+                            >
                                 {uploadPreview.name}
                             </Descriptions.Item>
-                            <Descriptions.Item label="描述">
+                            <Descriptions.Item
+                                label={t("skills.uploadDialog.description")}
+                            >
                                 {uploadPreview.description}
                             </Descriptions.Item>
-                            <Descriptions.Item label="包内资源">
-                                {uploadPreview.references} 个 references ·{" "}
-                                {uploadPreview.assets} 个 asset ·{" "}
-                                {uploadPreview.scripts} 个 scripts
+                            <Descriptions.Item
+                                label={t(
+                                    "skills.uploadDialog.packageResources",
+                                )}
+                            >
+                                {t("skills.uploadDialog.packageSummary", {
+                                    references: uploadPreview.references,
+                                    assets: uploadPreview.assets,
+                                    scripts: uploadPreview.scripts,
+                                })}
                             </Descriptions.Item>
                         </Descriptions>
                     </div>

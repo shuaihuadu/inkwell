@@ -22,6 +22,8 @@ import {
     theme,
 } from "antd";
 import { useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import DataListPage, {
     DataListRowAction,
 } from "../../shared/components/data-list-page";
@@ -43,7 +45,10 @@ interface JsonSchemaProperty {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
-const parseToolParameters = (schemaText: string): ToolParameter[] => {
+const parseToolParameters = (
+    schemaText: string,
+    t: TFunction,
+): ToolParameter[] => {
     try {
         const schema: unknown = JSON.parse(schemaText);
         if (!isRecord(schema) || !isRecord(schema.properties)) {
@@ -68,7 +73,7 @@ const parseToolParameters = (schemaText: string): ToolParameter[] => {
                       .join(" | ")
                 : typeof property.type === "string"
                   ? property.type
-                  : "未知";
+                  : t("common.unknown");
             const allowedValues = Array.isArray(property.enum)
                 ? property.enum.map(String)
                 : [];
@@ -85,8 +90,8 @@ const parseToolParameters = (schemaText: string): ToolParameter[] => {
     }
 };
 
-const formatTime = (value: string): string =>
-    new Intl.DateTimeFormat("zh-CN", {
+const formatTime = (value: string, locale: string): string =>
+    new Intl.DateTimeFormat(locale, {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -96,6 +101,7 @@ const formatTime = (value: string): string =>
     }).format(new Date(value));
 
 export function ToolManagement() {
+    const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const [searchText, setSearchText] = useState("");
     const [selectedTool, setSelectedTool] =
@@ -111,18 +117,18 @@ export function ToolManagement() {
             .includes(normalizedSearch),
     );
     const selectedParameters = selectedTool
-        ? parseToolParameters(selectedTool.parametersJsonSchema)
+        ? parseToolParameters(selectedTool.parametersJsonSchema, t)
         : [];
 
     return (
         <DataListPage<AgentToolDefinition>
-            title="工具"
-            description="查看 Agent 可使用的工具。工具帮助 Agent 查询信息、调用服务或完成具体操作。"
-            refreshLabel="刷新工具"
+            title={t("tools.title")}
+            description={t("tools.description")}
+            refreshLabel={t("tools.refreshLabel")}
             onRefresh={() => void toolsQuery.refetch()}
             refreshing={toolsQuery.isFetching && !toolsQuery.isLoading}
             searchValue={searchText}
-            searchPlaceholder="搜索名称或描述"
+            searchPlaceholder={t("tools.searchPlaceholder")}
             searchMaxLength={128}
             onSearchChange={setSearchText}
             paginationResetKey={searchText}
@@ -131,15 +137,15 @@ export function ToolManagement() {
             tableScrollX={800}
             loading={toolsQuery.isLoading}
             errorMessage={
-                toolsQuery.isError ? "工具列表加载失败，请稍后重试" : undefined
+                toolsQuery.isError ? t("tools.loadFailed") : undefined
             }
             onRetry={() => void toolsQuery.refetch()}
-            emptyText="当前没有已注册的工具"
-            filteredEmptyText="没有匹配的工具，请清除搜索条件"
+            emptyText={t("tools.empty")}
+            filteredEmptyText={t("tools.filteredEmpty")}
             isFiltered={normalizedSearch.length > 0}
             columns={[
                 {
-                    title: "名称",
+                    title: t("tools.columns.name"),
                     dataIndex: "name",
                     width: 210,
                     render: (value: string) => (
@@ -147,25 +153,27 @@ export function ToolManagement() {
                     ),
                 },
                 {
-                    title: "描述",
+                    title: t("tools.columns.description"),
                     dataIndex: "description",
                     ellipsis: true,
                 },
                 {
-                    title: "参数",
+                    title: t("tools.columns.parameters"),
                     dataIndex: "parametersJsonSchema",
                     width: 90,
                     render: (value: string) =>
-                        `${parseToolParameters(value).length} 项`,
+                        t("tools.parameterCount", {
+                            count: parseToolParameters(value, t).length,
+                        }),
                 },
                 {
-                    title: "更新时间",
+                    title: t("tools.columns.updatedTime"),
                     dataIndex: "updatedTime",
                     width: 168,
-                    render: formatTime,
+                    render: (value: string) => formatTime(value, i18n.language),
                 },
                 {
-                    title: "操作",
+                    title: t("tools.columns.actions"),
                     key: "actions",
                     width: 92,
                     fixed: "right",
@@ -173,8 +181,8 @@ export function ToolManagement() {
                     className: "inkwell-action-column",
                     render: (_, tool) => (
                         <DataListRowAction
-                            label={`查看 ${tool.name}`}
-                            text="查看"
+                            label={t("tools.viewLabel", { name: tool.name })}
+                            text={t("common.view")}
                             icon={<EyeOutlined />}
                             onClick={() => setSelectedTool(tool)}
                         />
@@ -184,15 +192,15 @@ export function ToolManagement() {
         >
             <Drawer
                 width={600}
-                title="Tool 详情"
+                title={t("tools.details.title")}
                 closable={false}
                 open={selectedTool !== null}
                 onClose={() => setSelectedTool(null)}
                 extra={
-                    <Tooltip title="关闭">
+                    <Tooltip title={t("common.close")}>
                         <Button
                             type="text"
-                            aria-label="关闭 Tool 详情"
+                            aria-label={t("tools.details.closeLabel")}
                             icon={<CloseOutlined />}
                             onClick={() => setSelectedTool(null)}
                         />
@@ -226,7 +234,9 @@ export function ToolManagement() {
                                         </Typography.Text>
                                     </Typography.Title>
                                     <Tag>
-                                        {selectedParameters.length} 个参数
+                                        {t("tools.details.parameterCount", {
+                                            count: selectedParameters.length,
+                                        })}
                                     </Tag>
                                 </Flex>
                                 <Typography.Paragraph
@@ -237,7 +247,10 @@ export function ToolManagement() {
                                 </Typography.Paragraph>
                                 <Typography.Text type="secondary">
                                     <CalendarOutlined />{" "}
-                                    {formatTime(selectedTool.updatedTime)}
+                                    {formatTime(
+                                        selectedTool.updatedTime,
+                                        i18n.language,
+                                    )}
                                 </Typography.Text>
                             </div>
                         </div>
@@ -250,7 +263,7 @@ export function ToolManagement() {
                                 >
                                     <FormOutlined />
                                     <Typography.Text strong>
-                                        参数
+                                        {t("tools.details.parameters")}
                                     </Typography.Text>
                                 </Space>
                                 <Table<ToolParameter>
@@ -258,10 +271,14 @@ export function ToolManagement() {
                                     pagination={false}
                                     rowKey="name"
                                     dataSource={selectedParameters}
-                                    locale={{ emptyText: "此工具没有参数" }}
+                                    locale={{
+                                        emptyText: t(
+                                            "tools.details.noParameters",
+                                        ),
+                                    }}
                                     columns={[
                                         {
-                                            title: "名称",
+                                            title: t("tools.columns.name"),
                                             dataIndex: "name",
                                             render: (value: string) => (
                                                 <Typography.Text code>
@@ -270,29 +287,35 @@ export function ToolManagement() {
                                             ),
                                         },
                                         {
-                                            title: "类型",
+                                            title: t("tools.details.type"),
                                             dataIndex: "type",
                                             width: 92,
                                         },
                                         {
-                                            title: "必填",
+                                            title: t("tools.details.required"),
                                             dataIndex: "required",
                                             width: 72,
                                             render: (value: boolean) =>
                                                 value ? (
                                                     <Tag color="processing">
-                                                        是
+                                                        {t("common.yes")}
                                                     </Tag>
                                                 ) : (
-                                                    <Tag>否</Tag>
+                                                    <Tag>{t("common.no")}</Tag>
                                                 ),
                                         },
                                         {
-                                            title: "可选值",
+                                            title: t(
+                                                "tools.details.allowedValues",
+                                            ),
                                             dataIndex: "allowedValues",
                                             render: (values: string[]) =>
                                                 values.length > 0
-                                                    ? values.join("、")
+                                                    ? values.join(
+                                                          t(
+                                                              "common.listSeparator",
+                                                          ),
+                                                      )
                                                     : "—",
                                         },
                                     ]}
@@ -306,7 +329,7 @@ export function ToolManagement() {
                                 >
                                     <CodeOutlined />
                                     <Typography.Text strong>
-                                        原始 JSON Schema
+                                        {t("tools.details.rawSchema")}
                                     </Typography.Text>
                                 </Space>
                                 <Collapse
@@ -314,7 +337,9 @@ export function ToolManagement() {
                                     items={[
                                         {
                                             key: "schema",
-                                            label: "查看原始 Schema",
+                                            label: t(
+                                                "tools.details.viewSchema",
+                                            ),
                                             children: (
                                                 <pre className="resource-schema">
                                                     {
@@ -334,7 +359,7 @@ export function ToolManagement() {
                                 >
                                     <CalendarOutlined />
                                     <Typography.Text strong>
-                                        时间信息
+                                        {t("tools.details.timeInformation")}
                                     </Typography.Text>
                                 </Space>
                                 <Descriptions
@@ -343,9 +368,12 @@ export function ToolManagement() {
                                     items={[
                                         {
                                             key: "updated",
-                                            label: "更新时间",
+                                            label: t(
+                                                "tools.columns.updatedTime",
+                                            ),
                                             children: formatTime(
                                                 selectedTool.updatedTime,
+                                                i18n.language,
                                             ),
                                         },
                                     ]}

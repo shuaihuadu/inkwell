@@ -30,9 +30,11 @@
     "@monaco-editor/react": "4.7.0",
     "@tanstack/react-query": "5.101.2",
     "antd": "6.5.1",
+    "i18next": "25.6.2",
     "jszip": "3.10.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "react-i18next": "16.5.4",
     "zustand": "5.0.14"
   },
   "devDependencies": {

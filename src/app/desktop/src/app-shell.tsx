@@ -1,5 +1,6 @@
 import { Modal, Spin } from "antd";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AgentEditor } from "./features/agent-library/agent-editor";
 import { AgentWorkspace } from "./features/agent-library/agent-workspace";
 import { useAuthStore } from "./features/auth/auth-store";
@@ -17,6 +18,7 @@ type AgentView =
     | { kind: "chat"; agent: AgentListItem; returnAgentId: string };
 
 export default function AppShell() {
+    const { t } = useTranslation();
     const status = useAuthStore((state) => state.status);
     const identity = useAuthStore((state) => state.identity);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
@@ -31,11 +33,11 @@ export default function AppShell() {
         }
 
         Modal.confirm({
-            title: "有未保存的修改",
-            content: "离开后，本次修改将丢失。",
-            okText: "仍然离开",
+            title: t("editor.unsavedTitle"),
+            content: t("editor.unsavedContent"),
+            okText: t("editor.leave"),
             okButtonProps: { danger: true },
-            cancelText: "继续编辑",
+            cancelText: t("editor.continueEditing"),
             onOk: () => {
                 setAgentEditorDirty(false);
                 onLeave();

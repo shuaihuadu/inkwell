@@ -11,7 +11,7 @@
 | UI-004 | Agent 配置 · 工具         | `src/pages/AgentDesignPage.tsx` · Agent 编辑 → 工具                 | 已挂载 / 未挂载、工具参数展开                     | `screenshots/22-agent-tool-bindings.png`                                                      |
 | UI-004 | Agent 配置 · Skills       | `src/pages/AgentDesignPage.tsx` · Agent 编辑 → Skills               | 已挂载 / 未挂载、加载阶段状态                     | `screenshots/23-agent-skill-bindings.png`                                                     |
 | UI-010 | 工具列表                  | `src/pages/ToolListPage.tsx` · `/shell` → 资源中心 → 工具           | 有数据、固定表格正文、统一总数与操作              | `screenshots/24-tool-list-unified.png`                                                        |
-| UI-010 | 工具列表 · Tool 详情       | `src/pages/ToolListPage.tsx` · 工具 → 查看                          | 只读身份信息、参数表、原始 JSON Schema 展开态     | `screenshots/30-tool-readonly-details.png`                                                    |
+| UI-010 | 工具列表 · Tool 详情      | `src/pages/ToolListPage.tsx` · 工具 → 查看                          | 只读身份信息、参数表、原始 JSON Schema 展开态     | `screenshots/30-tool-readonly-details.png`                                                    |
 | UI-011 | Skills 列表               | `src/pages/SkillListPage.tsx` · `/shell` → 资源中心 → Skills        | 有数据、Owner 操作、固定分页                      | `screenshots/25-skill-list-unified.png`                                                       |
 | UI-011 | Skills 列表 · Skill 详情  | `src/pages/SkillListPage.tsx` · Skills → 查看                       | 超长 Markdown 默认折叠 / 展开滚动、资源与时间信息 | `screenshots/28-skill-readonly-details.png`、`screenshots/29-skill-long-content-expanded.png` |
 | UI-012 | 模型列表                  | `src/pages/ModelListPage.tsx` · `/shell` → 资源中心 → 模型          | 有数据、三态能力、统一测试按钮                    | `screenshots/26-model-list-unified.png`                                                       |
@@ -103,9 +103,9 @@ Instructions 对超长内容默认展示约 5 行预览，并显示字符数；�
 
 - 左侧 nav 是真正可展开折叠的两级树形结构，共三组：`工作区`（Agent 空间）/ `资源中心`（工具、Skills、模型）/ `系统管理`（用户管理，仅 Admin 可见）。UI-010 ~ UI-012 已从早期占位入口升级为正式资源列表页；分组标题可点击折叠/展开，Sider 收起为图标条时分组一律展开、只显示图标。
 - 品牌主题色（曜石紫/朱砂橙/碧海青）三选一只是 Design Lab 评审工具的候选方案，H2 ADR 会锁定其中一套，**不是**面向最终用户的产品功能；但“浅色/暗色”外观切换是合理的最终产品功能，已加入模拟 Header。
-- i18n/多语言切换明确不做（ADR-014 + AGENTS.md §3.3 禁区已锁定 v1 仅 zh-CN，原型阶段不能绕过）。
+- 界面语言支持简体中文与英文。用户可在“个人设置 / Preferences”中即时切换；原型同步切换 Ant Design / Ant Design X 内建文案，并用用户菜单、帮助菜单和设置弹层验证两种语言下的布局。产品页面完整翻译由桌面端集中消息资源维护，Design Lab 不复制整套产品文案。
 - “关于”入口：Header 品牌区一个实心圆点（无图标），`currentColor` 驱动的呼吸动画，随主题自动换色；点击弹出 Modal：版本/构建号/提交/作者/GitHub 链接同居一个信息列表，下方大尺寸二维码占据剩余整个区域。
-- “个人设置”入口（2026-07-15 新增）：用户菜单“个人设置”点击弹 Modal，内含两组 `Segmented`：外观模式（亮色/暗色/跟随系统，`DesignContext` 新增 `AppearanceMode` 类型，“跟随系统”监听 `prefers-color-scheme` 实时跟随）+ 主题色（复用 `THEMES` 定义），两者都是全局生效（与顶部 Design Lab 工具条的主题/暗色开关共享同一个 `useDesign()` context）。
+- “个人设置”入口：用户菜单“个人设置 / Preferences”点击弹 Modal，内含三组 `Segmented`：界面语言（简体中文/English）、外观模式（亮色/暗色/跟随系统，`DesignContext` 的 `AppearanceMode` 监听 `prefers-color-scheme`）和主题色（复用 `THEMES` 定义），三者都是全局生效。
 - “后台服务正常/重连中/后台服务异常”网络状态徽标（2026-07-15 两轮修订：先从“在线”改“网络正常”避免与用户 presence 混淆，再改“后台服务正常”避免与本机网络混淆），ui-spec.md §0.2 同步改写。
 - Agent 空间占位内容：固定卡片高度 + 单行省略的标题/元信息 + 固定两行裁剪的描述，保证内容多寡不影响卡片高度一致。顶部“新建 Agent”按钮同样钻取进 Agent 设计页，但以 `new-draft`（未保存的草稿）状态打开空白配置（ui-spec.md §3.4）。两档 tab ——`我的` / `团队共享`（2026-07-15 移除原第三档 `我使用过`，requirements.md §13 第 32 条）。
 - **Agent 卡片点击按发布状态分流**（2026-07-15 新决定，requirements.md §13 第 30 条 / ui-spec.md §3.4）：`MOCK_AGENTS` 新增 `published` 字段。已发布 Agent（卡片下方标“点击进入对话”）点击卡片直达新建的 **Agent 对话页**（见下方“Agent 对话页”小节）；仅存在未发布过的草稿（标“草稿” Tag，卡片下方标“点击继继编辑草稿”）仍点击钻取进 Agent 设计页。已发布卡片右上角新增 hover 才显现的“编辑”快捷图标按钮（`.inkwell-agent-card-edit-btn` + styles.css hover 规则），直达 Agent 设计页，不需先进对话。进入对话页时主导航 nav 自动收缩为图标条，“返回”时自动恢复展开（ui-spec.md §5.1）。
@@ -192,6 +192,7 @@ Skills 区段只从统一 Skill 管理目录中选择并绑定，不在 Agent �
 - **踩坑记录**：种子数据/演示文案最初把 `${userText}`（用户原话）直接拼进每一轮的草稿正文里（如"帮我优化一下这段文案：我们的产品…"），导致草稿听起来像是把用户的整句话又重复了一遍，不自然。修复：草稿正文只保留真正的文案内容，`${userText}` 只用在步骤的 `description`（如"基于『xxx』生成初稿"）里做上下文提示，不混进正文。**教训：给"AI 产出的内容"写种子/演示文案时，别图省事直接把用户输入原样拼进产出里，先读一遍拼出来的完整句子，检查是不是自然的表达。**
 
 **排查记录（供以后遇到类似问题参考）**：
+
 1. 打字动画卡在第一帧——用 `node_modules/@ant-design/x/es/bubble/hooks/useTyping.js` 源码确认是 `useLayoutEffect` 驱动 rAF 循环、无 cleanup，`StrictMode` 双调用会打断循环；改用自己的 `setTimeout` 分块更新彻底绕开这个坑。
 2. 修复打字动画时顺手给 `useMockChat` 的内部函数（`resetMessages`/`appendReply`/`sendMessage`/`retryLast`/`submit`/`startNewSession`）全部用 `useCallback` + ref（`messagesRef`/`replyingRef`/`mockReplyRef`/`inputRef`）包装到"绝对稳定"，这一步引入了一个新 bug：`submit` 曾经写成 `setInput(current => { ...; sendMessage(text); return ""; })`，在 `setState` 的函数式 updater 里调用有副作用的 `sendMessage`——React `StrictMode` 会故意双调用 updater 函数来抓这类不纯函数，导致消息真的发送了两次（出现"两个子元素 key 相同"的 React 报错 + 气泡真的重复了一遍）。修复：改成读 `inputRef.current`（一个普通 ref），不再把副作用塞进 `setState` 的 updater 里。**教训：`setState(prev => {...})` 的 updater 必须是纯函数，不能在里面调用任何有副作用的函数（哪怜是"看起来只是读一下最新值"的动机），需要读最新值时用 ref，不要用函数式 updater 夹带私货。**
 
@@ -255,7 +256,8 @@ user/ai 气泡的正文原来是纯文本展示——真实场景里模型回复
 - **`useMockChat.ts` 的 `defaultMockReply`**：特意改成带上加粗/斜体/行内代码/列表/链接/引用块的示例文本，方便在原型里直接打字验证渲染效果，不用另外造数据。
 - **流式输出期间的行为**：内容在 `TEXT_MESSAGE_CONTENT` 事件逐块累加时，中途会出现"没闭合的 `**` 或代码块"，这是预期内的、`XMarkdown` 能容忍的短暂现象（闭合之前先按纯文本展示那一小段，不会报错/崩溃）；`XMarkdown` 其实还专门提供了 `streaming`（`hasNextChunk`/`enableAnimation`/`tail` 光标动画等）配置项用来对接真正的流式场景，本次先用最基础的 `content` 用法验证渲染能力，没有接这套配置——如果以后想要更贴近真实"打字机+光标"效果，可以再加。
 - **验证**：卡在一个"Vite 依赖预打包缓存过期"的坑——刚装完新包、dev server 还在跑，浏览器报 `504 Outdated Optimize Dep`，重启 dev server（顺带清了 `node_modules/.vite`）后恢复正常。恢复后在 `AgentChatPage` 发一条任意消息，实测加粗/斜体/行内代码/列表/链接/引用块全部正确渲染成真实 DOM 元素（用 DOM `textContent` 核对文本内容完全正确，截图 JPEG 压缩偶尔会让中文字形看起来像别的字，那是截图压缩的视觉伪影，不是真实渲染 bug，排查时要用 DOM 文本核对而不是只看截图）；`tsc -b --force` 通过。
-3. 修完 (2) 后一度怀疑又出现"点击/发送完全没反应"的问题，且伴随浏览器主线程被完全占满（`requestAnimationFrame` 排队 20+ 秒都不回调）——一开始怀疑是新代码引入了死循环，重启了 vite dev server、清了端口、开了全新的浏览器 tab 反复验证，结果**全新 tab 完全正常**，问题只出现在这一整个超长会话里反复被拿来试验（多次触发 Harness 演示、多次 reload、多次 HMR）的那一个旧 tab 上，怀疑是该 tab 长期积累的定时器/状态残留把主线程堵住了，并非代码本身的 bug。**教训：长时间反复在同一个浏览器 tab 上做大量交互测试后，如果突然出现"所有交互都没反应"且伴随主线程假死，先怀疑是不是这个 tab 自己积累出了问题（开一个全新 tab 复测），不要急着断定是刚改的代码引入了死循环。**
+
+- **额外排查**：修完上述问题后一度怀疑又出现"点击/发送完全没反应"的问题，且伴随浏览器主线程被完全占满（`requestAnimationFrame` 排队 20+ 秒都不回调）——一开始怀疑是新代码引入了死循环，重启了 vite dev server、清了端口、开了全新的浏览器 tab 反复验证，结果**全新 tab 完全正常**，问题只出现在这一整个超长会话里反复被拿来试验（多次触发 Harness 演示、多次 reload、多次 HMR）的那一个旧 tab 上，怀疑是该 tab 长期积累的定时器/状态残留把主线程堵住了，并非代码本身的 bug。**教训：长时间反复在同一个浏览器 tab 上做大量交互测试后，如果突然出现"所有交互都没反应"且伴随主线程假死，先怀疑是不是这个 tab 自己积累出了问题（开一个全新 tab 复测），不要急着断定是刚改的代码引入了死循环。**
 
 依赖备注：`ThoughtChain` 从 `@ant-design/x` 顶层直接 `import { ThoughtChain, type ThoughtChainItemType } from "@ant-design/x"` 即可拿到（`node_modules/@ant-design/x/es/index.d.ts` 已导出），不需要额外装包。
 
@@ -268,7 +270,7 @@ user/ai 气泡的正文原来是纯文本展示——真实场景里模型回复
 
 **`CopilotPanel` 打开时的宽度联动**：`CopilotPanel` 固定 400px 且与配置表单并排（而不是遮罩），在较窄视口下会挤占配置表单的可用宽度，叠加 AppShell 主导航（展开 200px）与 Agent 设计页自身的“配置区段”侧边栏（展开 176px）两层已有的固定宽侧栏，三层宽度叠加足以把表单内容区压缩到几乎为零、触发浏览器逐字换行的破坏性渲染（每个字单独占一行）。修复方式：`AgentDesignPage` 新增 `onCopilotOpenChange` 回调 prop，打开/关闭面板时既收起/展开 AppShell 主导航（`AppShellExplorer.tsx` 里 `setCollapsed`），也同步收起/展开自身的“配置区段”侧边栏（`setSiderCollapsed`），三处联动尽量让出宽度；同时给 Agent 头部的名称/版本信息区块和“配置区段”内容面板分别加了 `minWidth`（140px / 280px）兜底——当可用宽度依然不够时，宁可让内容整块换行/被 `overflow:auto` 横向滚动裁切，也不能让 flex 子项在 `minWidth:0` 下无限收缩到发生逐字换行。
 
-依赖：新增 `@ant-design/x@^2.8.0`（peer 依赖 `antd@^6.1.1` 与本原型已用的 antd 6.5.1 兼容）；`RootLayout.tsx` 新增 `XProvider locale={zhCN}` 包裹全站，保证 Ant Design X 组件文案也走 zh-CN（与 ADR-014 不做 i18n 的约定一致）。
+依赖：新增 `@ant-design/x@^2.8.0`（peer 依赖 `antd@^6.1.1` 与本原型已用的 antd 6.5.1 兼容）；`RootLayout.tsx` 通过 `DesignContext.locale` 为 `ConfigProvider` 与 `XProvider` 同步选择 `zh-CN` / `en-US` locale。
 
 ## 亮暗主题开关统一为太阳/月亮 `Switch`（2026-07-15 新增）
 

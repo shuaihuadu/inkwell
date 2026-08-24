@@ -28,6 +28,8 @@ import {
     Typography,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type {
@@ -52,9 +54,9 @@ interface ChatPanelProps {
 }
 
 const TrialPrompts = [
-    "整理一份竞品研究框架",
-    "分析这份资料的关键结论",
-    "为调研报告设计目录",
+    "chat.prompts.research.description",
+    "chat.prompts.analyze",
+    "chat.prompts.outline.description",
 ];
 
 type LocalConversation = ConversationItemType & {
@@ -64,11 +66,12 @@ type LocalConversation = ConversationItemType & {
 
 const toConversationItem = (
     conversation: AgentConversationListItem,
+    t: TFunction,
 ): LocalConversation => ({
     key: conversation.id,
     agentVersionId: conversation.agentVersionId,
-    label: conversation.title ?? "新会话",
-    group: "历史会话",
+    label: conversation.title ?? t("chat.panel.newConversation"),
+    group: t("chat.panel.historyGroup"),
 });
 
 const restoreActiveRunMessages = (
@@ -117,6 +120,7 @@ export function ChatPanel({
     runMode = "published",
     onClose,
 }: ChatPanelProps) {
+    const { t, i18n } = useTranslation();
     const appearance = useResolvedAppearance();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [draft, setDraft] = useState("");
@@ -176,7 +180,11 @@ export function ChatPanel({
         ])
             .then(async ([items, activeRun]) => {
                 if (disposed) return;
-                setConversations(items.map(toConversationItem));
+                setConversations(
+                    items.map((conversation) =>
+                        toConversationItem(conversation, t),
+                    ),
+                );
                 const selectedConversation =
                     (activeRun?.conversationId
                         ? items.find(
@@ -218,7 +226,7 @@ export function ChatPanel({
                     void messageApi.error(
                         reason instanceof Error
                             ? reason.message
-                            : "会话历史加载失败。",
+                            : t("chat.panel.errors.historyLoad"),
                     );
                 }
             });
@@ -226,7 +234,7 @@ export function ChatPanel({
         return () => {
             disposed = true;
         };
-    }, [agent, messageApi, variant]);
+    }, [agent, i18n.language, messageApi, t, variant]);
 
     const applySnapshot = useCallback(
         (snapshot: ChatRunSnapshot, originalInput?: string): void => {
@@ -297,17 +305,19 @@ export function ChatPanel({
                     });
                 }
                 setConversations(
-                    persistedConversations.map(toConversationItem),
+                    persistedConversations.map((conversation) =>
+                        toConversationItem(conversation, t),
+                    ),
                 );
             } catch (reason) {
                 void messageApi.error(
                     reason instanceof Error
                         ? reason.message
-                        : "会话历史刷新失败。",
+                        : t("chat.panel.errors.historyRefresh"),
                 );
             }
         },
-        [agent, messageApi, variant],
+        [agent, messageApi, t, variant],
     );
 
     useEffect(
@@ -361,7 +371,7 @@ export function ChatPanel({
                 conversationKey = conversation.id;
                 setActiveConversationKey(conversation.id);
                 setConversations((current) => [
-                    toConversationItem(conversation),
+                    toConversationItem(conversation, t),
                     ...current,
                 ]);
             }
@@ -384,7 +394,7 @@ export function ChatPanel({
                     reason:
                         reason instanceof Error
                             ? reason.message
-                            : "Agent 调用失败。",
+                            : t("chat.panel.errors.agentCall"),
                     input: content,
                 });
             }
@@ -441,7 +451,9 @@ export function ChatPanel({
             );
         } catch (reason) {
             void messageApi.error(
-                reason instanceof Error ? reason.message : "会话消息加载失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("chat.panel.errors.messagesLoad"),
             );
         }
     };
@@ -452,7 +464,9 @@ export function ChatPanel({
             await desktopApi.deleteAgentConversation(agent.id, key);
         } catch (reason) {
             void messageApi.error(
-                reason instanceof Error ? reason.message : "删除会话失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("chat.panel.errors.deleteConversation"),
             );
             return;
         }
@@ -476,16 +490,20 @@ export function ChatPanel({
             desktopApi.listAgentConversations(agent.id),
         ]);
         setMessages(persistedMessages);
-        setConversations(persistedConversations.map(toConversationItem));
+        setConversations(
+            persistedConversations.map((conversation) =>
+                toConversationItem(conversation, t),
+            ),
+        );
     };
 
     const confirmDeleteConversation = (key: string): void => {
         Modal.confirm({
-            title: "删除这个会话？",
-            content: "会话及其全部消息将被永久删除，操作不可恢复。",
-            okText: "确认删除",
+            title: t("chat.panel.deleteDialog.title"),
+            content: t("chat.panel.deleteDialog.content"),
+            okText: t("chat.panel.deleteDialog.confirm"),
             okButtonProps: { danger: true },
-            cancelText: "取消",
+            cancelText: t("common.cancel"),
             onOk: () => deleteConversation(key),
         });
     };
@@ -495,11 +513,11 @@ export function ChatPanel({
         const agentId = agent.id;
         const conversationKey = activeConversationKey;
         Modal.confirm({
-            title: "清空当前会话？",
-            content: "全部消息将被永久删除，但会话仍保留在历史列表中。",
-            okText: "确认清空",
+            title: t("chat.panel.clearDialog.title"),
+            content: t("chat.panel.clearDialog.content"),
+            okText: t("chat.panel.clearDialog.confirm"),
             okButtonProps: { danger: true },
-            cancelText: "取消",
+            cancelText: t("common.cancel"),
             onOk: async () => {
                 try {
                     await desktopApi.clearAgentConversation(
@@ -511,7 +529,7 @@ export function ChatPanel({
                     void messageApi.error(
                         reason instanceof Error
                             ? reason.message
-                            : "清空会话失败。",
+                            : t("chat.panel.errors.clearConversation"),
                     );
                     throw reason;
                 }
@@ -522,7 +540,7 @@ export function ChatPanel({
     if (!agent)
         return (
             <section className="chat-panel chat-empty">
-                <Empty description="选择一个 Agent 开始对话" />
+                <Empty description={t("chat.panel.selectAgent")} />
             </section>
         );
 
@@ -531,10 +549,10 @@ export function ChatPanel({
             <section className="chat-panel-full">
                 {contextHolder}
                 <header className="chat-page-header">
-                    <Tooltip title="返回 Agent 空间">
+                    <Tooltip title={t("chat.panel.back")}>
                         <Button
                             type="text"
-                            aria-label="返回 Agent 空间"
+                            aria-label={t("chat.panel.back")}
                             icon={<ArrowLeftOutlined />}
                             onClick={onClose}
                         />
@@ -547,22 +565,29 @@ export function ChatPanel({
                     />
                     <Typography.Text strong>{agent.name}</Typography.Text>
                     <Tag>
-                        模型：
-                        {agentDetailsQuery.data?.buildOptions.modelOptions
-                            .modelId ?? "未配置"}
+                        {t("chat.panel.model", {
+                            model:
+                                agentDetailsQuery.data?.buildOptions
+                                    .modelOptions.modelId ??
+                                t("chat.panel.modelNotConfigured"),
+                        })}
                     </Tag>
                     <Tag>
                         {activeConversation
                             ? activeConversationVersionNumber === undefined
-                                ? "版本加载中"
-                                : `版本：v${activeConversationVersionNumber}`
-                            : `版本：v${agent.latestPublishedVersionNumber}`}
+                                ? t("chat.panel.versionLoading")
+                                : t("chat.panel.version", {
+                                      version: activeConversationVersionNumber,
+                                  })
+                            : t("chat.panel.version", {
+                                  version: agent.latestPublishedVersionNumber,
+                              })}
                     </Tag>
                     <div className="chat-page-header-actions">
-                        <Tooltip title="查看 Agent 详情">
+                        <Tooltip title={t("chat.panel.viewDetails")}>
                             <Button
                                 type="text"
-                                aria-label="查看 Agent 详情"
+                                aria-label={t("chat.panel.viewDetails")}
                                 icon={<EyeOutlined />}
                                 loading={
                                     agentDetailsQuery.isLoading ||
@@ -573,10 +598,10 @@ export function ChatPanel({
                                 onClick={() => setDetailsOpen(true)}
                             />
                         </Tooltip>
-                        <Tooltip title="清空当前会话">
+                        <Tooltip title={t("chat.panel.clearConversation")}>
                             <Button
                                 type="text"
-                                aria-label="清空当前会话"
+                                aria-label={t("chat.panel.clearConversation")}
                                 icon={<ClearOutlined />}
                                 disabled={
                                     !activeConversationKey ||
@@ -605,12 +630,14 @@ export function ChatPanel({
                         <div className="chat-history-header">
                             {!historyCollapsed && (
                                 <Typography.Text type="secondary">
-                                    会话
+                                    {t("chat.panel.conversations")}
                                 </Typography.Text>
                             )}
                             <Tooltip
                                 title={
-                                    historyCollapsed ? "展开会话" : "收起会话"
+                                    historyCollapsed
+                                        ? t("chat.panel.expandConversations")
+                                        : t("chat.panel.collapseConversations")
                                 }
                             >
                                 <Button
@@ -618,8 +645,12 @@ export function ChatPanel({
                                     size="small"
                                     aria-label={
                                         historyCollapsed
-                                            ? "展开会话"
-                                            : "收起会话"
+                                            ? t(
+                                                  "chat.panel.expandConversations",
+                                              )
+                                            : t(
+                                                  "chat.panel.collapseConversations",
+                                              )
                                     }
                                     icon={
                                         historyCollapsed ? (
@@ -636,11 +667,16 @@ export function ChatPanel({
                         </div>
                         <div className="chat-history-list">
                             {historyCollapsed ? (
-                                <Tooltip title="新建会话" placement="right">
+                                <Tooltip
+                                    title={t("chat.panel.createConversation")}
+                                    placement="right"
+                                >
                                     <Button
                                         block
                                         type="text"
-                                        aria-label="新建会话"
+                                        aria-label={t(
+                                            "chat.panel.createConversation",
+                                        )}
                                         icon={<PlusOutlined />}
                                         onClick={startNewConversation}
                                     />
@@ -653,7 +689,9 @@ export function ChatPanel({
                                     }
                                     groupable
                                     creation={{
-                                        label: "新建会话",
+                                        label: t(
+                                            "chat.panel.createConversation",
+                                        ),
                                         icon: <PlusOutlined />,
                                         onClick: startNewConversation,
                                     }}
@@ -664,7 +702,7 @@ export function ChatPanel({
                                         items: [
                                             {
                                                 key: "delete",
-                                                label: "删除",
+                                                label: t("common.delete"),
                                                 danger: true,
                                                 icon: <DeleteOutlined />,
                                                 onClick: () =>
@@ -742,27 +780,32 @@ export function ChatPanel({
                     <Typography.Text type="secondary">
                         {variant === "trial"
                             ? runMode === "draft"
-                                ? "当前草稿"
-                                : `已发布 v${agent.latestPublishedVersionNumber}`
-                            : `已发布 v${agent.latestPublishedVersionNumber}`}
+                                ? t("chat.panel.currentDraft")
+                                : t("chat.panel.publishedVersion", {
+                                      version:
+                                          agent.latestPublishedVersionNumber,
+                                  })
+                            : t("chat.panel.publishedVersion", {
+                                  version: agent.latestPublishedVersionNumber,
+                              })}
                     </Typography.Text>
                 </div>
                 {variant === "trial" && (
                     <div className="chat-trial-actions">
                         <Button
                             type="text"
-                            aria-label="新建试运行会话"
+                            aria-label={t("chat.panel.newTrial")}
                             icon={<PlusOutlined />}
                             onClick={() => setMessages([])}
                         />
                         <Button
                             type="text"
-                            aria-label="试运行会话列表"
+                            aria-label={t("chat.panel.trialList")}
                             icon={<CommentOutlined />}
                         />
                         <Button
                             type="text"
-                            aria-label="关闭试运行"
+                            aria-label={t("chat.panel.closeTrial")}
                             icon={<CloseOutlined />}
                             onClick={onClose}
                         />
@@ -780,14 +823,16 @@ export function ChatPanel({
                                         {agent.name.slice(0, 1)}
                                     </div>
                                 }
-                                title="从一个研究问题开始"
-                                description="我可以协助检索资料、梳理证据并生成结构化报告。"
+                                title={t("chat.panel.trialWelcomeTitle")}
+                                description={t(
+                                    "chat.panel.trialWelcomeDescription",
+                                )}
                             />
                             <Prompts
                                 vertical
                                 items={TrialPrompts.map((prompt, index) => ({
                                     key: `trial-${index}`,
-                                    description: prompt,
+                                    description: t(prompt),
                                 }))}
                                 onItemClick={(info) =>
                                     void send(String(info.data.description))
@@ -798,10 +843,10 @@ export function ChatPanel({
                         <div className="conversation-starter">
                             <RobotOutlined />
                             <Typography.Title level={4}>
-                                开始新的对话
+                                {t("chat.panel.startConversation")}
                             </Typography.Title>
                             <Typography.Text type="secondary">
-                                消息将由当前 Agent 的已发布版本处理。
+                                {t("chat.panel.publishedMessage")}
                             </Typography.Text>
                         </div>
                     )
@@ -822,8 +867,10 @@ export function ChatPanel({
                 showPrompts
                 versionLabel={
                     runMode === "draft"
-                        ? "当前使用已保存草稿"
-                        : `当前使用已发布版本 v${agent.latestPublishedVersionNumber}`
+                        ? t("chat.panel.usingDraft")
+                        : t("chat.panel.usingPublished", {
+                              version: agent.latestPublishedVersionNumber,
+                          })
                 }
                 onChange={setDraft}
                 onSubmit={(value) => void send(value)}

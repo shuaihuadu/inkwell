@@ -2,16 +2,17 @@ import { GlobalOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, Button, ConfigProvider, Form, Input, Typography } from 'antd'
 import type { InputRef } from 'antd'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { desktopApi } from '../../shared/network/desktop-api'
 import type { LoginFailureCode, LoginRequest } from '../../shared/network/contracts'
 import { useAuthStore } from './auth-store'
 
-const loginErrors: Record<LoginFailureCode, string> = {
-    'invalid-credentials': '账号或密码错误，请重试',
-    'account-locked': '账号已被锁定，请联系系统管理员',
-    'rate-limited': '登录过于频繁，请稍后重试',
-    offline: '网络异常，已断开。请检查网络连接',
-    unknown: '登录失败，请稍后重试',
+const loginErrorKeys: Record<LoginFailureCode, string> = {
+    'invalid-credentials': 'auth.errors.invalidCredentials',
+    'account-locked': 'auth.errors.accountLocked',
+    'rate-limited': 'auth.errors.rateLimited',
+    offline: 'auth.errors.offline',
+    unknown: 'auth.errors.unknown',
 }
 
 interface LoginPageProps {
@@ -19,6 +20,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
+    const { t } = useTranslation()
     const [form] = Form.useForm<LoginRequest>()
     const passwordInputRef = useRef<InputRef>(null)
     const setSnapshot = useAuthStore((state) => state.setSnapshot)
@@ -66,7 +68,7 @@ export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
                 <div className="login-form-wrap">
                     <header className="login-heading">
                         <img src="./logo.svg" alt="Inkwell" width="64" height="64" />
-                        <Typography.Title level={4}>Inkwell Agent 平台</Typography.Title>
+                        <Typography.Title level={4}>{t('auth.platform')}</Typography.Title>
                     </header>
 
                     {failure && (
@@ -75,7 +77,7 @@ export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
                             type={failure === 'rate-limited' || failure === 'offline' ? 'warning' : 'error'}
                             showIcon
                             icon={failure === 'offline' ? <GlobalOutlined /> : undefined}
-                            message={loginErrors[failure]}
+                            message={t(loginErrorKeys[failure])}
                         />
                     )}
 
@@ -91,34 +93,34 @@ export function LoginPage({ initiallyOffline = false }: LoginPageProps) {
                         <Form.Item
                             name="username"
                             rules={[
-                                { required: true, message: '请输入账号' },
-                                { max: 64, message: '账号长度不超过 64' },
+                                { required: true, message: t('auth.usernameRequired') },
+                                { max: 64, message: t('auth.usernameTooLong') },
                             ]}
                         >
                             <Input
                                 prefix={<UserOutlined />}
-                                placeholder="请输入账号"
+                                placeholder={t('auth.usernamePlaceholder')}
                                 autoComplete="username"
                                 autoFocus
                                 disabled={fieldsDisabled}
                             />
                         </Form.Item>
-                        <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+                        <Form.Item name="password" rules={[{ required: true, message: t('auth.passwordRequired') }]}>
                             <Input.Password
                                 ref={passwordInputRef}
                                 prefix={<LockOutlined />}
-                                placeholder="请输入密码"
+                                placeholder={t('auth.passwordPlaceholder')}
                                 autoComplete="current-password"
                                 disabled={fieldsDisabled}
                             />
                         </Form.Item>
                         <Button block type="primary" htmlType="submit" loading={submitting} disabled={submitDisabled}>
-                            {submitting ? '登录中…' : '登录'}
+                            {submitting ? t('auth.loggingIn') : t('auth.login')}
                         </Button>
                     </Form>
 
                     <Typography.Paragraph className="login-help" type="secondary">
-                        如忘记密码或需要开通账号，请联系系统管理员
+                        {t('auth.help')}
                     </Typography.Paragraph>
                 </div>
             </section>

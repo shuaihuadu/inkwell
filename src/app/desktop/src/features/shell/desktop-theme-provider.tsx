@@ -1,8 +1,11 @@
 import { ConfigProvider, theme } from "antd";
+import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
+import i18n from "../../shared/i18n/i18n";
 import { useAppearanceStore, useResolvedAppearance } from "./appearance-store";
+import { useResolvedLocale } from "./locale-store";
 import { desktopThemes } from "./themes";
 
 interface DesktopThemeProviderProps {
@@ -13,6 +16,7 @@ export function DesktopThemeProvider({ children }: DesktopThemeProviderProps) {
     const resolvedAppearance = useResolvedAppearance();
     const isDark = resolvedAppearance === "dark";
     const themeName = useAppearanceStore((state) => state.themeName);
+    const locale = useResolvedLocale();
     const activeTheme = desktopThemes[themeName];
     const activeTokens = isDark ? activeTheme.dark : activeTheme.light;
 
@@ -21,9 +25,15 @@ export function DesktopThemeProvider({ children }: DesktopThemeProviderProps) {
         document.documentElement.dataset.theme = themeName;
     }, [isDark, themeName]);
 
+    useEffect(() => {
+        document.documentElement.lang = locale;
+        document.documentElement.dataset.locale = locale;
+        void i18n.changeLanguage(locale);
+    }, [locale]);
+
     return (
         <ConfigProvider
-            locale={zhCN}
+            locale={locale === "en-US" ? enUS : zhCN}
             theme={{
                 algorithm: isDark
                     ? theme.darkAlgorithm
@@ -50,10 +60,7 @@ function ThemeCssVariables({ children }: DesktopThemeProviderProps) {
             "--shell-text-description",
             token.colorTextDescription,
         );
-        rootStyle.setProperty(
-            "--shell-text-tertiary",
-            token.colorTextTertiary,
-        );
+        rootStyle.setProperty("--shell-text-tertiary", token.colorTextTertiary);
         rootStyle.setProperty(
             "--shell-fill-quaternary",
             token.colorFillQuaternary,

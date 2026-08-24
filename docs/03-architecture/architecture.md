@@ -86,6 +86,7 @@ flowchart TB
 详见 [ADR-001](./adr/ADR-001-client-runtime-electron-react.md)。
 
 - **Renderer 层**：React 19 + Vite 6 + TypeScript 5.x（最新 minor）；Pro Layout 风格；状态管理使用 [Zustand](https://github.com/pmndrs/zustand)（轻量，避开 Redux 模板代码）+ React Query（数据获取与缓存）。
+- **多语言层**：[i18next](https://www.i18next.com/) + `react-i18next` 管理 `zh-CN` / `en-US` 消息资源；Zustand persist 保存 `zh-CN` / `en-US` / `system` 本机偏好并将系统首选语言解析为受支持 locale；Ant Design locale、日期 / 数字格式与 `html.lang` 同步切换。公共操作收敛到 `common.*`，详见 [ADR-027](./adr/ADR-027-desktop-ui-bilingual-localization.md)。
 - **画布层**：~~[React Flow](https://reactflow.dev/)（`@xyflow/react` 12+）+ 自定义 NodeTypes / EdgeTypes（[ADR-006](./adr/ADR-006-orchestration-canvas-react-flow.md)）~~（已随触发器 / 多 Agent 编排于 2026-07-09 推迟至 v2，详见 [requirements.md §13 第 28 条](../01-requirements/requirements.md)；ADR-006 设计保留供 v2 参考）。
 - **流式层**：[`@ag-ui/client`](https://github.com/ag-ui-protocol) 客户端 SDK 接收 SSE 事件 → Zustand store → 渲染 [UI-002 聊天](../01-requirements/ui-spec.md) / [UI-007 调试](../01-requirements/ui-spec.md)。
 - **Main 层**：负责 idle 监听 / lock 调度（[ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md)）/ 麦克风权限 / 自动更新（[electron-updater](https://www.electron.build/auto-update)）；通过 `preload.ts` + `contextBridge` 向 Renderer 暴露受控 API。
@@ -355,7 +356,7 @@ helm install inkwell ./charts/inkwell --namespace inkwell-prod
 - [RISK-007](./risk-analysis.md#risk-007-主进程长-sse-跨锁屏可靠性) 主进程长 SSE 跨锁屏可靠性
 - [RISK-008](./risk-analysis.md#risk-008-v1-范围裁剪压力) v1 范围裁剪压力
 - [RISK-009](./risk-analysis.md#risk-009-skill-加载错误传播到对话) Skill 加载错误传播
-- [RISK-010](./risk-analysis.md#risk-010-v1-不引入-i18n-的-v2-重做成本) v2 引入 i18n 的重构成本
+- [RISK-010](./risk-analysis.md#risk-010-双语-ui-翻译覆盖与边界漂移) 双语 UI 翻译覆盖与边界漂移
 - [RISK-011](./risk-analysis.md#risk-011-文件存储三-provider-contract-漏出) 文件存储三 Provider contract 漏出
 - [RISK-012](./risk-analysis.md#risk-012-redis-单点与缓存-invalidation-一致性) Redis 单点与缓存 invalidation 一致性
 - [RISK-013](./risk-analysis.md#risk-013-v1-未引入-key-vault-的凭据轮换与隔离弱化) v1 未引入 Key Vault 的凭据轮换与隔离弱化

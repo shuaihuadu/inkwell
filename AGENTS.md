@@ -138,7 +138,7 @@
 
 - **客户端**
   - 不做本地缓存对话历史（[NFR-001](docs/01-requirements/requirements.md)）
-  - 不本地化（不引入 i18n 框架，文案直接 zh-CN 字面量；轻量 `tFn(label)` wrapper 是允许的预备，[ADR-014](docs/03-architecture/adr/ADR-014-i18n-out-of-scope-v1.md) + [RISK-010](docs/03-architecture/risk-analysis.md)）
+  - 桌面端自有 UI 文案支持 `zh-CN` / `en-US`，统一通过集中消息资源与 `common.*` 公共操作 key 维护；不得在组件中新增固定 UI 字面量（[ADR-027](docs/03-architecture/adr/ADR-027-desktop-ui-bilingual-localization.md) + [RISK-010](docs/03-architecture/risk-analysis.md)）。后端错误正文、模型输出、用户数据、Agent 内容与 ASR 暂不国际化
   - 不做客户端 ASR / TTS（[ADR-009](docs/03-architecture/adr/ADR-009-multimodal-azure-speech.md)）
   - 不做客户端 PII / 敏感字段拦截（[OQ-001 closed §A](docs/01-requirements/open-questions.md)）
 - **协议**

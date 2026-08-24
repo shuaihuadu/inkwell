@@ -178,9 +178,9 @@ test("renders the prototype-aligned login experience", async ({
 
     try {
         const page = await application.firstWindow();
-        expect(
-            await application.evaluate(({ app }) => app.getName()),
-        ).toBe("Inkwell");
+        expect(await application.evaluate(({ app }) => app.getName())).toBe(
+            "Inkwell",
+        );
         await expect(
             page.getByRole("heading", { name: "Inkwell", exact: true }),
         ).toBeVisible();
@@ -1519,6 +1519,58 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByRole("dialog", { name: "个人设置" }),
         ).toBeVisible();
+        const languageOptions = page.locator(".appearance-options").first();
+        await expect(
+            languageOptions.getByText("跟随系统", { exact: true }),
+        ).toBeVisible();
+        const expectedSystemLocale = await page.evaluate(() => {
+            const language = navigator.languages[0]?.toLowerCase();
+            if (language?.startsWith("en")) return "en-US";
+            return "zh-CN";
+        });
+        await languageOptions
+            .getByText("跟随系统", { exact: true })
+            .dispatchEvent("click");
+        await expect(page.locator("html")).toHaveAttribute(
+            "data-locale",
+            expectedSystemLocale,
+        );
+        await languageOptions
+            .getByText("English", { exact: true })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("dialog", { name: "Preferences" }),
+        ).toBeVisible();
+        await expect(
+            languageOptions.getByText("System", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("Workspace", { exact: true }),
+        ).toBeVisible();
+        await expect(page.locator("html")).toHaveAttribute(
+            "data-locale",
+            "en-US",
+        );
+        await page.reload();
+        await expect(
+            page.getByText("Workspace", { exact: true }),
+        ).toBeVisible();
+        await expect(page.locator("html")).toHaveAttribute(
+            "data-locale",
+            "en-US",
+        );
+        await page
+            .getByRole("button", { name: "Open user menu" })
+            .dispatchEvent("click");
+        await page
+            .getByText("Preferences", { exact: true })
+            .dispatchEvent("click");
+        await page
+            .getByText("简体中文", { exact: true })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("dialog", { name: "个人设置" }),
+        ).toBeVisible();
         await expect(page.getByText("曜石紫", { exact: true })).toBeVisible();
         await expect(page.getByText("朱砂橙", { exact: true })).toBeVisible();
         await expect(page.getByText("碧海青", { exact: true })).toBeVisible();
@@ -2356,7 +2408,7 @@ test("shows authentication errors and enters the workspace after login", async (
             "12px",
         );
         await expect(
-            page.locator(".agent-skill-stages").first().getByText("Discovery"),
+            page.locator(".agent-skill-stages").first().getByText("发现"),
         ).toBeVisible();
         await page
             .locator(".agent-editor-actions")

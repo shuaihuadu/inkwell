@@ -20,6 +20,7 @@ import {
     Typography,
 } from "antd";
 import { useDeferredValue, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 export type GuideSection =
     | "quick-start"
@@ -30,34 +31,13 @@ export type GuideSection =
 
 const GuideSections: Array<{
     key: GuideSection;
-    label: string;
-    description: string;
+    translationKey: "quickStart" | "create" | "publish" | "share" | "faq";
 }> = [
-    {
-        key: "quick-start",
-        label: "快速开始",
-        description: "从创建到共享，完成第一个 Agent。",
-    },
-    {
-        key: "create",
-        label: "创建与配置",
-        description: "设置基础信息、Instructions、模型、Tools 和 Skills。",
-    },
-    {
-        key: "publish",
-        label: "保存与发布",
-        description: "理解草稿、已发布版本和未发布修改。",
-    },
-    {
-        key: "share",
-        label: "共享与复制",
-        description: "把已发布 Agent 交给团队使用，或复制独立副本。",
-    },
-    {
-        key: "faq",
-        label: "常见问题",
-        description: "快速处理版本、共享和权限相关疑问。",
-    },
+    { key: "quick-start", translationKey: "quickStart" },
+    { key: "create", translationKey: "create" },
+    { key: "publish", translationKey: "publish" },
+    { key: "share", translationKey: "share" },
+    { key: "faq", translationKey: "faq" },
 ];
 
 interface UserGuideProps {
@@ -71,11 +51,19 @@ export function UserGuide({
     onStartQuickGuide,
     onGoToAgentSpace,
 }: UserGuideProps) {
+    const { t } = useTranslation();
     const [activeSection, setActiveSection] =
         useState<GuideSection>(initialSection);
     const [searchText, setSearchText] = useState("");
     const deferredSearch = useDeferredValue(searchText.trim().toLowerCase());
-    const visibleSections = GuideSections.filter((section) =>
+    const sections = GuideSections.map((section) => ({
+        ...section,
+        label: t(`guide.sections.${section.translationKey}.label`),
+        description: t(
+            `guide.sections.${section.translationKey}.description`,
+        ),
+    }));
+    const visibleSections = sections.filter((section) =>
         `${section.label} ${section.description}`
             .toLowerCase()
             .includes(deferredSearch),
@@ -85,18 +73,21 @@ export function UserGuide({
         <main className="user-guide-page">
             <aside className="user-guide-sidebar">
                 <div className="user-guide-sidebar-header">
-                    <Typography.Text strong>使用指南</Typography.Text>
+                    <Typography.Text strong>{t("guide.title")}</Typography.Text>
                 </div>
                 <div className="user-guide-search">
                     <Input
                         allowClear
                         prefix={<SearchOutlined />}
-                        placeholder="搜索指南"
+                        placeholder={t("guide.searchPlaceholder")}
                         value={searchText}
                         onChange={(event) => setSearchText(event.target.value)}
                     />
                 </div>
-                <nav className="user-guide-nav" aria-label="使用指南章节">
+                <nav
+                    className="user-guide-nav"
+                    aria-label={t("guide.navigationLabel")}
+                >
                     {visibleSections.length > 0 ? (
                         visibleSections.map((section) => (
                             <button
@@ -118,7 +109,7 @@ export function UserGuide({
                     ) : (
                         <Empty
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description="没有匹配的指南"
+                            description={t("guide.noMatches")}
                         />
                     )}
                 </nav>
@@ -144,37 +135,38 @@ function GuideContent({
     onStartQuickGuide: () => void;
     onGoToAgentSpace: () => void;
 }) {
+    const { t } = useTranslation();
     if (section === "quick-start") {
         return (
             <>
                 <GuideHeading
-                    eyebrow="大约 5 分钟"
-                    title="创建并发布第一个 Agent"
-                    description="沿着一条完整路径认识 Inkwell。每一步都可以稍后返回，不会强制锁定操作顺序。"
+                    eyebrow={t("guide.quickStart.eyebrow")}
+                    title={t("guide.quickStart.title")}
+                    description={t("guide.quickStart.description")}
                 />
                 <Steps
                     orientation="vertical"
                     current={1}
                     items={[
                         {
-                            title: "创建 Agent",
-                            content: "填写名称和用途，建立一个未发布草稿。",
+                            title: t("guide.quickStart.steps.create.title"),
+                            content: t("guide.quickStart.steps.create.content"),
                         },
                         {
-                            title: "完成核心配置",
-                            content: "补充 Instructions，并选择运行模型。",
+                            title: t("guide.quickStart.steps.configure.title"),
+                            content: t("guide.quickStart.steps.configure.content"),
                         },
                         {
-                            title: "试运行",
-                            content: "用真实问题检查回答是否符合预期。",
+                            title: t("guide.quickStart.steps.trial.title"),
+                            content: t("guide.quickStart.steps.trial.content"),
                         },
                         {
-                            title: "发布版本",
-                            content: "把当前草稿固化为可用于对话的正式版本。",
+                            title: t("guide.quickStart.steps.publish.title"),
+                            content: t("guide.quickStart.steps.publish.content"),
                         },
                         {
-                            title: "按需共享",
-                            content: "允许团队成员只读查看和使用已发布版本。",
+                            title: t("guide.quickStart.steps.share.title"),
+                            content: t("guide.quickStart.steps.share.content"),
                         },
                     ]}
                 />
@@ -184,13 +176,13 @@ function GuideContent({
                         icon={<RocketOutlined />}
                         onClick={onStartQuickGuide}
                     >
-                        打开快速开始
+                        {t("guide.quickStart.open")}
                     </Button>
                     <Button
                         icon={<ArrowRightOutlined />}
                         onClick={onGoToAgentSpace}
                     >
-                        前往 Agent 空间
+                        {t("guide.quickStart.goToAgents")}
                     </Button>
                 </Space>
             </>
@@ -201,31 +193,31 @@ function GuideContent({
         return (
             <>
                 <GuideHeading
-                    eyebrow="Agent 配置"
-                    title="先定义职责，再补充能力"
-                    description="建议先用最小配置完成一次试运行，再逐步挂载 Tools 与 Skills。"
+                    eyebrow={t("guide.create.eyebrow")}
+                    title={t("guide.create.title")}
+                    description={t("guide.create.description")}
                 />
                 <GuideList
                     items={[
-                        ["基础信息", "用清晰名称和简短描述说明 Agent 的职责边界。"],
+                        [t("guide.create.items.basics.title"), t("guide.create.items.basics.description")],
                         [
-                            "Instructions",
-                            "写明目标、约束、输出格式和无法完成时的处理方式。",
+                            t("guide.create.items.instructions.title"),
+                            t("guide.create.items.instructions.description"),
                         ],
                         [
-                            "模型与参数",
-                            "选择运行模型；没有明确原因时保留默认生成参数。",
+                            t("guide.create.items.model.title"),
+                            t("guide.create.items.model.description"),
                         ],
                         [
-                            "Tools 与 Skills",
-                            "只挂载任务真正需要的能力，减少不确定行为。",
+                            t("guide.create.items.capabilities.title"),
+                            t("guide.create.items.capabilities.description"),
                         ],
                     ]}
                 />
                 <Alert
                     type="info"
                     showIcon
-                    title="试运行使用当前已保存配置；正式对话始终使用已发布版本。"
+                    title={t("guide.create.trialNote")}
                 />
             </>
         );
@@ -235,31 +227,31 @@ function GuideContent({
         return (
             <>
                 <GuideHeading
-                    eyebrow="版本生命周期"
-                    title="保存草稿不等于发布"
-                    description="草稿用于继续编辑，发布用于生成新的正式版本。两者不会互相替代。"
+                    eyebrow={t("guide.publish.eyebrow")}
+                    title={t("guide.publish.title")}
+                    description={t("guide.publish.description")}
                 />
                 <GuideList
                     items={[
                         [
-                            "保存",
-                            "保存当前配置为草稿，不影响已发布版本和进行中的对话。",
+                            t("guide.publish.items.save.title"),
+                            t("guide.publish.items.save.description"),
                         ],
                         [
-                            "发布",
-                            "把草稿固化成新版本；新的对话轮次开始使用该版本。",
+                            t("guide.publish.items.publish.title"),
+                            t("guide.publish.items.publish.description"),
                         ],
                         [
-                            "有未发布的修改",
-                            "说明已发布版本仍可用，但当前草稿包含更新。",
+                            t("guide.publish.items.changes.title"),
+                            t("guide.publish.items.changes.description"),
                         ],
                     ]}
                 />
                 <Divider />
                 <Space size={8} wrap>
-                    <Tag color="warning">未发布的草稿</Tag>
-                    <Tag color="processing">有未发布的修改</Tag>
-                    <Tag color="success">已发布</Tag>
+                    <Tag color="warning">{t("guide.publish.draft")}</Tag>
+                    <Tag color="processing">{t("guide.publish.changed")}</Tag>
+                    <Tag color="success">{t("guide.publish.published")}</Tag>
                 </Space>
             </>
         );
@@ -269,23 +261,23 @@ function GuideContent({
         return (
             <>
                 <GuideHeading
-                    eyebrow="团队协作"
-                    title="共享使用权，不共享编辑权"
-                    description="团队成员可以查看和使用已发布版本，但不能修改 Owner 的 Agent。"
+                    eyebrow={t("guide.share.eyebrow")}
+                    title={t("guide.share.title")}
+                    description={t("guide.share.description")}
                 />
                 <GuideList
                     items={[
                         [
-                            "共享",
-                            "只暴露当前已发布版本；未发布修改不会提前生效。",
+                            t("guide.share.items.share.title"),
+                            t("guide.share.items.share.description"),
                         ],
                         [
-                            "撤销共享",
-                            "团队成员失去访问权限，Owner 原件和配置不会被删除。",
+                            t("guide.share.items.revoke.title"),
+                            t("guide.share.items.revoke.description"),
                         ],
                         [
-                            "复制为我的 Agent",
-                            "创建独立副本，复制者成为新副本的 Owner。",
+                            t("guide.share.items.copy.title"),
+                            t("guide.share.items.copy.description"),
                         ],
                     ]}
                     icons={[
@@ -301,27 +293,27 @@ function GuideContent({
     return (
         <>
             <GuideHeading
-                eyebrow="常见问题"
-                title="快速找到当前状态的含义"
-                description="这些问题覆盖 Agent 创建、版本和团队共享中的常见困惑。"
+                eyebrow={t("guide.faq.eyebrow")}
+                title={t("guide.faq.title")}
+                description={t("guide.faq.description")}
             />
             <GuideList
                 items={[
                     [
-                        "为什么卡片点击进入对话？",
-                        "已发布 Agent 的主要任务是使用；通过卡片操作进入编辑或只读详情。",
+                        t("guide.faq.items.open.title"),
+                        t("guide.faq.items.open.description"),
                     ],
                     [
-                        "为什么团队成员不能编辑共享 Agent？",
-                        "共享只授予查看和使用权限；需要修改时请复制为自己的 Agent。",
+                        t("guide.faq.items.edit.title"),
+                        t("guide.faq.items.edit.description"),
                     ],
                     [
-                        "撤销共享会删除 Agent 吗？",
-                        "不会。它只移除团队可见性，Owner 的原件和版本历史保持不变。",
+                        t("guide.faq.items.revoke.title"),
+                        t("guide.faq.items.revoke.description"),
                     ],
                     [
-                        "修改后为什么对话没有变化？",
-                        "保存草稿不会影响正式对话，需要发布新版本后才会生效。",
+                        t("guide.faq.items.changes.title"),
+                        t("guide.faq.items.changes.description"),
                     ],
                 ]}
                 icons={Array.from({ length: 4 }, (_, index) => (

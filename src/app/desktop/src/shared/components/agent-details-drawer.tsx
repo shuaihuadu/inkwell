@@ -26,6 +26,8 @@ import {
     theme,
 } from "antd";
 import { useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { MarkdownContent } from "./markdown-content";
 import type { AgentToolDefinition, AgentVersion } from "../network/contracts";
 
@@ -34,14 +36,16 @@ interface AgentDetailsDrawerProps {
     open: boolean;
     version: AgentVersion | null;
     tools: AgentToolDefinition[];
-    statusLabel: "已发布" | "历史版本" | null;
+    statusLabel: "published" | "historical" | null;
     extra?: ReactNode;
     footer?: ReactNode;
     onClose: () => void;
 }
 
-function displayValue(value: number | null | undefined): string {
-    return value === null || value === undefined ? "默认" : String(value);
+function displayValue(value: number | null | undefined, t: TFunction): string {
+    return value === null || value === undefined
+        ? t("agents.details.defaultValue")
+        : String(value);
 }
 
 function SectionTitle({
@@ -79,13 +83,15 @@ export function AgentDetailsDrawer({
     footer,
     onClose,
 }: AgentDetailsDrawerProps) {
+    const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const [messageApi, messageContextHolder] = message.useMessage();
     const [expandedVersionId, setExpandedVersionId] = useState<string | null>(
         null,
     );
     const snapshot = version?.snapshot;
-    const instructions = snapshot?.instructions || "未配置 Instructions";
+    const instructions =
+        snapshot?.instructions || t("agents.editor.instructions.empty");
     const hasLongInstructions =
         instructions.length > 180 || instructions.split("\n").length > 8;
     const instructionsExpanded = expandedVersionId === version?.id;
@@ -98,9 +104,9 @@ export function AgentDetailsDrawer({
     const copyInstructions = async (): Promise<void> => {
         try {
             await navigator.clipboard.writeText(instructions);
-            void messageApi.success("Instructions 已复制");
+            void messageApi.success(t("agents.details.instructionsCopied"));
         } catch {
-            void messageApi.error("复制失败，请重试");
+            void messageApi.error(t("agents.details.copyFailed"));
         }
     };
 
@@ -117,15 +123,15 @@ export function AgentDetailsDrawer({
                 open={open}
                 onClose={closeDrawer}
                 closable={false}
-                title="Agent 详情"
+                title={t("agents.details.title")}
                 width={600}
                 extra={
                     <Space size={8}>
                         {extra}
-                        <Tooltip title="关闭">
+                        <Tooltip title={t("common.close")}>
                             <Button
                                 type="text"
-                                aria-label="关闭 Agent 详情"
+                                aria-label={t("agents.details.closeLabel")}
                                 icon={<CloseOutlined />}
                                 onClick={closeDrawer}
                             />
@@ -166,21 +172,32 @@ export function AgentDetailsDrawer({
                                     {statusLabel && (
                                         <Tag
                                             color={
-                                                statusLabel === "已发布"
+                                                statusLabel === "published"
                                                     ? "success"
                                                     : "default"
                                             }
                                         >
-                                            {statusLabel}
+                                            {statusLabel === "published"
+                                                ? t(
+                                                      "agents.editor.version.published",
+                                                  )
+                                                : t(
+                                                      "agents.editor.version.historical",
+                                                  )}
                                         </Tag>
                                     )}
-                                    <Tag>版本：v{version.versionNumber}</Tag>
+                                    <Tag>
+                                        {t("agents.details.version", {
+                                            version: version.versionNumber,
+                                        })}
+                                    </Tag>
                                 </Flex>
                                 <Typography.Paragraph
                                     type="secondary"
                                     style={{ margin: "6px 0 0" }}
                                 >
-                                    {snapshot.description || "暂无描述"}
+                                    {snapshot.description ||
+                                        t("agents.details.noDescription")}
                                 </Typography.Paragraph>
                                 <Flex gap={16} wrap style={{ marginTop: 8 }}>
                                     <Typography.Text type="secondary">
@@ -192,7 +209,7 @@ export function AgentDetailsDrawer({
                                         <CalendarOutlined />{" "}
                                         {new Date(
                                             version.createdTime,
-                                        ).toLocaleString("zh-CN")}
+                                        ).toLocaleString(i18n.language)}
                                     </Typography.Text>
                                 </Flex>
                             </div>
@@ -201,7 +218,7 @@ export function AgentDetailsDrawer({
                         <div className="agent-details-content">
                             <section className="agent-details-section">
                                 <SectionTitle icon={<AppstoreOutlined />}>
-                                    版本概览
+                                    {t("agents.details.overview")}
                                 </SectionTitle>
                                 <Descriptions
                                     size="small"
@@ -209,14 +226,23 @@ export function AgentDetailsDrawer({
                                     items={[
                                         {
                                             key: "summary",
-                                            label: "变更摘要",
+                                            label: t(
+                                                "agents.details.changeSummary",
+                                            ),
                                             children:
-                                                version.changeSummary || "无",
+                                                version.changeSummary ||
+                                                t("agents.details.noSummary"),
                                         },
                                         {
                                             key: "model",
-                                            label: "运行模型",
-                                            children: model.modelId || "未配置",
+                                            label: t(
+                                                "agents.details.runtimeModel",
+                                            ),
+                                            children:
+                                                model.modelId ||
+                                                t(
+                                                    "agents.details.notConfigured",
+                                                ),
                                         },
                                     ]}
                                 />
@@ -231,13 +257,24 @@ export function AgentDetailsDrawer({
                                                 type="secondary"
                                                 className="agent-details-instructions-count"
                                             >
-                                                {instructions.length} 字符
+                                                {t(
+                                                    "agents.details.characterCount",
+                                                    {
+                                                        count: instructions.length,
+                                                    },
+                                                )}
                                             </Typography.Text>
-                                            <Tooltip title="复制 Instructions">
+                                            <Tooltip
+                                                title={t(
+                                                    "agents.details.copyInstructions",
+                                                )}
+                                            >
                                                 <Button
                                                     type="text"
                                                     size="small"
-                                                    aria-label="复制 Instructions"
+                                                    aria-label={t(
+                                                        "agents.details.copyInstructions",
+                                                    )}
                                                     icon={<CopyOutlined />}
                                                     onClick={() =>
                                                         void copyInstructions()
@@ -247,7 +284,7 @@ export function AgentDetailsDrawer({
                                         </Space>
                                     }
                                 >
-                                    Instructions
+                                    {t("agents.editor.sections.instructions")}
                                 </SectionTitle>
                                 <div
                                     className={`agent-details-instructions ${
@@ -286,15 +323,15 @@ export function AgentDetailsDrawer({
                                         }
                                     >
                                         {instructionsExpanded
-                                            ? "收起"
-                                            : "展开全文"}
+                                            ? t("agents.details.collapse")
+                                            : t("agents.details.expand")}
                                     </Button>
                                 )}
                             </section>
 
                             <section className="agent-details-section">
                                 <SectionTitle icon={<SlidersOutlined />}>
-                                    模型与上下文
+                                    {t("agents.details.modelAndContext")}
                                 </SectionTitle>
                                 <Descriptions
                                     size="small"
@@ -302,28 +339,42 @@ export function AgentDetailsDrawer({
                                     items={[
                                         {
                                             key: "temperature",
-                                            label: "Temperature",
+                                            label: t(
+                                                "agents.editor.model.temperature",
+                                            ),
                                             children: displayValue(
                                                 model.temperature,
+                                                t,
                                             ),
                                         },
                                         {
                                             key: "topP",
-                                            label: "Top P",
-                                            children: displayValue(model.topP),
+                                            label: t(
+                                                "agents.editor.model.topP",
+                                            ),
+                                            children: displayValue(
+                                                model.topP,
+                                                t,
+                                            ),
                                         },
                                         {
                                             key: "maxTokens",
-                                            label: "Max Tokens",
+                                            label: t(
+                                                "agents.editor.model.maxTokens",
+                                            ),
                                             children: displayValue(
                                                 model.maxTokens,
+                                                t,
                                             ),
                                         },
                                         {
                                             key: "maxMessages",
-                                            label: "历史消息上限",
+                                            label: t(
+                                                "agents.details.historyLimit",
+                                            ),
                                             children: displayValue(
                                                 chatHistory?.maxMessages,
+                                                t,
                                             ),
                                         },
                                     ]}
@@ -332,7 +383,7 @@ export function AgentDetailsDrawer({
 
                             <section className="agent-details-section">
                                 <SectionTitle icon={<ToolOutlined />}>
-                                    工具
+                                    {t("agents.details.tools")}
                                 </SectionTitle>
                                 <Flex gap={8} wrap>
                                     {toolBindings.length > 0 ? (
@@ -348,7 +399,7 @@ export function AgentDetailsDrawer({
                                         ))
                                     ) : (
                                         <Typography.Text type="secondary">
-                                            未挂载工具
+                                            {t("agents.details.noTools")}
                                         </Typography.Text>
                                     )}
                                 </Flex>
@@ -356,7 +407,7 @@ export function AgentDetailsDrawer({
 
                             <section className="agent-details-section">
                                 <SectionTitle icon={<ReadOutlined />}>
-                                    Skills
+                                    {t("agents.editor.sections.skills")}
                                 </SectionTitle>
                                 <Flex gap={8} wrap>
                                     {skills.length > 0 ? (
@@ -370,7 +421,7 @@ export function AgentDetailsDrawer({
                                         ))
                                     ) : (
                                         <Typography.Text type="secondary">
-                                            未挂载 Skill
+                                            {t("agents.details.noSkills")}
                                         </Typography.Text>
                                     )}
                                 </Flex>

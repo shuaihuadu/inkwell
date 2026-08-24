@@ -1,5 +1,6 @@
 import { Button, Form, Input, Modal, message } from "antd";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type { ChangePasswordRequest } from "../../shared/network/contracts";
 import { useAuthStore } from "./auth-store";
@@ -19,6 +20,7 @@ export function ChangePasswordModal({
     required = false,
     onClose,
 }: ChangePasswordModalProps) {
+    const { t } = useTranslation();
     const [form] = Form.useForm<ChangePasswordFormValues>();
     const [submitting, setSubmitting] = useState(false);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
@@ -39,11 +41,16 @@ export function ChangePasswordModal({
                 newPassword: values.newPassword,
             });
             setSnapshot({ status: "authenticated", identity });
-            messageApi.success("密码已修改");
+            messageApi.success(t("auth.changePassword.success"));
             close();
         } catch (reason) {
             messageApi.error(
-                `修改失败：${reason instanceof Error ? reason.message : "未知错误"}`,
+                t("auth.changePassword.failed", {
+                    message:
+                        reason instanceof Error
+                            ? reason.message
+                            : t("common.unknownError"),
+                }),
             );
         } finally {
             setSubmitting(false);
@@ -62,7 +69,7 @@ export function ChangePasswordModal({
                 footer={null}
                 centered
                 width={440}
-                title="修改密码"
+                title={t("auth.changePassword.title")}
             >
                 <Form<ChangePasswordFormValues>
                     form={form}
@@ -72,26 +79,42 @@ export function ChangePasswordModal({
                 >
                     <Form.Item
                         name="currentPassword"
-                        label="当前密码"
-                        rules={[{ required: true, message: "请输入当前密码" }]}
+                        label={t("auth.changePassword.currentPassword")}
+                        rules={[
+                            {
+                                required: true,
+                                message: t(
+                                    "auth.changePassword.currentPasswordRequired",
+                                ),
+                            },
+                        ]}
                     >
                         <Input.Password
                             autoComplete="current-password"
-                            placeholder="输入当前密码"
+                            placeholder={t(
+                                "auth.changePassword.currentPasswordPlaceholder",
+                            )}
                             autoFocus
                         />
                     </Form.Item>
                     <Form.Item
                         name="newPassword"
-                        label="新密码"
-                        extra="使用 8–128 个字符，且不能与当前密码相同。"
+                        label={t("auth.changePassword.newPassword")}
+                        extra={t("auth.changePassword.newPasswordHelp")}
                         dependencies={["currentPassword"]}
                         rules={[
-                            { required: true, message: "请输入新密码" },
+                            {
+                                required: true,
+                                message: t(
+                                    "auth.changePassword.newPasswordRequired",
+                                ),
+                            },
                             {
                                 min: 8,
                                 max: 128,
-                                message: "密码长度应为 8–128 个字符",
+                                message: t(
+                                    "auth.changePassword.passwordLength",
+                                ),
                             },
                             ({ getFieldValue }) => ({
                                 validator: (_, value: string | undefined) =>
@@ -99,7 +122,9 @@ export function ChangePasswordModal({
                                     value === getFieldValue("currentPassword")
                                         ? Promise.reject(
                                               new Error(
-                                                  "新密码不能与当前密码相同",
+                                                  t(
+                                                      "auth.changePassword.passwordUnchanged",
+                                                  ),
                                               ),
                                           )
                                         : Promise.resolve(),
@@ -108,22 +133,31 @@ export function ChangePasswordModal({
                     >
                         <Input.Password
                             autoComplete="new-password"
-                            placeholder="输入新密码"
+                            placeholder={t(
+                                "auth.changePassword.newPasswordPlaceholder",
+                            )}
                         />
                     </Form.Item>
                     <Form.Item
                         name="confirmPassword"
-                        label="确认新密码"
+                        label={t("auth.changePassword.confirmPassword")}
                         dependencies={["newPassword"]}
                         rules={[
-                            { required: true, message: "请再次输入新密码" },
+                            {
+                                required: true,
+                                message: t(
+                                    "auth.changePassword.confirmPasswordRequired",
+                                ),
+                            },
                             ({ getFieldValue }) => ({
                                 validator: (_, value: string | undefined) =>
                                     value &&
                                     value !== getFieldValue("newPassword")
                                         ? Promise.reject(
                                               new Error(
-                                                  "两次输入的新密码不一致",
+                                                  t(
+                                                      "auth.changePassword.passwordMismatch",
+                                                  ),
                                               ),
                                           )
                                         : Promise.resolve(),
@@ -132,7 +166,9 @@ export function ChangePasswordModal({
                     >
                         <Input.Password
                             autoComplete="new-password"
-                            placeholder="再次输入新密码"
+                            placeholder={t(
+                                "auth.changePassword.confirmPasswordPlaceholder",
+                            )}
                         />
                     </Form.Item>
                     <div
@@ -143,7 +179,7 @@ export function ChangePasswordModal({
                             htmlType="submit"
                             loading={submitting}
                         >
-                            修改密码
+                            {t("auth.changePassword.submit")}
                         </Button>
                     </div>
                 </Form>

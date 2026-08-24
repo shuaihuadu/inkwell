@@ -40,6 +40,7 @@ import {
 } from "antd";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { desktopApi } from "../../shared/network/desktop-api";
 import { useAuthStore } from "../auth/auth-store";
 import { ChangePasswordModal } from "../auth/change-password-modal";
@@ -53,6 +54,8 @@ import {
     useAppearanceStore,
     useResolvedAppearance,
 } from "./appearance-store";
+import { useLocaleStore } from "./locale-store";
+import type { LocalePreference } from "../../shared/i18n/resources";
 import { desktopThemes, themeNames, type ThemeName } from "./themes";
 
 type NavigationKey =
@@ -77,62 +80,68 @@ interface NavigationGroup {
     items: NavigationItem[];
 }
 
-const navigationGroups: NavigationGroup[] = [
-    {
-        key: "workspace",
-        label: "工作区",
-        items: [
-            { key: "agents", label: "Agent 空间", icon: <AppstoreOutlined /> },
-        ],
-    },
-    {
-        key: "resources",
-        label: "资源中心",
-        items: [
-            {
-                key: "tools",
-                label: "工具",
-                icon: <ToolOutlined />,
-            },
-            {
-                key: "skills",
-                label: "Skills",
-                icon: <ReadOutlined />,
-            },
-            {
-                key: "models",
-                label: "模型",
-                icon: <ApiOutlined />,
-            },
-        ],
-    },
-    {
-        key: "system",
-        label: "系统管理",
-        items: [
-            {
-                key: "admin",
-                label: "用户管理",
-                icon: <SafetyCertificateOutlined />,
-                requiresAdmin: true,
-            },
-        ],
-    },
-];
-
 interface WorkspaceShellProps {
     children: ReactNode;
     onNavigate: (navigate: () => void) => void;
 }
 
 export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
+    const { t } = useTranslation();
     const identity = useAuthStore((state) => state.identity);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
     const appearanceMode = useAppearanceStore((state) => state.mode);
     const setAppearanceMode = useAppearanceStore((state) => state.setMode);
     const themeName = useAppearanceStore((state) => state.themeName);
     const setThemeName = useAppearanceStore((state) => state.setThemeName);
+    const locale = useLocaleStore((state) => state.locale);
+    const setLocale = useLocaleStore((state) => state.setLocale);
     const resolvedAppearance = useResolvedAppearance();
+    const navigationGroups: NavigationGroup[] = [
+        {
+            key: "workspace",
+            label: t("shell.navigation.workspace"),
+            items: [
+                {
+                    key: "agents",
+                    label: t("shell.navigation.agentSpace"),
+                    icon: <AppstoreOutlined />,
+                },
+            ],
+        },
+        {
+            key: "resources",
+            label: t("shell.navigation.resources"),
+            items: [
+                {
+                    key: "tools",
+                    label: t("shell.navigation.tools"),
+                    icon: <ToolOutlined />,
+                },
+                {
+                    key: "skills",
+                    label: t("shell.navigation.skills"),
+                    icon: <ReadOutlined />,
+                },
+                {
+                    key: "models",
+                    label: t("shell.navigation.models"),
+                    icon: <ApiOutlined />,
+                },
+            ],
+        },
+        {
+            key: "system",
+            label: t("shell.navigation.system"),
+            items: [
+                {
+                    key: "admin",
+                    label: t("shell.navigation.users"),
+                    icon: <SafetyCertificateOutlined />,
+                    requiresAdmin: true,
+                },
+            ],
+        },
+    ];
     const queryClient = useQueryClient();
     const [activeNavigation, setActiveNavigation] =
         useState<NavigationKey>("agents");
@@ -203,14 +212,14 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                     <button
                         type="button"
                         className="about-trigger"
-                        aria-label="关于 Inkwell"
+                        aria-label={t("shell.aboutInkwell")}
                         onClick={() => setAboutOpen(true)}
                     />
                 </div>
                 <div className="app-header-actions">
                     <Switch
                         size="small"
-                        aria-label="切换外观"
+                        aria-label={t("shell.appearanceSwitch")}
                         checked={resolvedAppearance === "dark"}
                         checkedChildren={<MoonFilled />}
                         unCheckedChildren={<SunFilled />}
@@ -218,8 +227,11 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             setAppearanceMode(checked ? "dark" : "light")
                         }
                     />
-                    <div className="connection-state" aria-label="后台服务正常">
-                        <span /> 后台服务正常
+                    <div
+                        className="connection-state"
+                        aria-label={t("shell.serviceHealthy")}
+                    >
+                        <span /> {t("shell.serviceHealthy")}
                     </div>
                     <Dropdown
                         trigger={["click"]}
@@ -229,23 +241,23 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                 {
                                     key: "guide",
                                     icon: <BookOutlined />,
-                                    label: "使用指南",
+                                    label: t("shell.guide"),
                                 },
                                 {
                                     key: "quick-start",
                                     icon: <RocketOutlined />,
-                                    label: "快速开始",
+                                    label: t("shell.quickStart"),
                                 },
                                 {
                                     key: "faq",
                                     icon: <QuestionCircleOutlined />,
-                                    label: "常见问题",
+                                    label: t("shell.faq"),
                                 },
                                 { type: "divider" },
                                 {
                                     key: "about",
                                     icon: <InfoCircleOutlined />,
-                                    label: "关于 Inkwell",
+                                    label: t("shell.aboutInkwell"),
                                 },
                             ],
                             onClick: ({ key }) => {
@@ -257,10 +269,10 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             },
                         }}
                     >
-                        <Tooltip title="帮助">
+                        <Tooltip title={t("shell.help")}>
                             <Button
                                 type="text"
-                                aria-label="帮助"
+                                aria-label={t("shell.help")}
                                 icon={<QuestionCircleOutlined />}
                             />
                         </Tooltip>
@@ -273,12 +285,12 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                 {
                                     key: "settings",
                                     icon: <SettingOutlined />,
-                                    label: "个人设置",
+                                    label: t("shell.settings"),
                                 },
                                 {
                                     key: "change-password",
                                     icon: <KeyOutlined />,
-                                    label: "修改密码",
+                                    label: t("shell.changePassword"),
                                 },
                                 ...(identity?.isAdmin
                                     ? [
@@ -287,7 +299,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                               icon: (
                                                   <SafetyCertificateOutlined />
                                               ),
-                                              label: "管理",
+                                              label: t("shell.administration"),
                                           },
                                       ]
                                     : []),
@@ -295,7 +307,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                 {
                                     key: "logout",
                                     icon: <LogoutOutlined />,
-                                    label: "登出",
+                                    label: t("shell.logout"),
                                 },
                             ],
                             onClick: ({ key }) => {
@@ -311,7 +323,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                         <button
                             type="button"
                             className="user-menu-trigger"
-                            aria-label="打开用户菜单"
+                            aria-label={t("shell.openUserMenu")}
                         >
                             <Avatar size={28}>
                                 {identity?.username.slice(0, 1).toUpperCase()}
@@ -326,7 +338,10 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
             </header>
 
             <div className="workspace-body">
-                <aside className="app-sidebar" aria-label="主导航">
+                <aside
+                    className="app-sidebar"
+                    aria-label={t("shell.navigation.main")}
+                >
                     {visibleGroups.map((group) => {
                         const expanded = expandedGroups.has(group.key);
                         return (
@@ -348,7 +363,9 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                             key={item.key}
                                             title={
                                                 item.placeholder
-                                                    ? "占位入口 · 即将上线"
+                                                    ? t(
+                                                          "shell.placeholderEntry",
+                                                      )
                                                     : undefined
                                             }
                                             placement="right"
@@ -364,7 +381,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                                 <span>{item.label}</span>
                                                 {item.placeholder && (
                                                     <Tag bordered={false}>
-                                                        待上线
+                                                        {t("shell.comingSoon")}
                                                     </Tag>
                                                 )}
                                             </button>
@@ -432,7 +449,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                                 {activeItem?.label}
                                             </Typography.Title>
                                             <Typography.Text type="secondary">
-                                                即将上线
+                                                {t("shell.comingSoon")}
                                             </Typography.Text>
                                         </div>
                                     }
@@ -446,7 +463,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                 open={quickStartOpen}
                 onClose={() => setQuickStartOpen(false)}
                 destroyOnHidden
-                title="快速开始"
+                title={t("shell.quickStart")}
                 width={400}
                 extra={
                     <Typography.Text type="secondary">
@@ -455,7 +472,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                 }
             >
                 <Typography.Paragraph type="secondary">
-                    完成这些关键步骤，建立从配置到团队使用的完整工作流。
+                    {t("shell.quickStartDescription")}
                 </Typography.Paragraph>
                 <Progress
                     percent={completedGuideSteps.size * 20}
@@ -467,14 +484,16 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                     size={4}
                     className="quick-start-list"
                 >
-                    {[
-                        ["创建一个 Agent", "填写名称和用途"],
-                        ["完成核心配置", "补充 Instructions 并选择模型"],
-                        ["进行一次试运行", "用真实问题检查回答"],
-                        ["发布第一个版本", "生成可用于对话的正式版本"],
-                        ["按需共享给团队", "允许成员只读查看和使用"],
-                    ].map(([title, description], index) => (
-                        <label className="quick-start-item" key={title}>
+                    {(
+                        [
+                            "create",
+                            "configure",
+                            "run",
+                            "publish",
+                            "share",
+                        ] as const
+                    ).map((step, index) => (
+                        <label className="quick-start-item" key={step}>
                             <Checkbox
                                 checked={completedGuideSteps.has(index)}
                                 onChange={(event) => {
@@ -489,10 +508,12 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             />
                             <span>
                                 <Typography.Text strong>
-                                    {title}
+                                    {t(`shell.quickStartSteps.${step}.title`)}
                                 </Typography.Text>
                                 <Typography.Text type="secondary">
-                                    {description}
+                                    {t(
+                                        `shell.quickStartSteps.${step}.description`,
+                                    )}
                                 </Typography.Text>
                             </span>
                         </label>
@@ -508,7 +529,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                         navigateTo("agents");
                     }}
                 >
-                    前往 Agent 空间
+                    {t("shell.goToAgentSpace")}
                 </Button>
             </Drawer>
 
@@ -532,24 +553,29 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                 <Divider />
                 <div className="about-details">
                     <div>
-                        <Typography.Text type="secondary">版本</Typography.Text>
+                        <Typography.Text type="secondary">
+                            {t("shell.about.version")}
+                        </Typography.Text>
                         <Typography.Text data-testid="app-version">
                             {metadataQuery.data?.version ?? "-"}
                         </Typography.Text>
                     </div>
                     <div>
                         <Typography.Text type="secondary">
-                            构建号
+                            {t("shell.about.buildNumber")}
                         </Typography.Text>
                         <Typography.Text data-testid="app-build-number">
-                            {metadataQuery.data?.buildNumber ?? "未提供"}
+                            {metadataQuery.data?.buildNumber ??
+                                t("common.unavailable")}
                         </Typography.Text>
                     </div>
                     <div>
-                        <Typography.Text type="secondary">提交</Typography.Text>
+                        <Typography.Text type="secondary">
+                            {t("shell.about.commit")}
+                        </Typography.Text>
                         <Typography.Text data-testid="app-commit">
                             {metadataQuery.data?.commit?.slice(0, 12) ??
-                                "未提供"}
+                                t("common.unavailable")}
                         </Typography.Text>
                     </div>
                     <div>
@@ -571,10 +597,10 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                         src="./quanzhange.jpg"
                         width="200"
                         height="200"
-                        alt="公众号二维码"
+                        alt={t("shell.about.qrAlt")}
                     />
                     <Typography.Text type="secondary">
-                        扫码关注作者公众号
+                        {t("shell.about.followAuthor")}
                     </Typography.Text>
                 </div>
             </Modal>
@@ -585,9 +611,25 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                 footer={null}
                 centered
                 width={440}
-                title="个人设置"
+                title={t("shell.settings")}
             >
-                <Typography.Text type="secondary">外观模式</Typography.Text>
+                <Typography.Text type="secondary">
+                    {t("locale.label")}
+                </Typography.Text>
+                <Segmented
+                    block
+                    className="appearance-options"
+                    value={locale}
+                    onChange={(value) => setLocale(value as LocalePreference)}
+                    options={[
+                        { value: "zh-CN", label: t("locale.chinese") },
+                        { value: "en-US", label: t("locale.english") },
+                        { value: "system", label: t("locale.system") },
+                    ]}
+                />
+                <Typography.Text type="secondary" className="theme-label">
+                    {t("shell.appearanceMode")}
+                </Typography.Text>
                 <Segmented
                     block
                     className="appearance-options"
@@ -601,7 +643,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             label: (
                                 <Space size={4}>
                                     <BulbOutlined />
-                                    亮色
+                                    {t("shell.light")}
                                 </Space>
                             ),
                         },
@@ -610,7 +652,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             label: (
                                 <Space size={4}>
                                     <BulbFilled />
-                                    暗色
+                                    {t("shell.dark")}
                                 </Space>
                             ),
                         },
@@ -619,14 +661,14 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                             label: (
                                 <Space size={4}>
                                     <DesktopOutlined />
-                                    跟随系统
+                                    {t("shell.system")}
                                 </Space>
                             ),
                         },
                     ]}
                 />
                 <Typography.Text type="secondary" className="theme-label">
-                    主题色
+                    {t("shell.themeColor")}
                 </Typography.Text>
                 <Segmented
                     block
@@ -644,7 +686,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                                             desktopThemes[name].primaryColor,
                                     }}
                                 />
-                                {desktopThemes[name].label}
+                                {t(`shell.themes.${name}`)}
                             </Space>
                         ),
                     }))}

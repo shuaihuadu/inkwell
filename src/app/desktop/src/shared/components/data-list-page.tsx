@@ -21,6 +21,7 @@ import {
     type CSSProperties,
     type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 const pageSize = 20;
 
@@ -117,6 +118,7 @@ export default function DataListPage<ItemType extends object>({
     isFiltered,
     children,
 }: DataListPageProps<ItemType>) {
+    const { t } = useTranslation();
     const tableViewportRef = useRef<HTMLDivElement>(null);
     const [tableBodyHeight, setTableBodyHeight] = useState(385);
     const [pagination, setPagination] = useState({
@@ -171,7 +173,7 @@ export default function DataListPage<ItemType extends object>({
                     action={
                         onRetry && (
                             <Button size="small" onClick={onRetry}>
-                                重试
+                                {t("common.retry")}
                             </Button>
                         )
                     }
@@ -181,7 +183,7 @@ export default function DataListPage<ItemType extends object>({
             <div className="inkwell-data-list-toolbar">
                 <Space wrap>{filters}</Space>
                 <Space className="inkwell-data-list-actions">
-                    <Tooltip title="刷新">
+                    <Tooltip title={t("common.refresh")}>
                         <Button
                             aria-label={refreshLabel}
                             icon={<ReloadOutlined />}
@@ -241,7 +243,7 @@ export default function DataListPage<ItemType extends object>({
             {!loading && (
                 <div className="inkwell-data-list-pagination">
                     <Typography.Text type="secondary">
-                        共 {dataSource.length} 项
+                        {t("common.itemCount", { count: dataSource.length })}
                     </Typography.Text>
                     <Pagination
                         size="small"

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "./shared/i18n/i18n";
 import "./index.css";
 import AppShell from "./app-shell";
 import { DesktopThemeProvider } from "./features/shell/desktop-theme-provider";

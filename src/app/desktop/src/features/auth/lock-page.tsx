@@ -2,15 +2,16 @@ import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Avatar, Button, Form, Input, Space, Typography } from "antd";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type { UnlockFailureCode } from "../../shared/network/contracts";
 import { useAuthStore } from "./auth-store";
 
-const unlockErrors: Record<UnlockFailureCode, string> = {
-    "invalid-password": "密码错误，请重试",
-    "account-locked": "账号已被锁定，请联系系统管理员",
-    offline: "网络异常，已断开。请检查网络连接",
-    unknown: "解锁失败，请稍后重试",
+const unlockErrorKeys: Record<UnlockFailureCode, string> = {
+    "invalid-password": "auth.lock.errors.invalidPassword",
+    "account-locked": "auth.lock.errors.accountLocked",
+    offline: "auth.lock.errors.offline",
+    unknown: "auth.lock.errors.unknown",
 };
 
 interface UnlockForm {
@@ -18,6 +19,7 @@ interface UnlockForm {
 }
 
 export function LockPage() {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const identity = useAuthStore((state) => state.identity);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
@@ -36,10 +38,10 @@ export function LockPage() {
                 });
             } else if (result.code !== "account-locked") {
                 // 账号锁定时主进程已将全局状态跳转到匿名态，界面会切换到登录页，无需在本组件继续展示错误。
-                setError(unlockErrors[result.code]);
+                setError(t(unlockErrorKeys[result.code]));
             }
         } catch {
-            setError(unlockErrors.unknown);
+            setError(t(unlockErrorKeys.unknown));
         } finally {
             setSubmitting(false);
         }
@@ -61,10 +63,12 @@ export function LockPage() {
                 />
                 <div className="lock-heading">
                     <Typography.Title level={4}>
-                        Inkwell 已锁定
+                        {t("auth.lock.title")}
                     </Typography.Title>
                     <Typography.Text type="secondary">
-                        {identity?.username}，请输入密码继续
+                        {t("auth.lock.continueAs", {
+                            username: identity?.username,
+                        })}
                     </Typography.Text>
                 </div>
                 {error && <Alert type="error" showIcon message={error} />}
@@ -75,14 +79,19 @@ export function LockPage() {
                 >
                     <Form.Item
                         name="password"
-                        rules={[{ required: true, message: "请输入密码" }]}
+                        rules={[
+                            {
+                                required: true,
+                                message: t("auth.lock.passwordRequired"),
+                            },
+                        ]}
                     >
                         <Input.Password
                             autoFocus
                             size="large"
                             prefix={<LockOutlined />}
                             autoComplete="current-password"
-                            placeholder="密码"
+                            placeholder={t("auth.lock.passwordPlaceholder")}
                         />
                     </Form.Item>
                     <Button
@@ -92,7 +101,7 @@ export function LockPage() {
                         htmlType="submit"
                         loading={submitting}
                     >
-                        解锁
+                        {t("auth.lock.unlock")}
                     </Button>
                 </Form>
                 <Space size={16}>
@@ -101,7 +110,7 @@ export function LockPage() {
                         size="small"
                         onClick={() => void logout()}
                     >
-                        切换账号
+                        {t("auth.lock.switchAccount")}
                     </Button>
                     <Button
                         type="link"
@@ -109,7 +118,7 @@ export function LockPage() {
                         danger
                         onClick={() => void logout()}
                     >
-                        登出
+                        {t("auth.lock.logout")}
                     </Button>
                 </Space>
             </section>

@@ -4,31 +4,26 @@ import {
 } from "@ant-design/icons";
 import { Prompts } from "@ant-design/x";
 import { Button, Space, theme } from "antd";
+import { useTranslation } from "react-i18next";
 
 const FullChatPrompts = [
-    { key: "research", description: "整理一份竞品研究框架" },
-    { key: "outline", description: "为调研报告设计目录" },
-    { key: "rewrite", description: "帮我优化一段产品介绍文案" },
-    { key: "tools", description: "展示工具调用示例" },
+    { key: "research" },
+    { key: "outline" },
+    { key: "rewrite" },
+    { key: "tools" },
 ];
 
 const TrialChatPrompts = [
     {
         key: "research",
-        label: "研究框架",
-        description: "整理一份竞品研究框架",
         icon: <FileSearchOutlined />,
     },
     {
         key: "outline",
-        label: "报告目录",
-        description: "为调研报告设计目录",
         icon: <AppstoreAddOutlined />,
     },
     {
         key: "tools",
-        label: "工具调用",
-        description: "展示工具调用示例",
         icon: <AppstoreAddOutlined />,
     },
 ];
@@ -44,7 +39,10 @@ export function ChatQuickPrompts({
     compact = true,
     onSelect,
 }: ChatQuickPromptsProps) {
+    const { t } = useTranslation();
     const { token } = theme.useToken();
+    const promptDescription = (key: string): string =>
+        t(`chat.prompts.${key}.description`);
 
     if (variant === "trial") {
         return (
@@ -54,9 +52,9 @@ export function ChatQuickPrompts({
                         key={prompt.key}
                         size="small"
                         icon={prompt.icon}
-                        onClick={() => onSelect(prompt.description)}
+                        onClick={() => onSelect(promptDescription(prompt.key))}
                     >
-                        {prompt.label}
+                        {t(`chat.prompts.${prompt.key}.label`)}
                     </Button>
                 ))}
             </Space>
@@ -66,7 +64,10 @@ export function ChatQuickPrompts({
     return (
         <Prompts
             className="chat-quick-prompts chat-quick-prompts-full"
-            items={FullChatPrompts}
+            items={FullChatPrompts.map((prompt) => ({
+                ...prompt,
+                description: promptDescription(prompt.key),
+            }))}
             wrap
             onItemClick={(info) => onSelect(String(info.data.description))}
             styles={

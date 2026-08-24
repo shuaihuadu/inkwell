@@ -2,6 +2,7 @@ import { SyncOutlined } from "@ant-design/icons";
 import { Actions, Bubble, type BubbleItemType } from "@ant-design/x";
 import { Button, Flex, Typography } from "antd";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { MarkdownContent } from "../../shared/components/markdown-content";
 import type { ChatMessage, ChatRunError } from "../../shared/network/contracts";
 import { useResolvedAppearance } from "../shell/appearance-store";
@@ -24,6 +25,7 @@ export function ChatMessageList({
     onRegenerate,
     onRetry,
 }: ChatMessageListProps) {
+    const { t } = useTranslation();
     const appearance = useResolvedAppearance();
     const [feedbackByMessage, setFeedbackByMessage] = useState<
         Record<string, FeedbackValue>
@@ -90,7 +92,7 @@ export function ChatMessageList({
                                 className="chat-run-status"
                                 type="secondary"
                             >
-                                已停止生成
+                                {t("chat.messages.stopped")}
                             </Typography.Text>
                         )}
                         {showError && error && (
@@ -104,10 +106,10 @@ export function ChatMessageList({
                                 <Button
                                     className="chat-retry-button"
                                     size="small"
-                                    aria-label="重试失败消息"
+                                    aria-label={t("chat.messages.retryLabel")}
                                     onClick={onRetry}
                                 >
-                                    重试
+                                    {t("common.retry")}
                                 </Button>
                             </Flex>
                         )}
@@ -120,7 +122,7 @@ export function ChatMessageList({
                             items={[
                                 {
                                     key: "regenerate",
-                                    label: "重新生成",
+                                    label: t("chat.messages.regenerate"),
                                     icon: <SyncOutlined />,
                                     onItemClick: () => onRegenerate(index),
                                 },
@@ -129,7 +131,10 @@ export function ChatMessageList({
                                     actionRender: (
                                         <Actions.Copy
                                             text={item.content}
-                                            aria-label={`复制第 ${index + 1} 条消息`}
+                                            aria-label={t(
+                                                "chat.messages.copyLabel",
+                                                { number: index + 1 },
+                                            )}
                                         />
                                     ),
                                 },
@@ -137,7 +142,10 @@ export function ChatMessageList({
                                     key: "feedback",
                                     actionRender: (
                                         <Actions.Feedback
-                                            aria-label={`评价第 ${index + 1} 条消息`}
+                                            aria-label={t(
+                                                "chat.messages.feedbackLabel",
+                                                { number: index + 1 },
+                                            )}
                                             value={
                                                 feedbackByMessage[messageKey] ??
                                                 "default"

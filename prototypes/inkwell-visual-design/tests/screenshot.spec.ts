@@ -133,6 +133,39 @@ test.describe("Login Explorer", () => {
 });
 
 test.describe("Agent Design Page", () => {
+    test("shows bilingual personal settings", async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await waitForRender(page);
+
+        await page.getByText("alice", { exact: true }).click();
+        await page.getByText("个人设置", { exact: true }).click();
+        await page.getByText("English", { exact: true }).click();
+
+        const preferences = page.getByRole("dialog", {
+            name: "Preferences",
+        });
+        await expect(preferences).toBeVisible();
+        await expect(
+            preferences.getByText("Display language", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            preferences.getByText("Appearance", { exact: true }),
+        ).toBeVisible();
+        const languageOptions = preferences.locator(".ant-segmented").first();
+        await expect(
+            languageOptions.getByText("System", { exact: true }),
+        ).toBeVisible();
+        await expect(page.locator(".ant-dropdown")).toBeHidden();
+        await expect(preferences).toHaveCSS("opacity", "1");
+        await expect(preferences).toHaveCSS("transform", "none");
+        await expectNoHorizontalOverflow(page);
+        await page.screenshot({
+            path: screenshotPath("32-bilingual-personal-settings.png"),
+            fullPage: true,
+        });
+    });
+
     test("shows polished read-only Tool and model details", async ({
         page,
     }, testInfo) => {
@@ -503,9 +536,7 @@ test.describe("Agent Design Page", () => {
             hasText: "客服助手",
         });
         await versionAgentCard.hover();
-        await versionAgentCard
-            .getByRole("button", { name: /^编辑 / })
-            .click();
+        await versionAgentCard.getByRole("button", { name: /^编辑 / }).click();
         await page.getByRole("button", { name: "版本" }).click();
         const historicalRow = page.locator(".ant-table-row").filter({
             hasText: "v2",
@@ -556,9 +587,7 @@ test.describe("Agent Design Page", () => {
             hasText: "客服助手",
         });
         await trialAgentCard.hover();
-        await trialAgentCard
-            .getByRole("button", { name: /^编辑 / })
-            .click();
+        await trialAgentCard.getByRole("button", { name: /^编辑 / }).click();
         await page.getByRole("button", { name: "试运行" }).click();
         await page.getByRole("button", { name: "研究框架" }).click();
         await expect(page.getByText("4 项已完成", { exact: true })).toBeVisible(
@@ -597,9 +626,7 @@ test.describe("Agent Design Page", () => {
             .locator(".inkwell-agent-card")
             .filter({ hasText: "客服助手" });
         await toolCallAgentCard.hover();
-        await toolCallAgentCard
-            .getByRole("button", { name: /^编辑 / })
-            .click();
+        await toolCallAgentCard.getByRole("button", { name: /^编辑 / }).click();
         await page.getByRole("button", { name: "试运行" }).click();
         await page.getByRole("button", { name: "工具调用" }).click();
         await expect(page.getByText("调用中", { exact: true })).toBeVisible();

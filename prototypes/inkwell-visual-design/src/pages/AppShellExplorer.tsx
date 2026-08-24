@@ -768,9 +768,12 @@ export default function AppShellExplorer() {
         themeName,
         appearanceMode,
         isDark,
+        locale,
+        localePreference,
         setThemeName,
         setAppearanceMode,
         setIsDark,
+        setLocale,
     } = useDesign();
     const [isAdmin, setIsAdmin] = useState(true);
     const [network, setNetwork] = useState<NetworkStatus>("online");
@@ -789,6 +792,7 @@ export default function AppShellExplorer() {
     );
     const [aboutOpen, setAboutOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [changePasswordOpen, setChangePasswordOpen] = useState(false);
     const [changePasswordForm] = Form.useForm<ChangePasswordFormValues>();
     const [locked, setLocked] = useState(false);
@@ -810,22 +814,55 @@ export default function AppShellExplorer() {
         items: group.items.filter((item) => !item.requiresAdmin || isAdmin),
     })).filter((group) => group.items.length > 0);
 
+    const english = locale === "en-US";
     const userMenuItems = [
-        { key: "settings", icon: <SettingOutlined />, label: "个人设置" },
-        { key: "change-password", icon: <KeyOutlined />, label: "修改密码" },
+        {
+            key: "settings",
+            icon: <SettingOutlined />,
+            label: english ? "Preferences" : "个人设置",
+        },
+        {
+            key: "change-password",
+            icon: <KeyOutlined />,
+            label: english ? "Change password" : "修改密码",
+        },
         { type: "divider" as const },
         // UI-002 锁定页（ui-spec.md §2）的模拟入口——真实产品里这个页面主要由 5
         // 分钟无操作/主窗口失焦自动触发（NFR-003），但很多真实产品也会在用户菜单里附带一个
         // 手动“锁定”入口，方便评审时不用真的等 5 分钟。
-        { key: "lock", icon: <LockOutlined />, label: "锁定" },
-        { key: "logout", icon: <LogoutOutlined />, label: "登出" },
+        {
+            key: "lock",
+            icon: <LockOutlined />,
+            label: english ? "Lock" : "锁定",
+        },
+        {
+            key: "logout",
+            icon: <LogoutOutlined />,
+            label: english ? "Sign out" : "登出",
+        },
     ];
     const helpMenuItems = [
-        { key: "guide", icon: <BookOutlined />, label: "使用指南" },
-        { key: "quick-start", icon: <RocketOutlined />, label: "快速开始" },
-        { key: "faq", icon: <QuestionCircleOutlined />, label: "常见问题" },
+        {
+            key: "guide",
+            icon: <BookOutlined />,
+            label: english ? "User guide" : "使用指南",
+        },
+        {
+            key: "quick-start",
+            icon: <RocketOutlined />,
+            label: english ? "Quick start" : "快速开始",
+        },
+        {
+            key: "faq",
+            icon: <QuestionCircleOutlined />,
+            label: english ? "FAQ" : "常见问题",
+        },
         { type: "divider" as const },
-        { key: "about", icon: <InfoCircleOutlined />, label: "关于 Inkwell" },
+        {
+            key: "about",
+            icon: <InfoCircleOutlined />,
+            label: english ? "About Inkwell" : "关于 Inkwell",
+        },
     ];
 
     const openGuide = (section: GuideSection) => {
@@ -1080,9 +1117,12 @@ export default function AppShellExplorer() {
                             }}
                         />
                         <Dropdown
+                            open={settingsOpen ? false : userMenuOpen}
+                            onOpenChange={setUserMenuOpen}
                             menu={{
                                 items: userMenuItems,
                                 onClick: ({ key }) => {
+                                    setUserMenuOpen(false);
                                     if (key === "settings")
                                         setSettingsOpen(true);
                                     if (key === "change-password")
@@ -1552,17 +1592,37 @@ export default function AppShellExplorer() {
                 </div>
             </Modal>
 
-            {/* 个人设置弹层：仅管理外观 */}
+            {/* 个人设置弹层：管理界面语言与外观 */}
             <Modal
                 open={settingsOpen}
                 onCancel={() => setSettingsOpen(false)}
                 footer={null}
                 centered
                 width={440}
-                title="个人设置"
+                title={english ? "Preferences" : "个人设置"}
             >
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    外观模式
+                    {english ? "Display language" : "界面语言"}
+                </Typography.Text>
+                <div style={{ marginTop: 8, marginBottom: 20 }}>
+                    <Segmented
+                        block
+                        value={localePreference}
+                        onChange={(value) =>
+                            setLocale(value as typeof localePreference)
+                        }
+                        options={[
+                            { value: "zh-CN", label: "简体中文" },
+                            { value: "en-US", label: "English" },
+                            {
+                                value: "system",
+                                label: english ? "System" : "跟随系统",
+                            },
+                        ]}
+                    />
+                </div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {english ? "Appearance" : "外观模式"}
                 </Typography.Text>
                 <div style={{ marginTop: 8, marginBottom: 20 }}>
                     <Segmented
@@ -1577,7 +1637,7 @@ export default function AppShellExplorer() {
                                 label: (
                                     <Space size={4}>
                                         <BulbOutlined />
-                                        亮色
+                                        {english ? "Light" : "亮色"}
                                     </Space>
                                 ),
                             },
@@ -1586,7 +1646,7 @@ export default function AppShellExplorer() {
                                 label: (
                                     <Space size={4}>
                                         <BulbFilled />
-                                        暗色
+                                        {english ? "Dark" : "暗色"}
                                     </Space>
                                 ),
                             },
@@ -1595,7 +1655,7 @@ export default function AppShellExplorer() {
                                 label: (
                                     <Space size={4}>
                                         <DesktopOutlined />
-                                        跟随系统
+                                        {english ? "System" : "跟随系统"}
                                     </Space>
                                 ),
                             },
@@ -1603,7 +1663,7 @@ export default function AppShellExplorer() {
                     />
                 </div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    主题色
+                    {english ? "Theme color" : "主题色"}
                 </Typography.Text>
                 <div style={{ marginTop: 8 }}>
                     <Segmented
@@ -1627,7 +1687,13 @@ export default function AppShellExplorer() {
                                             flexShrink: 0,
                                         }}
                                     />
-                                    {THEMES[name].label}
+                                    {english
+                                        ? {
+                                              amethyst: "Purple",
+                                              terracotta: "Orange",
+                                              teal: "Teal",
+                                          }[name]
+                                        : THEMES[name].label}
                                 </Space>
                             ),
                         }))}

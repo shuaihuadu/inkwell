@@ -107,6 +107,7 @@
 - 文件命名使用 kebab-case
 - 代码和注释符合社区统一标准规范
 - 视觉风格参考 Ant Design Pro（AGENTS.md §2.1 已定）
+- 桌面端固定 UI 文案必须进入 `src/app/desktop/src/shared/i18n/resources.ts`，同时维护 `zh-CN` / `en-US`；跨页面公共操作优先复用 `common.*`，不得在各 feature 重复定义。后端错误正文、模型输出、用户数据、Agent 内容与 ASR 暂不翻译
 
 ## 单元测试规范
 

@@ -3,7 +3,6 @@ import type { ThemeConfig } from "antd";
 export type ThemeName = "amethyst" | "terracotta" | "teal";
 
 export interface DesktopTheme {
-    label: string;
     primaryColor: string;
     light: ThemeConfig["token"];
     dark: ThemeConfig["token"];
@@ -16,7 +15,6 @@ const commonTokens: ThemeConfig["token"] = {
 
 export const desktopThemes: Record<ThemeName, DesktopTheme> = {
     amethyst: {
-        label: "曜石紫",
         primaryColor: "#68469C",
         light: {
             ...commonTokens,
@@ -68,7 +66,6 @@ export const desktopThemes: Record<ThemeName, DesktopTheme> = {
         },
     },
     terracotta: {
-        label: "朱砂橙",
         primaryColor: "#B4533C",
         light: {
             ...commonTokens,
@@ -120,7 +117,6 @@ export const desktopThemes: Record<ThemeName, DesktopTheme> = {
         },
     },
     teal: {
-        label: "碧海青",
         primaryColor: "#0D9488",
         light: {
             ...commonTokens,

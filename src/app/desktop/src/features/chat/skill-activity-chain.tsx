@@ -6,31 +6,45 @@ import {
 } from "@ant-design/icons";
 import { ThoughtChain, type ThoughtChainItemType } from "@ant-design/x";
 import { Flex, Typography, theme } from "antd";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import type { SkillRunActivity } from "../../shared/network/contracts";
 
 interface SkillActivityChainProps {
     activities: SkillRunActivity[];
 }
 
-const getActivityTitle = (activity: SkillRunActivity): string => {
+const getActivityTitle = (
+    activity: SkillRunActivity,
+    t: TFunction,
+): string => {
     switch (activity.type) {
         case "skill-loaded":
-            return `加载 Skill：${activity.skillName}`;
+            return t("chat.activity.title.loaded", {
+                name: activity.skillName,
+            });
         case "skill-resource-read":
-            return `读取资源：${activity.targetName ?? activity.skillName}`;
+            return t("chat.activity.title.resource", {
+                name: activity.targetName ?? activity.skillName,
+            });
         case "skill-script-run":
-            return `运行脚本：${activity.targetName ?? activity.skillName}`;
+            return t("chat.activity.title.script", {
+                name: activity.targetName ?? activity.skillName,
+            });
     }
 };
 
-const getActivityDescription = (activity: SkillRunActivity): string => {
+const getActivityDescription = (
+    activity: SkillRunActivity,
+    t: TFunction,
+): string => {
     switch (activity.type) {
         case "skill-loaded":
-            return "读取 Skill 指令";
+            return t("chat.activity.readInstructions");
         case "skill-resource-read":
-            return `来自 ${activity.skillName}`;
+            return t("chat.activity.fromSkill", { name: activity.skillName });
         case "skill-script-run":
-            return `来自 ${activity.skillName}`;
+            return t("chat.activity.fromSkill", { name: activity.skillName });
     }
 };
 
@@ -43,6 +57,7 @@ const formatArguments = (argumentsJson: string): string => {
 };
 
 export function SkillActivityChain({ activities }: SkillActivityChainProps) {
+    const { t } = useTranslation();
     const { token } = theme.useToken();
     const activeActivity = activities.find(
         (activity) => activity.status === "loading",
@@ -59,24 +74,26 @@ export function SkillActivityChain({ activities }: SkillActivityChainProps) {
     const items: ThoughtChainItemType[] = activities.map((activity) => {
         return {
             key: activity.callId,
-            title: getActivityTitle(activity),
+            title: getActivityTitle(activity, t),
             description:
                 activity.status === "loading"
-                    ? "调用中"
+                    ? t("chat.activity.status.loading")
                     : activity.status === "error"
-                      ? "调用失败"
+                      ? t("chat.activity.status.failed")
                       : activity.status === "abort"
-                        ? "已停止"
+                        ? t("chat.activity.status.stopped")
                         : activity.type === "skill-loaded"
-                          ? "加载成功"
-                          : "调用成功",
+                          ? t("chat.activity.status.loaded")
+                          : t("chat.activity.status.success"),
             content: (
                 <Flex vertical gap={8} className="skill-activity-detail">
                     <Typography.Text type="secondary">
-                        {getActivityDescription(activity)}
+                        {getActivityDescription(activity, t)}
                     </Typography.Text>
                     <Flex vertical gap={3}>
-                        <Typography.Text type="secondary">参数</Typography.Text>
+                        <Typography.Text type="secondary">
+                            {t("chat.activity.parameters")}
+                        </Typography.Text>
                         <Typography.Text className="skill-activity-parameters">
                             {formatArguments(activity.argumentsJson)}
                         </Typography.Text>
@@ -107,15 +124,21 @@ export function SkillActivityChain({ activities }: SkillActivityChainProps) {
                 ) : (
                     <CheckCircleFilled style={{ color: token.colorSuccess }} />
                 )}
-                <Typography.Text strong>工具调用</Typography.Text>
+                <Typography.Text strong>{t("chat.activity.calls")}</Typography.Text>
                 <Typography.Text type="secondary" className="activity-summary">
                     {activeActivity
-                        ? getActivityTitle(activeActivity)
+                        ? getActivityTitle(activeActivity, t)
                         : failedCount > 0
-                          ? `${failedCount} 项失败`
+                                                    ? t("chat.activity.failedCount", {
+                                                                count: failedCount,
+                                                        })
                           : abortedCount > 0
-                            ? `${abortedCount} 项已停止`
-                            : `${completedCount} 项已完成`}
+                                                        ? t("chat.activity.stoppedCount", {
+                                                                    count: abortedCount,
+                                                            })
+                                                        : t("chat.activity.completedCount", {
+                                                                    count: completedCount,
+                                                            })}
                 </Typography.Text>
             </Flex>
             <ThoughtChain items={items} />

@@ -45,6 +45,8 @@ import {
     theme,
 } from "antd";
 import { Fragment, useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { AgentDetailsDrawer } from "../../shared/components/agent-details-drawer";
 import { MarkdownContent } from "../../shared/components/markdown-content";
 import { MarkdownEditor } from "../../shared/components/markdown-editor";
@@ -93,15 +95,19 @@ interface AgentFormValues {
 
 const Sections: Array<{
     key: AgentEditorSection;
-    label: string;
+    translationKey: AgentEditorSection;
     icon: React.ReactNode;
 }> = [
-    { key: "basic", label: "基础信息", icon: <UserOutlined /> },
-    { key: "instructions", label: "Instructions", icon: <RobotOutlined /> },
-    { key: "model", label: "模型与参数", icon: <SlidersOutlined /> },
-    { key: "tools", label: "工具", icon: <ToolOutlined /> },
-    { key: "skills", label: "Skills", icon: <ReadOutlined /> },
-    { key: "version", label: "版本", icon: <HistoryOutlined /> },
+    { key: "basic", translationKey: "basic", icon: <UserOutlined /> },
+    {
+        key: "instructions",
+        translationKey: "instructions",
+        icon: <RobotOutlined />,
+    },
+    { key: "model", translationKey: "model", icon: <SlidersOutlined /> },
+    { key: "tools", translationKey: "tools", icon: <ToolOutlined /> },
+    { key: "skills", translationKey: "skills", icon: <ReadOutlined /> },
+    { key: "version", translationKey: "version", icon: <HistoryOutlined /> },
 ];
 
 const InitialValues: AgentFormValues = {
@@ -128,6 +134,7 @@ export function AgentEditor({
     onClone,
     onDirtyChange,
 }: AgentEditorProps) {
+    const { t } = useTranslation();
     const identity = useAuthStore((state) => state.identity);
     const queryClient = useQueryClient();
     const [form] = Form.useForm<AgentFormValues>();
@@ -179,11 +186,13 @@ export function AgentEditor({
             setSavedSincePublish(true);
             form.setFieldsValue(toFormValues(saved));
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
-            messageApi.success("已存为草稿，未影响已发布版本");
+            messageApi.success(t("agents.editor.messages.saved"));
         },
         onError: (reason) =>
             messageApi.error(
-                reason instanceof Error ? reason.message : "草稿保存失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.editor.messages.saveFailed"),
             ),
     });
     const avatarMutation = useMutation({
@@ -196,11 +205,13 @@ export function AgentEditor({
         onSuccess: (response) => {
             setAvatarUri(response.avatarUri);
             setDirty(true);
-            messageApi.success("头像已上传，请保存 Agent");
+            messageApi.success(t("agents.editor.messages.avatarUploaded"));
         },
         onError: (reason) =>
             messageApi.error(
-                reason instanceof Error ? reason.message : "头像上传失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.editor.messages.avatarUploadFailed"),
             ),
     });
     const publishMutation = useMutation({
@@ -237,13 +248,17 @@ export function AgentEditor({
             await queryClient.invalidateQueries({
                 queryKey: ["agent-versions", saved.id],
             });
-            messageApi.success(`已发布为 v${version.versionNumber}`);
+            messageApi.success(
+                t("agents.editor.messages.published", {
+                    version: version.versionNumber,
+                }),
+            );
         },
         onError: (reason) =>
             messageApi.error(
                 reason instanceof Error
                     ? reason.message
-                    : "发布失败，草稿已保留。",
+                    : t("agents.editor.messages.publishFailed"),
             ),
     });
     const cloneMutation = useMutation({
@@ -251,12 +266,14 @@ export function AgentEditor({
             desktopApi.cloneAgent(sourceAgentId),
         onSuccess: async (clone) => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
-            messageApi.success("已复制为我的 Agent");
+            messageApi.success(t("agents.editor.messages.cloned"));
             onClone(clone.id);
         },
         onError: (reason) =>
             messageApi.error(
-                reason instanceof Error ? reason.message : "复制 Agent 失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.editor.messages.cloneFailed"),
             ),
     });
     const rollbackMutation = useMutation({
@@ -286,11 +303,17 @@ export function AgentEditor({
             await queryClient.invalidateQueries({
                 queryKey: ["agent-versions", versionAgentId],
             });
-            messageApi.success(`已回滚，生成新版本 v${version.versionNumber}`);
+            messageApi.success(
+                t("agents.editor.messages.rolledBack", {
+                    version: version.versionNumber,
+                }),
+            );
         },
         onError: (reason) =>
             messageApi.error(
-                reason instanceof Error ? reason.message : "回滚失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.editor.messages.rollbackFailed"),
             ),
     });
     const deleteMutation = useMutation({
@@ -298,12 +321,14 @@ export function AgentEditor({
             desktopApi.deleteAgent(targetAgentId),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
-            messageApi.success("Agent 已删除");
+            messageApi.success(t("agents.editor.messages.deleted"));
             onBack();
         },
         onError: (reason) =>
             messageApi.error(
-                reason instanceof Error ? reason.message : "删除 Agent 失败。",
+                reason instanceof Error
+                    ? reason.message
+                    : t("agents.editor.messages.deleteFailed"),
             ),
     });
 
@@ -335,7 +360,11 @@ export function AgentEditor({
         cloneMutation.isPending ||
         rollbackMutation.isPending ||
         deleteMutation.isPending;
-    const selectedSection = Sections.find((item) => item.key === section)!;
+    const sections = Sections.map((item) => ({
+        ...item,
+        label: t(`agents.editor.sections.${item.translationKey}`),
+    }));
+    const selectedSection = sections.find((item) => item.key === section)!;
     const chatModels = (modelsQuery.data ?? []).filter(
         (model) => model.category === "Chat",
     );
@@ -360,12 +389,13 @@ export function AgentEditor({
     const confirmDelete = (): void => {
         if (!currentAgent) return;
         Modal.confirm({
-            title: `删除「${currentAgent.name}」？`,
-            content:
-                "将永久删除该 Agent、全部版本及相关会话历史，操作不可恢复。",
-            okText: "确认删除",
+            title: t("agents.editor.deleteDialog.title", {
+                name: currentAgent.name,
+            }),
+            content: t("agents.editor.deleteDialog.content"),
+            okText: t("agents.editor.deleteDialog.confirm"),
             okButtonProps: { danger: true },
-            cancelText: "取消",
+            cancelText: t("common.cancel"),
             onOk: async () => deleteMutation.mutateAsync(currentAgent.id),
         });
     };
@@ -380,9 +410,9 @@ export function AgentEditor({
     if (agentId && agentQuery.isError) {
         return (
             <main className="agent-editor-loading">
-                <Empty description="Agent 加载失败">
+                <Empty description={t("agents.editor.loadFailed")}>
                     <Button onClick={() => void agentQuery.refetch()}>
-                        重试
+                        {t("common.retry")}
                     </Button>
                 </Empty>
             </main>
@@ -395,7 +425,7 @@ export function AgentEditor({
             <header className="agent-editor-header">
                 <Button
                     type="text"
-                    aria-label="返回 Agent 空间"
+                    aria-label={t("agents.editor.backLabel")}
                     icon={<ArrowLeftOutlined />}
                     onClick={onBack}
                 />
@@ -408,13 +438,22 @@ export function AgentEditor({
                 </Avatar>
                 <div className="agent-editor-identity">
                     <Typography.Text strong>
-                        {agentName || "新建 Agent"}
+                        {agentName || t("agents.editor.newAgent")}
                     </Typography.Text>
                     <Space size={8}>
                         <Typography.Text type="secondary">
                             {currentAgent
-                                ? `v${currentAgent.latestPublishedVersionNumber} · Owner: ${isOwner ? identity?.username : currentAgent.ownerUserId.slice(0, 8)}`
-                                : "尚未保存"}
+                                ? t("agents.editor.versionOwner", {
+                                      version:
+                                          currentAgent.latestPublishedVersionNumber,
+                                      owner: isOwner
+                                          ? identity?.username
+                                          : currentAgent.ownerUserId.slice(
+                                                0,
+                                                8,
+                                            ),
+                                  })
+                                : t("agents.editor.notSaved")}
                         </Typography.Text>
                         <AgentStateTag
                             agent={currentAgent}
@@ -425,11 +464,11 @@ export function AgentEditor({
                 </div>
                 <div className="agent-editor-actions">
                     {isOwner && currentAgent && (
-                        <Tooltip title="删除 Agent">
+                        <Tooltip title={t("agents.editor.delete")}>
                             <Button
                                 danger
                                 type="text"
-                                aria-label="删除 Agent"
+                                aria-label={t("agents.editor.delete")}
                                 icon={<DeleteOutlined />}
                                 loading={deleteMutation.isPending}
                                 disabled={busy}
@@ -443,7 +482,7 @@ export function AgentEditor({
                         disabled={busy}
                         onClick={() => void openTrial()}
                     >
-                        试运行
+                        {t("agents.editor.trial")}
                     </Button>
                     {isOwner && (
                         <Button
@@ -452,7 +491,7 @@ export function AgentEditor({
                             disabled={busy}
                             onClick={() => void save()}
                         >
-                            保存
+                            {t("common.save")}
                         </Button>
                     )}
                     {isOwner && (
@@ -463,7 +502,7 @@ export function AgentEditor({
                             disabled={busy}
                             onClick={() => setPublishOpen(true)}
                         >
-                            发布
+                            {t("agents.editor.publish")}
                         </Button>
                     )}
                     {!isOwner && currentAgent && (
@@ -476,7 +515,7 @@ export function AgentEditor({
                                 cloneMutation.mutate(currentAgent.id)
                             }
                         >
-                            复制为我的 Agent
+                            {t("agents.editor.copyToMine")}
                         </Button>
                     )}
                 </div>
@@ -487,7 +526,7 @@ export function AgentEditor({
                     banner
                     type="info"
                     showIcon
-                    message="这是其他成员共享的 Agent，当前为只读模式。"
+                    message={t("agents.editor.readonly")}
                 />
             )}
 
@@ -497,7 +536,7 @@ export function AgentEditor({
                 <div className="agent-editor-workspace">
                     <nav
                         className={`agent-editor-sections ${sectionsCollapsed ? "collapsed" : ""}`}
-                        aria-label="Agent 配置区段"
+                        aria-label={t("agents.editor.navigationLabel")}
                     >
                         <div className="agent-editor-sections-toggle">
                             <Button
@@ -505,8 +544,8 @@ export function AgentEditor({
                                 size="small"
                                 aria-label={
                                     sectionsCollapsed
-                                        ? "展开配置导航"
-                                        : "收起配置导航"
+                                        ? t("agents.editor.expandNavigation")
+                                        : t("agents.editor.collapseNavigation")
                                 }
                                 icon={
                                     sectionsCollapsed ? (
@@ -521,7 +560,7 @@ export function AgentEditor({
                             />
                         </div>
                         <div className="agent-editor-section-list">
-                            {Sections.map((item) => (
+                            {sections.map((item) => (
                                 <Tooltip
                                     key={item.key}
                                     title={
@@ -558,11 +597,15 @@ export function AgentEditor({
                                 {selectedSection.label}
                             </Typography.Title>
                             {section === "instructions" && (
-                                <Tooltip title="给 Agent 的系统指令。支持 Markdown，超过 32K 字符时给出警告。">
+                                <Tooltip
+                                    title={t("agents.editor.instructionsHelp")}
+                                >
                                     <Button
                                         type="text"
                                         size="small"
-                                        aria-label="系统指令说明"
+                                        aria-label={t(
+                                            "agents.editor.instructionsHelpLabel",
+                                        )}
                                         icon={<QuestionCircleOutlined />}
                                     />
                                 </Tooltip>
@@ -576,7 +619,7 @@ export function AgentEditor({
                                 disabled={!isOwner || busy}
                                 onValuesChange={() => setDirty(true)}
                             >
-                                {Sections.map((item) => (
+                                {sections.map((item) => (
                                     <div
                                         key={item.key}
                                         hidden={section !== item.key}
@@ -654,9 +697,9 @@ export function AgentEditor({
 
             <Modal
                 open={publishOpen}
-                title="发布新版本"
-                okText="发布"
-                cancelText="取消"
+                title={t("agents.editor.publishDialog.title")}
+                okText={t("agents.editor.publish")}
+                cancelText={t("common.cancel")}
                 confirmLoading={publishMutation.isPending}
                 onCancel={() => {
                     setPublishOpen(false);
@@ -668,12 +711,11 @@ export function AgentEditor({
                     type="secondary"
                     style={{ marginBottom: 16 }}
                 >
-                    发布后将成为新的正式版本，正在使用该 Agent
-                    的对话会从下一轮开始使用新版本。
+                    {t("agents.editor.publishDialog.description")}
                 </Typography.Paragraph>
                 <Form layout="vertical">
                     <Form.Item
-                        label="变更说明（可选）"
+                        label={t("agents.editor.publishDialog.changeSummary")}
                         style={{ marginBottom: 0 }}
                     >
                         <Input
@@ -681,7 +723,9 @@ export function AgentEditor({
                             onChange={(event) =>
                                 setChangeSummary(event.target.value)
                             }
-                            placeholder="说明本次修改的内容，会记录到版本历史里"
+                            placeholder={t(
+                                "agents.editor.publishDialog.changeSummaryPlaceholder",
+                            )}
                             maxLength={100}
                         />
                     </Form.Item>
@@ -692,13 +736,13 @@ export function AgentEditor({
                                 setShareAfterPublish(event.target.checked)
                             }
                         >
-                            发布后共享给团队
+                            {t("agents.editor.publishDialog.shareAfterPublish")}
                         </Checkbox>
                         <Typography.Text
                             className="agent-publish-share-hint"
                             type="secondary"
                         >
-                            团队成员将可以查看并使用本次发布的新版本。
+                            {t("agents.editor.publishDialog.shareHint")}
                         </Typography.Text>
                     </Form.Item>
                 </Form>
@@ -747,10 +791,14 @@ function AgentSection({
     ) => Promise<AgentVersion>;
     rollbackPending: boolean;
 }) {
+    const { t } = useTranslation();
     if (section === "basic") {
         return (
             <div className="agent-basic-grid">
-                <Form.Item label="头像" style={{ marginBottom: 0 }}>
+                <Form.Item
+                    label={t("agents.editor.basic.avatar")}
+                    style={{ marginBottom: 0 }}
+                >
                     <div className="agent-basic-avatar-wrap">
                         {readonly ? (
                             <Avatar
@@ -761,7 +809,9 @@ function AgentSection({
                                 {(agentName || agent?.name || "A").slice(0, 1)}
                             </Avatar>
                         ) : (
-                            <Tooltip title="更换头像">
+                            <Tooltip
+                                title={t("agents.editor.basic.changeAvatar")}
+                            >
                                 <Upload
                                     showUploadList={false}
                                     accept="image/png,image/jpeg,image/webp"
@@ -774,7 +824,9 @@ function AgentSection({
                                     <button
                                         type="button"
                                         className="agent-basic-avatar agent-basic-avatar-editor"
-                                        aria-label="更换 Agent 头像"
+                                        aria-label={t(
+                                            "agents.editor.basic.changeAvatarLabel",
+                                        )}
                                     >
                                         {avatarUri ? (
                                             <img src={avatarUri} alt="" />
@@ -793,23 +845,35 @@ function AgentSection({
                             </Tooltip>
                         )}
                         <Typography.Text type="secondary">
-                            {readonly ? "Agent 头像" : "点击更换"}
+                            {readonly
+                                ? t("agents.editor.basic.avatarReadonly")
+                                : t("agents.editor.basic.clickToChange")}
                         </Typography.Text>
                     </div>
                 </Form.Item>
                 <div>
                     <Form.Item
-                        label="Agent 名称"
+                        label={t("agents.editor.basic.name")}
                         name="name"
                         rules={[
-                            { required: true, message: "请输入 Agent 名称" },
-                            { max: 50, message: "名称不能超过 50 个字符" },
+                            {
+                                required: true,
+                                message: t("agents.editor.basic.nameRequired"),
+                            },
+                            {
+                                max: 50,
+                                message: t("agents.editor.basic.nameTooLong"),
+                            },
                         ]}
                     >
-                        <Input placeholder="Agent 名称（1–50 字符）" />
+                        <Input
+                            placeholder={t(
+                                "agents.editor.basic.namePlaceholder",
+                            )}
+                        />
                     </Form.Item>
                     <Form.Item
-                        label="描述"
+                        label={t("agents.editor.basic.description")}
                         name="description"
                         style={{ marginBottom: 0 }}
                     >
@@ -817,19 +881,21 @@ function AgentSection({
                             rows={5}
                             maxLength={500}
                             showCount
-                            placeholder="简要描述这个 Agent 的职责和能力"
+                            placeholder={t(
+                                "agents.editor.basic.descriptionPlaceholder",
+                            )}
                         />
                     </Form.Item>
                     <Form.Item
-                        label="团队可见"
+                        label={t("agents.editor.basic.teamVisible")}
                         name="isShared"
                         valuePropName="checked"
-                        tooltip="对应 Agent 管理态的 IsShared，不随版本快照回滚。"
+                        tooltip={t("agents.editor.basic.teamVisibleHelp")}
                         style={{ marginTop: 18, marginBottom: 0 }}
                     >
                         <Switch
-                            checkedChildren="已共享"
-                            unCheckedChildren="仅自己"
+                            checkedChildren={t("agents.editor.basic.shared")}
+                            unCheckedChildren={t("agents.editor.basic.private")}
                         />
                     </Form.Item>
                 </div>
@@ -847,7 +913,7 @@ function AgentSection({
             <BindingSelector
                 name="toolIds"
                 loading={toolsLoading}
-                empty="统一工具管理中暂无可用工具"
+                empty={t("agents.editor.bindings.noTools")}
                 items={tools.map((tool) => ({
                     id: tool.id,
                     name: tool.name,
@@ -866,12 +932,12 @@ function AgentSection({
                     type="secondary"
                     className="agent-skills-description"
                 >
-                    从统一 Skill 管理中选择需要挂载到当前 Agent 的 Skill。
+                    {t("agents.editor.bindings.skillsDescription")}
                 </Typography.Paragraph>
                 <BindingSelector
                     name="skillIds"
                     loading={skillsLoading}
-                    empty="统一 Skill 管理中暂无可用 Skill"
+                    empty={t("agents.editor.bindings.noSkills")}
                     items={skills.map((skill) => ({
                         id: skill.id,
                         name: skill.name,
@@ -903,6 +969,7 @@ interface VersionSnapshotField {
 function versionSnapshotFields(
     snapshot: AgentVersion["snapshot"],
     tools: Awaited<ReturnType<typeof desktopApi.listTools>>,
+    t: TFunction,
 ): VersionSnapshotField[] {
     const toolName = (toolId: string): string =>
         tools.find((tool) => tool.id === toolId)?.name ?? toolId.slice(0, 8);
@@ -910,41 +977,65 @@ function versionSnapshotFields(
     const toolSummary =
         (snapshot.buildOptions.toolBindings ?? [])
             .map((binding) => toolName(binding.toolId))
-            .join("、") || "无";
+            .join(t("common.listSeparator")) ||
+        t("agents.editor.version.emptyValue");
     const skillSummary =
         (snapshot.buildOptions.skills ?? [])
             .map((skill) => skill.name)
-            .join("、") || "无";
+            .join(t("common.listSeparator")) ||
+        t("agents.editor.version.emptyValue");
     return [
-        { section: "基础信息", label: "名称", value: snapshot.name },
         {
-            section: "基础信息",
-            label: "描述",
+            section: t("agents.editor.version.snapshot.basic"),
+            label: t("agents.editor.version.snapshot.name"),
+            value: snapshot.name,
+        },
+        {
+            section: t("agents.editor.version.snapshot.basic"),
+            label: t("agents.editor.version.snapshot.description"),
             value: snapshot.description ?? "-",
         },
         {
-            section: "Instructions",
-            label: "Instructions",
+            section: t("agents.editor.version.snapshot.instructions"),
+            label: t("agents.editor.version.snapshot.instructions"),
             value: snapshot.instructions ?? "-",
         },
-        { section: "模型与参数", label: "模型", value: model.modelId ?? "-" },
         {
-            section: "模型与参数",
-            label: "Temperature",
-            value: String(model.temperature ?? "默认"),
+            section: t("agents.editor.version.snapshot.model"),
+            label: t("agents.editor.version.snapshot.modelId"),
+            value: model.modelId ?? "-",
         },
         {
-            section: "模型与参数",
-            label: "Top P",
-            value: String(model.topP ?? "默认"),
+            section: t("agents.editor.version.snapshot.model"),
+            label: t("agents.editor.model.temperature"),
+            value: String(
+                model.temperature ?? t("agents.editor.version.defaultValue"),
+            ),
         },
         {
-            section: "模型与参数",
-            label: "Max Tokens",
-            value: String(model.maxTokens ?? "默认"),
+            section: t("agents.editor.version.snapshot.model"),
+            label: t("agents.editor.model.topP"),
+            value: String(
+                model.topP ?? t("agents.editor.version.defaultValue"),
+            ),
         },
-        { section: "能力", label: "工具", value: toolSummary },
-        { section: "能力", label: "Skills", value: skillSummary },
+        {
+            section: t("agents.editor.version.snapshot.model"),
+            label: t("agents.editor.model.maxTokens"),
+            value: String(
+                model.maxTokens ?? t("agents.editor.version.defaultValue"),
+            ),
+        },
+        {
+            section: t("agents.editor.version.snapshot.capabilities"),
+            label: t("agents.editor.version.snapshot.tools"),
+            value: toolSummary,
+        },
+        {
+            section: t("agents.editor.version.snapshot.capabilities"),
+            label: t("agents.editor.version.snapshot.skills"),
+            value: skillSummary,
+        },
     ];
 }
 
@@ -966,6 +1057,7 @@ function VersionHistorySection({
     ) => Promise<AgentVersion>;
     rollbackPending: boolean;
 }) {
+    const { t, i18n } = useTranslation();
     const appearance = useResolvedAppearance();
     const { token } = theme.useToken();
     const [modal, modalContextHolder] = Modal.useModal();
@@ -974,7 +1066,8 @@ function VersionHistorySection({
     const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
 
-    if (versions.length === 0) return <Empty description="此 Agent 尚未发布" />;
+    if (versions.length === 0)
+        return <Empty description={t("agents.editor.version.none")} />;
 
     const latestVersionNumber =
         agent?.latestPublishedVersionNumber ??
@@ -992,10 +1085,12 @@ function VersionHistorySection({
 
     const confirmRollback = (version: AgentVersion): void => {
         modal.confirm({
-            title: `回滚到 v${version.versionNumber}？`,
-            content: "将基于该历史版本生成一个新的发布版本，不会覆盖版本历史。",
-            okText: "确认回滚",
-            cancelText: "取消",
+            title: t("agents.editor.version.rollbackTitle", {
+                version: version.versionNumber,
+            }),
+            content: t("agents.editor.version.rollbackContent"),
+            okText: t("agents.editor.version.confirmRollback"),
+            cancelText: t("common.cancel"),
             okButtonProps: { danger: true },
             onOk: async () => {
                 await onRollback(version.id, null);
@@ -1010,8 +1105,8 @@ function VersionHistorySection({
     const target =
         versions.find((version) => version.id === targetVersionId) ??
         versions[0];
-    const baseFields = versionSnapshotFields(base.snapshot, tools);
-    const targetFields = versionSnapshotFields(target.snapshot, tools);
+    const baseFields = versionSnapshotFields(base.snapshot, tools, t);
+    const targetFields = versionSnapshotFields(target.snapshot, tools, t);
     const differences = baseFields
         .map((field, index) => ({
             ...field,
@@ -1034,10 +1129,10 @@ function VersionHistorySection({
             >
                 <div>
                     <Typography.Title level={5} style={{ margin: 0 }}>
-                        版本历史
+                        {t("agents.editor.version.history")}
                     </Typography.Title>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        发布和回滚会生成不可变版本；保存草稿不会出现在这里。
+                        {t("agents.editor.version.historyDescription")}
                     </Typography.Text>
                 </div>
                 <Button
@@ -1047,7 +1142,7 @@ function VersionHistorySection({
                         openComparison(versions[1].id, versions[0].id)
                     }
                 >
-                    版本对比
+                    {t("agents.editor.version.compare")}
                 </Button>
             </Flex>
             <Table
@@ -1058,7 +1153,7 @@ function VersionHistorySection({
                 dataSource={versions}
                 columns={[
                     {
-                        title: "版本",
+                        title: t("agents.editor.version.columns.version"),
                         dataIndex: "versionNumber",
                         width: 72,
                         render: (versionNumber: number) => (
@@ -1068,7 +1163,7 @@ function VersionHistorySection({
                         ),
                     },
                     {
-                        title: "状态",
+                        title: t("agents.editor.version.columns.status"),
                         key: "status",
                         width: 96,
                         render: (_value: unknown, version: AgentVersion) => (
@@ -1077,31 +1172,33 @@ function VersionHistorySection({
                                     isPublished(version) ? "success" : "default"
                                 }
                             >
-                                {isPublished(version) ? "已发布" : "历史版本"}
+                                {isPublished(version)
+                                    ? t("agents.editor.version.published")
+                                    : t("agents.editor.version.historical")}
                             </Tag>
                         ),
                     },
                     {
-                        title: "保存时间",
+                        title: t("agents.editor.version.columns.savedTime"),
                         dataIndex: "createdTime",
                         width: 168,
                         render: (createdTime: string) =>
-                            new Date(createdTime).toLocaleString("zh-CN"),
+                            new Date(createdTime).toLocaleString(i18n.language),
                     },
                     {
-                        title: "保存人",
+                        title: t("agents.editor.version.columns.savedBy"),
                         key: "savedBy",
                         width: 120,
                         render: (_value: unknown, version: AgentVersion) =>
                             savedBy(version),
                     },
                     {
-                        title: "变更摘要",
+                        title: t("agents.editor.version.columns.summary"),
                         dataIndex: "changeSummary",
                         render: (summary: string | null) => summary || "-",
                     },
                     {
-                        title: "操作",
+                        title: t("agents.editor.version.columns.actions"),
                         key: "actions",
                         width: 72,
                         align: "center",
@@ -1111,7 +1208,7 @@ function VersionHistorySection({
                                 size="small"
                                 onClick={() => setDetailTarget(version)}
                             >
-                                查看
+                                {t("common.view")}
                             </Button>
                         ),
                     },
@@ -1126,8 +1223,8 @@ function VersionHistorySection({
                 tools={tools}
                 statusLabel={
                     detailTarget && isPublished(detailTarget)
-                        ? "已发布"
-                        : "历史版本"
+                        ? "published"
+                        : "historical"
                 }
                 extra={
                     detailTarget && (
@@ -1144,7 +1241,9 @@ function VersionHistorySection({
                                             )
                                         }
                                     >
-                                        与上一版比较
+                                        {t(
+                                            "agents.editor.version.previousCompare",
+                                        )}
                                     </Button>
                                 )}
                             {!isPublished(detailTarget) && (
@@ -1158,7 +1257,7 @@ function VersionHistorySection({
                                         )
                                     }
                                 >
-                                    与最新版比较
+                                    {t("agents.editor.version.latestCompare")}
                                 </Button>
                             )}
                         </Space>
@@ -1173,7 +1272,7 @@ function VersionHistorySection({
                             loading={rollbackPending}
                             onClick={() => confirmRollback(detailTarget)}
                         >
-                            回滚到本版
+                            {t("agents.editor.version.rollbackThis")}
                         </Button>
                     ) : undefined
                 }
@@ -1185,7 +1284,7 @@ function VersionHistorySection({
                 footer={null}
                 width={920}
                 centered
-                title="版本对比"
+                title={t("agents.editor.version.compare")}
             >
                 <Flex align="center" gap={12} style={{ marginBottom: 20 }}>
                     <Select
@@ -1194,18 +1293,20 @@ function VersionHistorySection({
                         style={{ flex: 1 }}
                         options={versions.map((version) => ({
                             value: version.id,
-                            label: `v${version.versionNumber} · ${version.changeSummary || "无摘要"}`,
+                            label: `v${version.versionNumber} · ${version.changeSummary || t("agents.editor.version.noSummary")}`,
                             disabled: version.id === target.id,
                         }))}
                     />
-                    <Typography.Text type="secondary">对比</Typography.Text>
+                    <Typography.Text type="secondary">
+                        {t("agents.editor.version.versus")}
+                    </Typography.Text>
                     <Select
                         value={target.id}
                         onChange={setTargetVersionId}
                         style={{ flex: 1 }}
                         options={versions.map((version) => ({
                             value: version.id,
-                            label: `v${version.versionNumber} · ${version.changeSummary || "无摘要"}`,
+                            label: `v${version.versionNumber} · ${version.changeSummary || t("agents.editor.version.noSummary")}`,
                             disabled: version.id === base.id,
                         }))}
                     />
@@ -1219,7 +1320,7 @@ function VersionHistorySection({
                     }}
                 >
                     <Typography.Text strong style={{ padding: 12 }}>
-                        字段
+                        {t("agents.editor.version.field")}
                     </Typography.Text>
                     <Typography.Text strong style={{ padding: 12 }}>
                         v{base.versionNumber}
@@ -1270,7 +1371,7 @@ function VersionHistorySection({
                 </div>
                 {differences.length === 0 && (
                     <Typography.Text type="secondary">
-                        两个版本的配置完全相同。
+                        {t("agents.editor.version.identical")}
                     </Typography.Text>
                 )}
             </Modal>
@@ -1279,6 +1380,7 @@ function VersionHistorySection({
 }
 
 function InstructionsSection({ readonly }: { readonly: boolean }) {
+    const { t } = useTranslation();
     const appearance = useResolvedAppearance();
     const form = Form.useFormInstance<AgentFormValues>();
     const instructions = Form.useWatch("instructions", form) ?? "";
@@ -1289,7 +1391,7 @@ function InstructionsSection({ readonly }: { readonly: boolean }) {
                     className="agent-instructions-warning"
                     type="warning"
                     showIcon
-                    message="Instructions 较长，可能挤占模型上下文"
+                    message={t("agents.editor.instructions.tooLong")}
                 />
             )}
             {readonly ? (
@@ -1301,7 +1403,7 @@ function InstructionsSection({ readonly }: { readonly: boolean }) {
                         />
                     ) : (
                         <Typography.Text type="secondary">
-                            暂无 Instructions
+                            {t("agents.editor.instructions.empty")}
                         </Typography.Text>
                     )}
                 </div>
@@ -1311,7 +1413,7 @@ function InstructionsSection({ readonly }: { readonly: boolean }) {
                     className="agent-instructions-editor"
                 >
                     <MarkdownEditor
-                        aria-label="Instructions"
+                        aria-label={t("agents.editor.sections.instructions")}
                         appearance={appearance}
                     />
                 </Form.Item>
@@ -1342,6 +1444,7 @@ function BindingSelector({
         parameters?: string[];
     }>;
 }) {
+    const { t } = useTranslation();
     const form = Form.useFormInstance<AgentFormValues>();
     const selectedIds = Form.useWatch(name, form) ?? [];
     if (loading) return <Skeleton active paragraph={{ rows: 3 }} />;
@@ -1366,13 +1469,23 @@ function BindingSelector({
                                 )}
                             </div>
                             <div className="agent-binding-item-copy">
-                                <Typography.Text strong>{item.name}</Typography.Text>
+                                <Typography.Text strong>
+                                    {item.name}
+                                </Typography.Text>
                                 <Typography.Text type="secondary">
                                     {item.description}
                                 </Typography.Text>
                                 {name === "skillIds" && (
-                                    <Flex gap={6} wrap className="agent-skill-stages">
-                                        <Tag>Discovery</Tag>
+                                    <Flex
+                                        gap={6}
+                                        wrap
+                                        className="agent-skill-stages"
+                                    >
+                                        <Tag>
+                                            {t(
+                                                "agents.editor.bindings.discovery",
+                                            )}
+                                        </Tag>
                                         <Tag
                                             color={
                                                 selectedIds.includes(item.id)
@@ -1380,29 +1493,41 @@ function BindingSelector({
                                                     : undefined
                                             }
                                         >
-                                            Activation
+                                            {t(
+                                                "agents.editor.bindings.activation",
+                                            )}
                                         </Tag>
-                                        <Tag>Execution</Tag>
+                                        <Tag>
+                                            {t(
+                                                "agents.editor.bindings.execution",
+                                            )}
+                                        </Tag>
                                     </Flex>
                                 )}
                                 {name === "toolIds" &&
                                     selectedIds.includes(item.id) &&
                                     item.parameters &&
                                     item.parameters.length > 0 && (
-                                        <Flex gap={12} wrap className="agent-binding-config">
-                                            {item.parameters.map((parameter) => (
-                                                <Form.Item
-                                                    key={parameter}
-                                                    name={[
-                                                        "toolParameters",
-                                                        item.id,
-                                                        parameter,
-                                                    ]}
-                                                    label={parameter}
-                                                >
-                                                    <Input size="small" />
-                                                </Form.Item>
-                                            ))}
+                                        <Flex
+                                            gap={12}
+                                            wrap
+                                            className="agent-binding-config"
+                                        >
+                                            {item.parameters.map(
+                                                (parameter) => (
+                                                    <Form.Item
+                                                        key={parameter}
+                                                        name={[
+                                                            "toolParameters",
+                                                            item.id,
+                                                            parameter,
+                                                        ]}
+                                                        label={parameter}
+                                                    >
+                                                        <Input size="small" />
+                                                    </Form.Item>
+                                                ),
+                                            )}
                                         </Flex>
                                     )}
                             </div>
@@ -1449,14 +1574,20 @@ function ModelSection({
     chatModels: Awaited<ReturnType<typeof desktopApi.listModels>>;
     loading: boolean;
 }) {
+    const { t } = useTranslation();
     return (
         <>
             <Card size="small" className="agent-model-picker">
                 <Form.Item
-                    label="运行模型"
+                    label={t("agents.editor.model.runtime")}
                     name="modelId"
                     required={false}
-                    rules={[{ required: true, message: "请选择运行模型" }]}
+                    rules={[
+                        {
+                            required: true,
+                            message: t("agents.editor.model.runtimeRequired"),
+                        },
+                    ]}
                 >
                     <Select
                         loading={loading}
@@ -1467,17 +1598,19 @@ function ModelSection({
                                     <span>{model.id}</span>
                                     {model.supportsVision && (
                                         <Tag style={{ marginInlineEnd: 0 }}>
-                                            视觉
+                                            {t("agents.editor.model.vision")}
                                         </Tag>
                                     )}
                                     {model.supportsTools && (
                                         <Tag style={{ marginInlineEnd: 0 }}>
-                                            工具
+                                            {t("agents.editor.model.tools")}
                                         </Tag>
                                     )}
                                     {model.supportsStructuredOutput && (
                                         <Tag style={{ marginInlineEnd: 0 }}>
-                                            结构化输出
+                                            {t(
+                                                "agents.editor.model.structuredOutput",
+                                            )}
                                         </Tag>
                                     )}
                                 </Space>
@@ -1487,18 +1620,20 @@ function ModelSection({
                 </Form.Item>
             </Card>
             <Typography.Text strong className="agent-model-section-title">
-                生成参数
+                {t("agents.editor.model.generationParameters")}
             </Typography.Text>
             <Typography.Text
                 type="secondary"
                 className="agent-model-section-description"
             >
-                关闭“自定义”后使用模型默认值，不写入请求参数。
+                {t("agents.editor.model.generationDescription")}
             </Typography.Text>
             <div className="agent-parameter-grid">
                 <ParameterCard
-                    title="Temperature"
-                    description="控制输出的随机性"
+                    title={t("agents.editor.model.temperature")}
+                    description={t(
+                        "agents.editor.model.temperatureDescription",
+                    )}
                     customName="customTemperature"
                     valueName="temperature"
                     min={0}
@@ -1506,8 +1641,8 @@ function ModelSection({
                     step={0.01}
                 />
                 <ParameterCard
-                    title="Top P"
-                    description="限制候选词概率范围"
+                    title={t("agents.editor.model.topP")}
+                    description={t("agents.editor.model.topPDescription")}
                     customName="customTopP"
                     valueName="topP"
                     min={0}
@@ -1515,8 +1650,8 @@ function ModelSection({
                     step={0.01}
                 />
                 <ParameterCard
-                    title="Max Tokens"
-                    description="限制单次输出长度"
+                    title={t("agents.editor.model.maxTokens")}
+                    description={t("agents.editor.model.maxTokensDescription")}
                     customName="customMaxTokens"
                     valueName="maxTokens"
                     min={1}
@@ -1529,23 +1664,23 @@ function ModelSection({
                 strong
                 className="agent-model-section-title context"
             >
-                上下文
+                {t("agents.editor.model.context")}
             </Typography.Text>
             <Typography.Text
                 type="secondary"
                 className="agent-model-section-description context"
             >
-                超过该数量时，最早的历史消息会被裁剪，避免无限增长挤占模型上下文。
+                {t("agents.editor.model.contextDescription")}
             </Typography.Text>
             <Form.Item
                 className="agent-model-context-input"
-                label="最大消息记录数"
+                label={t("agents.editor.model.maxMessages")}
                 name="maxMessages"
             >
                 <InputNumber
                     min={1}
                     max={500}
-                    suffix="条"
+                    suffix={t("agents.editor.model.messageUnit")}
                     style={{ width: 160 }}
                 />
             </Form.Item>
@@ -1572,6 +1707,7 @@ function ParameterCard({
     step: number;
     slider?: boolean;
 }) {
+    const { t } = useTranslation();
     const form = Form.useFormInstance<AgentFormValues>();
     const custom = Form.useWatch(customName, form) as boolean;
     return (
@@ -1586,8 +1722,8 @@ function ParameterCard({
                 <Form.Item name={customName} valuePropName="checked" noStyle>
                     <Switch
                         size="small"
-                        checkedChildren="自定义"
-                        unCheckedChildren="默认"
+                        checkedChildren={t("agents.editor.model.custom")}
+                        unCheckedChildren={t("agents.editor.model.default")}
                     />
                 </Form.Item>
             </div>
@@ -1626,11 +1762,14 @@ function AgentStateTag({
     dirty: boolean;
     savedSincePublish: boolean;
 }) {
-    if (dirty) return <Tag color="warning">未保存</Tag>;
+    const { t } = useTranslation();
+    if (dirty)
+        return <Tag color="warning">{t("agents.editor.state.unsaved")}</Tag>;
     if (!agent?.latestPublishedVersionNumber)
-        return <Tag color="warning">未发布的草稿</Tag>;
-    if (savedSincePublish) return <Tag color="processing">有未发布的修改</Tag>;
-    return <Tag color="success">已发布</Tag>;
+        return <Tag color="warning">{t("agents.editor.state.draft")}</Tag>;
+    if (savedSincePublish)
+        return <Tag color="processing">{t("agents.editor.state.changed")}</Tag>;
+    return <Tag color="success">{t("agents.editor.state.published")}</Tag>;
 }
 
 function toFormValues(agent: AgentDefinition): AgentFormValues {

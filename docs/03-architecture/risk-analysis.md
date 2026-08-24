@@ -39,7 +39,7 @@ downstream:
 | [RISK-007](#risk-007-主进程长-sse-跨锁屏可靠性)                                | 可靠性          | 主进程长 SSE 跨锁屏休眠重连                              | 中     | [ADR-011](./adr/ADR-011-auto-lock-with-inflight-task-survival.md) / [ADR-012](./adr/ADR-012-client-server-protocol-rest-agui.md)                                                                                                                                       |
 | [RISK-008](#risk-008-v1-范围裁剪压力)                                          | 进度 / 范围     | OQ-006 范围裁剪是否兜得住                                | 中     | [OQ-006](../01-requirements/open-questions.md)                                                                                                                                                                                                                         |
 | [RISK-009](#risk-009-skill-加载错误传播到对话)                                 | 体验 / 错误     | Skill 加载失败影响对话                                   | 低     | [ADR-010](./adr/ADR-010-skill-loading-static-only-v1.md) / [EX-008](../01-requirements/requirements.md)                                                                                                                                                                |
-| [RISK-010](#risk-010-v1-不引入-i18n-的-v2-重做成本)                            | 技术债          | v2 引入 i18n 重构成本                                    | 低     | [ADR-014](./adr/ADR-014-i18n-out-of-scope-v1.md)                                                                                                                                                                                                                       |
+| [RISK-010](#risk-010-双语-ui-翻译覆盖与边界漂移)                               | 体验 / 维护     | 双语 UI 翻译覆盖与边界漂移                               | 中     | [ADR-027](./adr/ADR-027-desktop-ui-bilingual-localization.md)                                                                                                                                                                                                          |
 | [RISK-011](#risk-011-文件存储三-provider-contract-漏出)                        | 数据层 / 测试   | 文件存储三 Provider contract 测试漏出                    | 中     | [ADR-015](./adr/ADR-015-object-storage-provider-switchable.md)                                                                                                                                                                                                         |
 | [RISK-012](#risk-012-redis-单点与缓存-invalidation-一致性)                     | 数据层 / 一致性 | Redis 单点 + 多副本 invalidation                         | 中     | [ADR-016](./adr/ADR-016-cache-provider-redis.md)                                                                                                                                                                                                                       |
 | [RISK-013](#risk-013-v1-未引入-key-vault-的凭据轮换与隔离弱化)                 | 安全 / 合规     | K8s Secret + .env 弱于 Key Vault                         | 中     | [ADR-005](./adr/ADR-005-deployment-docker-compose-aks.md) / [OQ-A006 closed §B](./open-questions-arch.md)                                                                                                                                                              |
@@ -159,16 +159,17 @@ downstream:
   3. H4 用例覆盖：(a) frontmatter 缺字段；(b) markdown 语法错误；(c) Activation 匹配过载（多条 Skill 同时命中）。
 - **残余风险**：v1 Skill 数量预期不大（< 50 条），错误概率与影响可控。
 
-## RISK-010 v1 不引入 i18n 的 v2 重做成本
+## RISK-010 双语 UI 翻译覆盖与边界漂移
 
-- **类别**：技术债
-- **触发条件**：v2 引入英文 / 其他语言时，需要遍历全代码库抽 i18n key + 翻译。
-- **影响范围**：[ADR-014](./adr/ADR-014-i18n-out-of-scope-v1.md) — 客户端 React 组件 + 后端错误消息 + 模型 prompt 模板。
+- **类别**：体验 / 维护
+- **触发条件**：新增界面直接写固定文案、只维护一种语言，或第三方组件 / 日期格式没有接入当前 locale；也可能把服务端错误、用户数据或模型内容误当作 UI 文案翻译。
+- **影响范围**：[REQ-019](../01-requirements/requirements.md) 与 [ADR-027](./adr/ADR-027-desktop-ui-bilingual-localization.md) 覆盖的 Electron Renderer。
 - **缓解方案（可执行）**：
-  1. 在 [tech-debt-tracker](../../../.he/docs/tech-debt-gc.md) 登记本风险，标记为"已知技术债，v2 必须处理"。
-  2. v1 编码时 ESLint 规则禁止"魔术字符串"用于 UI 文案；强制走 [`tFn(label)`](./adr/ADR-014-i18n-out-of-scope-v1.md) wrapper（v1 wrapper 透传，v2 切到 i18n 框架时只改 wrapper 实现）— 这是"轻量预备"，与 ADR-014 §备选 B 区别在于不引入 i18n 框架，仅提供一个零成本 wrapper。
-  3. 错误消息常量集中在 `Inkwell.Common.Errors.Resources`，v2 替换实现而不替换调用点。
-- **残余风险**：第 2 条缓解需要团队纪律，纪律不到位时 v2 重构成本回升 — 但相比"完全不准备"已显著降低。
+  1. 消息资源按领域组织，跨页面公共操作只使用 `common.*`，避免重复翻译和术语漂移。
+  2. 单元测试覆盖默认语言、英文公共文案和缺失 key 的中文 fallback；Electron E2E 覆盖即时切换与重启保持。
+  3. ESLint 与源码扫描检查组件中的固定 UI 字面量；新增页面评审时同时检查 `zh-CN` / `en-US`。
+  4. 明确边界：只翻译客户端自有文案和前端上下文前缀；后端错误正文、用户数据、Agent / Tool / Skill / Model 内容、模型输出与 ASR 保持原文。
+- **残余风险**：英文领域术语仍依赖人工校对；本地 locale 偏好不会跨设备同步；后端错误可能与英文 UI 混排，待后续错误国际化专项解决。
 
 ## RISK-011 文件存储三 Provider contract 漏出
 

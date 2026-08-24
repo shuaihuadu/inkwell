@@ -1,6 +1,7 @@
 import { PaperClipOutlined } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
 import { Button, Flex, Space, Tooltip, Typography } from "antd";
+import { useTranslation } from "react-i18next";
 import { ChatQuickPrompts } from "./chat-quick-prompts";
 
 interface ChatComposerProps {
@@ -24,6 +25,7 @@ export function ChatComposer({
     onSubmit,
     onCancel,
 }: ChatComposerProps) {
+    const { t } = useTranslation();
     return (
         <div className={`chat-composer chat-composer-${variant}`}>
             {showPrompts && (
@@ -36,7 +38,7 @@ export function ChatComposer({
                     minRows: variant === "full" && showPrompts ? 1 : 2,
                     maxRows: variant === "full" ? 6 : 5,
                 }}
-                placeholder="输入消息，Enter 发送，Shift + Enter 换行"
+                placeholder={t("chat.composer.placeholder")}
                 value={value}
                 onChange={onChange}
                 onSubmit={onSubmit}
@@ -46,10 +48,10 @@ export function ChatComposer({
                 footer={(actionNode) => (
                     <Flex justify="space-between" align="center">
                         <Space size={8}>
-                            <Tooltip title="附件发送暂未开放">
+                            <Tooltip title={t("chat.composer.attachmentUnavailable")}>
                                 <Button
                                     type="text"
-                                    aria-label="添加附件"
+                                    aria-label={t("chat.composer.addAttachment")}
                                     icon={<PaperClipOutlined />}
                                     disabled
                                 />

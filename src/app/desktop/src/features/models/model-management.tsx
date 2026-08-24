@@ -24,6 +24,8 @@ import {
     theme,
 } from "antd";
 import { useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import DataListPage, {
     DataListRowAction,
     DataListRowActions,
@@ -35,36 +37,39 @@ import type {
 } from "../../shared/network/contracts";
 import { useAuthStore } from "../auth/auth-store";
 
-const categoryLabels: Record<LLMModelCategory, string> = {
-    Unknown: "未知",
-    Chat: "对话",
-    Embedding: "嵌入",
-    ImageGeneration: "图像生成",
-    VideoGeneration: "视频生成",
-};
+const modelCategories: LLMModelCategory[] = [
+    "Unknown",
+    "Chat",
+    "Embedding",
+    "ImageGeneration",
+    "VideoGeneration",
+];
 
 type ModelCategoryFilter = LLMModelCategory | "All";
 type TestState = "success" | "failure";
 
 function CapabilityTag({ value }: { value: boolean | null }) {
+    const { t } = useTranslation();
     if (value === null) {
-        return <Tag>未知</Tag>;
+        return <Tag>{t("common.unknown")}</Tag>;
     }
 
     return value ? (
-        <Tag color="success">支持</Tag>
+        <Tag color="success">{t("models.capability.supported")}</Tag>
     ) : (
-        <Tag color="default">不支持</Tag>
+        <Tag color="default">{t("models.capability.unsupported")}</Tag>
     );
 }
 
-const formatTokens = (value: number | null): string =>
-    value === null ? "未知" : value.toLocaleString();
+const formatTokens = (
+    value: number | null,
+    locale: string,
+    t: TFunction,
+): string =>
+    value === null ? t("common.unknown") : value.toLocaleString(locale);
 
-const formatLatency = (value: string): string => {
-    const match = /^(?:(\d+)\.)?(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)$/.exec(
-        value,
-    );
+const formatLatency = (value: string, locale: string): string => {
+    const match = /^(?:(\d+)\.)?(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)$/.exec(value);
     if (!match) {
         return value;
     }
@@ -75,10 +80,11 @@ const formatLatency = (value: string): string => {
     const seconds = Number(match[4]);
     const milliseconds =
         (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000;
-    return `${Math.round(milliseconds).toLocaleString()} ms`;
+    return `${Math.round(milliseconds).toLocaleString(locale)} ms`;
 };
 
 export function ModelManagement() {
+    const { t, i18n } = useTranslation();
     const { token } = theme.useToken();
     const isAdmin = useAuthStore((state) => state.identity?.isAdmin === true);
     const [category, setCategory] = useState<ModelCategoryFilter>("All");
@@ -102,7 +108,7 @@ export function ModelManagement() {
                 (model) => model.id === result.modelId,
             );
             const categoryLabel = testedModel
-                ? categoryLabels[testedModel.category]
+                ? t(`models.categories.${testedModel.category}`)
                 : "";
             setTestStates((current) => ({
                 ...current,
@@ -110,10 +116,16 @@ export function ModelManagement() {
             }));
             if (result.isSuccess) {
                 messageApi.success(
-                    `${result.modelId} ${categoryLabel}最小请求成功 · ${formatLatency(result.latency)}`,
+                    t("models.test.success", {
+                        model: result.modelId,
+                        category: categoryLabel,
+                        latency: formatLatency(result.latency, i18n.language),
+                    }),
                 );
             } else {
-                messageApi.error(result.errorMessage ?? "模型连接测试失败");
+                messageApi.error(
+                    result.errorMessage ?? t("models.test.failed"),
+                );
             }
         },
         onError: (reason, modelId) => {
@@ -122,7 +134,9 @@ export function ModelManagement() {
                 [modelId]: "failure",
             }));
             messageApi.error(
-                reason instanceof Error ? reason.message : "模型连接测试失败",
+                reason instanceof Error
+                    ? reason.message
+                    : t("models.test.failed"),
             );
         },
     });
@@ -139,44 +153,48 @@ export function ModelManagement() {
 
     return (
         <DataListPage<LLMModel>
-            title="模型"
-            description="查看 LiteLLM 实时发现的模型与能力。此列表只读，模型配置在 LiteLLM 中维护。"
-            primaryAction={isAdmin ? (
-                <Button
-                    type="primary"
-                    ghost
-                    icon={<ExportOutlined />}
-                    disabled={!dashboardUrl}
-                    loading={managementQuery.isLoading}
-                    onClick={() =>
-                        dashboardUrl && void desktopApi.openExternal(dashboardUrl)
-                    }
-                >
-                    模型管理
-                </Button>
-            ) : undefined}
+            title={t("models.title")}
+            description={t("models.description")}
+            primaryAction={
+                isAdmin ? (
+                    <Button
+                        type="primary"
+                        ghost
+                        icon={<ExportOutlined />}
+                        disabled={!dashboardUrl}
+                        loading={managementQuery.isLoading}
+                        onClick={() =>
+                            dashboardUrl &&
+                            void desktopApi.openExternal(dashboardUrl)
+                        }
+                    >
+                        {t("models.management")}
+                    </Button>
+                ) : undefined
+            }
             filters={
                 <Select<ModelCategoryFilter>
-                    aria-label="筛选模型类型"
+                    aria-label={t("models.filterLabel")}
                     value={category}
                     onChange={setCategory}
                     style={{ width: 170 }}
                     options={[
-                        { label: "全部类型", value: "All" },
-                        ...Object.entries(categoryLabels).map(
-                            ([value, label]) => ({ value, label }),
-                        ),
+                        { label: t("models.allTypes"), value: "All" },
+                        ...modelCategories.map((value) => ({
+                            value,
+                            label: t(`models.categories.${value}`),
+                        })),
                     ]}
                 />
             }
-            refreshLabel="刷新模型"
+            refreshLabel={t("models.refreshLabel")}
             onRefresh={() => {
                 void modelsQuery.refetch();
                 void managementQuery.refetch();
             }}
             refreshing={modelsQuery.isFetching && !modelsQuery.isLoading}
             searchValue={searchText}
-            searchPlaceholder="搜索模型标识或提供方"
+            searchPlaceholder={t("models.searchPlaceholder")}
             searchMaxLength={128}
             onSearchChange={setSearchText}
             paginationResetKey={`${searchText}:${category}`}
@@ -185,15 +203,15 @@ export function ModelManagement() {
             tableScrollX={1120}
             loading={modelsQuery.isLoading}
             errorMessage={
-                modelsQuery.isError ? "无法读取 LiteLLM 模型，请重试" : undefined
+                modelsQuery.isError ? t("models.loadFailed") : undefined
             }
             onRetry={() => void modelsQuery.refetch()}
-            emptyText="LiteLLM 当前未返回模型"
-            filteredEmptyText="在所选条件内没有结果，请清除筛选"
+            emptyText={t("models.empty")}
+            filteredEmptyText={t("models.filteredEmpty")}
             isFiltered={normalizedSearch.length > 0 || category !== "All"}
             columns={[
                 {
-                    title: "模型标识",
+                    title: t("models.columns.id"),
                     dataIndex: "id",
                     width: 210,
                     fixed: "left",
@@ -202,30 +220,42 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "模型类型",
+                    title: t("models.columns.type"),
                     dataIndex: "category",
                     width: 150,
-                    render: (value: LLMModelCategory) => categoryLabels[value],
+                    render: (value: LLMModelCategory) =>
+                        t(`models.categories.${value}`),
                 },
                 {
-                    title: "提供方",
+                    title: t("models.columns.provider"),
                     dataIndex: "ownedBy",
                     width: 110,
-                    render: (value: string | null) => value ?? "未知",
+                    render: (value: string | null) =>
+                        value ?? t("common.unknown"),
                 },
                 {
-                    title: "Token 上限",
+                    title: t("models.columns.tokenLimit"),
                     key: "tokens",
                     width: 178,
                     render: (_, model) => (
                         <Typography.Text type="secondary">
-                            输入 {formatTokens(model.maxInputTokens)} / 输出{" "}
-                            {formatTokens(model.maxOutputTokens)}
+                            {t("models.columns.tokenSummary", {
+                                input: formatTokens(
+                                    model.maxInputTokens,
+                                    i18n.language,
+                                    t,
+                                ),
+                                output: formatTokens(
+                                    model.maxOutputTokens,
+                                    i18n.language,
+                                    t,
+                                ),
+                            })}
                         </Typography.Text>
                     ),
                 },
                 {
-                    title: "视觉",
+                    title: t("models.columns.vision"),
                     dataIndex: "supportsVision",
                     width: 78,
                     render: (value: boolean | null) => (
@@ -233,7 +263,7 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "工具",
+                    title: t("models.columns.tools"),
                     dataIndex: "supportsTools",
                     width: 78,
                     render: (value: boolean | null) => (
@@ -241,7 +271,7 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "结构化",
+                    title: t("models.columns.structured"),
                     dataIndex: "supportsStructuredOutput",
                     width: 78,
                     render: (value: boolean | null) => (
@@ -249,7 +279,7 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "推理",
+                    title: t("models.columns.reasoning"),
                     dataIndex: "supportsReasoning",
                     width: 78,
                     render: (value: boolean | null) => (
@@ -257,7 +287,7 @@ export function ModelManagement() {
                     ),
                 },
                 {
-                    title: "操作",
+                    title: t("models.columns.actions"),
                     key: "actions",
                     width: 220,
                     fixed: "right",
@@ -266,14 +296,18 @@ export function ModelManagement() {
                     render: (_, model) => (
                         <DataListRowActions>
                             <DataListRowAction
-                                label={`查看 ${model.id}`}
-                                text="查看"
+                                label={t("models.viewLabel", {
+                                    name: model.id,
+                                })}
+                                text={t("common.view")}
                                 icon={<EyeOutlined />}
                                 onClick={() => setSelectedModel(model)}
                             />
                             <DataListRowAction
-                                label={`测试 ${model.id}`}
-                                text="测试"
+                                label={t("models.test.actionLabel", {
+                                    name: model.id,
+                                })}
+                                text={t("models.test.action")}
                                 icon={<ExperimentOutlined />}
                                 loading={
                                     testMutation.isPending &&
@@ -282,7 +316,9 @@ export function ModelManagement() {
                                 onClick={() => testMutation.mutate(model.id)}
                             />
                             {testStates[model.id] === "failure" && (
-                                <Tag color="error">失败</Tag>
+                                <Tag color="error">
+                                    {t("models.test.failureStatus")}
+                                </Tag>
                             )}
                         </DataListRowActions>
                     ),
@@ -292,15 +328,15 @@ export function ModelManagement() {
             {messageContext}
             <Drawer
                 width={600}
-                title="模型详情"
+                title={t("models.details.title")}
                 closable={false}
                 open={selectedModel !== null}
                 onClose={() => setSelectedModel(null)}
                 extra={
-                    <Tooltip title="关闭">
+                    <Tooltip title={t("common.close")}>
                         <Button
                             type="text"
-                            aria-label="关闭模型详情"
+                            aria-label={t("models.details.closeLabel")}
                             icon={<CloseOutlined />}
                             onClick={() => setSelectedModel(null)}
                         />
@@ -325,101 +361,192 @@ export function ModelManagement() {
                             />
                             <div className="agent-details-identity-copy">
                                 <Flex align="center" gap={8} wrap>
-                                    <Typography.Title level={4} style={{ margin: 0 }}>
+                                    <Typography.Title
+                                        level={4}
+                                        style={{ margin: 0 }}
+                                    >
                                         {selectedModel.id}
                                     </Typography.Title>
                                     <Tag color="processing">
-                                        {categoryLabels[selectedModel.category]}
+                                        {t(
+                                            `models.categories.${selectedModel.category}`,
+                                        )}
                                     </Tag>
                                 </Flex>
                                 <Flex gap={8} wrap style={{ marginTop: 8 }}>
-                                    <Tag>{selectedModel.providerMode ?? "模式未知"}</Tag>
-                                    <Tag>{selectedModel.ownedBy ?? "提供方未知"}</Tag>
+                                    <Tag>
+                                        {selectedModel.providerMode ??
+                                            t("models.details.unknownMode")}
+                                    </Tag>
+                                    <Tag>
+                                        {selectedModel.ownedBy ??
+                                            t("models.details.unknownProvider")}
+                                    </Tag>
                                 </Flex>
                             </div>
                         </div>
 
                         <div className="agent-details-content">
                             <section className="agent-details-section">
-                                <Space size={8} className="agent-details-section-title">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
                                     <ApiOutlined />
-                                    <Typography.Text strong>模型信息</Typography.Text>
+                                    <Typography.Text strong>
+                                        {t("models.details.information")}
+                                    </Typography.Text>
                                 </Space>
                                 <Descriptions
                                     size="small"
                                     column={1}
                                     items={[
-                                        { key: "id", label: "模型 ID", children: selectedModel.id },
-                                        { key: "category", label: "Category", children: selectedModel.category },
+                                        {
+                                            key: "id",
+                                            label: t("models.details.modelId"),
+                                            children: selectedModel.id,
+                                        },
+                                        {
+                                            key: "category",
+                                            label: t("models.details.category"),
+                                            children: t(
+                                                `models.categories.${selectedModel.category}`,
+                                            ),
+                                        },
                                         {
                                             key: "providerMode",
-                                            label: "Provider Mode",
-                                            children: selectedModel.providerMode ?? "未知",
+                                            label: t(
+                                                "models.details.providerMode",
+                                            ),
+                                            children:
+                                                selectedModel.providerMode ??
+                                                t("common.unknown"),
                                         },
                                         {
                                             key: "ownedBy",
-                                            label: "OwnedBy",
-                                            children: selectedModel.ownedBy ?? "未知",
+                                            label: t("models.details.ownedBy"),
+                                            children:
+                                                selectedModel.ownedBy ??
+                                                t("common.unknown"),
                                         },
                                     ]}
                                 />
                             </section>
 
                             <section className="agent-details-section">
-                                <Space size={8} className="agent-details-section-title">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
                                     <DatabaseOutlined />
-                                    <Typography.Text strong>Token 上限</Typography.Text>
+                                    <Typography.Text strong>
+                                        {t("models.details.tokenLimit")}
+                                    </Typography.Text>
                                 </Space>
                                 <div className="model-metric-grid">
                                     <div className="model-metric-item">
-                                        <Typography.Text type="secondary">最大输入</Typography.Text>
-                                        <Typography.Title level={4} style={{ margin: 0 }}>
-                                            {formatTokens(selectedModel.maxInputTokens)}
+                                        <Typography.Text type="secondary">
+                                            {t("models.details.maxInput")}
+                                        </Typography.Text>
+                                        <Typography.Title
+                                            level={4}
+                                            style={{ margin: 0 }}
+                                        >
+                                            {formatTokens(
+                                                selectedModel.maxInputTokens,
+                                                i18n.language,
+                                                t,
+                                            )}
                                         </Typography.Title>
-                                        <Typography.Text type="secondary">tokens</Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            {t("models.details.tokens")}
+                                        </Typography.Text>
                                     </div>
                                     <div className="model-metric-item">
-                                        <Typography.Text type="secondary">最大输出</Typography.Text>
-                                        <Typography.Title level={4} style={{ margin: 0 }}>
-                                            {formatTokens(selectedModel.maxOutputTokens)}
+                                        <Typography.Text type="secondary">
+                                            {t("models.details.maxOutput")}
+                                        </Typography.Text>
+                                        <Typography.Title
+                                            level={4}
+                                            style={{ margin: 0 }}
+                                        >
+                                            {formatTokens(
+                                                selectedModel.maxOutputTokens,
+                                                i18n.language,
+                                                t,
+                                            )}
                                         </Typography.Title>
-                                        <Typography.Text type="secondary">tokens</Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            {t("models.details.tokens")}
+                                        </Typography.Text>
                                     </div>
                                 </div>
                             </section>
 
                             <section className="agent-details-section">
-                                <Space size={8} className="agent-details-section-title">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
                                     <AppstoreOutlined />
-                                    <Typography.Text strong>能力</Typography.Text>
+                                    <Typography.Text strong>
+                                        {t("models.details.capabilities")}
+                                    </Typography.Text>
                                 </Space>
                                 <div className="model-capability-grid">
                                     <div className="model-capability-item">
-                                        <Typography.Text>视觉</Typography.Text>
-                                        <CapabilityTag value={selectedModel.supportsVision} />
+                                        <Typography.Text>
+                                            {t("models.columns.vision")}
+                                        </Typography.Text>
+                                        <CapabilityTag
+                                            value={selectedModel.supportsVision}
+                                        />
                                     </div>
                                     <div className="model-capability-item">
-                                        <Typography.Text>工具调用</Typography.Text>
-                                        <CapabilityTag value={selectedModel.supportsTools} />
+                                        <Typography.Text>
+                                            {t("models.details.toolCalls")}
+                                        </Typography.Text>
+                                        <CapabilityTag
+                                            value={selectedModel.supportsTools}
+                                        />
                                     </div>
                                     <div className="model-capability-item">
-                                        <Typography.Text>结构化输出</Typography.Text>
-                                        <CapabilityTag value={selectedModel.supportsStructuredOutput} />
+                                        <Typography.Text>
+                                            {t(
+                                                "models.details.structuredOutput",
+                                            )}
+                                        </Typography.Text>
+                                        <CapabilityTag
+                                            value={
+                                                selectedModel.supportsStructuredOutput
+                                            }
+                                        />
                                     </div>
                                     <div className="model-capability-item">
-                                        <Typography.Text>推理</Typography.Text>
-                                        <CapabilityTag value={selectedModel.supportsReasoning} />
+                                        <Typography.Text>
+                                            {t("models.columns.reasoning")}
+                                        </Typography.Text>
+                                        <CapabilityTag
+                                            value={
+                                                selectedModel.supportsReasoning
+                                            }
+                                        />
                                     </div>
                                 </div>
                             </section>
 
                             <section className="agent-details-section">
-                                <Space size={8} className="agent-details-section-title">
+                                <Space
+                                    size={8}
+                                    className="agent-details-section-title"
+                                >
                                     <ClockCircleOutlined />
-                                    <Typography.Text strong>数据来源</Typography.Text>
+                                    <Typography.Text strong>
+                                        {t("models.details.dataSource")}
+                                    </Typography.Text>
                                 </Space>
                                 <Typography.Text type="secondary">
-                                    数据来自 LiteLLM 实时发现，不在 Inkwell 中保存副本。
+                                    {t("models.details.dataSourceDescription")}
                                 </Typography.Text>
                             </section>
                         </div>
