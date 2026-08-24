@@ -53,6 +53,11 @@ public sealed record class AgentDefinition : IHasOwner, IHasTimestamps
     public int LatestPublishedVersionNumber { get; init; }
 
     /// <summary>
+    /// 获取当前可编辑定义是否包含尚未发布的修改。
+    /// </summary>
+    public bool HasUnpublishedChanges { get; init; }
+
+    /// <summary>
     /// 获取 Agent 是否对团队共享。
     /// </summary>
     public bool IsShared { get; init; }

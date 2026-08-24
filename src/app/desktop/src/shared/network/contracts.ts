@@ -63,6 +63,7 @@ export interface AgentListItem {
     ownerUserId: string;
     isShared: boolean;
     latestPublishedVersionNumber: number;
+    hasUnpublishedChanges: boolean;
     updatedTime: string;
 }
 
@@ -76,6 +77,7 @@ export interface AgentDefinition {
     buildOptions: AgentBuildOptions;
     currentPublishedVersionId: string | null;
     latestPublishedVersionNumber: number;
+    hasUnpublishedChanges: boolean;
     isShared: boolean;
     sharedRevokedByAdminTime: string | null;
     createdTime: string;
@@ -244,6 +246,16 @@ export interface ChatMessage {
     content: string;
     skillActivities?: SkillRunActivity[];
     runStatus?: ChatRunStatus;
+    usage?: ChatTokenUsage;
+}
+
+export interface ChatTokenUsage {
+    inputTokenCount: number | null;
+    outputTokenCount: number | null;
+    totalTokenCount: number | null;
+    cachedInputTokenCount: number | null;
+    reasoningTokenCount: number | null;
+    additionalCounts?: Record<string, number> | null;
 }
 
 export interface ChatRequest {
@@ -264,7 +276,8 @@ export interface ChatRunError {
 export type SkillRunActivityType =
     | "skill-loaded"
     | "skill-resource-read"
-    | "skill-script-run";
+    | "skill-script-run"
+    | "tool-called";
 
 export type SkillRunActivityStatus = "loading" | "success" | "error" | "abort";
 
@@ -272,6 +285,7 @@ export interface SkillRunActivity {
     callId: string;
     type: SkillRunActivityType;
     skillName: string;
+    functionName: string;
     targetName?: string;
     argumentsJson: string;
     status: SkillRunActivityStatus;
@@ -283,6 +297,7 @@ export interface ChatRunSnapshot {
     status: ChatRunStatus;
     content: string;
     skillActivities: SkillRunActivity[];
+    usage?: ChatTokenUsage;
     error?: ChatRunError;
 }
 

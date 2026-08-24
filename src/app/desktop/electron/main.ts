@@ -7,6 +7,8 @@ import {
     safeStorage,
     shell,
 } from "electron";
+import { HttpAgent } from "@ag-ui/client";
+import type { Message } from "@ag-ui/core";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -32,6 +34,7 @@ import type {
     ChatRequest,
     ChatRunError,
     ChatRunSnapshot,
+    ChatTokenUsage,
     CreateAccountRequest,
     IssuedCredential,
     LLMModel,
@@ -43,6 +46,11 @@ import type {
     UnlockResult,
     UserListItem,
 } from "../src/shared/network/contracts.js";
+import {
+    addAguiTokenUsage,
+    type AguiTokenUsage,
+} from "./chat-token-usage.js";
+import { toToolRunActivity } from "./chat-tool-activity.js";
 
 declare const __INKWELL_BUILD_NUMBER__: string;
 declare const __INKWELL_COMMIT_SHA__: string;
@@ -62,6 +70,7 @@ const apiBaseUrl = (
 const authSessionFileName = "auth-session.bin";
 const idleLockMilliseconds = 60 * 60 * 1000;
 const completedChatRunLimit = 20;
+const chatRunBroadcastIntervalMilliseconds = 32;
 const applicationIconPath = join(__dirname, "../renderer/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
@@ -77,6 +86,7 @@ const chatRuns = new Map<
     }
 >();
 const completedChatRunIds: string[] = [];
+const pendingChatRunBroadcastTimers = new Map<string, NodeJS.Timeout>();
 
 interface InternalAuthSession extends AuthIdentity {
     sessionToken: string;
@@ -89,6 +99,7 @@ interface PagedApiResponse<T> {
 
 interface AgentChatMessageApiResponse {
     id: string;
+    usage?: ChatTokenUsage | null;
     message: {
         role?: string;
         Role?: string;
@@ -109,21 +120,6 @@ interface AgentChatMessageContentApiResponse {
     CallId?: string;
     arguments?: unknown;
     Arguments?: unknown;
-}
-
-interface ChatCompletionToolCall {
-    index?: number;
-    id?: string;
-    function?: {
-        name?: string;
-        arguments?: string;
-    };
-}
-
-interface PendingToolCall {
-    id?: string;
-    name: string;
-    arguments: string;
 }
 
 class ApiRequestError extends Error {
@@ -149,6 +145,20 @@ const copyChatRunSnapshot = (snapshot: ChatRunSnapshot): ChatRunSnapshot => ({
     skillActivities: snapshot.skillActivities.map((activity) => ({
         ...activity,
     })),
+    ...(snapshot.usage
+        ? {
+              usage: {
+                  ...snapshot.usage,
+                  ...(snapshot.usage.additionalCounts
+                      ? {
+                            additionalCounts: {
+                                ...snapshot.usage.additionalCounts,
+                            },
+                        }
+                      : {}),
+              },
+          }
+        : {}),
     ...(snapshot.error ? { error: { ...snapshot.error } } : {}),
 });
 
@@ -169,67 +179,13 @@ const copyActiveAgentChatRun = (
     snapshot: copyChatRunSnapshot(run.snapshot),
 });
 
-const toSkillRunActivity = (
-    toolCall: ChatCompletionToolCall,
-): SkillRunActivity | null => {
-    const functionName = toolCall.function?.name;
-    if (
-        functionName !== "load_skill" &&
-        functionName !== "read_skill_resource" &&
-        functionName !== "run_skill_script"
-    ) {
-        return null;
-    }
-
-    let argumentsValue: Record<string, unknown> = {};
-    try {
-        argumentsValue = JSON.parse(
-            toolCall.function?.arguments ?? "{}",
-        ) as Record<string, unknown>;
-    } catch {
-        return null;
-    }
-
-    const skillNameValue =
-        argumentsValue.skillName ?? argumentsValue.skill_name;
-    if (typeof skillNameValue !== "string" || !skillNameValue.trim()) {
-        return null;
-    }
-
-    const targetValue =
-        functionName === "read_skill_resource"
-            ? (argumentsValue.resourceName ?? argumentsValue.resource_name)
-            : functionName === "run_skill_script"
-              ? (argumentsValue.scriptName ?? argumentsValue.script_name)
-              : undefined;
-    const type =
-        functionName === "load_skill"
-            ? "skill-loaded"
-            : functionName === "read_skill_resource"
-              ? "skill-resource-read"
-              : "skill-script-run";
-
-    return {
-        callId:
-            toolCall.id ??
-            `${functionName}:${skillNameValue}:${typeof targetValue === "string" ? targetValue : ""}`,
-        type,
-        skillName: skillNameValue,
-        argumentsJson: toolCall.function?.arguments ?? "{}",
-        status: "loading",
-        ...(typeof targetValue === "string" && targetValue.trim()
-            ? { targetName: targetValue }
-            : {}),
-    };
-};
-
 const getPersistedSkillActivities = (
     contents: AgentChatMessageContentApiResponse[] | undefined,
 ): SkillRunActivity[] =>
     (contents ?? [])
         .filter((content) => content.$type === "functionCall")
         .map((content) =>
-            toSkillRunActivity({
+            toToolRunActivity({
                 id: content.callId ?? content.CallId,
                 function: {
                     name: content.name ?? content.Name,
@@ -261,7 +217,7 @@ const normalizePersistedChatMessages = (
         pendingMessageId = undefined;
     };
 
-    for (const { id, message } of items) {
+    for (const { id, message, usage } of items) {
         const role = message.role ?? message.Role;
         const contents = message.contents ?? message.Contents ?? [];
         const skillActivities = getPersistedSkillActivities(contents);
@@ -294,6 +250,7 @@ const normalizePersistedChatMessages = (
             id,
             role,
             content,
+            ...(usage ? { usage } : {}),
             ...(pendingSkillActivities.length > 0
                 ? { skillActivities: pendingSkillActivities }
                 : {}),
@@ -306,17 +263,44 @@ const normalizePersistedChatMessages = (
     return messages;
 };
 
-const broadcastChatRun = (snapshot: ChatRunSnapshot): void => {
+const sendChatRunSnapshot = (snapshot: ChatRunSnapshot): void => {
     const value = copyChatRunSnapshot(snapshot);
     for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send("inkwell:chat-run-changed", value);
     }
 };
 
+const broadcastChatRun = (
+    snapshot: ChatRunSnapshot,
+    immediate = false,
+): void => {
+    const pendingTimer = pendingChatRunBroadcastTimers.get(snapshot.requestId);
+    if (immediate || snapshot.status !== "running") {
+        if (pendingTimer) {
+            clearTimeout(pendingTimer);
+            pendingChatRunBroadcastTimers.delete(snapshot.requestId);
+        }
+        sendChatRunSnapshot(snapshot);
+        return;
+    }
+
+    if (pendingTimer) return;
+
+    pendingChatRunBroadcastTimers.set(
+        snapshot.requestId,
+        setTimeout(() => {
+            pendingChatRunBroadcastTimers.delete(snapshot.requestId);
+            const latestSnapshot = chatRuns.get(snapshot.requestId)?.snapshot;
+            if (latestSnapshot) sendChatRunSnapshot(latestSnapshot);
+        }, chatRunBroadcastIntervalMilliseconds),
+    );
+};
+
 const finishChatRun = (
     requestId: string,
     status: Exclude<ChatRunSnapshot["status"], "running">,
     error?: ChatRunError,
+    usage?: ChatTokenUsage,
 ): void => {
     const run = chatRuns.get(requestId);
     if (!run || run.snapshot.status !== "running") return;
@@ -334,9 +318,10 @@ const finishChatRun = (
                       : "error",
             ...(error ? { error: error.reason } : {}),
         })),
+        ...(status === "completed" && usage ? { usage } : {}),
         ...(error ? { error } : {}),
     };
-    broadcastChatRun(run.snapshot);
+    broadcastChatRun(run.snapshot, true);
     completedChatRunIds.push(requestId);
     while (completedChatRunIds.length > completedChatRunLimit) {
         const expiredRequestId = completedChatRunIds.shift();
@@ -1035,153 +1020,142 @@ const registerApiHandlers = (): void => {
                 },
             };
             chatRuns.set(input.requestId, run);
-            broadcastChatRun(run.snapshot);
-            const versionQuery =
-                input.runMode === "draft" ? "?version=draft" : "";
+            broadcastChatRun(run.snapshot, true);
+            const versionQuery = input.runMode === "draft" ? "?version=draft" : "";
             try {
-                let response: Response;
-                try {
-                    response = await fetch(
-                        `${apiBaseUrl}/agent/${input.agentId}/v1/chat/completions${versionQuery}`,
-                        {
-                            method: "POST",
-                            headers: {
-                                Accept: "text/event-stream",
-                                Authorization: `Bearer ${sessionToken ?? ""}`,
-                                "Content-Type": "application/json",
-                                "X-Inkwell-Agent-Run-Mode": input.runMode,
-                                ...(input.conversationId
-                                    ? {
-                                          "X-Inkwell-Conversation-Id":
-                                              input.conversationId,
-                                      }
-                                    : {}),
-                            },
-                            body: JSON.stringify({
-                                model: "inkwell",
-                                messages: input.messages,
-                                stream: true,
-                            }),
-                            signal: controller.signal,
-                        },
-                    );
-                } catch (reason) {
-                    if (controller.signal.aborted) throw reason;
-                    throw new ChatRunFailure({
-                        code: "NETWORK_ERROR",
-                        reason: "无法连接模型服务，请检查网络后重试。",
-                    });
-                }
-
-                if (!response.ok) {
-                    const reason = await getSafeErrorReason(response);
-                    if (response.status === 401) await clearAuthentication();
-                    throw new ChatRunFailure({
-                        code: `HTTP_${response.status}`,
-                        reason,
-                    });
-                }
-                if (!response.body) {
-                    throw new ChatRunFailure({
-                        code: "STREAM_ERROR",
-                        reason: "模型响应流无法读取，请重试。",
-                    });
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-                const pendingToolCalls = new Map<number, PendingToolCall>();
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() ?? "";
-
-                    for (const line of lines) {
-                        const data = line.trim().replace(/^data:\s*/, "");
-                        if (!data || data === "[DONE]") continue;
-
-                        let content: string | undefined;
+                const textByMessageId = new Map<string, string>();
+                let protocolError: ChatRunError | undefined;
+                let pendingUsage: ChatTokenUsage | undefined;
+                const messages: Message[] = input.messages.map((message, index) => ({
+                    id: message.id ?? `${input.requestId}:message:${index}`,
+                    role: message.role,
+                    content: message.content,
+                }));
+                const agent = new HttpAgent({
+                    url: `${apiBaseUrl}/agent/${input.agentId}${versionQuery}`,
+                    threadId: input.conversationId ?? input.requestId,
+                    initialMessages: messages,
+                    headers: {
+                        Authorization: `Bearer ${sessionToken ?? ""}`,
+                        "X-Inkwell-Agent-Run-Mode": input.runMode,
+                        ...(input.conversationId
+                            ? { "X-Inkwell-Conversation-Id": input.conversationId }
+                            : {}),
+                    },
+                    fetch: async (url, requestInit) => {
+                        let response: Response;
                         try {
-                            const chunk = JSON.parse(data) as {
-                                choices?: Array<{
-                                    delta?: {
-                                        content?: string;
-                                        tool_calls?: ChatCompletionToolCall[];
-                                    };
-                                }>;
-                            };
-                            content = chunk.choices?.[0]?.delta?.content;
-                            const toolCalls =
-                                chunk.choices?.[0]?.delta?.tool_calls ?? [];
-                            const newActivities = toolCalls
-                                .map((toolCall, position) => {
-                                    const key = toolCall.index ?? position;
-                                    const current = pendingToolCalls.get(
-                                        key,
-                                    ) ?? {
-                                        name: "",
-                                        arguments: "",
-                                    };
-                                    const next: PendingToolCall = {
-                                        id: toolCall.id ?? current.id,
-                                        name:
-                                            current.name +
-                                            (toolCall.function?.name ?? ""),
-                                        arguments:
-                                            current.arguments +
-                                            (toolCall.function?.arguments ??
-                                                ""),
-                                    };
-                                    pendingToolCalls.set(key, next);
-                                    return toSkillRunActivity({
-                                        id: next.id,
-                                        function: {
-                                            name: next.name,
-                                            arguments: next.arguments,
-                                        },
-                                    });
-                                })
-                                .filter(
-                                    (activity): activity is SkillRunActivity =>
-                                        activity !== null &&
-                                        !run.snapshot.skillActivities.some(
-                                            (existing) =>
-                                                existing.callId ===
-                                                activity.callId,
-                                        ),
-                                );
-                            if (newActivities.length > 0) {
-                                run.snapshot = {
-                                    ...run.snapshot,
-                                    skillActivities: [
-                                        ...run.snapshot.skillActivities,
-                                        ...newActivities,
-                                    ],
-                                };
-                                broadcastChatRun(run.snapshot);
-                            }
-                        } catch {
+                            response = await fetch(url, requestInit);
+                        } catch (reason) {
+                            if (controller.signal.aborted) throw reason;
                             throw new ChatRunFailure({
-                                code: "STREAM_ERROR",
-                                reason: "模型响应格式无效，请重试。",
+                                code: "NETWORK_ERROR",
+                                reason: "无法连接模型服务，请检查网络后重试。",
                             });
                         }
-                        if (content) {
+                        if (!response.ok) {
+                            const reason = await getSafeErrorReason(response);
+                            if (response.status === 401) await clearAuthentication();
+                            throw new ChatRunFailure({
+                                code: `HTTP_${response.status}`,
+                                reason,
+                            });
+                        }
+                        return response;
+                    },
+                });
+
+                await agent.runAgent(
+                    { runId: input.requestId, abortController: controller },
+                    {
+                        onTextMessageContentEvent: ({ event }) => {
+                            textByMessageId.set(
+                                event.messageId,
+                                (textByMessageId.get(event.messageId) ?? "") +
+                                    event.delta,
+                            );
                             run.snapshot = {
                                 ...run.snapshot,
-                                content: run.snapshot.content + content,
+                                content: Array.from(textByMessageId.values()).join(""),
                             };
                             broadcastChatRun(run.snapshot);
-                        }
-                    }
-                }
+                        },
+                        onToolCallEndEvent: ({ event, toolCallName, toolCallArgs }) => {
+                            if (
+                                run.snapshot.skillActivities.some(
+                                    (activity) => activity.callId === event.toolCallId,
+                                )
+                            ) {
+                                return;
+                            }
+                            const activity = toToolRunActivity({
+                                id: event.toolCallId,
+                                function: {
+                                    name: toolCallName,
+                                    arguments: JSON.stringify(toolCallArgs),
+                                },
+                            });
+                            if (!activity) return;
+                            run.snapshot = {
+                                ...run.snapshot,
+                                skillActivities: [
+                                    ...run.snapshot.skillActivities,
+                                    activity,
+                                ],
+                            };
+                            broadcastChatRun(run.snapshot, true);
+                        },
+                        onToolCallResultEvent: ({ event }) => {
+                            run.snapshot = {
+                                ...run.snapshot,
+                                skillActivities: run.snapshot.skillActivities.map(
+                                    (activity) =>
+                                        activity.callId === event.toolCallId
+                                            ? { ...activity, status: "success" }
+                                            : activity,
+                                ),
+                            };
+                            broadcastChatRun(run.snapshot, true);
+                        },
+                        onCustomEvent: ({ event }) => {
+                            if (event.name !== "inkwell.token_usage") return;
+                            pendingUsage = addAguiTokenUsage(
+                                pendingUsage,
+                                event.value as AguiTokenUsage,
+                            );
+                            if (!pendingUsage) return;
+                            run.snapshot = {
+                                ...run.snapshot,
+                                usage: pendingUsage,
+                            };
+                            broadcastChatRun(run.snapshot, true);
+                        },
+                        onRunErrorEvent: ({ event }) => {
+                            protocolError = {
+                                code: event.code ?? "STREAM_ERROR",
+                                reason: event.message,
+                            };
+                        },
+                    },
+                );
 
-                finishChatRun(input.requestId, "completed");
+                if (protocolError) throw new ChatRunFailure(protocolError);
+
+                let usage = pendingUsage;
+                if (input.conversationId) {
+                    const persistedMessages = normalizePersistedChatMessages(
+                        await requestAllPages<AgentChatMessageApiResponse>(
+                            `/api/agents/${encodeURIComponent(input.agentId)}/conversations/${encodeURIComponent(input.conversationId)}/messages`,
+                        ),
+                    );
+                    usage = [...persistedMessages]
+                        .reverse()
+                        .find(
+                            (message) =>
+                                message.role === "assistant" && message.usage,
+                        )?.usage;
+                }
+                finishChatRun(input.requestId, "completed", undefined, usage);
             } catch (reason) {
                 if (controller.signal.aborted) {
                     finishChatRun(input.requestId, "stopped");

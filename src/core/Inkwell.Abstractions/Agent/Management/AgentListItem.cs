@@ -11,4 +11,5 @@ public sealed record class AgentListItem(
     Guid OwnerUserId,
     bool IsShared,
     int LatestPublishedVersionNumber,
+    bool HasUnpublishedChanges,
     DateTimeOffset UpdatedTime);

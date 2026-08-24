@@ -1,4 +1,9 @@
-import { useState } from "react";
+import {
+    useRef,
+    useState,
+    type ComponentRef,
+    type UIEvent,
+} from "react";
 import {
     Avatar,
     Button,
@@ -9,6 +14,7 @@ import {
     theme as antdTheme,
 } from "antd";
 import {
+    ArrowDownOutlined,
     ArrowLeftOutlined,
     DeleteOutlined,
     EyeOutlined,
@@ -349,6 +355,8 @@ export default function AgentChatPage({
     const [sessions, setSessions] = useState(MOCK_SESSIONS);
     const [activeSession, setActiveSession] = useState("s1");
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+    const bubbleListRef = useRef<ComponentRef<typeof Bubble.List>>(null);
     const { attachmentsOpen, setAttachmentsOpen, files, setFiles } =
         useAttachments();
     const {
@@ -368,12 +376,14 @@ export default function AgentChatPage({
     const currentAgentVersion = chatAgentVersion(agentName);
 
     const handleSwitchSession = (key: string) => {
+        setShowScrollToLatest(false);
         setActiveSession(key);
         resetMessages(mockConversation(key, agentName));
     };
 
     const handleNewSession = () => {
         if (!startNewSession([])) return;
+        setShowScrollToLatest(false);
         const key = `s-${Date.now()}`;
         setSessions((prev) => [
             { key, label: "新建会话", group: "今天" },
@@ -393,6 +403,21 @@ export default function AgentChatPage({
     };
 
     const isEmpty = messages.length === 0 && !replying;
+
+    const handleMessageScroll = (event: UIEvent<HTMLDivElement>) => {
+        const scrollBox = event.currentTarget;
+        const hasOverflow = scrollBox.scrollHeight > scrollBox.clientHeight + 1;
+        setShowScrollToLatest(
+            hasOverflow && Math.abs(scrollBox.scrollTop) > 24,
+        );
+    };
+
+    const scrollToLatestMessage = () => {
+        bubbleListRef.current?.scrollTo({
+            top: "bottom",
+            behavior: "smooth",
+        });
+    };
 
     /** 输入包含"研究/调研/分析一下/深度"等关键词时，触发 Harness 风格的 plan→execute
      * 自主循环演示（计划 → 工具调用 → 任务清单逐项完成 → 流式回复），而不是普通的单条 mock 回复。 */
@@ -608,18 +633,35 @@ export default function AgentChatPage({
                         // 要挪到 Bubble.List 自己的 styles.scroll 上（滚动内容需要跟着一起
                         // 滚，不能钉在外层）。
                         <div
+                            className="inkwell-chat-message-stage"
                             style={{
                                 flex: 1,
                                 minHeight: 0,
                                 overflow: "hidden",
+                                position: "relative",
                             }}
                         >
                             <Bubble.List
+                                ref={bubbleListRef}
                                 items={toBubbleItems(messages, replying)}
                                 role={roles}
                                 style={{ height: "100%" }}
-                                styles={{ scroll: { padding: "20px 24px 0" } }}
+                                styles={{
+                                    scroll: { padding: "20px 24px 48px" },
+                                }}
+                                onScroll={handleMessageScroll}
                             />
+                            {showScrollToLatest && (
+                                <Tooltip title="滚动到最新消息">
+                                    <Button
+                                        className="inkwell-scroll-to-latest"
+                                        shape="circle"
+                                        aria-label="滚动到最新消息"
+                                        icon={<ArrowDownOutlined />}
+                                        onClick={scrollToLatestMessage}
+                                    />
+                                </Tooltip>
+                            )}
                         </div>
                     )}
 

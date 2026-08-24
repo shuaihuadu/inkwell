@@ -9,6 +9,91 @@ namespace Inkwell.Core.Tests.Versioning;
 public sealed class AgentVersionServiceTests
 {
     /// <summary>
+    /// 验证相同的可编辑定义与发布快照不会被标记为未发布修改。
+    /// </summary>
+    [TestMethod]
+    public void AgentSnapshotComparer_WithMatchingDefinition_ReturnsTrue()
+    {
+        // Arrange
+        AgentDefinition agent = CreateAgent(Guid.CreateVersion7());
+        AgentSnapshot snapshot = new()
+        {
+            Name = agent.Name,
+            AvatarUri = agent.AvatarUri,
+            Description = agent.Description,
+            Instructions = agent.Instructions,
+            BuildOptions = agent.BuildOptions,
+        };
+
+        // Act
+        bool matches = AgentSnapshotComparer.Matches(agent, snapshot);
+
+        // Assert
+        Assert.IsTrue(matches);
+    }
+
+    /// <summary>
+    /// 验证 Tool 参数变化会被识别为未发布修改。
+    /// </summary>
+    [TestMethod]
+    public void AgentSnapshotComparer_WithChangedToolParameters_ReturnsFalse()
+    {
+        // Arrange
+        Guid toolId = Guid.CreateVersion7();
+        AgentDefinition agent = CreateAgent(Guid.CreateVersion7()) with
+        {
+            BuildOptions = new AgentBuildOptions
+            {
+                ModelOptions = new AgentModelOptions { ModelId = "test-model" },
+                ToolBindings = [new AgentToolBinding(toolId, "{\"format\":\"short\"}")],
+            },
+        };
+        AgentSnapshot snapshot = new()
+        {
+            Name = agent.Name,
+            AvatarUri = agent.AvatarUri,
+            Description = agent.Description,
+            Instructions = agent.Instructions,
+            BuildOptions = agent.BuildOptions with
+            {
+                ToolBindings = [new AgentToolBinding(toolId, "{\"format\":\"long\"}")],
+            },
+        };
+
+        // Act
+        bool matches = AgentSnapshotComparer.Matches(agent, snapshot);
+
+        // Assert
+        Assert.IsFalse(matches);
+    }
+
+    /// <summary>
+    /// 验证 Agent 查询和列表均从当前发布快照重建未发布修改状态。
+    /// </summary>
+    [TestMethod]
+    public async Task AgentService_WithChangedDraft_ReturnsUnpublishedStateAsync()
+    {
+        // Arrange
+        Guid ownerUserId = Guid.CreateVersion7();
+        AgentDefinition agent = CreateAgent(ownerUserId) with { Instructions = "current draft" };
+        AgentVersion published = CreatePublished(agent, ownerUserId, 1, "published");
+        agent = agent with { CurrentPublishedVersionId = published.Id, LatestPublishedVersionNumber = 1 };
+        AgentService service = new(
+            new ImmediatePersistenceProvider(
+                new InMemoryAgentRepository(agent),
+                new InMemoryAgentVersionRepository(published)),
+            new PassthroughBuildOptionsResolver());
+
+        // Act
+        AgentDefinition loaded = await service.GetAgentAsync(agent.Id, ownerUserId);
+        IReadOnlyList<AgentListItem> listed = await service.ListMyAgentsAsync(ownerUserId);
+
+        // Assert
+        Assert.IsTrue(loaded.HasUnpublishedChanges);
+        Assert.IsTrue(listed.Single().HasUnpublishedChanges);
+    }
+
+    /// <summary>
     /// 验证共享用户可以解析当前发布版本。
     /// </summary>
     [TestMethod]
@@ -235,5 +320,15 @@ public sealed class AgentVersionServiceTests
             Task.FromResult<IReadOnlyDictionary<Guid, AgentVersion>>(this._versions
                 .Where(pair => versionIds.Contains(pair.Key))
                 .ToDictionary());
+    }
+
+    private sealed class PassthroughBuildOptionsResolver : IAgentBuildOptionsResolver
+    {
+        public Task<AgentBuildOptions> ResolveAsync(AgentUpsertRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AgentBuildOptions
+            {
+                ModelOptions = request.ModelOptions,
+                ChatHistoryOptions = request.ChatHistoryOptions,
+            });
     }
 }

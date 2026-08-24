@@ -11,6 +11,7 @@ internal sealed class SqlServerModelCustomizer(ModelCustomizerDependencies depen
         base.Customize(modelBuilder, context);
 
         modelBuilder.Entity<AgentChatMessageEntity>().Property(message => message.Message).HasColumnType("json");
+        modelBuilder.Entity<AgentChatMessageEntity>().Property(message => message.Usage).HasColumnType("json");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ReferenceFileUris).HasColumnType("json");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.AssetFileUris).HasColumnType("json");
         modelBuilder.Entity<AgentSkillEntity>().Property(skill => skill.ScriptFileUris).HasColumnType("json");

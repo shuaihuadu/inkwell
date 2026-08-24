@@ -23,6 +23,9 @@ public sealed record class AgentChatMessage : IHasTimestamps
     /// <summary>获取完整的 MAF Chat Message。</summary>
     public required ChatMessage Message { get; init; }
 
+    /// <summary>获取该回复所属 Run 正常完成后聚合的 Token 用量。</summary>
+    public UsageDetails? Usage { get; init; }
+
     /// <summary>获取会话内严格递增的消息序号。</summary>
     public required int SequenceNumber { get; init; }
 

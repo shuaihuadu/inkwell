@@ -9,7 +9,7 @@ authors:
     role: agent
 reviewers: []
 created: 2026-07-15
-updated: 2026-07-21
+updated: 2026-08-24
 upstream: []
 downstream: []
 ---
@@ -41,9 +41,9 @@ downstream: []
 | H5-001 | 登录、会话与锁定 | UI-001、UI-002、会话恢复、登出、自动锁定 | 已实现，待补验证 | [实施记录](H5-001-authentication-and-lock/implementation-record.md) |
 | H5-002 | 公共外壳与全局体验 | 依赖升级、AppShell、权限导航和主题已完成；继续网络状态与全局错误 | H5-002-A/B 已实现，H5-002-C 待设计 | [范围说明](H5-002-app-shell/scope.md) |
 | H5-003 | Agent 空间与基础管理 | UI-003、我的/团队共享、搜索、删除、共享、点击分流 | H5-003-A 被列表展示契约阻塞 | [范围说明](H5-003-agent-space/scope.md) |
-| H5-004 | Agent 设计与配置 | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布 | 待设计核验 | [范围说明](H5-004-agent-design/scope.md) |
+| H5-004 | Agent 设计与配置 | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布 | 草稿保存、发布和未发布修改状态已实现 | [范围说明](H5-004-agent-design/scope.md) |
 | H5-005 | Agent 会话 | 会话数据、REST、MAF AG-UI、Desktop SDK、停止、错误与锁屏恢复已落地 | H5-005-A/B/C/D 已实现 | [范围说明](H5-005-agent-conversation/scope.md) |
-| H5-006 | 版本管理 | UI-008、版本列表、diff、回滚 | 待起草任务简报 | 路线图定义 |
+| H5-006 | 版本管理 | UI-008、版本列表、完整快照 diff、回滚 | 已实现并完成 Core、WebApi、PostgreSQL 与 Electron 验证 | [路线图](desktop-implementation-roadmap.md#h5-006-版本管理) |
 | H5-007 | 调试与评测 | UI-007、Trace、评测集、回放 | H3 未完成 | 路线图定义 |
 | H5-008 | Admin 管理 | UI-009、账号解封、撤销他人共享 | H5-008-A 用户列表与解封已实现；撤销共享待设计 | [实施记录](H5-008-admin-management/implementation-record.md) |
 | H5-009 | API Key 与外部协议 | API Key 创建/撤销/绑定、四协议调用验证 | H3 未完成 | 路线图定义 |

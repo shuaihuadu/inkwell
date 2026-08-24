@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+    useEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode,
+} from "react";
 import {
     Button,
     Input,
@@ -92,6 +98,8 @@ export default function ResourceListPage<ItemType extends object>({
     tableScrollX,
     children,
 }: ResourceListPageProps<ItemType>) {
+    const tableViewportRef = useRef<HTMLDivElement>(null);
+    const [tableBodyHeight, setTableBodyHeight] = useState(385);
     const [page, setPage] = useState(1);
 
     useEffect(() => {
@@ -100,13 +108,38 @@ export default function ResourceListPage<ItemType extends object>({
 
     const maximumPage = Math.max(1, Math.ceil(dataSource.length / PAGE_SIZE));
     const currentPage = Math.min(page, maximumPage);
+    const visibleItems = dataSource.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE,
+    );
+
+    useEffect(() => {
+        const viewport = tableViewportRef.current;
+        if (!viewport) return;
+
+        const updateTableBodyHeight = () => {
+            const headerHeight =
+                viewport
+                    .querySelector(".ant-table-thead")
+                    ?.getBoundingClientRect().height ?? 55;
+            setTableBodyHeight(
+                Math.max(120, Math.floor(viewport.clientHeight - headerHeight)),
+            );
+        };
+        const observer = new ResizeObserver(updateTableBodyHeight);
+        observer.observe(viewport);
+        updateTableBodyHeight();
+        return () => observer.disconnect();
+    }, []);
 
     return (
         <div className="inkwell-resource-page">
             <header className="inkwell-resource-header">
                 <div>
                     <Typography.Title level={4}>{title}</Typography.Title>
-                    <Typography.Text type="secondary">{description}</Typography.Text>
+                    <Typography.Text type="secondary">
+                        {description}
+                    </Typography.Text>
                 </div>
                 {primaryAction}
             </header>
@@ -132,15 +165,20 @@ export default function ResourceListPage<ItemType extends object>({
                 </Space>
             </div>
 
-            <div className="inkwell-resource-table">
+            <div
+                ref={tableViewportRef}
+                className="inkwell-resource-table"
+                style={
+                    {
+                        "--inkwell-table-body-height": `${tableBodyHeight}px`,
+                    } as CSSProperties
+                }
+            >
                 <Table<ItemType>
                     className="inkwell-resource-table-content"
                     rowKey={rowKey}
-                    dataSource={dataSource.slice(
-                        (currentPage - 1) * PAGE_SIZE,
-                        currentPage * PAGE_SIZE,
-                    )}
-                    scroll={{ x: tableScrollX, y: 440 }}
+                    dataSource={visibleItems}
+                    scroll={{ x: tableScrollX, y: tableBodyHeight }}
                     pagination={false}
                     columns={columns}
                 />

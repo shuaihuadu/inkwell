@@ -138,7 +138,8 @@ public sealed class AgentConversationServiceTests
             new InkwellAgentSessionStateStore(
                 persistence,
                 new FixedTimeProvider(now),
-                NullLogger<InkwellAgentSessionStateStore>.Instance));
+                NullLogger<InkwellAgentSessionStateStore>.Instance),
+            NullLogger<AgentConversationService>.Instance);
 
     private static AgentDefinition CreateAgent(Guid id, Guid ownerUserId, Guid publishedVersionId, bool isShared) => new()
     {
@@ -311,6 +312,9 @@ public sealed class AgentConversationServiceTests
             this.AddedMessages.AddRange(messages);
             return Task.FromResult(messages);
         }
+
+        public Task<bool> UpdateMessageUsage(Guid conversationId, Guid messageId, UsageDetails usage, DateTimeOffset updatedTime, CancellationToken ct = default) =>
+            throw new NotSupportedException();
 
         public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default)
         {

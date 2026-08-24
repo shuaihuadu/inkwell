@@ -130,6 +130,17 @@ public sealed class AgentConversationsController(IAgentConversationService conve
     {
         Id = message.Id,
         Message = message.Message,
+        Usage = message.Usage is null ? null : new AgentTokenUsageResponse
+        {
+            InputTokenCount = message.Usage.InputTokenCount,
+            OutputTokenCount = message.Usage.OutputTokenCount,
+            TotalTokenCount = message.Usage.TotalTokenCount,
+            CachedInputTokenCount = message.Usage.CachedInputTokenCount,
+            ReasoningTokenCount = message.Usage.ReasoningTokenCount,
+            AdditionalCounts = message.Usage.AdditionalCounts is null
+                ? null
+                : new Dictionary<string, long>(message.Usage.AdditionalCounts),
+        },
         SequenceNumber = message.SequenceNumber,
         CreatedTime = message.CreatedTime,
         UpdatedTime = message.UpdatedTime,

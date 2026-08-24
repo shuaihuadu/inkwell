@@ -355,7 +355,8 @@ test.describe("Agent Design Page", () => {
         });
 
         await page.getByRole("button", { name: /工具$/ }).click();
-        await expect(page.locator(".inkwell-binding-item")).toHaveCount(3);
+        await expect(page.locator(".inkwell-binding-item")).toHaveCount(1);
+        await expect(page.locator(".inkwell-binding-config")).toHaveCount(0);
         await page.screenshot({
             path: screenshotPath("22-agent-tool-bindings.png"),
             fullPage: true,
@@ -363,6 +364,9 @@ test.describe("Agent Design Page", () => {
 
         await page.getByRole("button", { name: /Skills$/ }).click();
         await expect(page.locator(".inkwell-binding-item")).toHaveCount(2);
+        await expect(page.getByText("Discovery", { exact: true })).toHaveCount(
+            0,
+        );
         await page.screenshot({
             path: screenshotPath("23-agent-skill-bindings.png"),
             fullPage: true,
@@ -404,6 +408,43 @@ test.describe("Agent Design Page", () => {
         await expect(page.getByText(/共 \d+ 项/)).toBeVisible();
         await page.screenshot({
             path: screenshotPath("27-user-list-unified.png"),
+            fullPage: true,
+        });
+    });
+
+    test("uses theme-aware Tool and Skill icons in dark mode", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.setViewportSize({ width: 1080, height: 720 });
+        await page.goto("/shell");
+        await waitForRender(page);
+        await page.getByText("朱砂橙", { exact: true }).click();
+        await page.locator(".design-nav-controls .ant-switch").click();
+
+        const firstAgent = page.locator(".inkwell-agent-card").first();
+        await firstAgent.hover();
+        await firstAgent.getByRole("button", { name: /^编辑 / }).click();
+
+        await page.getByRole("button", { name: /工具$/ }).click();
+        const toolIcon = page
+            .locator(".inkwell-binding-item-icon > .anticon")
+            .first();
+        await expect(toolIcon).toBeVisible();
+        await expect(toolIcon).not.toHaveCSS("color", "rgb(0, 0, 0)");
+        await page.screenshot({
+            path: screenshotPath("33-agent-tool-bindings-dark.png"),
+            fullPage: true,
+        });
+
+        await page.getByRole("button", { name: /Skills$/ }).click();
+        const skillIcon = page
+            .locator(".inkwell-binding-item-icon > .anticon")
+            .first();
+        await expect(skillIcon).toBeVisible();
+        await expect(skillIcon).not.toHaveCSS("color", "rgb(0, 0, 0)");
+        await page.screenshot({
+            path: screenshotPath("34-agent-skill-bindings-dark.png"),
             fullPage: true,
         });
     });
@@ -558,6 +599,47 @@ test.describe("Agent Design Page", () => {
         });
         await expectNoHorizontalOverflow(page);
         expect(consoleErrors).toEqual([]);
+    });
+
+    test("scrolls back to the latest formal chat message", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await page.getByText("客服助手", { exact: true }).first().click();
+        await page.getByText("调研一下行业报告模板", { exact: true }).click();
+
+        const scrollBox = page.locator(".ant-bubble-list-scroll-box");
+        const scrollToLatest = page.getByRole("button", {
+            name: "滚动到最新消息",
+        });
+        await expect(scrollToLatest).toBeHidden();
+        await expect
+            .poll(() =>
+                scrollBox.evaluate(
+                    (element) => element.scrollHeight > element.clientHeight,
+                ),
+            )
+            .toBe(true);
+
+        await scrollBox.evaluate((element) => {
+            element.scrollTop = -element.scrollHeight;
+        });
+        await expect(scrollToLatest).toBeVisible();
+        await page.screenshot({
+            path: screenshotPath("20-agent-chat-scroll-to-latest.png"),
+            fullPage: true,
+        });
+
+        await scrollToLatest.click();
+        await expect(scrollToLatest).toBeHidden();
+        await expect
+            .poll(() =>
+                scrollBox.evaluate(
+                    (element) => Math.abs(element.scrollTop) <= 1,
+                ),
+            )
+            .toBe(true);
     });
 
     test("shows the same AG-UI run summary in chat and trial", async ({

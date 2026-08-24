@@ -1,14 +1,22 @@
 import { SyncOutlined } from "@ant-design/icons";
 import { Actions, Bubble, type BubbleItemType } from "@ant-design/x";
 import { Button, Flex, Typography } from "antd";
-import { useState } from "react";
+import {
+    useState,
+    type ComponentRef,
+    type Ref,
+    type UIEventHandler,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { MarkdownContent } from "../../shared/components/markdown-content";
 import type { ChatMessage, ChatRunError } from "../../shared/network/contracts";
 import { useResolvedAppearance } from "../shell/appearance-store";
+import { ChatTokenUsageSummary } from "./chat-token-usage";
 import { SkillActivityChain } from "./skill-activity-chain";
 
 type FeedbackValue = "default" | "like" | "dislike";
+
+export type ChatMessageListRef = ComponentRef<typeof Bubble.List>;
 
 interface ChatMessageListProps {
     messages: ChatMessage[];
@@ -16,6 +24,8 @@ interface ChatMessageListProps {
     error: ChatRunError | null;
     onRegenerate: (messageIndex: number) => void;
     onRetry: () => void;
+    listRef?: Ref<ChatMessageListRef>;
+    onScroll?: UIEventHandler<HTMLDivElement>;
 }
 
 export function ChatMessageList({
@@ -24,6 +34,8 @@ export function ChatMessageList({
     error,
     onRegenerate,
     onRetry,
+    listRef,
+    onScroll,
 }: ChatMessageListProps) {
     const { t } = useTranslation();
     const appearance = useResolvedAppearance();
@@ -31,7 +43,7 @@ export function ChatMessageList({
         Record<string, FeedbackValue>
     >({});
     const items: BubbleItemType[] = messages.flatMap((item, index) => {
-        const messageKey = item.id ?? `${item.role}-${index}`;
+        const messageKey = `${item.role}-${index}`;
         const isLatestRunning =
             Boolean(activeRequestId) && index === messages.length - 1;
         const hasContent = item.content.trim().length > 0;
@@ -67,6 +79,12 @@ export function ChatMessageList({
         }
 
         const showError = Boolean(error) && index === messages.length - 1;
+        const showUsage =
+            Boolean(item.usage) &&
+            item.runStatus !== "running" &&
+            item.runStatus !== "stopped" &&
+            item.runStatus !== "failed";
+        const showActions = hasContent && !isLatestRunning;
         if (
             hasContent ||
             showError ||
@@ -76,6 +94,7 @@ export function ChatMessageList({
             assistantItems.push({
                 key: messageKey,
                 role: "assistant",
+                classNames: { footer: "chat-message-footer" },
                 content: item.content,
                 loading: !hasContent && !hasSkillActivities && isLatestRunning,
                 contentRender: (content) => (
@@ -115,54 +134,67 @@ export function ChatMessageList({
                         )}
                     </div>
                 ),
+                footerPlacement: "outer-start",
                 footer:
-                    hasContent && !isLatestRunning ? (
-                        <Actions
-                            className="chat-message-actions"
-                            items={[
-                                {
-                                    key: "regenerate",
-                                    label: t("chat.messages.regenerate"),
-                                    icon: <SyncOutlined />,
-                                    onItemClick: () => onRegenerate(index),
-                                },
-                                {
-                                    key: "copy",
-                                    actionRender: (
-                                        <Actions.Copy
-                                            text={item.content}
-                                            aria-label={t(
-                                                "chat.messages.copyLabel",
-                                                { number: index + 1 },
-                                            )}
-                                        />
-                                    ),
-                                },
-                                {
-                                    key: "feedback",
-                                    actionRender: (
-                                        <Actions.Feedback
-                                            aria-label={t(
-                                                "chat.messages.feedbackLabel",
-                                                { number: index + 1 },
-                                            )}
-                                            value={
-                                                feedbackByMessage[messageKey] ??
-                                                "default"
-                                            }
-                                            onChange={(value) =>
-                                                setFeedbackByMessage(
-                                                    (current) => ({
-                                                        ...current,
-                                                        [messageKey]: value,
-                                                    }),
-                                                )
-                                            }
-                                        />
-                                    ),
-                                },
-                            ]}
-                        />
+                    showUsage || showActions ? (
+                        <Flex vertical gap={4}>
+                            {showUsage && item.usage && (
+                                <ChatTokenUsageSummary usage={item.usage} />
+                            )}
+                            {showActions && (
+                                <Actions
+                                    className="chat-message-actions"
+                                    items={[
+                                        {
+                                            key: "regenerate",
+                                            label: t(
+                                                "chat.messages.regenerate",
+                                            ),
+                                            icon: <SyncOutlined />,
+                                            onItemClick: () =>
+                                                onRegenerate(index),
+                                        },
+                                        {
+                                            key: "copy",
+                                            actionRender: (
+                                                <Actions.Copy
+                                                    text={item.content}
+                                                    aria-label={t(
+                                                        "chat.messages.copyLabel",
+                                                        { number: index + 1 },
+                                                    )}
+                                                />
+                                            ),
+                                        },
+                                        {
+                                            key: "feedback",
+                                            actionRender: (
+                                                <Actions.Feedback
+                                                    aria-label={t(
+                                                        "chat.messages.feedbackLabel",
+                                                        { number: index + 1 },
+                                                    )}
+                                                    value={
+                                                        feedbackByMessage[
+                                                            messageKey
+                                                        ] ?? "default"
+                                                    }
+                                                    onChange={(value) =>
+                                                        setFeedbackByMessage(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [messageKey]:
+                                                                    value,
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            )}
+                        </Flex>
                     ) : undefined,
             });
         }
@@ -172,8 +204,10 @@ export function ChatMessageList({
 
     return (
         <Bubble.List
+            ref={listRef}
             className="chat-bubble-list"
             items={items}
+            onScroll={onScroll}
             role={{
                 user: {
                     placement: "end",

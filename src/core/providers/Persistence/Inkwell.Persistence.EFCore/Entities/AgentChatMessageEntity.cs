@@ -9,6 +9,7 @@ internal sealed class AgentChatMessageEntity : IHasTimestamps
     public string? RunId { get; set; }
     public int? RunMessageIndex { get; set; }
     public string Message { get; set; } = string.Empty;
+    public string? Usage { get; set; }
     public int SequenceNumber { get; set; }
     public DateTimeOffset CreatedTime { get; init; }
     public DateTimeOffset UpdatedTime { get; init; }
