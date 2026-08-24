@@ -434,14 +434,24 @@ export const resources = {
                     copyLabel: "复制第 {{number}} 条消息",
                     feedbackLabel: "评价第 {{number}} 条消息",
                 },
+                usage: {
+                    label: "Token 用量",
+                    summaryLabel: "用量",
+                    input: "输入",
+                    output: "输出",
+                    total: "总计",
+                    tokens: "tokens",
+                },
                 activity: {
                     title: {
                         loaded: "加载 Skill：{{name}}",
                         resource: "读取资源：{{name}}",
                         script: "运行脚本：{{name}}",
+                        tool: "调用工具：{{name}}",
                     },
                     readInstructions: "读取 Skill 指令",
                     fromSkill: "来自 {{name}}",
+                    toolFunction: "函数 {{name}}",
                     status: {
                         loading: "调用中",
                         failed: "调用失败",
@@ -1426,14 +1436,24 @@ export const resources = {
                     copyLabel: "Copy message {{number}}",
                     feedbackLabel: "Rate message {{number}}",
                 },
+                usage: {
+                    label: "Token usage",
+                    summaryLabel: "Usage",
+                    input: "Input",
+                    output: "Output",
+                    total: "Total",
+                    tokens: "tokens",
+                },
                 activity: {
                     title: {
                         loaded: "Load Skill: {{name}}",
                         resource: "Read resource: {{name}}",
                         script: "Run script: {{name}}",
+                        tool: "Call tool: {{name}}",
                     },
                     readInstructions: "Read Skill instructions",
                     fromSkill: "From {{name}}",
+                    toolFunction: "Function {{name}}",
                     status: {
                         loading: "Running",
                         failed: "Failed",

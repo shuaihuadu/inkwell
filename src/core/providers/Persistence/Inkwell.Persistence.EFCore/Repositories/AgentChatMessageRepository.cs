@@ -77,6 +77,25 @@ internal sealed class AgentChatMessageRepository(InkwellDbContext db) : IAgentCh
         return [.. entities.Select(AgentChatMessageMappingExtensions.ToModel)];
     }
 
+    public async Task<bool> UpdateMessageUsage(
+        Guid conversationId,
+        Guid messageId,
+        UsageDetails usage,
+        DateTimeOffset updatedTime,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        string serializedUsage = AgentChatMessageUsageSerializer.Serialize(usage);
+        return await db.Set<AgentChatMessageEntity>()
+            .Where(message => message.ConversationId == conversationId && message.Id == messageId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(message => message.Usage, serializedUsage)
+                    .SetProperty(message => message.UpdatedTime, updatedTime),
+                ct)
+            .ConfigureAwait(false) == 1;
+    }
+
     public async Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) =>
         await db.Set<AgentChatMessageEntity>()
             .Where(message => message.ConversationId == conversationId && message.Id == messageId)

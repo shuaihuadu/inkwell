@@ -890,11 +890,7 @@ test("shows authentication errors and enters the workspace after login", async (
             return;
         }
 
-        if (
-            request.url?.startsWith("/agent/") &&
-            request.url.includes("/v1/chat/completions") &&
-            request.method === "POST"
-        ) {
+        if (request.url?.startsWith("/agent/") && request.method === "POST") {
             chatRequestUrls.push(request.url);
             chatRunModes.push(
                 request.headers["x-inkwell-agent-run-mode"] as
@@ -955,11 +951,26 @@ test("shows authentication errors and enters the workspace after login", async (
                 }
 
                 response.setHeader("Content-Type", "text/event-stream");
+                const runInput = JSON.parse(
+                    Buffer.concat(chunks).toString(),
+                ) as { threadId: string; runId: string };
+                const messageId = `${runInput.runId}:assistant`;
+                response.write(
+                    `data: ${JSON.stringify({ type: "RUN_STARTED", threadId: runInput.threadId, runId: runInput.runId })}\n\n`,
+                );
+                response.write(
+                    `data: ${JSON.stringify({ type: "TEXT_MESSAGE_START", messageId, role: "assistant" })}\n\n`,
+                );
                 const characters = Array.from(content);
                 let characterIndex = 0;
                 const writeNextDelta = (): void => {
                     if (characterIndex >= characters.length) {
-                        response.end("data: [DONE]\n\n");
+                        response.write(
+                            `data: ${JSON.stringify({ type: "TEXT_MESSAGE_END", messageId })}\n\n`,
+                        );
+                        response.end(
+                            `data: ${JSON.stringify({ type: "RUN_FINISHED", threadId: runInput.threadId, runId: runInput.runId })}\n\n`,
+                        );
                         return;
                     }
 
@@ -968,7 +979,7 @@ test("shows authentication errors and enters the workspace after login", async (
                         .join("");
                     characterIndex += 2;
                     response.write(
-                        `data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`,
+                        `data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", messageId, delta })}\n\n`,
                     );
                     setTimeout(writeNextDelta, 1);
                 };
@@ -2772,9 +2783,9 @@ test("shows authentication errors and enters the workspace after login", async (
             2,
         );
         expect(chatRequestUrls).toEqual([
-            "/agent/0198a96d-19e4-7000-8000-000000000301/v1/chat/completions",
-            `/agent/${sharedAgent.id}/v1/chat/completions`,
-            `/agent/${editableAgent.id}/v1/chat/completions?version=draft`,
+            "/agent/0198a96d-19e4-7000-8000-000000000301",
+            `/agent/${sharedAgent.id}`,
+            `/agent/${editableAgent.id}?version=draft`,
         ]);
         expect(chatRunModes).toEqual(["published", "published", "draft"]);
         expect(chatConversationIds).toEqual([
@@ -3159,23 +3170,58 @@ test("preserves, stops, and retries chat runs through Electron", async ({
         }
 
         if (
-            request.url?.startsWith(`/agent/${publishedAgent.id}/`) &&
-            request.url.includes("/v1/chat/completions") &&
+            request.url?.split("?")[0] === `/agent/${publishedAgent.id}` &&
             request.method === "POST"
         ) {
             const chunks: Buffer[] = [];
             request.on("data", (chunk: Buffer) => chunks.push(chunk));
             request.on("end", () => {
                 const body = JSON.parse(Buffer.concat(chunks).toString()) as {
+                    threadId: string;
+                    runId: string;
                     messages: Array<{ role: string; content: string }>;
                 };
                 const userContent = body.messages.at(-1)?.content ?? "";
                 const conversationId = request.headers[
                     "x-inkwell-conversation-id"
                 ] as string | undefined;
-                const writeDelta = (content: string): void => {
-                    response.write(
-                        `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`,
+                const assistantMessageId = `${body.runId}:assistant`;
+                let textMessageStarted = false;
+                const writeEvent = (event: Record<string, unknown>): void => {
+                    response.write(`data: ${JSON.stringify(event)}\n\n`);
+                };
+                const startRun = (): void => {
+                    response.setHeader("Content-Type", "text/event-stream");
+                    writeEvent({
+                        type: "RUN_STARTED",
+                        threadId: body.threadId,
+                        runId: body.runId,
+                    });
+                };
+                const writeDelta = (delta: string): void => {
+                    if (!textMessageStarted) {
+                        textMessageStarted = true;
+                        writeEvent({
+                            type: "TEXT_MESSAGE_START",
+                            messageId: assistantMessageId,
+                            role: "assistant",
+                        });
+                    }
+                    writeEvent({
+                        type: "TEXT_MESSAGE_CONTENT",
+                        messageId: assistantMessageId,
+                        delta,
+                    });
+                };
+                const finishRun = (): void => {
+                    if (textMessageStarted) {
+                        writeEvent({
+                            type: "TEXT_MESSAGE_END",
+                            messageId: assistantMessageId,
+                        });
+                    }
+                    response.end(
+                        `data: ${JSON.stringify({ type: "RUN_FINISHED", threadId: body.threadId, runId: body.runId })}\n\n`,
                     );
                 };
                 const persist = (assistantContent: string): void => {
@@ -3216,6 +3262,15 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                                                   },
                                                   CallId: "call-read-skill-resource",
                                               },
+                                              {
+                                                  $type: "functionCall",
+                                                  Name: "get_current_datetime",
+                                                  Arguments: {
+                                                      timeZoneId:
+                                                          "Asia/Shanghai",
+                                                  },
+                                                  CallId: "call-current-time",
+                                              },
                                           ]
                                         : [],
                             },
@@ -3223,6 +3278,13 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                         },
                         {
                             id: `${conversationId}-assistant`,
+                            usage: {
+                                inputTokenCount: 10,
+                                outputTokenCount: 20,
+                                totalTokenCount: 30,
+                                cachedInputTokenCount: null,
+                                reasoningTokenCount: null,
+                            },
                             message: {
                                 Role: "assistant",
                                 Contents: [
@@ -3268,86 +3330,94 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                         return;
                     }
 
-                    response.setHeader("Content-Type", "text/event-stream");
+                    startRun();
                     writeDelta("重试成功");
                     persist("重试成功");
-                    response.end("data: [DONE]\n\n");
+                    finishRun();
                     return;
                 }
 
                 if (userContent === "验证 Skill 调用") {
-                    response.setHeader("Content-Type", "text/event-stream");
-                    response.write(
-                        `data: ${JSON.stringify({
-                            choices: [
-                                {
-                                    delta: {
-                                        tool_calls: [
-                                            {
-                                                index: 0,
-                                                id: "call-load-skill",
-                                                type: "function",
-                                                function: {
-                                                    name: "load_skill",
-                                                    arguments:
-                                                        '{"skillName":"code-',
-                                                },
-                                            },
-                                            {
-                                                index: 1,
-                                                id: "call-read-skill-resource",
-                                                type: "function",
-                                                function: {
-                                                    name: "read_skill_resource",
-                                                    arguments:
-                                                        '{"skillName":"code-review","resourceName":"references/',
-                                                },
-                                            },
-                                        ],
-                                    },
-                                },
-                            ],
-                        })}\n\n`,
-                    );
-                    response.write(
-                        `data: ${JSON.stringify({
-                            choices: [
-                                {
-                                    delta: {
-                                        tool_calls: [
-                                            {
-                                                index: 0,
-                                                function: {
-                                                    arguments: 'review"}',
-                                                },
-                                            },
-                                            {
-                                                index: 1,
-                                                function: {
-                                                    arguments: 'rule.md"}',
-                                                },
-                                            },
-                                        ],
-                                    },
-                                },
-                            ],
-                        })}\n\n`,
-                    );
+                    startRun();
+                    const toolCalls = [
+                        {
+                            id: "call-load-skill",
+                            name: "load_skill",
+                            argumentsJson: '{"skillName":"code-review"}',
+                        },
+                        {
+                            id: "call-read-skill-resource",
+                            name: "read_skill_resource",
+                            argumentsJson:
+                                '{"skillName":"code-review","resourceName":"references/rule.md"}',
+                        },
+                        {
+                            id: "call-current-time",
+                            name: "get_current_datetime",
+                            argumentsJson: '{"timeZoneId":"Asia/Shanghai"}',
+                        },
+                    ];
+                    for (const toolCall of toolCalls) {
+                        writeEvent({
+                            type: "TOOL_CALL_START",
+                            toolCallId: toolCall.id,
+                            toolCallName: toolCall.name,
+                            parentMessageId: assistantMessageId,
+                        });
+                        writeEvent({
+                            type: "TOOL_CALL_ARGS",
+                            toolCallId: toolCall.id,
+                            delta: toolCall.argumentsJson,
+                        });
+                        writeEvent({
+                            type: "TOOL_CALL_END",
+                            toolCallId: toolCall.id,
+                        });
+                        writeEvent({
+                            type: "TOOL_CALL_RESULT",
+                            messageId: `${toolCall.id}:result`,
+                            toolCallId: toolCall.id,
+                            content: "ok",
+                            role: "tool",
+                        });
+                    }
+                    writeEvent({
+                        type: "CUSTOM",
+                        name: "inkwell.token_usage",
+                        value: {
+                            inputTokenCount: 3,
+                            outputTokenCount: 5,
+                            totalTokenCount: 8,
+                            cachedInputTokenCount: null,
+                            reasoningTokenCount: null,
+                        },
+                    });
                     setTimeout(() => {
+                        writeEvent({
+                            type: "CUSTOM",
+                            name: "inkwell.token_usage",
+                            value: {
+                                inputTokenCount: 7,
+                                outputTokenCount: 15,
+                                totalTokenCount: 22,
+                                cachedInputTokenCount: null,
+                                reasoningTokenCount: null,
+                            },
+                        });
                         writeDelta("已按 Skill 完成评审");
                         persist("已按 Skill 完成评审");
-                        response.end("data: [DONE]\n\n");
-                    }, 800);
+                        finishRun();
+                    }, 1_500);
                     return;
                 }
 
-                response.setHeader("Content-Type", "text/event-stream");
+                startRun();
                 if (userContent === "验证锁屏恢复") {
                     writeDelta("锁屏前");
                     setTimeout(() => {
                         writeDelta("，锁屏期间完成");
                         persist("锁屏前，锁屏期间完成");
-                        response.end("data: [DONE]\n\n");
+                        finishRun();
                     }, 300);
                     return;
                 }
@@ -3419,6 +3489,52 @@ test("preserves, stops, and retries chat runs through Electron", async ({
         await sender.fill("验证 Skill 调用");
         await sender.press("Enter");
         await expect(page.getByText("工具调用", { exact: true })).toBeVisible();
+        await expect
+            .poll(
+                () =>
+                    page.evaluate(() => {
+                        const snapshots = JSON.parse(
+                            sessionStorage.getItem("chat-run-snapshots") ??
+                                "[]",
+                        ) as Array<{
+                            status: string;
+                            content: string;
+                            skillActivities: Array<{ status: string }>;
+                            usage?: {
+                                inputTokenCount: number | null;
+                                outputTokenCount: number | null;
+                                totalTokenCount: number | null;
+                                cachedInputTokenCount: number | null;
+                                reasoningTokenCount: number | null;
+                            };
+                        }>;
+                        const snapshot = snapshots.at(-1);
+                        return snapshot
+                            ? {
+                                  status: snapshot.status,
+                                  content: snapshot.content,
+                                  activityStatuses:
+                                      snapshot.skillActivities.map(
+                                          (activity) => activity.status,
+                                      ),
+                                  usage: snapshot.usage,
+                              }
+                            : null;
+                    }),
+                { timeout: 1_000 },
+            )
+            .toEqual({
+                status: "running",
+                content: "",
+                activityStatuses: ["success", "success", "success"],
+                usage: {
+                    inputTokenCount: 3,
+                    outputTokenCount: 5,
+                    totalTokenCount: 8,
+                    cachedInputTokenCount: null,
+                    reasoningTokenCount: null,
+                },
+            });
         await page
             .getByRole("button", { name: "返回 Agent 空间" })
             .dispatchEvent("click");
@@ -3428,7 +3544,7 @@ test("preserves, stops, and retries chat runs through Electron", async ({
             .dispatchEvent("click");
         await expect(page.getByText("工具调用", { exact: true })).toBeVisible();
         await expect(
-            page.getByText("2 项已完成", { exact: true }),
+            page.getByText("3 项已完成", { exact: true }),
         ).toBeVisible();
         await expect(
             page.getByText("加载 Skill：code-review", { exact: true }),
@@ -3437,8 +3553,51 @@ test("preserves, stops, and retries chat runs through Electron", async ({
             page.getByText("读取资源：references/rule.md", { exact: true }),
         ).toBeVisible();
         await expect(
+            page.getByText("调用工具：get_current_datetime", { exact: true }),
+        ).toBeVisible();
+        await expect
+            .poll(() =>
+                page.evaluate(() => {
+                    const snapshots = JSON.parse(
+                        sessionStorage.getItem("chat-run-snapshots") ?? "[]",
+                    ) as Array<{
+                        status: string;
+                        content: string;
+                        error?: { code: string; reason: string };
+                    }>;
+                    const snapshot = snapshots.at(-1);
+                    return snapshot
+                        ? {
+                              status: snapshot.status,
+                              content: snapshot.content,
+                              error: snapshot.error,
+                          }
+                        : null;
+                }),
+            )
+            .toEqual({
+                status: "completed",
+                content: "已按 Skill 完成评审",
+                error: undefined,
+            });
+        await expect(
             page.getByText("已按 Skill 完成评审", { exact: true }),
         ).toBeVisible();
+        const liveUsage = page.getByText(
+            "用量 — 输入 10 · 输出 20 · 总计 30 tokens",
+            { exact: true },
+        );
+        await expect(liveUsage).toBeVisible();
+        await expect(liveUsage.locator(".anticon-bar-chart")).toBeVisible();
+        await expect(liveUsage).toHaveCSS("font-size", "12px");
+        expect(
+            await liveUsage.evaluate((element) => ({
+                hasFooter: Boolean(element.closest(".chat-message-footer")),
+                insideMessageContent: Boolean(
+                    element.closest(".chat-message-content"),
+                ),
+            })),
+        ).toEqual({ hasFooter: true, insideMessageContent: false });
         await expect(
             page.locator(".chat-bubble-list .ant-bubble-avatar"),
         ).toHaveCount(0);
@@ -3461,6 +3620,14 @@ test("preserves, stops, and retries chat runs through Electron", async ({
         ).toBeVisible();
         await expect(
             page.getByText("读取资源：references/rule.md", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("调用工具：get_current_datetime", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("用量 — 输入 10 · 输出 20 · 总计 30 tokens", {
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(
             page.locator(".chat-bubble-list .ant-bubble-avatar"),

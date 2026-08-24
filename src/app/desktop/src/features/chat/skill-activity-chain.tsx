@@ -14,10 +14,7 @@ interface SkillActivityChainProps {
     activities: SkillRunActivity[];
 }
 
-const getActivityTitle = (
-    activity: SkillRunActivity,
-    t: TFunction,
-): string => {
+const getActivityTitle = (activity: SkillRunActivity, t: TFunction): string => {
     switch (activity.type) {
         case "skill-loaded":
             return t("chat.activity.title.loaded", {
@@ -30,6 +27,10 @@ const getActivityTitle = (
         case "skill-script-run":
             return t("chat.activity.title.script", {
                 name: activity.targetName ?? activity.skillName,
+            });
+        case "tool-called":
+            return t("chat.activity.title.tool", {
+                name: activity.functionName,
             });
     }
 };
@@ -45,6 +46,10 @@ const getActivityDescription = (
             return t("chat.activity.fromSkill", { name: activity.skillName });
         case "skill-script-run":
             return t("chat.activity.fromSkill", { name: activity.skillName });
+        case "tool-called":
+            return t("chat.activity.toolFunction", {
+                name: activity.functionName,
+            });
     }
 };
 
@@ -124,21 +129,23 @@ export function SkillActivityChain({ activities }: SkillActivityChainProps) {
                 ) : (
                     <CheckCircleFilled style={{ color: token.colorSuccess }} />
                 )}
-                <Typography.Text strong>{t("chat.activity.calls")}</Typography.Text>
+                <Typography.Text strong>
+                    {t("chat.activity.calls")}
+                </Typography.Text>
                 <Typography.Text type="secondary" className="activity-summary">
                     {activeActivity
                         ? getActivityTitle(activeActivity, t)
                         : failedCount > 0
-                                                    ? t("chat.activity.failedCount", {
-                                                                count: failedCount,
-                                                        })
+                          ? t("chat.activity.failedCount", {
+                                count: failedCount,
+                            })
                           : abortedCount > 0
-                                                        ? t("chat.activity.stoppedCount", {
-                                                                    count: abortedCount,
-                                                            })
-                                                        : t("chat.activity.completedCount", {
-                                                                    count: completedCount,
-                                                            })}
+                            ? t("chat.activity.stoppedCount", {
+                                  count: abortedCount,
+                              })
+                            : t("chat.activity.completedCount", {
+                                  count: completedCount,
+                              })}
                 </Typography.Text>
             </Flex>
             <ThoughtChain items={items} />

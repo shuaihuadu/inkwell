@@ -340,6 +340,9 @@ public sealed class InkwellChatHistoryProviderTests
             return Task.FromResult(history);
         }
 
+        public Task<bool> UpdateMessageUsage(Guid conversationId, Guid messageId, UsageDetails usage, DateTimeOffset updatedTime, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) =>
