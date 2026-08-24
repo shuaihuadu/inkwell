@@ -1,4 +1,4 @@
-﻿# Auto detect text files and perform LF normalization
+# Auto detect text files and perform LF normalization
 # 跨平台开发时，Git 会自动处理行尾符
 
 # 默认行为：自动检测文本文件并规范化行尾符

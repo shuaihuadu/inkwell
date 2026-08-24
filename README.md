@@ -63,15 +63,17 @@ Port configuration is available in `src/core/Inkwell.AppHost/appsettings.json`.
 
 ## Desktop Releases
 
-The current Desktop version is `0.0.1-alpha`. The `alpha` label means features, configuration, database schemas, and public APIs are not stable and may introduce breaking changes.
+The current Desktop base version is `0.0.1-alpha`. The `alpha` label means features, configuration, database schemas, and public APIs are not stable and may introduce breaking changes.
 
-Pushing a Git tag that matches the version in `src/app/desktop/package.json`, such as `v0.0.1-alpha`, triggers GitHub Actions to create a prerelease with these packages:
+Every Desktop-related commit pushed to `main` triggers GitHub Actions to create a prerelease. The workflow automatically creates a tag from the base version and the seven-character commit identifier, such as `v0.0.1-alpha.8075619`, and generates these packages:
 
 - Windows x64: NSIS `.exe` and MSI `.msi`
 - macOS Universal: `.dmg` and `.zip`
 - Linux x64: `.AppImage` and `.deb`
 
-The version shown in the About window comes from `package.json`. The build number comes from the GitHub Actions run number and attempt, and the commit identifier comes from the release workflow commit. The packages use a numeric platform build version in the form `0.0.<run_number>.<run_attempt>` to satisfy macOS `CFBundleVersion` and Windows `FileVersion` requirements.
+Pull requests targeting `main` that change Desktop files run the same packaging matrix and retain the installers as workflow artifacts, but do not create a tag or GitHub Release. The workflow can also be run manually without creating a release.
+
+The version shown in the About window and installer filenames use the generated release version. The build number comes from the GitHub Actions run number and attempt, and the commit identifier comes from the release workflow commit. The packages use a numeric platform build version in the form `0.0.<run_number>.<run_attempt>` to satisfy macOS `CFBundleVersion` and Windows `FileVersion` requirements.
 
 Windows code signing and macOS notarization are not configured yet, so the packages are intended for alpha testing only. The Desktop application also requires access to a running Inkwell WebApi.
 

@@ -63,15 +63,17 @@ Inkwell 默认管理员账号和密码为 `admin` / `admin`，首次登录后必
 
 ## Desktop 发布
 
-Desktop 当前版本为 `0.0.1-alpha`。`alpha` 表示功能、配置、数据库结构和公开接口尚未稳定，后续版本可能包含 Breaking Change。
+Desktop 当前基础版本为 `0.0.1-alpha`。`alpha` 表示功能、配置、数据库结构和公开接口尚未稳定，后续版本可能包含 Breaking Change。
 
-推送与 `src/app/desktop/package.json` 版本一致的 Git Tag（例如 `v0.0.1-alpha`）后，GitHub Actions 会创建 prerelease 并生成以下安装包：
+每次涉及 Desktop 的提交进入 `main` 后，GitHub Actions 都会自动创建 prerelease。工作流使用基础版本和七位提交号自动创建 Tag，例如 `v0.0.1-alpha.8075619`，并生成以下安装包：
 
 - Windows x64：NSIS `.exe`、MSI `.msi`
 - macOS Universal：`.dmg`、`.zip`
 - Linux x64：`.AppImage`、`.deb`
 
-About 窗口中的版本来自 `package.json`，构建号来自 GitHub Actions run number 与 run attempt，提交号来自发布工作流对应的 Git commit。安装包内部使用纯数字平台构建版本 `0.0.<run_number>.<run_attempt>`，满足 macOS `CFBundleVersion` 与 Windows `FileVersion` 的格式要求。
+修改 Desktop 文件且目标为 `main` 的 Pull Request 会运行相同的三平台打包矩阵，并将安装包保留为工作流 Artifact，但不会创建 Tag 或 GitHub Release。手动运行工作流同样只生成 Artifact。
+
+About 窗口和安装包文件名使用自动生成的完整发布版本；构建号来自 GitHub Actions run number 与 run attempt，提交号来自发布工作流对应的 Git commit。安装包内部使用纯数字平台构建版本 `0.0.<run_number>.<run_attempt>`，满足 macOS `CFBundleVersion` 与 Windows `FileVersion` 的格式要求。
 
 当前安装包尚未接入 Windows 代码签名和 macOS notarization，仅用于 alpha 阶段测试；Desktop 仍需连接可用的 Inkwell WebApi。
 
