@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import {
     Alert,
     Button,
@@ -138,18 +138,10 @@ const MOCK_MODELS = [
 ];
 
 const MOCK_TOOLS = [
-    { id: "t1", name: "当前时间", description: "获取系统当前时间" },
     {
-        id: "t2",
-        name: "HTTP 请求",
-        description: "调用外部 HTTP 接口",
-        params: ["URL", "方法"],
-    },
-    {
-        id: "t3",
-        name: "代码执行",
-        description: "执行 Python/JS 代码片段",
-        params: ["language", "timeout"],
+        id: "t1",
+        name: "get_current_datetime",
+        description: "获取当前日期时间，可选指定 IANA 或 Windows 时区标识符。",
     },
 ];
 
@@ -624,9 +616,18 @@ function SectionTools({
     readonly: boolean;
     density: Density;
 }) {
+    const { token } = antdTheme.useToken();
     const [checked, setChecked] = useState<string[]>(["t1"]);
+    const bindingThemeStyle = {
+        "--inkwell-binding-border": token.colorBorderSecondary,
+        "--inkwell-binding-bg": token.colorBgContainer,
+        "--inkwell-binding-hover": token.colorFillQuaternary,
+        "--inkwell-binding-selected": token.colorPrimaryBg,
+        "--inkwell-binding-icon": token.colorPrimaryText,
+        "--inkwell-binding-icon-bg": token.colorPrimaryBgHover,
+    } as CSSProperties;
     return (
-        <div className="inkwell-binding-list">
+        <div className="inkwell-binding-list" style={bindingThemeStyle}>
             <div className="inkwell-binding-list-body">
                 {MOCK_TOOLS.map((t) => (
                     <div
@@ -649,8 +650,15 @@ function SectionTools({
                                     );
                                 }}
                             />
-                            <div className="inkwell-binding-item-icon">
-                                <ToolOutlined />
+                            <div
+                                className="inkwell-binding-item-icon"
+                                style={{
+                                    background: token.colorPrimaryBgHover,
+                                }}
+                            >
+                                <ToolOutlined
+                                    style={{ color: token.colorPrimaryText }}
+                                />
                             </div>
                             <div className="inkwell-binding-item-copy">
                                 <Typography.Text
@@ -665,20 +673,6 @@ function SectionTools({
                                 >
                                     {t.description}
                                 </Typography.Text>
-                                {checked.includes(t.id) && t.params && (
-                                    <Form
-                                        layout="vertical"
-                                        className="inkwell-binding-config"
-                                    >
-                                        <Flex gap={12} wrap>
-                                            {t.params.map((p) => (
-                                                <Form.Item key={p} label={p}>
-                                                    <Input disabled={readonly} />
-                                                </Form.Item>
-                                            ))}
-                                        </Flex>
-                                    </Form>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -704,6 +698,14 @@ function SectionSkills({
 }) {
     const { token } = antdTheme.useToken();
     const [checked, setChecked] = useState<string[]>(["s1"]);
+    const bindingThemeStyle = {
+        "--inkwell-binding-border": token.colorBorderSecondary,
+        "--inkwell-binding-bg": token.colorBgContainer,
+        "--inkwell-binding-hover": token.colorFillQuaternary,
+        "--inkwell-binding-selected": token.colorPrimaryBg,
+        "--inkwell-binding-icon": token.colorPrimaryText,
+        "--inkwell-binding-icon-bg": token.colorPrimaryBgHover,
+    } as CSSProperties;
 
     return (
         <div>
@@ -714,78 +716,79 @@ function SectionSkills({
                 从统一 Skill 管理中选择需要挂载到当前 Agent 的 Skill。
             </Typography.Text>
 
-            <div className="inkwell-binding-list">
+            <div className="inkwell-binding-list" style={bindingThemeStyle}>
                 <div className="inkwell-binding-list-body">
-                {MOCK_SKILLS.map((s) => (
-                    <div
-                        key={s.id}
-                        className={`inkwell-binding-item${checked.includes(s.id) ? " selected" : ""}`}
-                        style={{
-                            paddingBlock: density === "compact" ? 10 : 14,
-                        }}
-                    >
-                        <div className="inkwell-binding-item-main">
-                            <Checkbox
-                                aria-label={s.name}
-                                checked={checked.includes(s.id)}
-                                disabled={readonly}
-                                onChange={(e) => {
-                                    setChecked((prev) =>
-                                        e.target.checked
-                                            ? [...prev, s.id]
-                                            : prev.filter((x) => x !== s.id),
-                                    );
-                                }}
-                            />
-                            <div className="inkwell-binding-item-icon">
-                                <ReadOutlined />
-                            </div>
-                            <div className="inkwell-binding-item-copy">
-                                <Space>
-                                    <Typography.Text
-                                        strong
-                                        style={{ fontSize: 13 }}
-                                    >
-                                        {s.name}
-                                    </Typography.Text>
-                                </Space>
-                                <Typography.Text
-                                    type="secondary"
-                                    style={{ fontSize: 12, display: "block" }}
+                    {MOCK_SKILLS.map((s) => (
+                        <div
+                            key={s.id}
+                            className={`inkwell-binding-item${checked.includes(s.id) ? " selected" : ""}`}
+                            style={{
+                                paddingBlock: density === "compact" ? 10 : 14,
+                            }}
+                        >
+                            <div className="inkwell-binding-item-main">
+                                <Checkbox
+                                    aria-label={s.name}
+                                    checked={checked.includes(s.id)}
+                                    disabled={readonly}
+                                    onChange={(e) => {
+                                        setChecked((prev) =>
+                                            e.target.checked
+                                                ? [...prev, s.id]
+                                                : prev.filter(
+                                                      (x) => x !== s.id,
+                                                  ),
+                                        );
+                                    }}
+                                />
+                                <div
+                                    className="inkwell-binding-item-icon"
+                                    style={{
+                                        background: token.colorPrimaryBgHover,
+                                    }}
                                 >
-                                    {s.description}
-                                </Typography.Text>
-                                <Flex gap={6} wrap style={{ marginTop: 8 }}>
-                                    <Tag>Discovery</Tag>
-                                    <Tag
-                                        color={
-                                            checked.includes(s.id)
-                                                ? "processing"
-                                                : undefined
-                                        }
+                                    <ReadOutlined
+                                        style={{
+                                            color: token.colorPrimaryText,
+                                        }}
+                                    />
+                                </div>
+                                <div className="inkwell-binding-item-copy">
+                                    <Space>
+                                        <Typography.Text
+                                            strong
+                                            style={{ fontSize: 14 }}
+                                        >
+                                            {s.name}
+                                        </Typography.Text>
+                                    </Space>
+                                    <Typography.Text
+                                        type="secondary"
+                                        style={{
+                                            fontSize: 12,
+                                            display: "block",
+                                        }}
                                     >
-                                        Activation
-                                    </Tag>
-                                    <Tag>Execution</Tag>
-                                </Flex>
+                                        {s.description}
+                                    </Typography.Text>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
 
-                {MOCK_SKILLS.length === 0 && (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            padding: 32,
-                            color: token.colorTextSecondary,
-                        }}
-                    >
-                        <Typography.Text type="secondary">
-                            统一 Skill 管理中暂无可用 Skill
-                        </Typography.Text>
-                    </div>
-                )}
+                    {MOCK_SKILLS.length === 0 && (
+                        <div
+                            style={{
+                                textAlign: "center",
+                                padding: 32,
+                                color: token.colorTextSecondary,
+                            }}
+                        >
+                            <Typography.Text type="secondary">
+                                统一 Skill 管理中暂无可用 Skill
+                            </Typography.Text>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
