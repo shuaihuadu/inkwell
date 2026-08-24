@@ -4,6 +4,7 @@ using System.Data;
 using System.Runtime.CompilerServices;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace Inkwell;
 
@@ -12,7 +13,8 @@ internal sealed class AgentConversationService(
     IPersistenceProvider persistence,
     TimeProvider timeProvider,
     IAgentBuildService buildService,
-    InkwellAgentSessionStateStore sessionStateStore) : IAgentConversationService
+    InkwellAgentSessionStateStore sessionStateStore,
+    ILogger<AgentConversationService> logger) : IAgentConversationService
 {
     private readonly IAgentRepository _agents = persistence.GetRepository<IAgentRepository>();
     private readonly IAgentConversationRepository _conversations = persistence.GetRepository<IAgentConversationRepository>();
@@ -143,6 +145,7 @@ internal sealed class AgentConversationService(
         await sessionStateStore
             .SaveSessionAsync(context.Agent, context.ConversationId, context.Session, cancellationToken)
             .ConfigureAwait(false);
+        await this.PersistUsageAsync(context, response.Usage, cancellationToken).ConfigureAwait(false);
 
         return response;
     }
@@ -157,17 +160,71 @@ internal sealed class AgentConversationService(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         RunContext context = await this.PrepareRunAsync(ownerUserId, agentId, conversationId, messages, cancellationToken).ConfigureAwait(false);
+        UsageDetails? usage = null;
 
         await foreach (AgentResponseUpdate update in context.Agent
             .RunStreamingAsync(context.RunMessages, context.Session, options, cancellationToken)
             .ConfigureAwait(false))
         {
+            foreach (UsageContent usageContent in update.Contents.OfType<UsageContent>())
+            {
+                usage = AgentTokenUsageAggregator.Add(usage, usageContent.Details);
+            }
+
             yield return update;
         }
 
         await sessionStateStore
             .SaveSessionAsync(context.Agent, context.ConversationId, context.Session, cancellationToken)
             .ConfigureAwait(false);
+        await this.PersistUsageAsync(context, usage, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task PersistUsageAsync(RunContext context, UsageDetails? usage, CancellationToken cancellationToken)
+    {
+        if (usage is null)
+        {
+            return;
+        }
+
+        try
+        {
+            IReadOnlyList<AgentChatMessage> runMessages = await this._messages
+                .ListMessagesByRun(context.ConversationId, context.ExecutionId, cancellationToken)
+                .ConfigureAwait(false);
+            AgentChatMessage? assistantMessage = runMessages
+                .Where(message => message.Message.Role == ChatRole.Assistant)
+                .OrderByDescending(message => message.RunMessageIndex)
+                .FirstOrDefault();
+            if (assistantMessage is null)
+            {
+                logger.LogWarning(
+                    "Skipped token usage persistence because the run has no assistant message. conversationId={ConversationId} executionId={ExecutionId}",
+                    context.ConversationId,
+                    context.ExecutionId);
+                return;
+            }
+
+            bool updated = await this._messages
+                .UpdateMessageUsage(context.ConversationId, assistantMessage.Id, usage, timeProvider.GetUtcNow(), cancellationToken)
+                .ConfigureAwait(false);
+            if (!updated)
+            {
+                logger.LogWarning(
+                    "Skipped token usage persistence because the assistant message no longer exists. conversationId={ConversationId} executionId={ExecutionId} messageId={MessageId}",
+                    context.ConversationId,
+                    context.ExecutionId,
+                    assistantMessage.Id);
+            }
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Token usage persistence failed after the run completed. conversationId={ConversationId} executionId={ExecutionId}",
+                context.ConversationId,
+                context.ExecutionId);
+        }
     }
 
     private async Task<RunContext> PrepareRunAsync(

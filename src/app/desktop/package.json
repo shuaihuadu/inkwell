@@ -24,6 +24,8 @@
     "test:e2e": "playwright test tests/login.spec.ts"
   },
   "dependencies": {
+    "@ag-ui/client": "0.0.57",
+    "@ag-ui/core": "0.0.57",
     "@ant-design/icons": "6.3.2",
     "@ant-design/x": "2.8.0",
     "@ant-design/x-markdown": "2.8.0",

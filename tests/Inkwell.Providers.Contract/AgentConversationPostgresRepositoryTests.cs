@@ -10,6 +10,8 @@ using Testcontainers.PostgreSql;
 
 namespace Inkwell.Providers.Contract;
 
+#pragma warning disable MEAI001
+
 /// <summary>验证 PostgreSQL Conversation Repository 的事务与持久化契约。</summary>
 [TestClass]
 [DoNotParallelize]
@@ -91,6 +93,63 @@ public sealed class AgentConversationPostgresRepositoryTests
 
         // Assert
         _ = await Assert.ThrowsExactlyAsync<DbUpdateException>(ActAsync);
+    }
+
+    /// <summary>验证 Token 用量只覆盖目标消息并完整保留 Provider 报告字段。</summary>
+    /// <returns>表示异步测试操作的任务。</returns>
+    [TestMethod]
+    public async Task MessageCrud_UpdateUsage_PreservesAllFieldsAndTargetsExactMessageAsync()
+    {
+        // Arrange
+        await ResetDatabaseAsync();
+        SeededConversation seeded = await SeedConversationAsync();
+        DateTimeOffset createdTime = seeded.CreatedTime.AddMinutes(1);
+        DateTimeOffset updatedTime = createdTime.AddMinutes(1);
+        await using ServiceProvider provider = BuildServiceProvider();
+        IAgentChatMessageRepository messages = provider.GetRequiredService<IAgentChatMessageRepository>();
+        IReadOnlyList<AgentChatMessage> added = await messages.AddMessages(
+        [
+            CreateMessage(seeded.ConversationId, "run-usage", 0, new ChatMessage(ChatRole.User, "question"), createdTime),
+            CreateMessage(seeded.ConversationId, "run-usage", 1, new ChatMessage(ChatRole.Assistant, "answer"), createdTime),
+        ]);
+        AgentChatMessage target = added[1];
+        UsageDetails usage = new()
+        {
+            InputTokenCount = 10,
+            OutputTokenCount = 20,
+            TotalTokenCount = 30,
+            CachedInputTokenCount = 4,
+            ReasoningTokenCount = 5,
+            InputAudioTokenCount = 6,
+            InputTextTokenCount = 7,
+            OutputAudioTokenCount = 8,
+            OutputTextTokenCount = 9,
+            AdditionalCounts = new() { ["providerCount"] = 11 },
+        };
+
+        // Act
+        bool updated = await messages.UpdateMessageUsage(seeded.ConversationId, target.Id, usage, updatedTime);
+        bool wrongConversationUpdated = await messages.UpdateMessageUsage(Guid.CreateVersion7(), target.Id, usage, updatedTime);
+        bool wrongMessageUpdated = await messages.UpdateMessageUsage(seeded.ConversationId, Guid.CreateVersion7(), usage, updatedTime);
+        IReadOnlyList<AgentChatMessage> persisted = await messages.ListMessagesByRun(seeded.ConversationId, "run-usage");
+
+        // Assert
+        Assert.IsTrue(updated);
+        Assert.IsFalse(wrongConversationUpdated);
+        Assert.IsFalse(wrongMessageUpdated);
+        Assert.IsNull(persisted[0].Usage);
+        UsageDetails persistedUsage = persisted[1].Usage!;
+        Assert.AreEqual(10, persistedUsage.InputTokenCount);
+        Assert.AreEqual(20, persistedUsage.OutputTokenCount);
+        Assert.AreEqual(30, persistedUsage.TotalTokenCount);
+        Assert.AreEqual(4, persistedUsage.CachedInputTokenCount);
+        Assert.AreEqual(5, persistedUsage.ReasoningTokenCount);
+        Assert.AreEqual(6, persistedUsage.InputAudioTokenCount);
+        Assert.AreEqual(7, persistedUsage.InputTextTokenCount);
+        Assert.AreEqual(8, persistedUsage.OutputAudioTokenCount);
+        Assert.AreEqual(9, persistedUsage.OutputTextTokenCount);
+        Assert.AreEqual(11, persistedUsage.AdditionalCounts!["providerCount"]);
+        Assert.AreEqual(updatedTime, persisted[1].UpdatedTime);
     }
 
     /// <summary>验证 Repository CRUD 在事务失败时整体回滚。</summary>
@@ -221,3 +280,5 @@ public sealed class AgentConversationPostgresRepositoryTests
 
     private sealed record SeededConversation(Guid ConversationId, DateTimeOffset CreatedTime);
 }
+
+#pragma warning restore MEAI001

@@ -13,6 +13,9 @@ public sealed record class AgentChatMessageResponse
     /// <summary>获取完整聊天消息。</summary>
     public required ChatMessage Message { get; init; }
 
+    /// <summary>获取正常完成 Run 的聚合 Token 用量。</summary>
+    public AgentTokenUsageResponse? Usage { get; init; }
+
     /// <summary>获取会话内消息序号。</summary>
     public required int SequenceNumber { get; init; }
 

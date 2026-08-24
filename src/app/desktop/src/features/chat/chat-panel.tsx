@@ -47,6 +47,7 @@ import { ChatComposer } from "./chat-composer";
 import { ChatMessageList, type ChatMessageListRef } from "./chat-message-list";
 import { ChatQuickPromptKeys } from "./chat-quick-prompt-items";
 import { ChatQuickPrompts } from "./chat-quick-prompts";
+import { applyChatRunSnapshotToMessages } from "./chat-run-messages";
 
 interface ChatPanelProps {
     agent: AgentListItem | null;
@@ -237,16 +238,7 @@ export function ChatPanel({
     const applySnapshot = useCallback(
         (snapshot: ChatRunSnapshot, originalInput?: string): void => {
             setMessages((current) =>
-                current.map((item, index) =>
-                    index === current.length - 1 && item.role === "assistant"
-                        ? {
-                              ...item,
-                              content: snapshot.content,
-                              skillActivities: snapshot.skillActivities,
-                              runStatus: snapshot.status,
-                          }
-                        : item,
-                ),
+                applyChatRunSnapshotToMessages(current, snapshot),
             );
             if (snapshot.status === "failed" && snapshot.error) {
                 setChatError((current) => ({

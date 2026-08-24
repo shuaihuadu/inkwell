@@ -555,6 +555,8 @@ public sealed class AgentFactoryTests
 
         public Task<IReadOnlyList<AgentChatMessage>> AddMessages(IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default) => throw new NotSupportedException();
 
+        public Task<bool> UpdateMessageUsage(Guid conversationId, Guid messageId, UsageDetails usage, DateTimeOffset updatedTime, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<bool> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<int> DeleteMessagesByConversation(Guid conversationId, CancellationToken ct = default) => throw new NotSupportedException();

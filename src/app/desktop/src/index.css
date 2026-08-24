@@ -1285,10 +1285,21 @@ textarea {
 .chat-message-content .x-markdown > :last-child {
     margin-bottom: 0;
 }
+.chat-token-usage {
+    display: block;
+    font-size: 12px;
+    line-height: 20px;
+}
+.chat-token-usage .anticon {
+    margin-inline-end: 4px;
+}
+.chat-token-usage-item {
+    white-space: nowrap;
+}
 .chat-message-actions {
     min-height: 24px;
 }
-.chat-bubble-list .ant-bubble-footer {
+.chat-bubble-list .chat-message-footer {
     margin-block-start: 8px;
 }
 .agent-editor-page {
