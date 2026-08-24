@@ -28,6 +28,8 @@ Inkwell 是一个基于 [Microsoft Agent Framework](https://github.com/microsoft
 
 ## 本地启动
 
+开始贡献代码前，请先阅读 [开发与分支工作流](CONTRIBUTING.md)，了解 `feature/* -> dev -> main` 的 Pull Request、验证、发布与紧急修复流程。
+
 本机需安装 [.NET 10 SDK](global.json)、Node.js（含 npm）和 Docker Desktop。克隆仓库后，按 lockfile 安装 Desktop 与视觉原型依赖，然后启动 Aspire AppHost：
 
 ```bash
