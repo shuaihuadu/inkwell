@@ -417,6 +417,8 @@ test("shows authentication errors and enters the workspace after login", async (
     let modelTestAttempts = 0;
     let accountLocked = true;
     let accountUnlockAttempts = 0;
+    let agentDeletes = 0;
+    let failNextAgentDelete = true;
     let agentShareRevocations = 0;
     let agentClones = 0;
     let agentCreates = 0;
@@ -429,6 +431,7 @@ test("shows authentication errors and enters the workspace after login", async (
     let conversationClears = 0;
     let conversationPageTwoRequests = 0;
     let messagePageTwoRequests = 0;
+    const deletedAgentIds = new Set<string>();
     const chatRequestUrls: string[] = [];
     const chatRunModes: (string | undefined)[] = [];
     const chatConversationIds: (string | undefined)[] = [];
@@ -498,7 +501,36 @@ test("shows authentication errors and enters the workspace after login", async (
 
         if (request.url === "/api/agents/mine") {
             response.setHeader("Content-Type", "application/json");
-            response.end(myAgentsResponse);
+            response.end(
+                JSON.stringify(
+                    JSON.parse(myAgentsResponse).filter(
+                        (agent: { id: string }) =>
+                            !deletedAgentIds.has(agent.id),
+                    ),
+                ),
+            );
+            return;
+        }
+
+        if (
+            request.url ===
+                "/api/agents/0198a96d-19e4-7000-8000-000000000302" &&
+            request.method === "DELETE"
+        ) {
+            agentDeletes += 1;
+            if (failNextAgentDelete) {
+                failNextAgentDelete = false;
+                response.statusCode = 500;
+                response.setHeader("Content-Type", "application/json");
+                response.end(
+                    JSON.stringify({ detail: "Agent deletion failed." }),
+                );
+                return;
+            }
+
+            deletedAgentIds.add("0198a96d-19e4-7000-8000-000000000302");
+            response.statusCode = 204;
+            response.end();
             return;
         }
 
@@ -1246,6 +1278,59 @@ test("shows authentication errors and enters the workspace after login", async (
             expect(agentCardText).not.toMatch(/更新于|分钟前|小时前|天前/);
         }
 
+        const draftAgentCard = page
+            .locator(".agent-space-card")
+            .filter({ hasText: "产品草稿" });
+        await draftAgentCard.hover();
+        await draftAgentCard
+            .getByRole("button", { name: "删除 产品草稿" })
+            .dispatchEvent("click");
+        const deleteAgentDialog = page.getByRole("dialog", {
+            name: "删除「产品草稿」？",
+        });
+        await expect(deleteAgentDialog).toContainText(
+            "将永久删除该 Agent、全部版本及所有参与用户的会话历史，操作不可恢复。",
+        );
+        await deleteAgentDialog
+            .getByRole("button", { name: /取\s*消/ })
+            .dispatchEvent("click");
+        await expect(deleteAgentDialog).toBeHidden();
+        expect(agentDeletes).toBe(0);
+        await expect(page.getByText("产品草稿", { exact: true })).toBeVisible();
+
+        await draftAgentCard
+            .getByRole("button", { name: "删除 产品草稿" })
+            .dispatchEvent("click");
+        await page
+            .getByRole("dialog", { name: "删除「产品草稿」？" })
+            .getByRole("button", { name: "确认删除" })
+            .dispatchEvent("click");
+        await expect.poll(() => agentDeletes).toBe(1);
+        await expect(page.getByText("Agent deletion failed.")).toBeVisible();
+        await expect(page.getByText("产品草稿", { exact: true })).toBeVisible();
+        await page
+            .getByRole("dialog", { name: "删除「产品草稿」？" })
+            .getByRole("button", { name: /取\s*消/ })
+            .dispatchEvent("click");
+        await expect(
+            page.getByRole("dialog", { name: "删除「产品草稿」？" }),
+        ).toBeHidden();
+
+        await draftAgentCard
+            .getByRole("button", { name: "删除 产品草稿" })
+            .dispatchEvent("click");
+        await page
+            .getByRole("dialog", { name: "删除「产品草稿」？" })
+            .getByRole("button", { name: "确认删除", exact: true })
+            .dispatchEvent("click");
+        await expect.poll(() => agentDeletes).toBe(2);
+        await expect(
+            page.getByText("Agent 已删除", { exact: true }),
+        ).toBeVisible();
+        await expect(page.getByText("产品草稿", { exact: true })).toHaveCount(
+            0,
+        );
+
         await page.getByRole("button", { name: "帮助" }).dispatchEvent("click");
         const helpMenu = page.getByRole("menu");
         await expect(
@@ -1744,6 +1829,11 @@ test("shows authentication errors and enters the workspace after login", async (
             .locator(".agent-space-card")
             .filter({ hasText: "合同审查助手" });
         await sharedAgentCard.hover();
+        await expect(
+            sharedAgentCard.getByRole("button", {
+                name: "删除 合同审查助手",
+            }),
+        ).toHaveCount(0);
         await sharedAgentCard
             .getByRole("button", { name: "查看 合同审查助手 详情" })
             .dispatchEvent("click");

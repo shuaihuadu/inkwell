@@ -194,6 +194,7 @@ export const resources = {
                     configComingSoon: "Agent 配置页将在下一项工作中接入。",
                     loadError: "加载失败，请检查网络后重试",
                     actionSuccess: {
+                        delete: "Agent 已删除",
                         share: "Agent 已共享给团队",
                         unshare: "已撤销团队共享",
                         revoke: "已由管理员撤销共享",
@@ -202,6 +203,8 @@ export const resources = {
                     actions: {
                         edit: "编辑配置",
                         editLabel: "编辑 {{name}}",
+                        delete: "删除 Agent",
+                        deleteLabel: "删除 {{name}}",
                         share: "共享已发布版本",
                         shareLabel: "共享 {{name}}",
                         revoke: "撤销共享",
@@ -222,6 +225,10 @@ export const resources = {
                         shared: "团队成员还没有共享 Agent",
                     },
                     dialogs: {
+                        deleteTitle: "删除「{{name}}」？",
+                        deleteContent:
+                            "将永久删除该 Agent、全部版本及所有参与用户的会话历史，操作不可恢复。",
+                        confirmDelete: "确认删除",
                         revokeTitle: "撤销「{{name}}」的共享",
                         revokeContent:
                             "撤销后，其他成员将无法继续访问；Owner 原件不会被删除。",
@@ -1190,6 +1197,7 @@ export const resources = {
                     loadError:
                         "Could not load Agents. Check your connection and try again.",
                     actionSuccess: {
+                        delete: "Agent deleted",
                         share: "Agent shared with the team",
                         unshare: "Team access revoked",
                         revoke: "Shared access revoked by an administrator",
@@ -1198,6 +1206,8 @@ export const resources = {
                     actions: {
                         edit: "Edit configuration",
                         editLabel: "Edit {{name}}",
+                        delete: "Delete Agent",
+                        deleteLabel: "Delete {{name}}",
                         share: "Share published version",
                         shareLabel: "Share {{name}}",
                         revoke: "Revoke access",
@@ -1218,6 +1228,10 @@ export const resources = {
                         shared: "No team members have shared an Agent yet",
                     },
                     dialogs: {
+                        deleteTitle: "Delete “{{name}}”?",
+                        deleteContent:
+                            "This permanently deletes the Agent, every version, and every participant's conversation history. This action cannot be undone.",
+                        confirmDelete: "Delete Agent",
                         revokeTitle: "Revoke access to “{{name}}”?",
                         revokeContent:
                             "Other members will lose access. The owner's Agent will not be deleted.",
