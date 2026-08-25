@@ -36,30 +36,30 @@ downstream: []
 
 ## Desktop 实施单元
 
-| 编号 | 实施单元 | 主要范围 | 当前状态 | 执行文档 |
-| --- | --- | --- | --- | --- |
-| H5-001 | 登录、会话与锁定 | UI-001、UI-002、会话恢复、登出、自动锁定 | 已实现，待补验证 | [实施记录](H5-001-authentication-and-lock/implementation-record.md) |
-| H5-002 | 公共外壳与全局体验 | 依赖升级、AppShell、权限导航和主题已完成；继续网络状态与全局错误 | H5-002-A/B 已实现，H5-002-C 待设计 | [范围说明](H5-002-app-shell/scope.md) |
-| H5-003 | Agent 空间与基础管理 | UI-003、我的/团队共享、搜索、删除、共享、点击分流 | H5-003-A 被列表展示契约阻塞 | [范围说明](H5-003-agent-space/scope.md) |
-| H5-004 | Agent 设计与配置 | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布 | 草稿保存、发布和未发布修改状态已实现 | [范围说明](H5-004-agent-design/scope.md) |
-| H5-005 | Agent 会话 | 会话数据、REST、MAF AG-UI、Desktop SDK、停止、错误与锁屏恢复已落地 | H5-005-A/B/C/D 已实现 | [范围说明](H5-005-agent-conversation/scope.md) |
-| H5-006 | 版本管理 | UI-008、版本列表、完整快照 diff、回滚 | 已实现并完成 Core、WebApi、PostgreSQL 与 Electron 验证 | [路线图](desktop-implementation-roadmap.md#h5-006-版本管理) |
-| H5-007 | 调试与评测 | UI-007、Trace、评测集、回放 | H3 未完成 | 路线图定义 |
-| H5-008 | Admin 管理 | UI-009、账号解封、撤销他人共享 | H5-008-A 用户列表与解封已实现；撤销共享待设计 | [实施记录](H5-008-admin-management/implementation-record.md) |
-| H5-009 | API Key 与外部协议 | API Key 创建/撤销/绑定、四协议调用验证 | H3 未完成 | 路线图定义 |
-| H5-010 | 多模态输入 | 图片、语音转写、文档输入、能力前置校验 | H3 未完成 | 路线图定义 |
-| H5-011 | 桌面横切质量 | 离线与错误规约、可访问性、性能、Windows/macOS 验证 | 持续实施 | 路线图定义 |
-| H5-012 | 桌面打包与更新 | 安装包、签名、公证、自动更新、发布通道 | 三平台安装包与 prerelease 已实现；签名、公证和自动更新待规划 | 路线图定义 |
-| H5-013 | LLM Provider 与 LiteLLM 接入 | Provider 端口、实时模型发现、分类、Agent Chat Client | 模型列表、详情、管理外链与 Member 测试入口已实现；非 Chat 诊断待补 | [任务简报](H5-013-llm-provider/ai-task-brief.md) |
+| 编号   | 实施单元                     | 主要范围                                                           | 当前状态                                                           | 执行文档                                                            |
+| ------ | ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| H5-001 | 登录、会话与锁定             | UI-001、UI-002、会话恢复、登出、自动锁定                           | 已实现，待补验证                                                   | [实施记录](H5-001-authentication-and-lock/implementation-record.md) |
+| H5-002 | 公共外壳与全局体验           | 依赖升级、AppShell、权限导航、主题、网络状态和全局错误             | H5-002-A/B/C 已实现，等待 Owner 评审                               | [范围说明](H5-002-app-shell/scope.md)                               |
+| H5-003 | Agent 空间与基础管理         | UI-003、我的/团队共享、搜索、删除、共享、点击分流                  | H5-003-A 被列表展示契约阻塞                                        | [范围说明](H5-003-agent-space/scope.md)                             |
+| H5-004 | Agent 设计与配置             | UI-004、基础属性、模型参数、工具、Skills、知识库、记忆、草稿/发布  | 草稿保存、发布和未发布修改状态已实现                               | [范围说明](H5-004-agent-design/scope.md)                            |
+| H5-005 | Agent 会话                   | 会话数据、REST、MAF AG-UI、Desktop SDK、停止、错误与锁屏恢复已落地 | H5-005-A/B/C/D 已实现                                              | [范围说明](H5-005-agent-conversation/scope.md)                      |
+| H5-006 | 版本管理                     | UI-008、版本列表、完整快照 diff、回滚                              | 已实现并完成 Core、WebApi、PostgreSQL 与 Electron 验证             | [路线图](desktop-implementation-roadmap.md#h5-006-版本管理)         |
+| H5-007 | 调试与评测                   | UI-007、Trace、评测集、回放                                        | H3 未完成                                                          | 路线图定义                                                          |
+| H5-008 | Admin 管理                   | UI-009、账号解封、撤销他人共享                                     | H5-008-A 用户列表与解封已实现；撤销共享待设计                      | [实施记录](H5-008-admin-management/implementation-record.md)        |
+| H5-009 | API Key 与外部协议           | API Key 创建/撤销/绑定、四协议调用验证                             | H3 未完成                                                          | 路线图定义                                                          |
+| H5-010 | 多模态输入                   | 图片、语音转写、文档输入、能力前置校验                             | H3 未完成                                                          | 路线图定义                                                          |
+| H5-011 | 桌面横切质量                 | 离线与错误规约、可访问性、性能、Windows/macOS 验证                 | 持续实施                                                           | 路线图定义                                                          |
+| H5-012 | 桌面打包与更新               | 安装包、签名、公证、自动更新、发布通道                             | 三平台安装包与 prerelease 已实现；签名、公证和自动更新待规划       | 路线图定义                                                          |
+| H5-013 | LLM Provider 与 LiteLLM 接入 | Provider 端口、实时模型发现、分类、Agent Chat Client               | 模型列表、详情、管理外链与 Member 测试入口已实现；非 Chat 诊断待补 | [任务简报](H5-013-llm-provider/ai-task-brief.md)                    |
 
 总体依赖、实施顺序和各单元完成定义见 [Desktop 实施路线图](desktop-implementation-roadmap.md)。
 
 ## 横切实施指南
 
-| 主题 | 适用范围 | 文档 |
-| --- | --- | --- |
-| Grafana 指标查看 | OpenTelemetry Agent 指标、PromQL、Tempo 联查、Dashboard 与故障排查 | [Grafana 指标查看指南](observability/metrics-guide.md) |
-| 日志治理缺口 | 当前日志覆盖矩阵、生产 Alloy/Collector、脱敏、成本与告警 backlog | [日志现状与生产治理缺口](observability/logging-gap-analysis.md) |
+| 主题             | 适用范围                                                           | 文档                                                            |
+| ---------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Grafana 指标查看 | OpenTelemetry Agent 指标、PromQL、Tempo 联查、Dashboard 与故障排查 | [Grafana 指标查看指南](observability/metrics-guide.md)          |
+| 日志治理缺口     | 当前日志覆盖矩阵、生产 Alloy/Collector、脱敏、成本与告警 backlog   | [日志现状与生产治理缺口](observability/logging-gap-analysis.md) |
 
 ## 执行规则
 

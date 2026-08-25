@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { desktopApi } from "../../shared/network/desktop-api";
 import type { ChangePasswordRequest } from "../../shared/network/contracts";
+import { useNetworkStore } from "../shell/network-store";
 import { useAuthStore } from "./auth-store";
 
 interface ChangePasswordFormValues extends ChangePasswordRequest {
@@ -24,6 +25,7 @@ export function ChangePasswordModal({
     const [form] = Form.useForm<ChangePasswordFormValues>();
     const [submitting, setSubmitting] = useState(false);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
+    const connectionStatus = useNetworkStore((state) => state.status);
     const [messageApi, contextHolder] = message.useMessage();
 
     const close = (): void => {
@@ -76,6 +78,7 @@ export function ChangePasswordModal({
                     layout="vertical"
                     onFinish={(values) => void changePassword(values)}
                     requiredMark="optional"
+                    disabled={connectionStatus !== "online"}
                 >
                     <Form.Item
                         name="currentPassword"
@@ -178,6 +181,7 @@ export function ChangePasswordModal({
                             type="primary"
                             htmlType="submit"
                             loading={submitting}
+                            disabled={connectionStatus !== "online"}
                         >
                             {t("auth.changePassword.submit")}
                         </Button>
