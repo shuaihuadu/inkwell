@@ -8,7 +8,9 @@ import { ChangePasswordModal } from "./features/auth/change-password-modal";
 import { LockPage } from "./features/auth/lock-page";
 import { LoginPage } from "./features/auth/login-page";
 import { ChatPanel } from "./features/chat/chat-panel";
+import { GlobalApiAlert } from "./features/shell/global-api-alert";
 import { WorkspaceShell } from "./features/shell/workspace-shell";
+import { useNetworkStore } from "./features/shell/network-store";
 import { desktopApi } from "./shared/network/desktop-api";
 import type { AgentListItem } from "./shared/network/contracts";
 
@@ -22,6 +24,8 @@ export default function AppShell() {
     const status = useAuthStore((state) => state.status);
     const identity = useAuthStore((state) => state.identity);
     const setSnapshot = useAuthStore((state) => state.setSnapshot);
+    const setConnection = useNetworkStore((state) => state.setConnection);
+    const setGlobalError = useNetworkStore((state) => state.setGlobalError);
     const [agentView, setAgentView] = useState<AgentView>({ kind: "space" });
     const [agentEditorDirty, setAgentEditorDirty] = useState(false);
 
@@ -50,8 +54,13 @@ export default function AppShell() {
     };
 
     useEffect(() => {
-        const unsubscribe = desktopApi.onAuthStateChanged(setSnapshot);
+        const unsubscribeAuth = desktopApi.onAuthStateChanged(setSnapshot);
+        const unsubscribeConnection =
+            desktopApi.onConnectionStateChanged(setConnection);
+        const unsubscribeGlobalError =
+            desktopApi.onGlobalApiError(setGlobalError);
         void desktopApi.restoreAuth().then(setSnapshot);
+        void desktopApi.getConnectionState().then(setConnection);
 
         let lastReportedAt = 0;
         const reportActivity = (): void => {
@@ -73,11 +82,13 @@ export default function AppShell() {
             });
 
         return () => {
-            unsubscribe();
+            unsubscribeAuth();
+            unsubscribeConnection();
+            unsubscribeGlobalError();
             for (const eventName of activityEvents)
                 window.removeEventListener(eventName, reportActivity);
         };
-    }, [setSnapshot]);
+    }, [setConnection, setGlobalError, setSnapshot]);
 
     useEffect(() => {
         if (status !== "offline") return;
@@ -91,27 +102,39 @@ export default function AppShell() {
 
     if (status === "restoring") {
         return (
-            <main className="auth-state-page">
-                <Spin size="large" />
-            </main>
+            <>
+                <GlobalApiAlert />
+                <main className="auth-state-page">
+                    <Spin size="large" />
+                </main>
+            </>
         );
     }
 
     if (status === "offline") {
-        return <LoginPage initiallyOffline />;
+        return (
+            <>
+                <GlobalApiAlert />
+                <LoginPage initiallyOffline />
+            </>
+        );
     }
 
     if (status === "authenticated" || status === "locked") {
         if (identity?.mustChangePassword) {
             return (
-                <main className="auth-state-page">
-                    <ChangePasswordModal open required />
-                </main>
+                <>
+                    <GlobalApiAlert />
+                    <main className="auth-state-page">
+                        <ChangePasswordModal open required />
+                    </main>
+                </>
             );
         }
 
         return (
             <>
+                <GlobalApiAlert />
                 <WorkspaceShell
                     onNavigate={(navigate) =>
                         leaveAgentEditor(() => {
@@ -136,7 +159,7 @@ export default function AppShell() {
                             onBack={returnToAgentSpace}
                             onClone={(agentId) => {
                                 setAgentEditorDirty(false);
-                                setAgentView({ kind: "editor", agentId })
+                                setAgentView({ kind: "editor", agentId });
                             }}
                             onDirtyChange={setAgentEditorDirty}
                         />
@@ -159,5 +182,10 @@ export default function AppShell() {
             </>
         );
     }
-    return <LoginPage />;
+    return (
+        <>
+            <GlobalApiAlert />
+            <LoginPage />
+        </>
+    );
 }

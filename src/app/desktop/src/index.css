@@ -47,7 +47,10 @@ textarea {
     font: inherit;
 }
 #root {
-    min-height: 100vh;
+    display: flex;
+    height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
 }
 .auth-state-page,
 .lock-page {
@@ -104,7 +107,8 @@ textarea {
 }
 .login-page {
     display: flex;
-    min-height: 100vh;
+    min-height: 0;
+    flex: 1 1 auto;
     overflow: hidden;
     background: var(--shell-bg);
 }
@@ -262,10 +266,17 @@ textarea {
 }
 .workspace-shell {
     display: flex;
-    height: 100vh;
+    min-height: 0;
+    flex: 1 1 auto;
     flex-direction: column;
     overflow: hidden;
     background: var(--shell-bg);
+}
+.global-api-alert {
+    z-index: 1100;
+    flex: 0 0 auto;
+    border-radius: 0;
+    padding: 7px 20px;
 }
 .app-header {
     display: flex;
@@ -347,6 +358,14 @@ textarea {
     border-radius: 50%;
     background: #31a174;
     box-shadow: 0 0 0 3px #dff3e9;
+}
+.connection-state.reconnecting span {
+    background: #d89614;
+    box-shadow: 0 0 0 3px #fff1b8;
+}
+.connection-state.offline span {
+    background: #cf1322;
+    box-shadow: 0 0 0 3px #ffccc7;
 }
 .user-menu-trigger {
     display: flex;

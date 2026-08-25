@@ -57,6 +57,7 @@ import {
 import { useLocaleStore } from "./locale-store";
 import type { LocalePreference } from "../../shared/i18n/resources";
 import { desktopThemes, themeNames, type ThemeName } from "./themes";
+import { useNetworkStore } from "./network-store";
 
 type NavigationKey =
     | "agents"
@@ -96,6 +97,7 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
     const locale = useLocaleStore((state) => state.locale);
     const setLocale = useLocaleStore((state) => state.setLocale);
     const resolvedAppearance = useResolvedAppearance();
+    const connectionStatus = useNetworkStore((state) => state.status);
     const navigationGroups: NavigationGroup[] = [
         {
             key: "workspace",
@@ -228,10 +230,11 @@ export function WorkspaceShell({ children, onNavigate }: WorkspaceShellProps) {
                         }
                     />
                     <div
-                        className="connection-state"
-                        aria-label={t("shell.serviceHealthy")}
+                        className={`connection-state ${connectionStatus}`}
+                        aria-label={t(`shell.connection.${connectionStatus}`)}
                     >
-                        <span /> {t("shell.serviceHealthy")}
+                        <span />
+                        {t(`shell.connection.${connectionStatus}`)}
                     </div>
                     <Dropdown
                         trigger={["click"]}
