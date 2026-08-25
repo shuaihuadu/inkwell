@@ -104,7 +104,20 @@ export const resources = {
                 },
                 aboutInkwell: "关于 Inkwell",
                 appearanceSwitch: "切换外观",
-                serviceHealthy: "后台服务正常",
+                connection: {
+                    online: "后台服务正常",
+                    reconnecting: "重连中",
+                    offline: "后台服务异常",
+                },
+                errors: {
+                    offline:
+                        "网络连接已断开，正在尝试重新连接。写操作已禁用，恢复后自动收起",
+                    reconnecting: "正在连接后台服务，写操作暂不可用",
+                    "rate-limited": "操作过于频繁，请稍后再试",
+                    rateLimitedWithRetry:
+                        "操作过于频繁，请在 {{seconds}} 秒后重试",
+                    "service-unavailable": "后台服务暂时不可用，请稍后重试",
+                },
                 guide: "使用指南",
                 quickStart: "快速开始",
                 faq: "常见问题",
@@ -217,12 +230,6 @@ export const resources = {
                         shareContent:
                             "共享后，团队成员可以查看并使用该 Agent 的已发布版本。",
                         confirmShare: "确认共享",
-                    },
-                    relativeTime: {
-                        now: "刚刚更新",
-                        minutes: "{{count}} 分钟前",
-                        hours: "{{count}} 小时前",
-                        days: "{{count}} 天前",
                     },
                 },
                 editor: {
@@ -1087,7 +1094,22 @@ export const resources = {
                 },
                 aboutInkwell: "About Inkwell",
                 appearanceSwitch: "Toggle appearance",
-                serviceHealthy: "Service connected",
+                connection: {
+                    online: "Service connected",
+                    reconnecting: "Reconnecting",
+                    offline: "Service unavailable",
+                },
+                errors: {
+                    offline:
+                        "The connection was lost. Reconnecting now. Write actions are disabled until service is restored.",
+                    reconnecting:
+                        "Connecting to the service. Write actions are temporarily unavailable.",
+                    "rate-limited": "Too many requests. Try again later.",
+                    rateLimitedWithRetry:
+                        "Too many requests. Try again in {{seconds}} seconds.",
+                    "service-unavailable":
+                        "The service is temporarily unavailable. Try again later.",
+                },
                 guide: "User guide",
                 quickStart: "Quick start",
                 faq: "FAQ",
@@ -1204,15 +1226,6 @@ export const resources = {
                         shareContent:
                             "Team members will be able to view and use the published version of this Agent.",
                         confirmShare: "Share",
-                    },
-                    relativeTime: {
-                        now: "Updated just now",
-                        minutes: "Updated {{count}} minute ago",
-                        minutes_other: "Updated {{count}} minutes ago",
-                        hours: "Updated {{count}} hour ago",
-                        hours_other: "Updated {{count}} hours ago",
-                        days: "Updated {{count}} day ago",
-                        days_other: "Updated {{count}} days ago",
                     },
                 },
                 editor: {

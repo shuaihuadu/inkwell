@@ -35,7 +35,9 @@ import type {
     ChatRunError,
     ChatRunSnapshot,
     ChatTokenUsage,
+    ConnectionSnapshot,
     CreateAccountRequest,
+    GlobalApiError,
     IssuedCredential,
     LLMModel,
     LLMModelTestResult,
@@ -51,6 +53,10 @@ import {
     type AguiTokenUsage,
 } from "./chat-token-usage.js";
 import { toToolRunActivity } from "./chat-tool-activity.js";
+import {
+    nextConnectionSnapshot,
+    toGlobalApiError,
+} from "./network-status.js";
 
 declare const __INKWELL_BUILD_NUMBER__: string;
 declare const __INKWELL_COMMIT_SHA__: string;
@@ -71,9 +77,20 @@ const authSessionFileName = "auth-session.bin";
 const idleLockMilliseconds = 60 * 60 * 1000;
 const completedChatRunLimit = 20;
 const chatRunBroadcastIntervalMilliseconds = 32;
-const applicationIconPath = join(__dirname, "../renderer/logo.png");
+const onlineProbeIntervalMilliseconds = 30_000;
+const reconnectingProbeIntervalMilliseconds = 2_000;
+const offlineProbeIntervalMilliseconds = 5_000;
+const healthProbeTimeoutMilliseconds = 3_000;
+const applicationIconPath = app.isPackaged
+    ? join(__dirname, "../renderer/logo.png")
+    : join(__dirname, "../../public/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
+let connectionSnapshot: ConnectionSnapshot = { status: "reconnecting" };
+let consecutiveConnectionFailures = 0;
+let connectionProbeTimer: NodeJS.Timeout | null = null;
+let connectionProbeInFlight = false;
+let globalApiError: GlobalApiError | null = null;
 let idleLockTimer: NodeJS.Timeout | null = null;
 const chatRuns = new Map<
     string,
@@ -362,6 +379,70 @@ const broadcastAuthState = (): void => {
     }
 };
 
+const broadcastConnectionState = (): void => {
+    for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(
+            "inkwell:connection-state-changed",
+            connectionSnapshot,
+        );
+    }
+};
+
+const setConnectionResult = (succeeded: boolean): void => {
+    const previousStatus = connectionSnapshot.status;
+    const next = nextConnectionSnapshot(
+        succeeded,
+        consecutiveConnectionFailures,
+    );
+    connectionSnapshot = next.snapshot;
+    consecutiveConnectionFailures = next.consecutiveFailures;
+    if (connectionSnapshot.status !== previousStatus) broadcastConnectionState();
+};
+
+const broadcastGlobalApiError = (error: GlobalApiError | null): void => {
+    globalApiError = error;
+    for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("inkwell:global-api-error", error);
+    }
+};
+
+const scheduleConnectionProbe = (delayMilliseconds: number): void => {
+    if (connectionProbeTimer) clearTimeout(connectionProbeTimer);
+    connectionProbeTimer = setTimeout(() => {
+        void probeConnection();
+    }, delayMilliseconds);
+};
+
+const probeConnection = async (): Promise<void> => {
+    if (connectionProbeInFlight) return;
+    connectionProbeInFlight = true;
+    connectionProbeTimer = null;
+    try {
+        const response = await fetch(`${apiBaseUrl}/healthz`, {
+            signal: AbortSignal.timeout(healthProbeTimeoutMilliseconds),
+        });
+        setConnectionResult(response.ok);
+    } catch {
+        setConnectionResult(false);
+    } finally {
+        connectionProbeInFlight = false;
+        const delay =
+            connectionSnapshot.status === "online"
+                ? onlineProbeIntervalMilliseconds
+                : connectionSnapshot.status === "reconnecting"
+                  ? reconnectingProbeIntervalMilliseconds
+                  : offlineProbeIntervalMilliseconds;
+        scheduleConnectionProbe(delay);
+    }
+};
+
+const startConnectionMonitor = (): void => scheduleConnectionProbe(0);
+
+const stopConnectionMonitor = (): void => {
+    if (connectionProbeTimer) clearTimeout(connectionProbeTimer);
+    connectionProbeTimer = null;
+};
+
 const setAuthState = (
     status: AuthStatus,
     identity: AuthIdentity | null,
@@ -430,19 +511,49 @@ const clearAuthentication = async (): Promise<void> => {
 };
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-        ...init,
-        headers: {
-            Accept: "application/json",
-            ...(init?.body && !(init.body instanceof FormData)
-                ? { "Content-Type": "application/json" }
-                : {}),
-            ...(sessionToken
-                ? { Authorization: `Bearer ${sessionToken}` }
-                : {}),
-            ...init?.headers,
-        },
-    });
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (
+        connectionSnapshot.status !== "online" &&
+        method !== "GET" &&
+        method !== "HEAD"
+    ) {
+        throw new Error("Inkwell API is unavailable.");
+    }
+
+    let response: Response;
+    try {
+        response = await fetch(`${apiBaseUrl}${path}`, {
+            ...init,
+            headers: {
+                Accept: "application/json",
+                ...(init?.body && !(init.body instanceof FormData)
+                    ? { "Content-Type": "application/json" }
+                    : {}),
+                ...(sessionToken
+                    ? { Authorization: `Bearer ${sessionToken}` }
+                    : {}),
+                ...init?.headers,
+            },
+        });
+        setConnectionResult(true);
+    } catch (reason) {
+        setConnectionResult(false);
+        scheduleConnectionProbe(0);
+        throw reason;
+    }
+
+    const handlesErrorsLocally =
+        path === "/api/auth/login" || path === "/api/auth/unlock";
+    if (handlesErrorsLocally) {
+        if (globalApiError) broadcastGlobalApiError(null);
+    } else {
+        const nextGlobalError = toGlobalApiError(
+            response.status,
+            response.headers.get("Retry-After"),
+        );
+        if (nextGlobalError) broadcastGlobalApiError(nextGlobalError);
+        else if (response.ok && globalApiError) broadcastGlobalApiError(null);
+    }
 
     if (!response.ok) {
         const detail = await response.text();
@@ -451,6 +562,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
             path !== "/api/auth/login" &&
             path !== "/api/auth/unlock"
         ) {
+            if (globalApiError) broadcastGlobalApiError(null);
             await clearAuthentication();
         }
         throw new ApiRequestError(
@@ -538,6 +650,10 @@ const registerApiHandlers = (): void => {
             buildNumber: __INKWELL_BUILD_NUMBER__,
             commit: __INKWELL_COMMIT_SHA__,
         }),
+    );
+    ipcMain.handle(
+        "inkwell:connection-state",
+        (): ConnectionSnapshot => connectionSnapshot,
     );
     ipcMain.handle("inkwell:restore-auth", restoreAuthentication);
 
@@ -1043,16 +1159,26 @@ const registerApiHandlers = (): void => {
                             : {}),
                     },
                     fetch: async (url, requestInit) => {
-                        let response: Response;
-                        try {
-                            response = await fetch(url, requestInit);
-                        } catch (reason) {
-                            if (controller.signal.aborted) throw reason;
+                        if (connectionSnapshot.status !== "online") {
                             throw new ChatRunFailure({
                                 code: "NETWORK_ERROR",
                                 reason: "无法连接模型服务，请检查网络后重试。",
                             });
                         }
+
+                        let response: Response;
+                        try {
+                            response = await fetch(url, requestInit);
+                        } catch (reason) {
+                            if (controller.signal.aborted) throw reason;
+                            setConnectionResult(false);
+                            scheduleConnectionProbe(0);
+                            throw new ChatRunFailure({
+                                code: "NETWORK_ERROR",
+                                reason: "无法连接模型服务，请检查网络后重试。",
+                            });
+                        }
+                        setConnectionResult(true);
                         if (!response.ok) {
                             const reason = await getSafeErrorReason(response);
                             if (response.status === 401) await clearAuthentication();
@@ -1267,6 +1393,7 @@ app.whenReady().then(() => {
         });
     });
     registerApiHandlers();
+    startConnectionMonitor();
     powerMonitor.on("lock-screen", lockAuthentication);
     app.on("browser-window-blur", scheduleIdleLock);
     createWindow();
@@ -1283,3 +1410,5 @@ app.on("window-all-closed", () => {
         app.quit();
     }
 });
+
+app.on("before-quit", stopConnectionMonitor);

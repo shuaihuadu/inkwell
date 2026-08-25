@@ -67,6 +67,11 @@ export function ChatMessageList({
 
         const assistantItems: BubbleItemType[] = [];
         const hasSkillActivities = Boolean(item.skillActivities?.length);
+        const hasActiveSkillActivity = Boolean(
+            item.skillActivities?.some(
+                (activity) => activity.status === "loading",
+            ),
+        );
         if (hasSkillActivities) {
             assistantItems.push({
                 key: `${messageKey}-skills`,
@@ -89,14 +94,15 @@ export function ChatMessageList({
             hasContent ||
             showError ||
             item.runStatus === "stopped" ||
-            (!hasSkillActivities && isLatestRunning)
+            (isLatestRunning && !hasActiveSkillActivity)
         ) {
             assistantItems.push({
                 key: messageKey,
                 role: "assistant",
                 classNames: { footer: "chat-message-footer" },
                 content: item.content,
-                loading: !hasContent && !hasSkillActivities && isLatestRunning,
+                loading:
+                    !hasContent && isLatestRunning && !hasActiveSkillActivity,
                 contentRender: (content) => (
                     <div className="chat-message-content">
                         {String(content) && (

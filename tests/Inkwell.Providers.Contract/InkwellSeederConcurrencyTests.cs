@@ -13,7 +13,7 @@ namespace Inkwell.Providers.Contract;
 /// <summary>
 /// 验证 ADR-024 §幂等性保证要求的加固：两个 <see cref="InkwellSeeder"/> 实例并发跑同一段 Seed
 /// （模拟 <c>Inkwell.Migrator</c> Job 极端情况下短暂并发）时，不应有任一方抛异常失败，且最终
-/// 数据库里只有一条 <c>admin</c> 用户记录和一条内置工具记录。
+/// 数据库里只有一条 <c>admin</c> 用户记录、一条内置工具记录和一套示例 Agent 发布数据。
 /// </summary>
 [TestClass]
 public sealed class InkwellSeederConcurrencyTests
@@ -39,7 +39,7 @@ public sealed class InkwellSeederConcurrencyTests
     }
 
     [TestMethod]
-    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_Admin_And_ToolAsync()
+    public async Task Concurrent_SeedAsync_Does_Not_Throw_And_Inserts_Exactly_One_Seed_Data_SetAsync()
     {
         // Arrange
         ServiceProvider providerA = BuildServiceProvider();
@@ -66,6 +66,10 @@ public sealed class InkwellSeederConcurrencyTests
 
         UserEntity admin = await db.Set<UserEntity>().SingleAsync(x => x.Username == "admin");
         AgentToolEntity currentDateTimeTool = await db.Set<AgentToolEntity>().SingleAsync(x => x.Name == "get_current_datetime");
+        AgentEntity sampleAgent = await db.Set<AgentEntity>().SingleAsync(x => x.Id == Guid.Parse("00000000-0000-0000-0000-000000000301"));
+        AgentVersionEntity sampleAgentVersion = await db.Set<AgentVersionEntity>().SingleAsync(x => x.AgentId == sampleAgent.Id);
+        AgentBuildOptions sampleBuildOptions = JsonSerializer.Deserialize<AgentBuildOptions>(sampleAgent.BuildOptions)!;
+        AgentSnapshot sampleSnapshot = JsonSerializer.Deserialize<AgentSnapshot>(sampleAgentVersion.Snapshot)!;
         string[] hashParts = admin.PasswordHash.Split('$');
         byte[] salt = Convert.FromBase64String(hashParts[2]);
         byte[] expectedHash = Convert.FromBase64String(hashParts[3]);
@@ -78,6 +82,28 @@ public sealed class InkwellSeederConcurrencyTests
         Assert.IsTrue(CryptographicOperations.FixedTimeEquals(configuredPasswordHash, expectedHash));
         Assert.IsFalse(CryptographicOperations.FixedTimeEquals(defaultPasswordHash, expectedHash));
         Assert.AreEqual(Guid.Parse("00000000-0000-0000-0000-000000000101"), currentDateTimeTool.Id);
+        Assert.AreEqual(admin.Id, sampleAgent.OwnerUserId);
+        Assert.AreEqual("Inkwell 小助手", sampleAgent.Name);
+        Assert.IsTrue(sampleAgent.IsShared);
+        Assert.AreEqual(1, sampleAgent.LatestPublishedVersionNumber);
+        Assert.AreEqual(sampleAgentVersion.Id, sampleAgent.CurrentPublishedVersionId);
+        Assert.AreEqual(1, sampleAgentVersion.VersionNumber);
+        Assert.AreEqual(sampleAgent.Name, sampleSnapshot.Name);
+        Assert.AreEqual(sampleAgent.Description, sampleSnapshot.Description);
+        Assert.AreEqual(sampleAgent.Instructions, sampleSnapshot.Instructions);
+        Assert.AreEqual("gpt-5.4", sampleBuildOptions.ModelOptions.ModelId);
+        Assert.AreEqual(0.2, sampleBuildOptions.ModelOptions.Temperature);
+        Assert.AreEqual(0.9, sampleBuildOptions.ModelOptions.TopP);
+        Assert.AreEqual(4096, sampleBuildOptions.ModelOptions.MaxTokens);
+        Assert.HasCount(1, sampleBuildOptions.ToolBindings);
+        Assert.AreEqual(currentDateTimeTool.Id, sampleBuildOptions.ToolBindings[0].ToolId);
+        Assert.IsNull(sampleBuildOptions.ToolBindings[0].ParametersJson);
+        Assert.IsEmpty(sampleBuildOptions.Skills);
+        Assert.IsTrue(JsonElement.DeepEquals(
+            JsonSerializer.SerializeToElement(sampleBuildOptions),
+            JsonSerializer.SerializeToElement(sampleSnapshot.BuildOptions)));
+        StringAssert.Contains(sampleAgent.Instructions, "保存草稿不会影响当前正式对话");
+        StringAssert.Contains(sampleAgent.Instructions, "不把规划、设计或原型中的功能说成已经可用");
         Assert.IsEmpty(
             JsonDocument.Parse(currentDateTimeTool.ParametersJsonSchema)
                 .RootElement
@@ -105,6 +131,20 @@ public sealed class InkwellSeederConcurrencyTests
                 .GetProperty("properties")
                 .EnumerateObject()
                 .ToArray());
+
+        await refreshedDb.Set<AgentVersionEntity>()
+            .Where(version => version.AgentId == sampleAgent.Id)
+            .ExecuteDeleteAsync();
+        await refreshedDb.Set<AgentEntity>()
+            .Where(agent => agent.Id == sampleAgent.Id)
+            .ExecuteDeleteAsync();
+
+        await using AsyncServiceScope restoreScope = providerA.CreateAsyncScope();
+        await restoreScope.ServiceProvider.GetRequiredService<InkwellSeeder>().SeedAsync();
+        InkwellDbContext restoredDb = restoreScope.ServiceProvider.GetRequiredService<InkwellDbContext>();
+
+        Assert.AreEqual(1, await restoredDb.Set<AgentEntity>().CountAsync(agent => agent.Id == sampleAgent.Id));
+        Assert.AreEqual(1, await restoredDb.Set<AgentVersionEntity>().CountAsync(version => version.AgentId == sampleAgent.Id));
     }
 
     private static ServiceProvider BuildServiceProvider()
@@ -115,6 +155,8 @@ public sealed class InkwellSeederConcurrencyTests
         Dictionary<string, string?> configurationValues = new()
         {
             ["Inkwell:Persistence:Seed:AdminPassword"] = ConfiguredAdminPassword,
+            ["Inkwell:Persistence:Seed:SampleDataEnabled"] = "true",
+            ["Inkwell:Persistence:Seed:AgentModelId"] = "gpt-5.4",
         };
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)

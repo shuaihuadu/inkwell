@@ -55,6 +55,19 @@ export interface AppMetadata {
     commit: string | null;
 }
 
+export type ConnectionStatus = "online" | "reconnecting" | "offline";
+
+export interface ConnectionSnapshot {
+    status: ConnectionStatus;
+}
+
+export type GlobalApiErrorCode = "rate-limited" | "service-unavailable";
+
+export interface GlobalApiError {
+    code: GlobalApiErrorCode;
+    retryAfterSeconds: number | null;
+}
+
 export interface AgentListItem {
     id: string;
     name: string;
@@ -324,6 +337,13 @@ export interface AgentConversation extends AgentConversationListItem {
 export interface InkwellDesktopApi {
     platform: string;
     getAppMetadata: () => Promise<AppMetadata>;
+    getConnectionState: () => Promise<ConnectionSnapshot>;
+    onConnectionStateChanged: (
+        listener: (snapshot: ConnectionSnapshot) => void,
+    ) => () => void;
+    onGlobalApiError: (
+        listener: (error: GlobalApiError | null) => void,
+    ) => () => void;
     restoreAuth: () => Promise<AuthSnapshot>;
     login: (request: LoginRequest) => Promise<LoginResult>;
     unlock: (password: string) => Promise<UnlockResult>;

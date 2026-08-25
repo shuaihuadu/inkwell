@@ -4,6 +4,32 @@ import type { InkwellDesktopApi } from "../src/shared/network/contracts.js";
 const api: InkwellDesktopApi = {
     platform: process.platform,
     getAppMetadata: () => ipcRenderer.invoke("inkwell:app-metadata"),
+    getConnectionState: () => ipcRenderer.invoke("inkwell:connection-state"),
+    onConnectionStateChanged: (listener) => {
+        const handler = (
+            _event: Electron.IpcRendererEvent,
+            snapshot: Parameters<typeof listener>[0],
+        ): void => {
+            listener(snapshot);
+        };
+        ipcRenderer.on("inkwell:connection-state-changed", handler);
+        return () =>
+            ipcRenderer.removeListener(
+                "inkwell:connection-state-changed",
+                handler,
+            );
+    },
+    onGlobalApiError: (listener) => {
+        const handler = (
+            _event: Electron.IpcRendererEvent,
+            error: Parameters<typeof listener>[0],
+        ): void => {
+            listener(error);
+        };
+        ipcRenderer.on("inkwell:global-api-error", handler);
+        return () =>
+            ipcRenderer.removeListener("inkwell:global-api-error", handler);
+    },
     restoreAuth: () => ipcRenderer.invoke("inkwell:restore-auth"),
     login: (request) => ipcRenderer.invoke("inkwell:login", request),
     unlock: (password) => ipcRenderer.invoke("inkwell:unlock", password),
