@@ -17,6 +17,8 @@ int grafanaPort = GetPort(builder.Configuration["Ports:Grafana"], "Ports:Grafana
 int prometheusPort = GetPort(builder.Configuration["Ports:Prometheus"], "Ports:Prometheus", 6806);
 int tempoPort = GetPort(builder.Configuration["Ports:Tempo"], "Ports:Tempo", 6807);
 int lokiPort = GetPort(builder.Configuration["Ports:Loki"], "Ports:Loki", 6808);
+bool sampleDataEnabled = builder.Configuration.GetValue<bool>("Inkwell:Persistence:Seed:SampleDataEnabled");
+string sampleAgentModelId = builder.Configuration["Inkwell:Persistence:Seed:AgentModelId"] ?? string.Empty;
 string otelLgtmImage = ContainerImageConfiguration.GetRequired("AppHost:OtelLgtm:Image");
 string otelLgtmTag = ContainerImageConfiguration.GetRequired("AppHost:OtelLgtm:Tag");
 string liteLLMImage = ContainerImageConfiguration.GetRequired("AppHost:LiteLLM:Image");
@@ -152,6 +154,8 @@ IResourceBuilder<ProjectResource> postgresMigrator = builder
     .WithEnvironment("ConnectionStrings__Inkwell", database.Resource.ConnectionStringExpression)
     .WithEnvironment("Inkwell__Persistence__Provider", "Postgres")
     .WithEnvironment("Inkwell__Persistence__Seed__AdminPassword", seedAdminPassword)
+    .WithEnvironment("Inkwell__Persistence__Seed__SampleDataEnabled", sampleDataEnabled.ToString())
+    .WithEnvironment("Inkwell__Persistence__Seed__AgentModelId", sampleAgentModelId)
     .WaitFor(database);
 
 IResourceBuilder<ProjectResource> sqlServerMigrator = builder
@@ -159,6 +163,8 @@ IResourceBuilder<ProjectResource> sqlServerMigrator = builder
     .WithEnvironment("ConnectionStrings__Inkwell", sqlServerDatabase.Resource.ConnectionStringExpression)
     .WithEnvironment("Inkwell__Persistence__Provider", "SqlServer")
     .WithEnvironment("Inkwell__Persistence__Seed__AdminPassword", seedAdminPassword)
+    .WithEnvironment("Inkwell__Persistence__Seed__SampleDataEnabled", sampleDataEnabled.ToString())
+    .WithEnvironment("Inkwell__Persistence__Seed__AgentModelId", sampleAgentModelId)
     .WaitFor(sqlServerDatabase);
 
 IResourceBuilder<ProjectResource> webApi = builder
