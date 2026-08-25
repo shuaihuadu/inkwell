@@ -1057,6 +1057,14 @@ test("shows authentication errors and enters the workspace after login", async (
         await expect(
             page.getByText("有未发布的修改", { exact: true }),
         ).toBeVisible();
+        const agentCards = page.locator(".agent-space-card");
+        const agentCardTexts = await agentCards.allInnerTexts();
+        for (const agentCardText of agentCardTexts) {
+            expect(agentCardText).not.toContain(
+                "0198a96d-19e4-7000-8000-000000000001",
+            );
+            expect(agentCardText).not.toMatch(/更新于|分钟前|小时前|天前/);
+        }
 
         await page.getByRole("button", { name: "帮助" }).dispatchEvent("click");
         const helpMenu = page.getByRole("menu");
