@@ -81,7 +81,9 @@ const onlineProbeIntervalMilliseconds = 30_000;
 const reconnectingProbeIntervalMilliseconds = 2_000;
 const offlineProbeIntervalMilliseconds = 5_000;
 const healthProbeTimeoutMilliseconds = 3_000;
-const applicationIconPath = join(__dirname, "../renderer/logo.png");
+const applicationIconPath = app.isPackaged
+    ? join(__dirname, "../renderer/logo.png")
+    : join(__dirname, "../../public/logo.png");
 let sessionToken: string | null = null;
 let authSnapshot: AuthSnapshot = { status: "restoring", identity: null };
 let connectionSnapshot: ConnectionSnapshot = { status: "reconnecting" };
