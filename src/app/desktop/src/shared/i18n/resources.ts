@@ -218,12 +218,6 @@ export const resources = {
                             "共享后，团队成员可以查看并使用该 Agent 的已发布版本。",
                         confirmShare: "确认共享",
                     },
-                    relativeTime: {
-                        now: "刚刚更新",
-                        minutes: "{{count}} 分钟前",
-                        hours: "{{count}} 小时前",
-                        days: "{{count}} 天前",
-                    },
                 },
                 editor: {
                     sections: {
@@ -1204,15 +1198,6 @@ export const resources = {
                         shareContent:
                             "Team members will be able to view and use the published version of this Agent.",
                         confirmShare: "Share",
-                    },
-                    relativeTime: {
-                        now: "Updated just now",
-                        minutes: "Updated {{count}} minute ago",
-                        minutes_other: "Updated {{count}} minutes ago",
-                        hours: "Updated {{count}} hour ago",
-                        hours_other: "Updated {{count}} hours ago",
-                        days: "Updated {{count}} day ago",
-                        days_other: "Updated {{count}} days ago",
                     },
                 },
                 editor: {

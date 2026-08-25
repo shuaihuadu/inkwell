@@ -506,13 +506,9 @@ function AgentCard({
                         )}
                     </Space>
                     <Typography.Text type="secondary" ellipsis>
-                        {activeTab === "shared"
-                            ? `${shortId(agent.ownerUserId)} · `
-                            : ""}
                         {isPublished(agent)
                             ? `v${agent.latestPublishedVersionNumber}`
                             : t("agents.space.status.unpublished")}
-                        {` · ${formatRelativeTime(agent.updatedTime, t)}`}
                     </Typography.Text>
                 </div>
             </div>
@@ -605,28 +601,4 @@ function getActionDialog(
         okText: t("agents.space.dialogs.confirmShare"),
         cancelText: t("common.cancel"),
     };
-}
-
-function shortId(value: string): string {
-    return value.slice(0, 8);
-}
-
-function formatRelativeTime(value: string, t: TFunction): string {
-    const time = Date.parse(value);
-    if (Number.isNaN(time)) return t("agents.space.relativeTime.now");
-    const elapsedMinutes = Math.max(
-        0,
-        Math.floor((Date.now() - time) / 60_000),
-    );
-    if (elapsedMinutes < 1) return t("agents.space.relativeTime.now");
-    if (elapsedMinutes < 60)
-        return t("agents.space.relativeTime.minutes", {
-            count: elapsedMinutes,
-        });
-    const elapsedHours = Math.floor(elapsedMinutes / 60);
-    if (elapsedHours < 24)
-        return t("agents.space.relativeTime.hours", { count: elapsedHours });
-    return t("agents.space.relativeTime.days", {
-        count: Math.floor(elapsedHours / 24),
-    });
 }
