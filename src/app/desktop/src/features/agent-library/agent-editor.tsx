@@ -236,6 +236,7 @@ export function AgentEditor({
                 ...saved,
                 currentPublishedVersionId: version.id,
                 latestPublishedVersionNumber: version.versionNumber,
+                hasUnpublishedChanges: false,
             };
             setSavedAgent(published);
             setDirty(false);
@@ -290,15 +291,24 @@ export function AgentEditor({
                 rollbackChangeSummary,
             ),
         onSuccess: async (version) => {
-            setSavedAgent((previous) =>
-                previous
-                    ? {
-                          ...previous,
-                          currentPublishedVersionId: version.id,
-                          latestPublishedVersionNumber: version.versionNumber,
-                      }
-                    : previous,
-            );
+            const previous = currentAgent!;
+            const restored: AgentDefinition = {
+                ...previous,
+                name: version.snapshot.name,
+                avatarUri: version.snapshot.avatarUri,
+                description: version.snapshot.description,
+                instructions: version.snapshot.instructions,
+                buildOptions: version.snapshot.buildOptions,
+                currentPublishedVersionId: version.id,
+                latestPublishedVersionNumber: version.versionNumber,
+                hasUnpublishedChanges: false,
+                updatedTime: version.updatedTime,
+            };
+            setSavedAgent(restored);
+            setAvatarUri(restored.avatarUri);
+            setDirty(false);
+            setSavedSincePublish(false);
+            form.setFieldsValue(toFormValues(restored));
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
             await queryClient.invalidateQueries({
                 queryKey: ["agent-versions", versionAgentId],
@@ -458,7 +468,10 @@ export function AgentEditor({
                         <AgentStateTag
                             agent={currentAgent}
                             dirty={dirty}
-                            savedSincePublish={savedSincePublish}
+                            savedSincePublish={
+                                savedSincePublish ||
+                                currentAgent?.hasUnpublishedChanges === true
+                            }
                         />
                     </Space>
                 </div>
@@ -688,6 +701,8 @@ export function AgentEditor({
                                 isShared: currentAgent.isShared,
                                 latestPublishedVersionNumber:
                                     currentAgent.latestPublishedVersionNumber,
+                                hasUnpublishedChanges:
+                                    currentAgent.hasUnpublishedChanges,
                                 updatedTime: currentAgent.updatedTime,
                             }}
                         />
@@ -976,19 +991,43 @@ function versionSnapshotFields(
     const model = snapshot.buildOptions.modelOptions;
     const toolSummary =
         (snapshot.buildOptions.toolBindings ?? [])
-            .map((binding) => toolName(binding.toolId))
+            .map((binding) =>
+                binding.parametersJson
+                    ? `${toolName(binding.toolId)}\n${formatJson(binding.parametersJson)}`
+                    : toolName(binding.toolId),
+            )
             .join(t("common.listSeparator")) ||
         t("agents.editor.version.emptyValue");
     const skillSummary =
         (snapshot.buildOptions.skills ?? [])
-            .map((skill) => skill.name)
-            .join(t("common.listSeparator")) ||
-        t("agents.editor.version.emptyValue");
+            .map((skill) =>
+                JSON.stringify(
+                    {
+                        name: skill.name,
+                        description: skill.description,
+                        content: skill.content,
+                        referenceFileUris: skill.referenceFileUris,
+                        assetFileUris: skill.assetFileUris,
+                        scriptFileUris: skill.scriptFileUris,
+                    },
+                    null,
+                    2,
+                ),
+            )
+            .join("\n\n") || t("agents.editor.version.emptyValue");
+    const chatHistory = snapshot.buildOptions.chatHistoryOptions
+        ? JSON.stringify(snapshot.buildOptions.chatHistoryOptions, null, 2)
+        : t("agents.editor.version.emptyValue");
     return [
         {
             section: t("agents.editor.version.snapshot.basic"),
             label: t("agents.editor.version.snapshot.name"),
             value: snapshot.name,
+        },
+        {
+            section: t("agents.editor.version.snapshot.basic"),
+            label: t("agents.editor.version.snapshot.avatar"),
+            value: snapshot.avatarUri ?? t("agents.editor.version.emptyValue"),
         },
         {
             section: t("agents.editor.version.snapshot.basic"),
@@ -1027,6 +1066,11 @@ function versionSnapshotFields(
             ),
         },
         {
+            section: t("agents.editor.version.snapshot.model"),
+            label: t("agents.editor.version.snapshot.chatHistory"),
+            value: chatHistory,
+        },
+        {
             section: t("agents.editor.version.snapshot.capabilities"),
             label: t("agents.editor.version.snapshot.tools"),
             value: toolSummary,
@@ -1037,6 +1081,14 @@ function versionSnapshotFields(
             value: skillSummary,
         },
     ];
+}
+
+function formatJson(value: string): string {
+    try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+        return value;
+    }
 }
 
 function VersionHistorySection({
@@ -1444,11 +1496,16 @@ function BindingSelector({
         parameters?: string[];
     }>;
 }) {
-    const { t } = useTranslation();
     const form = Form.useFormInstance<AgentFormValues>();
     const selectedIds = Form.useWatch(name, form) ?? [];
     if (loading) return <Skeleton active paragraph={{ rows: 3 }} />;
-    if (items.length === 0) return <Empty description={empty} />;
+    if (items.length === 0) {
+        return (
+            <div className="agent-binding-selector agent-binding-selector-empty">
+                <Typography.Text type="secondary">{empty}</Typography.Text>
+            </div>
+        );
+    }
     return (
         <Form.Item name={name} noStyle>
             <Checkbox.Group className="agent-binding-selector">
@@ -1475,35 +1532,6 @@ function BindingSelector({
                                 <Typography.Text type="secondary">
                                     {item.description}
                                 </Typography.Text>
-                                {name === "skillIds" && (
-                                    <Flex
-                                        gap={6}
-                                        wrap
-                                        className="agent-skill-stages"
-                                    >
-                                        <Tag>
-                                            {t(
-                                                "agents.editor.bindings.discovery",
-                                            )}
-                                        </Tag>
-                                        <Tag
-                                            color={
-                                                selectedIds.includes(item.id)
-                                                    ? "processing"
-                                                    : undefined
-                                            }
-                                        >
-                                            {t(
-                                                "agents.editor.bindings.activation",
-                                            )}
-                                        </Tag>
-                                        <Tag>
-                                            {t(
-                                                "agents.editor.bindings.execution",
-                                            )}
-                                        </Tag>
-                                    </Flex>
-                                )}
                                 {name === "toolIds" &&
                                     selectedIds.includes(item.id) &&
                                     item.parameters &&

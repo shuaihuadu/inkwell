@@ -59,6 +59,10 @@ namespace Inkwell.Persistence.EFCore.Postgres.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_time");
 
+                    b.Property<string>("Usage")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("usage");
+
                     b.HasKey("Id")
                         .HasName("pk_agent_chat_messages");
 

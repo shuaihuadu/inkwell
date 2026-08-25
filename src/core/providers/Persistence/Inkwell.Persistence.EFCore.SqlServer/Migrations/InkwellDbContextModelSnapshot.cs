@@ -51,6 +51,9 @@ namespace Inkwell.Persistence.EFCore.SqlServer.Migrations
                     b.Property<DateTimeOffset>("UpdatedTime")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Usage")
+                        .HasColumnType("json");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ConversationId", "SequenceNumber")

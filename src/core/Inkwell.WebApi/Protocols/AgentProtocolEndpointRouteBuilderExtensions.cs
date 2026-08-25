@@ -1,6 +1,9 @@
 // Copyright (c) ShuaiHua Du. All rights reserved.
 
+using AGUI.Abstractions;
+using AGUI.Server;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using Microsoft.Extensions.AI;
 
 namespace Inkwell.WebApi.Protocols;
 
@@ -23,7 +26,9 @@ public static class AgentProtocolEndpointRouteBuilderExtensions
 
         RoutingAgent agent = endpoints.ServiceProvider.GetRequiredService<RoutingAgent>();
 
-        IEndpointConventionBuilder agui = endpoints.MapAGUIServer("/agent/{agentId}", agent);
+        IEndpointConventionBuilder agui = endpoints
+            .MapAGUIServer("/agent/{agentId}", agent)
+            .WithMetadata(CreateStreamOptions());
         IEndpointConventionBuilder chatCompletions = endpoints.MapOpenAIChatCompletions(
             agent,
             "/agent/{agentId}/v1/chat/completions");
@@ -42,4 +47,34 @@ public static class AgentProtocolEndpointRouteBuilderExtensions
 
         return endpoints;
     }
+
+    private static AGUIStreamOptions CreateStreamOptions() => new AGUIStreamOptions()
+        .MapContent(MapUsageContent);
+
+#pragma warning disable MEAI001
+    private static IEnumerable<BaseEvent> MapUsageContent(AIContent content)
+    {
+        if (content is not UsageContent usageContent)
+        {
+            return [];
+        }
+
+        return
+        [
+            new CustomEvent
+            {
+                Name = "inkwell.token_usage",
+                Value = JsonSerializer.SerializeToElement(new
+                {
+                    inputTokenCount = usageContent.Details.InputTokenCount,
+                    outputTokenCount = usageContent.Details.OutputTokenCount,
+                    totalTokenCount = usageContent.Details.TotalTokenCount,
+                    cachedInputTokenCount = usageContent.Details.CachedInputTokenCount,
+                    reasoningTokenCount = usageContent.Details.ReasoningTokenCount,
+                    additionalCounts = usageContent.Details.AdditionalCounts,
+                }),
+            },
+        ];
+    }
+#pragma warning restore MEAI001
 }

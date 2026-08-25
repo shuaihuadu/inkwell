@@ -38,6 +38,15 @@ public interface IAgentChatMessageRepository
     /// <returns>已新增并分配序号的消息。</returns>
     Task<IReadOnlyList<AgentChatMessage>> AddMessages(IReadOnlyList<AgentChatMessage> messages, CancellationToken ct = default);
 
+    /// <summary>覆盖指定消息的 Token 用量。</summary>
+    /// <param name="conversationId">产品会话标识。</param>
+    /// <param name="messageId">消息标识。</param>
+    /// <param name="usage">正常完成 Run 的聚合 Token 用量。</param>
+    /// <param name="updatedTime">更新时间。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>更新成功时为 <see langword="true"/>；目标不存在时为 <see langword="false"/>。</returns>
+    Task<bool> UpdateMessageUsage(Guid conversationId, Guid messageId, UsageDetails usage, DateTimeOffset updatedTime, CancellationToken ct = default);
+
     /// <summary>删除指定会话内的单条消息。</summary>
     /// <param name="conversationId">产品会话标识。</param>
     /// <param name="messageId">消息标识。</param>

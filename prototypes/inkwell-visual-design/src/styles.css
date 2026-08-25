@@ -129,6 +129,17 @@ body,
     outline: none !important;
 }
 
+.inkwell-scroll-to-latest.ant-btn {
+    position: absolute;
+    right: 24px;
+    bottom: 12px;
+    z-index: 2;
+    color: var(--ant-color-text-secondary);
+    background: var(--ant-color-bg-elevated);
+    border-color: var(--ant-color-border-secondary);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 16%);
+}
+
 /*
  * AntD Alert 默认间隙偏松：无 description 时 padding 是 8px 12px 还算紧凑，
  * 但一旦传了 description（"with-description" 变体）padding 会跳到 16px 24px，
@@ -157,7 +168,13 @@ body,
 }
 
 .inkwell-resource-page {
+    display: flex;
+    width: 100%;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .inkwell-resource-header,
@@ -187,12 +204,23 @@ body,
 }
 
 .inkwell-resource-table {
+    min-height: 120px;
     max-width: 100%;
+    flex: 1;
     overflow: hidden;
 }
 
-.inkwell-resource-table-content .ant-table-body {
-    min-height: 440px;
+.inkwell-resource-table .ant-table-wrapper,
+.inkwell-resource-table .ant-spin-nested-loading,
+.inkwell-resource-table .ant-spin-container,
+.inkwell-resource-table .ant-table,
+.inkwell-resource-table .ant-table-container {
+    height: 100%;
+}
+
+.inkwell-resource-table .ant-table-body {
+    min-height: var(--inkwell-table-body-height, 120px);
+    overflow-y: auto !important;
 }
 
 .inkwell-row-action.ant-btn {
@@ -211,6 +239,7 @@ body,
 
 .inkwell-resource-pagination {
     min-height: 48px;
+    flex: 0 0 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -239,14 +268,14 @@ body,
 
 .inkwell-binding-list {
     overflow: hidden;
-    border: 1px solid var(--ant-color-border-secondary);
+    border: 1px solid var(--inkwell-binding-border);
     border-radius: 6px;
 }
 
 .inkwell-binding-item {
     padding-inline: 14px;
-    border-bottom: 1px solid var(--ant-color-border-secondary);
-    background: var(--ant-color-bg-container);
+    border-bottom: 1px solid var(--inkwell-binding-border);
+    background: var(--inkwell-binding-bg);
     transition: background-color 160ms ease;
 }
 
@@ -255,11 +284,11 @@ body,
 }
 
 .inkwell-binding-item:hover {
-    background: var(--ant-color-fill-quaternary);
+    background: var(--inkwell-binding-hover);
 }
 
 .inkwell-binding-item.selected {
-    background: var(--ant-color-primary-bg);
+    background: var(--inkwell-binding-selected);
 }
 
 .inkwell-binding-item-main {
@@ -279,8 +308,8 @@ body,
     display: grid;
     place-items: center;
     border-radius: 6px;
-    color: var(--ant-color-primary);
-    background: var(--ant-color-primary-bg-hover);
+    color: var(--inkwell-binding-icon);
+    background: var(--inkwell-binding-icon-bg);
 }
 
 .inkwell-binding-item-copy {
@@ -291,8 +320,8 @@ body,
 .inkwell-binding-config {
     margin-top: 12px;
     padding: 12px;
-    border-top: 1px solid var(--ant-color-border-secondary);
-    background: var(--ant-color-bg-container);
+    border-top: 1px solid var(--inkwell-binding-border);
+    background: var(--inkwell-binding-bg);
 }
 
 .inkwell-binding-config .ant-form-item {

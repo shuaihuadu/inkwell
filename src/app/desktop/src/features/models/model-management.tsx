@@ -2,7 +2,6 @@ import {
     ApiOutlined,
     AppstoreOutlined,
     CloseOutlined,
-    ClockCircleOutlined,
     DatabaseOutlined,
     EyeOutlined,
     ExperimentOutlined,
@@ -536,15 +535,6 @@ export function ModelManagement() {
                             </section>
 
                             <section className="agent-details-section">
-                                <Space
-                                    size={8}
-                                    className="agent-details-section-title"
-                                >
-                                    <ClockCircleOutlined />
-                                    <Typography.Text strong>
-                                        {t("models.details.dataSource")}
-                                    </Typography.Text>
-                                </Space>
                                 <Typography.Text type="secondary">
                                     {t("models.details.dataSourceDescription")}
                                 </Typography.Text>

@@ -53,6 +53,8 @@ function ThemeCssVariables({ children }: DesktopThemeProviderProps) {
         const rootStyle = document.documentElement.style;
         rootStyle.setProperty("--primary", token.colorPrimary);
         rootStyle.setProperty("--primary-soft", token.colorPrimaryBg);
+        rootStyle.setProperty("--primary-icon", token.colorPrimaryText);
+        rootStyle.setProperty("--primary-icon-bg", token.colorPrimaryBgHover);
         rootStyle.setProperty("--shell-bg", token.colorBgLayout);
         rootStyle.setProperty("--shell-panel", token.colorBgContainer);
         rootStyle.setProperty("--shell-border", token.colorBorderSecondary);
