@@ -3729,6 +3729,7 @@ test("preserves, stops, and retries chat runs through Electron", async ({
                     reasoningTokenCount: null,
                 },
             });
+        await expect(page.locator(".ant-bubble-loading")).toBeVisible();
         await page
             .getByRole("button", { name: "返回 Agent 空间" })
             .dispatchEvent("click");

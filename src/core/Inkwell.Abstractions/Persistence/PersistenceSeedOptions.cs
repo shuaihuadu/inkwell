@@ -12,4 +12,14 @@ public sealed class PersistenceSeedOptions
     /// </summary>
     [Required]
     public string AdminPassword { get; set; } = "admin";
+
+    /// <summary>
+    /// 获取或设置是否创建 Inkwell 小助手示例数据。
+    /// </summary>
+    public bool SampleDataEnabled { get; set; }
+
+    /// <summary>
+    /// 获取或设置 Inkwell 小助手使用的 LiteLLM Chat 模型标识。
+    /// </summary>
+    public string AgentModelId { get; set; } = string.Empty;
 }
