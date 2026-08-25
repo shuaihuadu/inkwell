@@ -412,6 +412,56 @@ test.describe("Agent Design Page", () => {
         });
     });
 
+    test("UI-003 confirms Owner Agent deletion before removing the card", async ({
+        page,
+    }, testInfo) => {
+        test.skip(testInfo.project.name !== "desktop-hd");
+        await page.goto("/shell");
+        await waitForRender(page);
+
+        const ownerCard = page
+            .locator(".inkwell-agent-card")
+            .filter({ hasText: "市场洞察 1" });
+        await ownerCard.hover();
+        await ownerCard
+            .getByRole("button", { name: "删除 市场洞察 1" })
+            .click();
+
+        const deleteDialog = page.getByRole("dialog", {
+            name: "删除「市场洞察 1」？",
+        });
+        await expect(deleteDialog).toContainText(
+            "将永久删除该 Agent、全部版本及所有参与用户的会话历史，操作不可恢复。",
+        );
+        await page.waitForTimeout(220);
+        await page.screenshot({
+            path: screenshotPath("32-agent-delete-confirmation.png"),
+        });
+        await deleteDialog.screenshot({
+            path: screenshotPath("33-agent-delete-dialog.png"),
+        });
+
+        await deleteDialog.getByRole("button", { name: /取\s*消/ }).click();
+        await expect(deleteDialog).toBeHidden();
+        await expect(ownerCard).toBeVisible();
+
+        await ownerCard.hover();
+        await ownerCard
+            .getByRole("button", { name: "删除 市场洞察 1" })
+            .click();
+        await page
+            .getByRole("dialog", { name: "删除「市场洞察 1」？" })
+            .getByRole("button", { name: "确认删除" })
+            .click();
+        await expect(ownerCard).toBeHidden();
+        await expect(page.getByText("Agent 已删除")).toBeVisible();
+
+        await page.getByRole("tab", { name: "团队共享" }).click();
+        await expect(page.getByRole("button", { name: /^删除 / })).toHaveCount(
+            0,
+        );
+    });
+
     test("uses theme-aware Tool and Skill icons in dark mode", async ({
         page,
     }, testInfo) => {

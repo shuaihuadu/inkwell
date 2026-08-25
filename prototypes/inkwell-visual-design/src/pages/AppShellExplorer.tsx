@@ -33,6 +33,7 @@ import {
     BookOutlined,
     BulbFilled,
     BulbOutlined,
+    DeleteOutlined,
     DesktopOutlined,
     DownOutlined,
     EditOutlined,
@@ -288,6 +289,9 @@ function AgentLibraryMock({
     const [statusFilter, setStatusFilter] = useState<AgentStatusFilter>("all");
     const [searchText, setSearchText] = useState("");
     const [page, setPage] = useState(1);
+    const [deletedAgentNames, setDeletedAgentNames] = useState(
+        () => new Set<string>(),
+    );
     const [sharedAgentNames, setSharedAgentNames] = useState(
         () =>
             new Set(
@@ -304,12 +308,14 @@ function AgentLibraryMock({
         token.colorSuccess,
         token.colorWarning,
     ];
-    const scopedAgents = MOCK_AGENTS.filter((agent) =>
-        activeTab === "shared"
-            ? agent.published &&
-              sharedAgentNames.has(agent.name) &&
-              agent.owner !== "owner-alice"
-            : agent.owner === "owner-alice",
+    const scopedAgents = MOCK_AGENTS.filter(
+        (agent) =>
+            !deletedAgentNames.has(agent.name) &&
+            (activeTab === "shared"
+                ? agent.published &&
+                  sharedAgentNames.has(agent.name) &&
+                  agent.owner !== "owner-alice"
+                : agent.owner === "owner-alice"),
     );
     const publishedCount = scopedAgents.filter(
         (agent) => agent.published,
@@ -374,6 +380,25 @@ function AgentLibraryMock({
                     return next;
                 });
                 messageApi.success("已撤销团队共享");
+            },
+        });
+    };
+
+    const deleteAgent = (name: string) => {
+        modalApi.confirm({
+            title: `删除「${name}」？`,
+            content:
+                "将永久删除该 Agent、全部版本及所有参与用户的会话历史，操作不可恢复。",
+            okText: "确认删除",
+            okButtonProps: { danger: true },
+            cancelText: "取消",
+            onOk: () => {
+                setDeletedAgentNames((current) => {
+                    const next = new Set(current);
+                    next.add(name);
+                    return next;
+                });
+                messageApi.success("Agent 已删除");
             },
         });
     };
@@ -524,6 +549,20 @@ function AgentLibraryMock({
                                                 onClick={(event) => {
                                                     event.stopPropagation();
                                                     onEditAgent(agent.name);
+                                                }}
+                                            />
+                                        </Tooltip>
+                                        <Tooltip title="删除 Agent">
+                                            <Button
+                                                className="inkwell-agent-card-edit-btn"
+                                                danger
+                                                type="default"
+                                                size="small"
+                                                aria-label={`删除 ${agent.name}`}
+                                                icon={<DeleteOutlined />}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    deleteAgent(agent.name);
                                                 }}
                                             />
                                         </Tooltip>

@@ -1,4 +1,5 @@
 import {
+    DeleteOutlined,
     EditOutlined,
     EyeOutlined,
     PlusOutlined,
@@ -39,7 +40,7 @@ import { ChatPanel } from "../chat/chat-panel";
 
 type AgentTab = "mine" | "shared";
 type AgentStatusFilter = "all" | "published" | "draft";
-type AgentAction = "share" | "unshare" | "revoke";
+type AgentAction = "delete" | "share" | "unshare" | "revoke";
 
 const AgentsPerPage = 20;
 
@@ -82,6 +83,7 @@ export function AgentWorkspace({
             action: AgentAction;
             agentId: string;
         }) => {
+            if (action === "delete") await desktopApi.deleteAgent(agentId);
             if (action === "share") await desktopApi.shareAgent(agentId);
             if (action === "unshare") await desktopApi.unshareAgent(agentId);
             if (action === "revoke") await desktopApi.revokeAgentShare(agentId);
@@ -89,6 +91,7 @@ export function AgentWorkspace({
         onSuccess: async (_result, variables) => {
             await queryClient.invalidateQueries({ queryKey: ["agents"] });
             const successMessageKeys: Record<AgentAction, string> = {
+                delete: "agents.space.actionSuccess.delete",
                 share: "agents.space.actionSuccess.share",
                 unshare: "agents.space.actionSuccess.unshare",
                 revoke: "agents.space.actionSuccess.revoke",
@@ -360,8 +363,8 @@ function AgentCard({
     const showOwnerActions = activeTab === "mine" && isOwner;
     const actionCount = showOwnerActions
         ? isPublished(agent)
-            ? 2
-            : 1
+            ? 3
+            : 2
         : activeTab === "shared"
           ? isAdmin
               ? 2
@@ -390,6 +393,25 @@ function AgentCard({
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     onEdit();
+                                }}
+                            />
+                        </Tooltip>
+                    )}
+                    {showOwnerActions && (
+                        <Tooltip title={t("agents.space.actions.delete")}>
+                            <Button
+                                danger
+                                type="text"
+                                size="small"
+                                aria-label={t(
+                                    "agents.space.actions.deleteLabel",
+                                    { name: agent.name },
+                                )}
+                                icon={<DeleteOutlined />}
+                                loading={isPending}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onAction("delete");
                                 }}
                             />
                         </Tooltip>
@@ -586,6 +608,15 @@ function getActionDialog(
     agentName: string,
     t: TFunction,
 ): ModalFuncProps {
+    if (action === "delete") {
+        return {
+            title: t("agents.space.dialogs.deleteTitle", { name: agentName }),
+            content: t("agents.space.dialogs.deleteContent"),
+            okText: t("agents.space.dialogs.confirmDelete"),
+            okButtonProps: { danger: true },
+            cancelText: t("common.cancel"),
+        };
+    }
     if (action === "revoke") {
         return {
             title: t("agents.space.dialogs.revokeTitle", { name: agentName }),
