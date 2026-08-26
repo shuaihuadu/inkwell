@@ -21,7 +21,7 @@
     "lint": "eslint .",
     "preview": "electron-vite preview",
     "test": "vitest run",
-    "test:e2e": "playwright test tests/login.spec.ts"
+    "test:e2e": "playwright test tests --workers=1"
   },
   "dependencies": {
     "@ag-ui/client": "0.0.57",
